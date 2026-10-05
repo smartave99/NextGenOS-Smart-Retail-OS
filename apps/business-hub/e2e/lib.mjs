@@ -29,7 +29,7 @@ export async function startHub(extraArgs = []) {
   child.stdout.on('data', (d) => { log += d; });
   child.stderr.on('data', (d) => { log += d; });
   for (let i = 0; i < 120; i += 1) {
-    try { if ((await fetch(`${url}/health`)).ok) break; } catch (_) { /* not up yet */ }
+    try { await fetch(`${url}/health`); break; } catch (_) { /* not up yet */ }
     await new Promise((r) => setTimeout(r, 250));
     if (i === 119) { child.kill(); throw new Error('The Hub did not start.\n' + log); }
   }
@@ -64,13 +64,15 @@ export async function newPage(browser, problems, viewport = { width: 1360, heigh
 const KIND = { retail: 'Retail store', restaurant: 'Restaurant', library: 'Library', construction: 'Construction', services: 'Services', wholesale: 'Wholesale', generic: 'Any other' };
 
 /** Runs the setup wizard in the browser: a business of the given kind in the given country, with or without the sample company. */
-export async function setUp(page, hub, { name = 'Test Business', country = 'India', region = 'Maharashtra', industry = 'retail', demo = true, owner = 'owner', password = 'a-long-test-password' } = {}) {
+export async function setUp(page, hub, { name = 'Test Business', country = 'India', region = 'Maharashtra', industry = 'retail', demo = true, owner = 'owner', password = 'a-long-test-password', salesTax = null } = {}) {
   await page.goto(hub.url + '/');
   await page.waitForURL('**/setup');
   await page.getByLabel('Business name').fill(name);
   await page.getByLabel('Country').selectOption({ label: country });
+  await page.waitForTimeout(500);           // the form is redrawn for the country chosen
   const regionBox = page.locator('#region');
   if (await regionBox.count()) await regionBox.selectOption({ label: region });
+  if (salesTax !== null) await page.getByLabel(/Sales tax at your shop/).fill(String(salesTax));
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('button', { name: new RegExp('^' + KIND[industry]) }).click();
   await page.getByRole('button', { name: 'Next' }).click();

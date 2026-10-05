@@ -41,8 +41,8 @@ else
                             <span class="spacer"></span>
                             @if (a.Appointment.Status == "booked") { <button type="button" class="btn secondary small" @onclick="() => Arrive(a)">Arrived</button> }
                             @if (a.Appointment.Status is "booked" or "arrived") { <button type="button" class="btn primary small" @onclick="() => OpenInvoice(a)">Charge</button> }
-                            @if (a.Appointment.Status == "booked") { <button type="button" class="btn ghost small" @onclick="() => SetStatus(a, "no-show")">No-show</button> }
-                            @if (a.Appointment.Status is "booked" or "arrived") { <button type="button" class="btn ghost small" @onclick="() => SetStatus(a, "cancelled")">Cancel</button> }
+                            @if (a.Appointment.Status == "booked") { <button type="button" class="btn ghost small" @onclick="() => NoShow(a)">No-show</button> }
+                            @if (a.Appointment.Status is "booked" or "arrived") { <button type="button" class="btn ghost small" @onclick="() => CancelBooking(a)">Cancel</button> }
                             @if (a.Appointment.DocumentId is { } doc) { <a class="btn ghost small" href="documents/@doc">Bill</a> }
                         </div>
                     </div>
@@ -176,6 +176,10 @@ else
     });
 
     private Task Arrive(AppointmentRow a) => SetStatus(a, "arrived");
+
+    private Task NoShow(AppointmentRow a) => SetStatus(a, "no-show");
+
+    private Task CancelBooking(AppointmentRow a) => SetStatus(a, "cancelled");
 
     // ---- new booking ---------------------------------------------------------------------------------------------------------------
 

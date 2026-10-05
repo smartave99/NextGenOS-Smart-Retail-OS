@@ -104,7 +104,7 @@
                     <button type="button" class="chips-btn @(method == m ? "on" : "")" aria-pressed="@(method == m)" @onclick="() => method = m">@Label(m)</button>
                 }
             </div>
-            <input class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(Remaining)" @bind="tender" @onkeydown="OnPayKey" />
+            <input class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(Remaining)" @bind="tender" @bind:event="oninput" @onkeydown="OnPayKey" />
             <div class="row wrap">
                 <button type="button" class="btn secondary" @onclick="AddPayment">Add payment</button>
                 @if (Shop.Features.Credit && customer is { CreditLimitMinor: > 0 })

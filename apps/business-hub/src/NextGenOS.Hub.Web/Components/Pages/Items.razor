@@ -60,7 +60,7 @@
                     }
                     <td class="right nowrap">
                         <button type="button" class="btn ghost small" @onclick="() => Edit(r.Item)">Edit</button>
-                        @if (lending && Me.Can(Perm.Catalog)) { <button type="button" class="btn ghost small" @onclick="() => AddCopies(r.Item)">Add copies</button> }
+                        @if (lending && Me.Can(Perm.Catalog)) { <button type="button" class="btn ghost small" @onclick="() => AddCopies(r.Item)">Copies</button> }
                         else if (r.Item.TrackStock && Me.Can(Perm.Stock)) { <button type="button" class="btn ghost small" @onclick="() => OpenStock(r.Item)">Stock</button> }
                     </td>
                 </tr>
@@ -196,15 +196,19 @@
 @if (copiesFor is not null)
 {
     <div class="sheet-back" @onclick="() => copiesFor = null">
-        <div class="sheet" role="dialog" aria-modal="true" aria-label="Add copies" @onclick:stopPropagation="true">
-            <h2>Add copies of @copiesFor.Name</h2>
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Copies of @copiesFor.Name" @onclick:stopPropagation="true">
+            <h2>Copies of @copiesFor.Name</h2>
             <Notice Error="@formError" />
-            <label for="c-n">How many copies</label>
+            <table class="tbl" id="copies">
+                <thead><tr><th>Barcode</th><th>State</th></tr></thead>
+                <tbody>@foreach (var c in App.Library.CopiesOf(copiesFor.Id)) { <tr><td>@c.Barcode</td><td><span class="chip @(c.Status == "available" ? "ok" : "")">@c.Status</span></td></tr> }</tbody>
+            </table>
+            <label for="c-n">Add more copies</label>
             <input id="c-n" type="number" min="1" max="500" @bind="copies" />
             <p class="muted small">Each copy gets its own barcode, which you stick on the book.</p>
             <div class="row">
-                <button type="button" class="btn secondary" @onclick="() => copiesFor = null">Cancel</button>
-                <button type="button" class="btn primary grow" id="save-copies" @onclick="SaveCopies">Add</button>
+                <button type="button" class="btn secondary" @onclick="() => copiesFor = null">Close</button>
+                <button type="button" class="btn primary grow" id="save-copies" @onclick="SaveCopies">Add the copies</button>
             </div>
         </div>
     </div>
@@ -367,6 +371,7 @@
     {
         copiesFor = i;
         copies = 1;
+        Info = null;
         formError = null;
     }
 
@@ -376,7 +381,6 @@
         try
         {
             App.Library.AddCopies(copiesFor!.Id, Math.Clamp(copies, 1, 500));
-            copiesFor = null;
             Find();
             Info = "Copies added.";
         }

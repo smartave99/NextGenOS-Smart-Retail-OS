@@ -13,7 +13,7 @@
     <section class="card">
         <h2>Lend</h2>
         <label for="member">Member (scan the card, or type the name)</label>
-        <input id="member" autocomplete="off" @bind="memberText" @onkeydown="MemberKey" placeholder="Card or name" />
+        <input id="member" autocomplete="off" @bind="memberText" @bind:event="oninput" @onkeydown="MemberKey" placeholder="Card or name" />
         @if (member is not null)
         {
             <div class="card flat" id="member-card">
@@ -30,12 +30,12 @@
                 }
             </div>
             <label for="copy">Book (scan the barcode on the copy)</label>
-            <input id="copy" autocomplete="off" @bind="copyText" @onkeydown="CopyKey" placeholder="Copy barcode" />
+            <input id="copy" autocomplete="off" @bind="copyText" @bind:event="oninput" @onkeydown="CopyKey" placeholder="Copy barcode" />
         }
 
         <h2 class="gap">Take back</h2>
         <label for="back">Book (scan the barcode on the copy)</label>
-        <input id="back" autocomplete="off" @bind="backText" @onkeydown="BackKey" placeholder="Copy barcode" />
+        <input id="back" autocomplete="off" @bind="backText" @bind:event="oninput" @onkeydown="BackKey" placeholder="Copy barcode" />
         @if (returned is not null)
         {
             <div class="notice @(returned.FineMinor > 0 ? "warn" : "ok")" id="returned" role="status">
@@ -67,8 +67,8 @@
             @if (late.Count == 0) { <div class="empty">Nothing is overdue.</div> }
             else
             {
-                <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Title</th><th>Member</th><th class="num">Days</th><th class="num">Fine so far</th><th></th></tr></thead>
-                    <tbody>@foreach (var o in late) { <tr><td>@o.Title</td><td>@o.MemberName@if (o.Phone is { Length: > 0 }) { <br /><span class="muted small">@o.Phone</span> }</td><td class="num">@o.DaysLate</td><td class="num">@Money(o.FineSoFarMinor)</td>
+                <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Title</th><th>Copy</th><th>Member</th><th class="num">Days</th><th class="num">Fine so far</th><th></th></tr></thead>
+                    <tbody>@foreach (var o in late) { <tr><td>@o.Title</td><td class="muted small">@o.CopyBarcode</td><td>@o.MemberName@if (o.Phone is { Length: > 0 }) { <br /><span class="muted small">@o.Phone</span> }</td><td class="num">@o.DaysLate</td><td class="num">@Money(o.FineSoFarMinor)</td>
                         <td class="right"><button type="button" class="btn ghost small" @onclick="() => MarkLost(o.LoanId)">Lost</button></td></tr> }</tbody></table></div>
             }
         }

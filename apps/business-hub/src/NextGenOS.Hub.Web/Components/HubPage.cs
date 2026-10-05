@@ -22,13 +22,29 @@ public abstract class HubPage : ComponentBase
     protected override async Task OnInitializedAsync()
     {
         Me = await Sess.GetAsync();
-        await Run(LoadAsync);
+        await Reload();
     }
 
     /// <summary>Reads what the screen shows. Called once when it opens, and again by <see cref="Reload"/>.</summary>
     protected virtual Task LoadAsync() => Task.CompletedTask;
 
-    protected Task Reload() => Run(LoadAsync);
+    /// <summary>Reads the screen again after a change. Messages already on the screen stay.</summary>
+    protected async Task Reload()
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch (HubException ex)
+        {
+            Error = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogError(ex, "A screen could not be read.");
+            Error = "Something went wrong reading this screen. Please try again.";
+        }
+    }
 
     protected string Money(long minor) => Shop.Money(minor);
 

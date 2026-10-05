@@ -242,6 +242,13 @@ else
         try
         {
             if (App.Users.Any()) throw new HubException("done", "This shop is already set up. Sign in instead.");
+            // The state or province must be one of this country's: a country changed after choosing one leaves a stale choice behind.
+            if (pack.Tax.Regions?.List is { Count: > 0 } known && !known.Any(r => r.Code == region))
+            {
+                if (known.Count == 1) region = known[0].Code;
+                else { step = 1; throw new HubException("region", $"Please choose your {(pack.Tax.Regions.Label ?? "region").ToLowerInvariant()}."); }
+            }
+            else if (pack.Tax.Regions?.List is not { Count: > 0 }) region = "";
             var settings = new ShopSettings
             {
                 Name = name.Trim(), Country = country, Region = region, Industry = industry, TaxId = taxId.Trim().ToUpperInvariant(), Phone = phone.Trim(), Address = address.Trim(),

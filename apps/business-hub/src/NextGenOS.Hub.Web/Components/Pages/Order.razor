@@ -165,7 +165,12 @@ else
 
     private long Share() => Restaurant.RestaurantService.EqualParts(view!.Document.PayableMinor, Math.Clamp(people, 1, 20))[Math.Min(payments.Count, Math.Clamp(people, 1, 20) - 1)];
 
-    private void Add(Item item) => Run(() => view = App.Restaurant.AddItem(Id, item.Id));
+    private void Add(Item item) => Run(() =>
+    {
+        // Tapping a dish again adds one more to the line that has not been sent yet.
+        var open = view!.Lines.FirstOrDefault(l => !l.Fired && l.ItemId == item.Id && string.IsNullOrEmpty(l.Note));
+        view = open is null ? App.Restaurant.AddItem(Id, item.Id) : App.Documents.UpdateLine(Id, open.Id, open.QtyMilli + 1000);
+    });
 
     private void Change(DocLine line, long delta) => Run(() =>
     {

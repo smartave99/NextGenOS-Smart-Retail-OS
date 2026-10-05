@@ -6,6 +6,9 @@
 #   - installing again over it (an update) works and keeps one service;
 #   - uninstalling removes exactly the installed files, the service, the shortcuts and the entry, and leaves the shop's data and any other
 #     file in the install folder alone.
+#   - a "profile" folder next to the setup file (a setup prepared for one business by the Setup Studio) is copied beside the program (only its five plain files), a
+#     touch-screen till (install.ini says kiosk=yes) gets a full screen shortcut in Startup, and uninstalling takes all of it away again; a plain setup run over a
+#     prepared one leaves the prepared files alone.
 # It does not run the Hub itself: a self-contained .NET program does not start under Wine, so that is checked by a person on Windows (and by the
 # release workflow's smoke test on a Windows runner).
 # Needs makensis (NSIS 3, with its 64-bit stub), wine64 and Xvfb: apt-get install nsis wine64 xvfb.
@@ -89,6 +92,37 @@ check "the shop's data is still there" test -f "$data/shop.db"
 check "the service is gone" bash -c "! '$WINE' reg query 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\NextGenOSHub' > /dev/null 2>&1"
 check "the shortcuts are gone" bash -c "! test -e '$c/users/Public/Desktop/Smart Retail POS.lnk' && ! test -e '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/Smart Retail POS/Open Smart Retail POS.lnk'"
 check "the uninstall entry is gone" bash -c "! '$WINE' reg query 'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\NextGenOS.SmartRetailPOS.Hub' > /dev/null 2>&1"
+
+echo "== a setup prepared for one business: a profile folder next to the setup file"
+mkdir -p "$work/profile"
+printf '{"schema":1}' > "$work/profile/setup.json"
+printf '{"schema":1}' > "$work/profile/theme.json"
+printf '{"schema":1}' > "$work/profile/brand.json"
+printf '[install]\r\nkind=touch-pos\r\nkiosk=yes\r\n' > "$work/profile/install.ini"
+printf 'release 3' > "$work/profile/release.txt"
+printf 'not ours' > "$work/profile/other.txt"
+mkdir -p "$c/Program Files (x86)/Microsoft/Edge/Application"
+printf 'MZ stand-in' > "$c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true
+check "the five plain files of the profile are copied beside the program" bash -c "cd '$app/profile' && test -f setup.json -a -f theme.json -a -f brand.json -a -f install.ini -a -f release.txt"
+check "nothing else in that folder is taken" test ! -e "$app/profile/other.txt"
+check "a touch-screen till opens full screen when the PC starts" test -f "$c/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/Smart Retail POS (full screen).lnk"
+check "the Start menu has the full screen entry too" test -f "$c/ProgramData/Microsoft/Windows/Start Menu/Programs/Smart Retail POS/Smart Retail POS (full screen).lnk"
+timeout 240 "$WINE" "$app/Uninstall.exe" /S > /dev/null 2>&1 || true
+for _ in $(seq 1 60); do [ -e "$app/NextGenOS.Hub.exe" ] || break; sleep 1; done
+sleep 3
+check "uninstalling takes the profile files and the full screen shortcuts away" bash -c "! test -e '$app/profile' && ! test -e '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/Smart Retail POS (full screen).lnk'"
+check "the shop's data is still there after that too" test -f "$data/shop.db"
+echo "== a plain setup (no profile folder) over a prepared one keeps the prepared files"
+mv "$work/profile" "$work/profile-away"
+timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true
+check "a plain install has no profile folder" test ! -e "$app/profile"
+mkdir -p "$app/profile"; printf '{"schema":1}' > "$app/profile/theme.json"
+timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true
+check "an update without a profile folder leaves the one already installed" test -f "$app/profile/theme.json"
+timeout 240 "$WINE" "$app/Uninstall.exe" /S > /dev/null 2>&1 || true
+for _ in $(seq 1 60); do [ -e "$app/NextGenOS.Hub.exe" ] || break; sleep 1; done
+sleep 3
 
 if [ "$failures" -ne 0 ]; then echo "$failures check(s) failed"; exit 1; fi
 echo "All installer checks passed (under Wine, with a stand-in program)."

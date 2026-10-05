@@ -7,6 +7,10 @@
 ; data folder is readable by that account and administrators only. Uninstalling never removes the shop's data.
 ;
 ; Quiet install for a person setting up many PCs:  SmartRetailHub-Setup.exe /S   (and /D=C:\Folder\Hub for another folder, last on the line)
+;
+; A setup prepared for one business: NextGenOS's Setup Studio puts a folder called "profile" next to this setup file. It holds only data (setup.json, theme.json,
+; brand.json and install.ini) and setup copies it beside the program, where the Hub reads it at first run. With no such folder this is the plain setup. When install.ini
+; says kiosk=yes (a touch-screen till or a self-service kiosk) the Hub also opens full screen when the PC starts.
 
 Unicode true
 Target amd64-unicode
@@ -87,6 +91,29 @@ Function OpenHub
   ExecShell "open" "${ADDRESS}"
 FunctionEnd
 
+; Where Microsoft Edge is: it lives in the 32-bit Program Files folder of 64-bit Windows. Leaves the path in $R0, or nothing when it is not found.
+Function FindEdge
+  StrCpy $R0 ""
+  ReadEnvStr $R1 "ProgramFiles(x86)"
+  ${If} $R1 != ""
+  ${AndIf} ${FileExists} "$R1\Microsoft\Edge\Application\msedge.exe"
+    StrCpy $R0 "$R1\Microsoft\Edge\Application\msedge.exe"
+    Return
+  ${EndIf}
+  ${If} ${FileExists} "$PROGRAMFILES32\Microsoft\Edge\Application\msedge.exe"
+    StrCpy $R0 "$PROGRAMFILES32\Microsoft\Edge\Application\msedge.exe"
+  ${ElseIf} ${FileExists} "$PROGRAMFILES64\Microsoft\Edge\Application\msedge.exe"
+    StrCpy $R0 "$PROGRAMFILES64\Microsoft\Edge\Application\msedge.exe"
+  ${EndIf}
+FunctionEnd
+
+; Copies one file of the prepared set-up, when it is there.
+!macro CopyProfileFile NAME
+  ${If} ${FileExists} "$EXEDIR\profile\${NAME}"
+    CopyFiles /SILENT "$EXEDIR\profile\${NAME}" "$INSTDIR\profile\${NAME}"
+  ${EndIf}
+!macroend
+
 Function .onInit
   ${IfNot} ${RunningX64}
     MessageBox MB_OK|MB_ICONSTOP "${APP} needs a 64-bit version of Windows 10 or Windows 11 (or Windows Server 2019 or later)." /SD IDOK
@@ -150,6 +177,19 @@ Section "Smart Retail POS Hub" SecMain
     File "${NOTICES}"
   !endif
 
+  ; The prepared set-up for this business, when there is one next to this setup file. Only these five plain files are taken, never anything else in that folder.
+  ${If} ${FileExists} "$EXEDIR\profile\setup.json"
+  ${OrIf} ${FileExists} "$EXEDIR\profile\theme.json"
+  ${OrIf} ${FileExists} "$EXEDIR\profile\brand.json"
+    DetailPrint "Adding the set-up prepared for this business..."
+    CreateDirectory "$INSTDIR\profile"
+    !insertmacro CopyProfileFile "setup.json"
+    !insertmacro CopyProfileFile "theme.json"
+    !insertmacro CopyProfileFile "brand.json"
+    !insertmacro CopyProfileFile "install.ini"
+    !insertmacro CopyProfileFile "release.txt"
+  ${EndIf}
+
   ; The shop's data lives in its own folder, outside the program folder, so an update or an uninstall never touches it. Only the service's
   ; account, administrators and the system may read it: the people at the PC use the Hub's own sign-in.
   CreateDirectory "$APPDATA\${COMPANY}\Hub"
@@ -176,6 +216,16 @@ Section "Smart Retail POS Hub" SecMain
   CreateDirectory "$SMPROGRAMS\${MENU_FOLDER}"
   CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
   CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
+
+  ; A touch-screen till or a kiosk opens the Hub full screen by itself when the PC starts (Microsoft Edge is part of Windows 10 and 11).
+  ReadINIStr $0 "$EXEDIR\profile\install.ini" "install" "kiosk"
+  ${If} $0 == "yes"
+    Call FindEdge
+    ${If} $R0 != ""
+      CreateShortCut "$SMSTARTUP\Smart Retail POS (full screen).lnk" "$R0" "--kiosk ${ADDRESS} --edge-kiosk-type=fullscreen --no-first-run"
+      CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Smart Retail POS (full screen).lnk" "$R0" "--kiosk ${ADDRESS} --edge-kiosk-type=fullscreen --no-first-run"
+    ${EndIf}
+  ${EndIf}
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "${APP}"
@@ -205,7 +255,16 @@ Section "Uninstall"
   Delete "$INSTDIR\EULA.txt"
   Delete "$INSTDIR\THIRD-PARTY-NOTICES.md"
   Delete "$INSTDIR\Uninstall.exe"
+  ; The prepared set-up: the five plain files setup copies, then the folder if nothing else is in it.
+  Delete "$INSTDIR\profile\setup.json"
+  Delete "$INSTDIR\profile\theme.json"
+  Delete "$INSTDIR\profile\brand.json"
+  Delete "$INSTDIR\profile\install.ini"
+  Delete "$INSTDIR\profile\release.txt"
+  RMDir "$INSTDIR\profile"
   RMDir "$INSTDIR"
+  Delete "$SMSTARTUP\Smart Retail POS (full screen).lnk"
+  Delete "$SMPROGRAMS\${MENU_FOLDER}\Smart Retail POS (full screen).lnk"
   Delete "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk"
   RMDir "$SMPROGRAMS\${MENU_FOLDER}"
   Delete "$DESKTOP\Smart Retail POS.lnk"

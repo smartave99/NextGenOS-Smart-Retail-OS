@@ -7,7 +7,7 @@ const { ROLE_LABELS } = require('../lib/auth');
 
 const MODULE_LABELS = {
   pos: 'Billing (POS)', ai: 'AI assistant', dashboard: 'Dashboard', storefront: 'Website & app',
-  'owner-live': "Owner's live view", chain: 'Chain control', api: 'Integrations (API)',
+  hub: 'Business Hub', 'owner-live': "Owner's live view", chain: 'Chain control', api: 'Integrations (API)',
 };
 const WHITE_LABELS = {
   none: 'Locked: shows the supplier\'s brand only',

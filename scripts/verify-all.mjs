@@ -135,7 +135,7 @@ const checks = [
   { name: 'names', title: 'Company / product / suite names are consistent', run: checkNames },
   {
     name: 'studio', title: 'Licence Studio tests (crypto, protocol, roles, HTTP)',
-    run: () => needs('node', () => runCmd('studio', 'node', ['--no-warnings', '--test', 'test/*.test.js'], { cwd: join(root, 'licensing', 'studio') })),
+    run: () => needs('npm', () => runCmd('studio', 'npm', ['test', '--silent'], { cwd: join(root, 'licensing', 'studio') })),
   },
   {
     name: 'dotnet-lib', title: '.NET licence library builds for .NET Framework 4.8 and .NET 8', full: true,

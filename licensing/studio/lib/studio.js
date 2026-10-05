@@ -7,7 +7,7 @@ const C = require('./crypto');
 
 const DAY = 86400;
 const PRODUCT = 'smart-retail-os';
-const MODULES = ['pos', 'ai', 'dashboard', 'storefront', 'owner-live', 'chain', 'api'];
+const MODULES = ['pos', 'hub', 'ai', 'dashboard', 'storefront', 'owner-live', 'chain', 'api'];
 const FP_KINDS = ['bios', 'board', 'cpu', 'disk', 'os'];
 const WHITE_LEVELS = ['none', 'theme', 'full'];
 
@@ -30,10 +30,11 @@ const parse = (value, fallback = null) => {
 };
 
 const DEFAULT_PLANS = [
-  { code: 'starter', name: 'Starter', description: 'One shop, one counter. Billing, stock and reports.', modules: ['pos'], limits: { devices: 1, stores: 1, users: 3 }, caps: { devices: 2, stores: 1, users: 10 }, term_days: 365, sort: 1 },
-  { code: 'business', name: 'Business', description: 'A shop with several counters. Adds the AI assistant, the dashboard and the owner\'s live view.', modules: ['pos', 'ai', 'dashboard', 'owner-live'], limits: { devices: 3, stores: 1, users: 10 }, caps: { devices: 10, stores: 1, users: 50 }, term_days: 365, sort: 2 },
-  { code: 'growth', name: 'Growth', description: 'A few shops and an online store. Adds the website and mobile app.', modules: ['pos', 'ai', 'dashboard', 'owner-live', 'storefront'], limits: { devices: 10, stores: 3, users: 30 }, caps: { devices: 30, stores: 10, users: 100 }, term_days: 365, sort: 3 },
-  { code: 'chain', name: 'Chain', description: 'A group of shops with central control. Everything, with the chain hub and the API.', modules: ['pos', 'ai', 'dashboard', 'owner-live', 'storefront', 'chain', 'api'], limits: { devices: 50, stores: 25, users: 200 }, caps: { devices: 500, stores: 250, users: 2000 }, term_days: 365, sort: 4 },
+  { code: 'hub', name: 'Business Hub', description: 'Any kind of business in any country: shop, restaurant, library, builder, services. One site, its tax, its words.', modules: ['hub'], limits: { devices: 3, stores: 1, users: 10 }, caps: { devices: 10, stores: 1, users: 50 }, term_days: 365, sort: 0 },
+  { code: 'starter', name: 'Starter', description: 'One shop, one counter. Billing, stock and reports.', modules: ['pos', 'hub'], limits: { devices: 1, stores: 1, users: 3 }, caps: { devices: 2, stores: 1, users: 10 }, term_days: 365, sort: 1 },
+  { code: 'business', name: 'Business', description: 'A shop with several counters. Adds the AI assistant, the dashboard and the owner\'s live view.', modules: ['pos', 'hub', 'ai', 'dashboard', 'owner-live'], limits: { devices: 3, stores: 1, users: 10 }, caps: { devices: 10, stores: 1, users: 50 }, term_days: 365, sort: 2 },
+  { code: 'growth', name: 'Growth', description: 'A few shops and an online store. Adds the website and mobile app.', modules: ['pos', 'hub', 'ai', 'dashboard', 'owner-live', 'storefront'], limits: { devices: 10, stores: 3, users: 30 }, caps: { devices: 30, stores: 10, users: 100 }, term_days: 365, sort: 3 },
+  { code: 'chain', name: 'Chain', description: 'A group of shops with central control. Everything, with the chain hub and the API.', modules: ['pos', 'hub', 'ai', 'dashboard', 'owner-live', 'storefront', 'chain', 'api'], limits: { devices: 50, stores: 25, users: 200 }, caps: { devices: 500, stores: 250, users: 2000 }, term_days: 365, sort: 4 },
 ];
 
 const DEFAULT_SETTINGS = {

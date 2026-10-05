@@ -53,7 +53,7 @@ test('activate: issues a signed licence and activation bound to the PC', () => {
   const a = C.verifyToken(res.act, ctx.trusted, 'act');
   const crl = C.verifyToken(res.crl, ctx.trusted, 'crl');
   assert.equal(l.lid, lic.lid);
-  assert.deepEqual(l.modules, ['pos', 'ai', 'dashboard', 'owner-live']);
+  assert.deepEqual(l.modules, ['pos', 'hub', 'ai', 'dashboard', 'owner-live']);
   assert.equal(l.cust.name, 'Green Mart');
   assert.equal(a.lid, lic.lid);
   assert.equal(a.fp.length, 5);

@@ -98,7 +98,7 @@ The licence brand is the starting point; the local brand kit is applied on top o
 
 ## 6. Modules
 
-`pos`, `ai`, `dashboard`, `storefront`, `owner-live`, `chain`, `api`. A client enables a feature only if its module is listed. The POS needs `pos`; the AI add-on `ai`; the dashboard `dashboard`; the storefront `storefront`.
+`pos`, `hub`, `ai`, `dashboard`, `storefront`, `owner-live`, `chain`, `api`. A client enables a feature only if its module is listed. The POS needs `pos`; the Business Hub (every industry, every country) `hub`; the AI add-on `ai`; the dashboard `dashboard`; the storefront `storefront`.
 
 ## 7. Device fingerprint
 

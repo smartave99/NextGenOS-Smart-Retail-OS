@@ -8,6 +8,6 @@
   "scripts": {
     "start": "node src/server.js",
     "init": "node src/cli.js init",
-    "test": "node --no-warnings --test "test/*.test.js""
+    "test": "node --no-warnings --test \"test/*.test.js\""
   }
 }

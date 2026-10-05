@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing.Windows\NextGenOS.Licensing.Windows.csproj" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />

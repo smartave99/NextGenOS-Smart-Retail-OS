@@ -2,8 +2,9 @@
 @using SmartRetail.Pos.Core.Updates
 @inject WhatsNewService News
 @inject UpdateStatusService Updates
+@inject BrandService Brand
 
-<PageTitle>What's new · Smart Retail POS</PageTitle>
+<PageTitle>What's new · @Brand.Name</PageTitle>
 
 @* The change log: what changed in each update (CHANGELOG.md, built into the app), newest first. The updates since the owner last
    looked are marked New; opening this page counts this version as seen, so the dot in the sidebar and the banner on Today go. *@

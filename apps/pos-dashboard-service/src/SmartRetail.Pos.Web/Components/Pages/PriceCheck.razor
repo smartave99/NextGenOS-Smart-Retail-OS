@@ -9,8 +9,9 @@
 @inject ISalesFactsRepository ShopFacts
 @inject IProductRepository Catalog
 @inject ILogger<PriceCheck> Log
+@inject BrandService Brand
 
-<PageTitle>Price check · Smart Retail POS</PageTitle>
+<PageTitle>Price check · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

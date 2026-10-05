@@ -4,8 +4,9 @@
 @inject ProductPhotoService Photos
 @inject NavigationManager Nav
 @inject ILogger<Products> Log
+@inject BrandService Brand
 
-<PageTitle>Products · Smart Retail POS</PageTitle>
+<PageTitle>Products · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

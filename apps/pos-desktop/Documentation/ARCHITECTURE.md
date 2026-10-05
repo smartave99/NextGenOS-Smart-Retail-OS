@@ -63,7 +63,7 @@ The solution is divided into two major tiers:
 - **Purpose**: Hardware ID Binding & Cloud License Management.
 - **Key Classes**:
   - `DevNet`: Hardware fingerprint extraction (motherboard, CPU serial, MAC address) and remote license validation.
-  - `FrmActivate`: Interactive WinForms dialog allowing store owners to enter 25-character license keys.
+  - `ActivationForm` (NextGenOS.Licensing.Windows, shared with the AI app): interactive dialog where the store owner enters the licence key (or activates without Internet).
   - `Encryption`: TripleDES / AES cipher routines protecting license tokens.
 
 ### `DevNetSR`

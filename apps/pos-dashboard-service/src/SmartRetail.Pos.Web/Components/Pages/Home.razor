@@ -12,8 +12,9 @@
 @inject WhatsNewService News
 @inject TimeProvider Clock
 @inject ILogger<Home> Log
+@inject BrandService Brand
 
-<PageTitle>Today · Smart Retail POS</PageTitle>
+<PageTitle>Today · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
@@ -57,7 +58,7 @@
     @* After an update: what changed, once. Opening What's new, or Got it, counts the version as seen. *@
     <div class="news-banner" role="status">
         <Icon Name="news" />
-        <span><strong>Smart Retail POS @News.CurrentVersion.</strong> @(now.Summary.Length > 0 ? now.Summary : "See what changed in this update.")</span>
+        <span><strong>@Brand.Name @News.CurrentVersion.</strong> @(now.Summary.Length > 0 ? now.Summary : "See what changed in this update.")</span>
         <a class="setup-banner-go" href="whats-new">What's new ›</a>
         <button type="button" class="btn btn-sm btn-link" @onclick="News.MarkSeen">Got it</button>
     </div>

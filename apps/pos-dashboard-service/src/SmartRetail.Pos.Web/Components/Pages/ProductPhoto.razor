@@ -8,8 +8,9 @@
 @inject StorageService Storage
 @inject IJSRuntime Js
 @inject ILogger<ProductPhoto> Log
+@inject BrandService Brand
 
-<PageTitle>@(product?.Name ?? "Product") · Photos · Smart Retail POS</PageTitle>
+<PageTitle>@(product?.Name ?? "Product") · Photos · @Brand.Name</PageTitle>
 
 @if (error is not null)
 {

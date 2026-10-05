@@ -15,9 +15,10 @@
 @inject CameraSearchLauncher Camera
 @inject NavigationManager Nav
 @inject IJSRuntime Js
+@inject BrandService Brand
 
 <header class="window-bar">
-    <a class="wb-brand" href=""><AppMark Size="18" /><span>Smart Retail POS</span></a>
+    <a class="wb-brand" href=""><AppMark Size="18" /><span>@Brand.Name</span></a>
     @if (Full)
     {
         <form class="wb-search" role="search" @onsubmit="Search">

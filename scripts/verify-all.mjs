@@ -183,6 +183,7 @@ if (existsSync(extraDir)) {
 // What this gate can never prove from here. Printed every time so that nobody forgets it.
 const NOT_VERIFIED = [
   'The Windows programs (POS, AI add-on, dashboard host) running on a real Windows PC with a real shop database.',
+  'The dashboard tests that need a live SQL Server with a POS database or the DINOv2 model (skipped here), and the AI test that needs the real Codex program.',
   'Real printers, barcode scanners, cash drawers and cameras (the device layer is tested with virtual devices and loop-back connections).',
   'The Android app on a real phone (it is built and signed by the release workflow in GitHub Actions).',
   'Code signing of installers (needs your certificate), and the Windows SmartScreen reputation.',

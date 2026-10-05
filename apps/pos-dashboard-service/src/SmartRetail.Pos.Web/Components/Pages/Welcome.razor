@@ -8,15 +8,16 @@
 @inject StorageService Storage
 @inject IOptions<ShopOptions> Shop
 @inject IJSRuntime Js
+@inject BrandService Brand
 
-<PageTitle>Get started · Smart Retail POS</PageTitle>
+<PageTitle>Get started · @Brand.Name</PageTitle>
 
 <div class="setup">
     <aside class="setup-rail">
         <a class="brand" href="">
             <AppMark Size="44" />
             <div>
-                <div class="brand-name">Smart Retail POS</div>
+                <div class="brand-name">@Brand.Name</div>
                 <div class="brand-by">Get started</div>
             </div>
         </a>

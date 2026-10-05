@@ -8,8 +8,9 @@
 @inject NavigationManager Nav
 @inject IJSRuntime Js
 @inject ILogger<Creative> Log
+@inject BrandService Brand
 
-<PageTitle>@(project?.Title ?? "Creative") · Creatives · Smart Retail POS</PageTitle>
+<PageTitle>@(project?.Title ?? "Creative") · Creatives · @Brand.Name</PageTitle>
 
 @if (project is null)
 {

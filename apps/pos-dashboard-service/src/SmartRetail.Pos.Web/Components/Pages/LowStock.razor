@@ -1,8 +1,9 @@
 @page "/stock"
 @inject IStockRepository Stock
 @inject ILogger<LowStock> Log
+@inject BrandService Brand
 
-<PageTitle>Low stock · Smart Retail POS</PageTitle>
+<PageTitle>Low stock · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

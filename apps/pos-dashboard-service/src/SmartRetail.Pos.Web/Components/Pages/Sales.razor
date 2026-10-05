@@ -4,8 +4,9 @@
 @inject ISalesFactsRepository Facts
 @inject TimeProvider Clock
 @inject ILogger<Sales> Log
+@inject BrandService Brand
 
-<PageTitle>Sales · Smart Retail POS</PageTitle>
+<PageTitle>Sales · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

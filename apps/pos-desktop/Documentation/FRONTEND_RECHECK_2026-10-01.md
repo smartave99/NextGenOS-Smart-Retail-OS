@@ -56,7 +56,7 @@ The repository is a recovered native .NET Framework 4.8 retail/ERP system: **one
 | Main menu | 228 leaf commands; master data, transactions, inventory, banking, payroll, accounting, reports, administrator | Enumerated from native controls; live execution and configured-role permission policy blocked |
 | Core rebuilt screens | Startup, sign-in, home, new sale, SQL connection settings | Rendering/component checks executed; seven defect groups found in conditional states |
 | Retained layouts | 392 main Forms and All tools | Full rebuilding/walkthrough not performed; All tools target/clipping failures directly observed |
-| Helper Forms | PhonePe FrmBrowser; speech Listen and Configuration; licensing FrmActivate | Four additional screens inventoried in both themes; normal helper journeys blocked |
+| Helper Forms | PhonePe FrmBrowser; speech Listen and Configuration; licensing ActivationForm | Four additional screens inventoried in both themes; normal helper journeys blocked |
 | Library projects | ChromeDriverManager, GS, PhonePe, QImage, Translitration, WhatsApp.V2, DevNetFB, DevNetLM, DevNetSR, DevNetTRLN, DevNetWP, MyDBLibrary | Compilation executed; operational integration behavior blocked |
 | SQL, licensing, backend | Database/persistence, license activation, Firebase | No isolated configuration or credentials/roles; normal startup and downstream results blocked |
 | Payments and communication | PhonePe, QR, WhatsApp/browser, email/SMS, customer display | Widgets inspected where safe; no provider/sender/device operation |

@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using DevNetLM.Forms;
+using NextGenOS.Licensing.Windows;
 using DevNetLM.Models;
 using NextGenOS.Licensing;
 
@@ -39,7 +39,7 @@ namespace DevNetLM
         /// <summary>Opens the activation window. When it succeeds the program restarts itself, so that it starts with a licence.</summary>
         public static bool ShowActivation()
         {
-            using (var window = new FrmActivate(PosLicence.Manager))
+            using (var window = new ActivationForm(PosLicence.Manager))
             {
                 window.ShowDialog();
                 if (window.WasActivated)

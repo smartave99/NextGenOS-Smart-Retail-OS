@@ -3,13 +3,13 @@ using System.Drawing;
 using System.Windows.Forms;
 using NextGenOS.Licensing;
 
-namespace DevNetLM.Forms
+namespace NextGenOS.Licensing.Windows
 {
     /// <summary>
     /// The activation window. Plain words, one thing to do: type the licence key and press Activate. For a PC without Internet it
     /// shows a code to read to the supplier and takes the answer code back. Built in code (no designer file) so it is easy to read.
     /// </summary>
-    public sealed class FrmActivate : Form
+    public sealed class ActivationForm : Form
     {
         private readonly LicenceManager _manager;
         private readonly Label _status = new Label();
@@ -28,7 +28,7 @@ namespace DevNetLM.Forms
         /// <summary>True when the PC ended up with a usable licence.</summary>
         public bool WasActivated { get; private set; }
 
-        public FrmActivate(LicenceManager manager)
+        public ActivationForm(LicenceManager manager)
         {
             _manager = manager;
             var brand = manager.Evaluate().Brand;

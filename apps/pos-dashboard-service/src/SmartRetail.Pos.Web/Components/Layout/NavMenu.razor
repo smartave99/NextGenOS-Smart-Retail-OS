@@ -12,12 +12,16 @@
 @inject CameraSearchLauncher Camera
 @inject NavigationManager Nav
 @inject ILogger<NavMenu> Log
+@inject BrandService Brand
 
 <a class="brand" href="">
     <AppMark />
     <div>
-        <div class="brand-name">Smart Retail POS</div>
-        <div class="brand-by">by NextGenOS</div>
+        <div class="brand-name">@Brand.Name</div>
+        @if (Brand.By is { } by)
+        {
+            <div class="brand-by">@by</div>
+        }
     </div>
 </a>
 

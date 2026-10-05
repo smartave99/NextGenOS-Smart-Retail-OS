@@ -2,8 +2,9 @@
 @using SmartRetail.AI.Memory
 @inject ChatHistoryService Chats
 @inject ILogger<PastChats> Log
+@inject BrandService Brand
 
-<PageTitle>Past chats · Smart Retail POS</PageTitle>
+<PageTitle>Past chats · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

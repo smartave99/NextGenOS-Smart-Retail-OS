@@ -8,8 +8,9 @@
 @inject NavigationManager Nav
 @inject IJSRuntime Js
 @inject ILogger<Posters> Log
+@inject BrandService Brand
 
-<PageTitle>@(poster is null ? "Posters" : poster.Kind.Title() + " poster") · Smart Retail POS</PageTitle>
+<PageTitle>@(poster is null ? "Posters" : poster.Kind.Title() + " poster") · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

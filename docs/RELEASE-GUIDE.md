@@ -35,9 +35,9 @@ The workflow does, in order:
 
 If the Windows job stops with *"The licence keys are not built in yet"*, step 2 above is not done. After you add the two variables, open the failed run and choose **Re-run failed jobs**: the Windows part is built and added to the same release.
 
-**Trying the Windows setup before you have keys.** Run the workflow by hand and tick **trial_without_keys**. It builds the same setup with no licence key inside, installs it on the Windows machine at GitHub and checks it, and leaves the files with the run (*Actions → the run → Artifacts*; no release is made). That setup can never be activated, so it only shows that installing, the service and uninstalling work. **Never give it to a customer.**
+**Trying the Windows setup before you have keys.** Make the tag `v1.0.0-trial1` (a tag with `-trial` in its name). The workflow builds the same setup with **no licence key inside**, installs it on the Windows machine at GitHub, checks the service and the uninstall, and publishes a pre-release marked **TRIAL BUILD**. That setup can never be activated, so it only shows that installing, the service and uninstalling work. **Never give it to a customer.** (You can also run the workflow by hand and tick *trial_without_keys*; GitHub only shows the *Run workflow* button once the workflow is on the `main` branch.)
 
-**Tags.** Pushing a tag needs permission to create tags in the repository. If your tools cannot push a tag, make it on GitHub: *Releases → Draft a new release → Choose a tag → type `v1.0.0-rc1` and *Create new tag* → tick *pre-release* → *Publish release*. Publishing makes the tag, and the workflow starts.
+**Making the tag.** Pushing a tag needs permission to create tags. If your tools cannot push one, make it on GitHub: *Releases → Draft a new release → Choose a tag → type `v1.0.0-rc1` → Create new tag*, set **Target** to the branch `claude/happy-fermat-jv4lg8` (or `main` once merged), tick *Set as a pre-release*, and *Publish release*. Publishing makes the tag, and the workflow starts; it then adds its files to that release.
 
 ## Test it yourself (about 30 minutes)
 

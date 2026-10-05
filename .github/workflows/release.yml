@@ -181,7 +181,8 @@ jobs:
       - name: Build the setup (publish, hide the names, audit, write the setup and the zip)
         shell: bash
         env:
-          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys }}
+          # A tag with -trial in its name (v1.0.0-trial1) does the same as the manual tick: a setup with no keys, to try installing only.
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
           set -euo pipefail
           EXTRA=""
@@ -283,7 +284,10 @@ jobs:
         run: |
           PRE=""
           case "${TAG}" in *-rc*|*-beta*|*-alpha*) PRE="--prerelease";; esac
-          { cat .github/release-notes.md; echo; echo "Built from ${GITHUB_SHA}."; echo; echo '```'; cat dist/BUILD-STATUS.txt; echo '```'; } > "${RUNNER_TEMP}/notes.md"
+          {
+            if [ -f dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt ]; then echo "> **TRIAL BUILD, NO LICENCE KEYS.** The Windows setup in this release can never be activated. It is only for trying the install, the service and the uninstall. Never give it to a customer."; echo; fi
+            cat .github/release-notes.md; echo; echo "Built from ${GITHUB_SHA}."; echo; echo '```'; cat dist/BUILD-STATUS.txt; echo '```'
+          } > "${RUNNER_TEMP}/notes.md"
           if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
             # A re-run (for example after the licence keys were added): put the new files on the release that is already there.
             gh release upload "${TAG}" dist/* --clobber --repo "${GITHUB_REPOSITORY}"

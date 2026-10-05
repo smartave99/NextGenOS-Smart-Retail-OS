@@ -2,11 +2,13 @@
 // preview, preparing the setup, a second person approving it, and the hand-over. A stand-in AI tool answers when asked. Nothing leaves this PC.
 import assert from 'node:assert';
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, chmodSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStudio } from '../lib/server.mjs';
+import { listZip } from '../lib/zip.mjs';
+import { makeBaseKit } from '../../../scripts/make-base-kit.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { chromium } = createRequire(resolve(here, '..', '..', '..', 'apps', 'business-hub', 'e2e', 'package.json'))('playwright');
@@ -255,11 +257,52 @@ try {
   await shot(page, '14-approved');
   step('the reviewer approves it as a second person; the approved release has a fingerprint and its setup files can be downloaded');
 
+  // the installer: an administrator tells the Studio where the released programs are; a reviewer makes the customer's pack
+  const programs = join(root, 'programs'); mkdirSync(programs);
+  writeFileSync(join(programs, 'SmartRetailPOS-Hub-Setup-1.4.0.exe'), Buffer.alloc(20000, 5));
+  writeFileSync(join(programs, 'smart-retail-pos-hub_1.4.0-1_amd64.deb'), Buffer.alloc(12000, 6));
+  writeFileSync(join(programs, 'base-kit.json'), JSON.stringify((await makeBaseKit(programs)).manifest));
+  await page.goto(studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/installer');
+  await page.locator('#programs-card').waitFor();
+  await page.locator('#programs-card .notice', { hasText: 'Ask an administrator' }).waitFor();
+  assert.strictEqual(await page.locator('#make-pack').isDisabled(), true, 'no pack without the programs');
+  await shot(page, '14b-installer-no-programs');
+  await page.locator('#signout').click();
+  await signIn(page, 'Asha Admin', 'a-long-password');
+  await page.goto(studio.url.replace(/\?k=.*/, '') + '#/settings');
+  await page.locator('#programs-settings').waitFor();
+  await page.locator('#programs-folder').fill(join(root, 'nowhere'));
+  await page.locator('#programs-save').click();
+  await page.locator('#programs-say .notice.warn', { hasText: 'not found' }).waitFor();
+  await page.locator('#programs-folder').fill(programs);
+  await page.locator('#programs-save').click();
+  await page.locator('#programs-say .notice.ok', { hasText: 'Version 1.4.0: 2 files checked' }).waitFor();
+  await shot(page, '14c-settings-programs');
+  await page.locator('#signout').click();
+  await signIn(page, 'Rita Reviewer', 'rita-long-password');
+  await page.goto(studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/installer');
+  await page.locator('#programs-ok').waitFor();
+  await page.locator('#pack-items [data-part="shop-pc"][data-status="ready"]').waitFor();
+  await shot(page, '14d-installer-ready');
+  await page.locator('#make-pack').click();
+  await page.locator('.toast', { hasText: 'The pack is made' }).last().waitFor({ timeout: 60000 });
+  await page.locator('#packs').waitFor();
+  await page.locator('#last-pack').waitFor();
+  const [packDownload] = await Promise.all([page.waitForEvent('download'), page.locator('[data-download-pack="1"]').click()]);
+  assert.match(packDownload.suggestedFilename(), /^luzon-fresh-mart-pack-release-1\.zip$/);
+  const packPath = join(root, 'downloaded-pack.zip');
+  await packDownload.saveAs(packPath);
+  const inPack = listZip(readFileSync(packPath));
+  for (const want of ['Luzon Fresh Mart/START HERE.html', 'Luzon Fresh Mart/1 - Shop PC (Windows)/SmartRetailPOS-Hub-Setup-1.4.0.exe', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/setup.json', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/install.ini']) assert.ok(inPack.includes(want), want + ' is in the pack');
+  await shot(page, '14e-pack-made');
+  step('an administrator chooses the programs folder (a wrong folder is explained); a reviewer sees what goes in the pack, makes it, and downloads the zip with the setup and the customer\'s profile beside it');
+
   // hand over
   await page.goto(studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/handover');
   await page.locator('#handover-sheet').waitFor();
   assert.match(await page.locator('#handover-sheet').innerText(), /Luzon Fresh Mart: your Smart Retail POS/);
   assert.match(await page.locator('#handover-sheet').innerText(), /Their own colours and logo/);
+  assert.match(await page.locator('#handover-sheet').innerText(), /1 - Shop PC \(Windows\)/, 'the sheet names the pack\'s folder');
   await shot(page, '15-handover');
   await page.locator('#deliver-note').fill('Given to the owner, Ana.');
   await page.locator('#deliver').click();

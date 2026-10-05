@@ -250,9 +250,50 @@ jobs:
           name: windows
           path: dist/*
 
+  linux:
+    name: Linux package for the Business Hub
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the licence keys in (public keys only)
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NGOS_PUBLIC_KEYS}" ]; then
+            printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+            node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+          fi
+      - name: Code obfuscator (a build tool, never shipped)
+        run: dotnet tool install --global Obfuscar.GlobalTool --version 2.2.50
+      - name: Build the packages (publish, hide the names, check prerequisites, audit, write the .deb) for Intel/AMD and ARM
+        env:
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          node apps/business-hub/installer/build-linux.mjs --version "${VERSION_NAME}" --arch x64 --out dist ${EXTRA}
+          node apps/business-hub/installer/build-linux.mjs --version "${VERSION_NAME}" --arch arm64 --out dist ${EXTRA}
+      - name: Install the Intel/AMD package on this runner, start it as its own account, add a profile package, remove it
+        run: node apps/business-hub/installer/test-linux-package.mjs --deb "dist/smart-retail-pos-hub_${VERSION_NAME}-1_amd64.deb"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
   publish:
     name: Publish the GitHub Release
-    needs: [gate, android, windows]
+    needs: [gate, android, windows, linux]
     # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
     if: ${{ always() && startsWith(github.ref, 'refs/tags/') && needs.gate.result == 'success' }}
     runs-on: ubuntu-latest
@@ -266,15 +307,22 @@ jobs:
         env:
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
+          LINUX: ${{ needs.linux.result }}
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
           set -euo pipefail
           test -d dist && [ -n "$(ls -A dist)" ] || { echo "Nothing was built, so there is nothing to release."; exit 1; }
           {
             echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
             echo "Windows setup for the Business Hub: ${WINDOWS}"
+            echo "Linux packages for the Business Hub: ${LINUX}"
             echo "Android app: ${ANDROID}"
           } > dist/BUILD-STATUS.txt
           cat dist/BUILD-STATUS.txt
+          # A build made without the licence keys is marked so that nothing downstream (the Setup Studio included) can mistake it for a real one.
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the installing. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
+      - name: The list of release files for the Setup Studio (what each file is, and its fingerprint)
+        run: node scripts/make-base-kit.mjs dist
       - name: Checksums
         run: cd dist && sha256sum * | grep -v SHA256SUMS > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Create the release

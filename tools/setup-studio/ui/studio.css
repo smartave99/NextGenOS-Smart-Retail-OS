@@ -126,6 +126,8 @@ input[type=file] { display: none; }
 .pill.proposed, .pill.review { background: var(--ngos-accent-soft); color: var(--ngos-accent-strong); }
 .pill.approved, .pill.built, .pill.delivered, .pill.ok { background: var(--ngos-ok-bg); color: var(--ngos-ok); }
 .pill.bad { background: var(--ngos-bad-bg); color: var(--ngos-bad); }
+.pill.warn { background: var(--ngos-warn-bg); color: var(--ngos-warn); }
+.tone-ok { color: var(--ngos-ok); } .tone-warn { color: var(--ngos-warn); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 
 /* notices */

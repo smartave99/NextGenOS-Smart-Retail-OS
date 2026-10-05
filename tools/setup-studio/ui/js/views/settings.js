@@ -10,7 +10,7 @@ export async function render() {
   const [settings, tools] = await Promise.all([get('/api/settings'), get('/api/ai/tools')]);
   const root = h('div', { class: 'view' }, h('div', { class: 'page-head' }, h('div', { class: 'grow' }, h('h1', {}, 'Settings'), h('p', { class: 'sub' }, 'Your company, the AI tools, and keeping things safe.'))));
   if (!ADMIN()) root.append(h('div', { class: 'notice mt', style: { 'margin-bottom': '18px' } }, icon('lock'), 'Only an administrator can change settings. You can look at them here.'));
-  root.append(companyCard(settings), aiCard(settings, tools), keysCard(settings), safeCard(settings));
+  root.append(companyCard(settings), await programsCard(), aiCard(settings, tools), keysCard(settings), safeCard(settings));
   return root;
 }
 
@@ -26,6 +26,24 @@ function companyCard(settings) {
   return h('div', { class: 'card', id: 'company-card' }, h('h2', {}, 'Your company'), h('p', { class: 'lead' }, 'Printed on the hand-over papers, so the customer knows who to call. Leave a field empty to leave it off the papers.'),
     h('div', { class: 'grid2' }, name, mail, phone, site),
     ADMIN() ? h('div', { class: 'row mt' }, h('button', { class: 'btn primary', id: 'company-save', type: 'button', onclick: async () => { try { await put('/api/company', { name: get(name), supportEmail: get(mail), supportPhone: get(phone), website: get(site) }); toast('Saved.'); } catch (e) { toast(e.message, 'bad'); } } }, 'Save')) : null);
+}
+
+// ---------- the programs folder ----------
+async function programsCard() {
+  const { programs } = await get('/api/programs');
+  const input = h('input', { type: 'text', id: 'programs-folder', value: programs.folder, disabled: !ADMIN(), placeholder: 'For example C:\\Users\\you\\Downloads\\release-1.0.0', spellcheck: 'false' });
+  const say = h('div', { id: 'programs-say' });
+  const show = (p, saved) => say.replaceChildren(
+    p.ok ? h('div', { class: 'notice ok' }, icon('check'), h('div', {}, h('b', {}, `Version ${p.version}: ${p.files.length} files checked`), h('div', { class: 'small' }, saved ? 'Saved. Every file matches its fingerprint.' : 'Every file matches its fingerprint.')))
+      : p.problems?.length ? h('div', { class: 'notice warn' }, icon('warn'), h('ul', {}, p.problems.map((t) => h('li', {}, t)))) : null);
+  if (programs.folder) show(programs);
+  return h('div', { class: 'card', id: 'programs-settings' }, h('h2', {}, 'The programs folder'),
+    h('p', { class: 'lead' }, 'The Studio does not build programs. NextGenOS builds and releases them; download every file of a release into one folder (including base-kit.json) and tell the Studio where it is. The Studio checks each file, then puts a customer\'s set-up beside them.'),
+    h('div', { class: 'field' }, h('label', { for: 'programs-folder' }, 'Folder with the release files'), input), say,
+    ADMIN() ? h('div', { class: 'row mt' }, h('button', { class: 'btn primary', id: 'programs-save', type: 'button', onclick: async (e) => {
+      const b = e.currentTarget; b.classList.add('busy');
+      try { const r = await put('/api/programs', { folder: input.value }); show(r.programs, r.saved); if (r.saved) toast('Saved.'); } catch (x) { toast(x.message, 'bad'); } finally { b.classList.remove('busy'); }
+    } }, 'Check and save')) : null);
 }
 
 // ---------- AI tools ----------

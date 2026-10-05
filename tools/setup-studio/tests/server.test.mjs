@@ -6,6 +6,7 @@ import { join, delimiter } from 'node:path';
 import http from 'node:http';
 import { startStudio } from '../lib/server.mjs';
 import { listZip } from '../lib/zip.mjs';
+import { makeBaseKit } from '../../../scripts/make-base-kit.mjs';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const good = (over = {}) => ({ business: { name: 'Luzon Fresh Mart', country: 'PH', industry: 'retail', contact: { phone: '+63 2 5555 0100', email: 'help@luzonfresh.example' } }, device: { kind: 'touch-pos', os: 'windows', screen: 'standard' }, look: { primaryColor: '#0a7d4b', style: 'friendly' }, licence: { whiteLabel: 'theme' }, ...over });
@@ -203,4 +204,103 @@ test('the AI tools over the interface: settings are checked, keys are never show
     assert.equal((await s.call('POST', '/api/ai/tools/claude-code/update', { session: samS, body: { confirm: true } })).status, 403);
     assert.equal((await s.call('POST', '/api/ai/tools/claude-code/update', { session, body: {} })).status, 400);
   } finally { process.env.PATH = oldPath; rmSync(tools, { recursive: true, force: true }); await s.done(); }
+});
+
+async function programsFolder(root, { trial = false, name = 'programs' } = {}) {
+  const dir = join(root, name);
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'SmartRetailPOS-Hub-Setup-1.4.0.exe'), Buffer.alloc(4000, 7));
+  writeFileSync(join(dir, 'smart-retail-pos-hub_1.4.0-1_amd64.deb'), Buffer.alloc(3000, 9));
+  if (trial) writeFileSync(join(dir, 'NO-LICENCE-KEYS-TRIAL-ONLY.txt'), 'trial');
+  const { manifest } = await makeBaseKit(dir);
+  writeFileSync(join(dir, 'base-kit.json'), JSON.stringify(manifest));
+  return dir;
+}
+
+test('the customer pack over the interface: only an administrator chooses the programs folder, a damaged or trial folder is refused, the pack is made from the approved release and downloaded by those who may', async () => {
+  const s = await boot();
+  try {
+    const admin = (await s.call('POST', '/api/setup', { body: { name: 'Asha Admin', password: 'a-long-password' } })).json.session;
+    const sales = (await s.call('POST', '/api/team', { session: admin, body: { name: 'Sam Sales', role: 'sales', password: 'sam-long-password' } })).json.member;
+    const reviewer = (await s.call('POST', '/api/team', { session: admin, body: { name: 'Rita Reviewer', role: 'reviewer', password: 'rita-long-password' } })).json.member;
+    const samS = (await s.call('POST', '/api/signin', { body: { id: sales.id, password: 'sam-long-password' } })).json.session;
+    const ritaS = (await s.call('POST', '/api/signin', { body: { id: reviewer.id, password: 'rita-long-password' } })).json.session;
+    await s.call('PUT', '/api/company', { session: admin, body: { name: 'Pinoy POS Partners', supportPhone: '+63 2 5555 0199' } });
+
+    const id = (await s.call('POST', '/api/customers', { session: samS, body: { intake: good({ ecosystem: { website: { wanted: true, domain: 'luzonfresh.example' }, android: { wanted: true, appId: 'com.luzonfresh.shop' }, aiAddon: { wanted: true } } }) } })).json.customer.id;
+    assert.equal((await s.call('GET', `/api/customers/${id}/outputs`, { session: ritaS })).json.release, null, 'nothing is approved yet');
+    assert.equal((await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: {} })).status, 409, 'no pack before an approval');
+    await s.call('PUT', `/api/customers/${id}/logo`, { session: samS, body: { data: PNG } });
+    await s.call('POST', `/api/customers/${id}/proposal`, { session: samS });
+    await s.call('POST', `/api/customers/${id}/submit`, { session: samS });
+    assert.equal((await s.call('POST', `/api/customers/${id}/approve`, { session: ritaS })).json.customer.state, 'approved');
+
+    // no programs folder yet
+    const before = await s.call('GET', `/api/customers/${id}/outputs`, { session: ritaS });
+    assert.equal(before.json.programs.ok, false);
+    assert.deepEqual(before.json.items, []);
+    assert.equal((await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: {} })).json.code, 'no-programs');
+
+    // who may choose the folder, and what a bad one says
+    const folder = await programsFolder(s.root);
+    assert.equal((await s.call('PUT', '/api/programs', { session: ritaS, body: { folder } })).status, 403, 'a reviewer cannot');
+    const missing = await s.call('PUT', '/api/programs', { session: admin, body: { folder: join(s.root, 'nowhere') } });
+    assert.equal(missing.json.saved, false);
+    assert.match(missing.json.programs.problems[0], /not found/);
+    assert.equal((await s.call('GET', '/api/programs', { session: admin })).json.programs.folder, '', 'a bad folder is not kept');
+    const saved = await s.call('PUT', '/api/programs', { session: admin, body: { folder: `"${folder}"` } });
+    assert.equal(saved.json.saved, true);
+    assert.equal(saved.json.programs.version, '1.4.0');
+    assert.ok(!JSON.stringify(saved.json).includes(folder + '/'), 'only file names, not paths of each file');
+
+    const plan = await s.call('GET', `/api/customers/${id}/outputs`, { session: ritaS });
+    assert.deepEqual(Object.fromEntries(plan.json.items.map((i) => [i.id, i.status])), { 'shop-pc': 'ready', ai: 'missing', website: 'missing', android: 'missing' });
+
+    // making it
+    assert.equal((await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: samS, body: {} })).status, 403, 'sales cannot make installers');
+    const made = await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: {} });
+    assert.equal(made.status, 200, JSON.stringify(made.json));
+    assert.equal(made.json.build.file, `${id}-pack-release-1.zip`);
+    assert.equal(made.json.customer.state, 'built');
+    assert.equal(made.json.customer.builds.at(-1).kind, 'pack');
+
+    const got = await s.call('GET', `/api/customers/${id}/builds/1/pack.zip`, { session: ritaS });
+    assert.equal(got.headers.get('content-type'), 'application/zip');
+    assert.equal(Number(got.headers.get('content-length')), got.buffer.length);
+    const names = listZip(got.buffer);
+    for (const want of ['Luzon Fresh Mart/START HERE.html', 'Luzon Fresh Mart/PACK-CONTENTS.json', 'Luzon Fresh Mart/1 - Shop PC (Windows)/SmartRetailPOS-Hub-Setup-1.4.0.exe', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/brand.json', 'Luzon Fresh Mart/4 - Android app/brand-kit/luzon-fresh-mart/brand.json']) assert.ok(names.includes(want), want);
+    assert.equal((await s.call('GET', `/api/customers/${id}/builds/1/pack.zip`, { session: samS })).status, 403);
+    assert.equal((await s.call('GET', `/api/customers/${id}/builds/2/pack.zip`, { session: ritaS })).status, 404);
+    assert.equal((await s.call('GET', `/api/customers/${id}/builds/1/pack.zip`, { key: null, session: ritaS })).status, 401);
+
+    // the hand-over sheet is made from the approved release and now names the pack's folders
+    const sheet = (await s.call('GET', `/api/customers/${id}/handover`, { session: samS })).json.sheet;
+    assert.equal(sheet.title, 'Luzon Fresh Mart: your Smart Retail POS');
+    assert.ok(sheet.sections.find((x) => x.heading === 'Putting it in place').steps[0].includes('1 - Shop PC (Windows)'));
+    assert.ok(sheet.sections.find((x) => x.heading === 'Need help?').text.includes('+63 2 5555 0199'));
+
+    // a trial folder (no licence keys) is refused unless it is only to try
+    const trial = await programsFolder(s.root, { trial: true, name: 'trial' });
+    await s.call('PUT', '/api/programs', { session: admin, body: { folder: trial } });
+    const refused = await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: {} });
+    assert.equal(refused.status, 409);
+    assert.match(refused.json.error, /licence keys/);
+    assert.equal((await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: { allowTrial: true } })).status, 200);
+
+    // a damaged file in the folder stops it
+    writeFileSync(join(trial, 'SmartRetailPOS-Hub-Setup-1.4.0.exe'), Buffer.alloc(4000, 1));
+    const damaged = await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: { allowTrial: true } });
+    assert.equal(damaged.status, 409);
+    assert.match(damaged.json.error, /fingerprint/);
+
+    // a release changed after it was approved is never packed
+    chmodSync(join(s.root, 'ws', 'customers', id, 'releases', '1', 'theme.json'), 0o644);
+    writeFileSync(join(s.root, 'ws', 'customers', id, 'releases', '1', 'theme.json'), '{"schema":1,"shape":"square"}');
+    await s.call('PUT', '/api/programs', { session: admin, body: { folder } });
+    const tampered = await s.call('POST', `/api/customers/${id}/outputs/pack`, { session: ritaS, body: {} });
+    assert.equal(tampered.status, 409);
+    assert.equal(tampered.json.code, 'tampered');
+    assert.ok((await s.call('GET', `/api/audit?customer=${id}`, { session: ritaS })).json.entries.some((e) => e.action === 'build.made'), 'a pack is in the activity record');
+  } finally { await s.done(); }
 });

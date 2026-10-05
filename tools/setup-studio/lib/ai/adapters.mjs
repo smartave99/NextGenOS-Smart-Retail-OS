@@ -3,6 +3,7 @@
 // off, in an empty folder, and the web services only ever answer a question.
 import { resolveExecutable, runCli, AiError, redact } from './cli.mjs';
 import { getKey } from '../secrets.mjs';
+import { claudeArgs, codexArgs, antigravityArgs, cleanToolConfig } from './options.mjs';
 
 const text = (v, max = 300) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
@@ -49,33 +50,51 @@ const cliCheck = (command) => () => { const path = resolveExecutable(command); r
 
 export const ADAPTERS = {
   'claude-code': {
-    label: 'Claude Code (on this PC)', kind: 'cli', command: 'claude', needsKey: false,
-    help: 'Uses the Claude Code program installed on this PC and the sign-in you already made in it. Nothing to paste.',
-    install: 'Install Claude Code from https://claude.com/claude-code and sign in once by running "claude" in a terminal.',
+    label: 'Claude Code (on this PC)', kind: 'cli', command: 'claude', needsKey: true, provider: 'anthropic',
+    help: 'Uses the Claude Code program on this PC with your Anthropic API key. (Anthropic does not allow another app to use a Claude.ai subscription sign-in, so a key is used, never a subscription.) Choose the model and how hard it thinks below.',
+    install: 'Install Claude Code, and paste an Anthropic API key in Settings.',
     detect: cliCheck('claude'),
-    async run({ system, user, config, timeoutMs }) {
-      const args = ['-p', '--output-format', 'json', '--tools', '', '--no-session-persistence', '--safe-mode'];
-      if (config.model) args.push('--model', String(config.model));
-      const r = await runCli({ command: 'claude', args, input: `${system}\n\n${user}`, timeoutMs });
-      if (r.code !== 0 || r.timedOut || r.tooLong) throw explainFailure('Claude Code', r);
+    async run({ system, user, config, timeoutMs, env }) {
+      const key = getKey('anthropic', env);
+      if (!key) throw new AiError('Claude Code needs an Anthropic API key here. Paste one in Settings.', 'auth');
+      const r = await runCli({ command: 'claude', args: claudeArgs(config), input: `${system}\n\n${user}`, timeoutMs, extraEnv: { ANTHROPIC_API_KEY: key }, env });
+      if (r.code !== 0 || r.timedOut || r.tooLong) throw explainFailure('Claude Code', r, [key]);
       let out;
       try { out = JSON.parse(r.stdout); } catch { throw new AiError('Claude Code did not answer in a form the Studio can read.', 'format'); }
-      if (out.is_error) throw new AiError(`Claude Code reported a problem: ${text(out.result)}`, 'failed');
-      return { text: String(out.result ?? ''), meta: { tool: 'claude-code', model: Object.keys(out.modelUsage ?? {})[0] ?? config.model ?? null } };
+      if (out.is_error) throw new AiError(`Claude Code reported a problem: ${redact(text(out.result), [key])}`, 'failed');
+      return { text: String(out.result ?? ''), meta: { tool: 'claude-code', model: Object.keys(out.modelUsage ?? {})[0] ?? config.model ?? null, effort: config.effort ?? null } };
     },
   },
   codex: {
     label: 'Codex (on this PC)', kind: 'cli', command: 'codex', needsKey: false,
-    help: 'Uses the Codex program installed on this PC and the sign-in you already made in it. It is run read-only, in an empty folder.',
-    install: 'Install the Codex command line from OpenAI and sign in once by running "codex" in a terminal.',
+    help: 'Uses the Codex program on this PC and the sign-in you made in it (ChatGPT or an OpenAI key). It is run read-only, in an empty folder. Choose the model and how hard it thinks below.',
+    install: 'Install the Codex command line from OpenAI and sign in once by running "codex login".',
     detect: cliCheck('codex'),
-    async run({ system, user, config, timeoutMs }) {
-      const args = ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never'];
-      if (config.model) args.push('--model', String(config.model));
-      args.push('-');
-      const r = await runCli({ command: 'codex', args, input: `${system}\n\n${user}`, timeoutMs });
+    async run({ system, user, config, timeoutMs, env }) {
+      const r = await runCli({ command: 'codex', args: codexArgs(config), input: `${system}\n\n${user}`, timeoutMs, env });
       if (r.code !== 0 || r.timedOut || r.tooLong) throw explainFailure('Codex', r);
-      return { text: r.stdout, meta: { tool: 'codex', model: config.model ?? null } };
+      return { text: r.stdout, meta: { tool: 'codex', model: config.model ?? null, effort: config.effort ?? null } };
+    },
+  },
+  antigravity: {
+    label: 'Antigravity (Google, on this PC)', kind: 'cli', command: 'agy', needsKey: false,
+    help: 'Uses Google\'s Antigravity command line ("agy") and the Google sign-in you made in it, or your Gemini key. It is run sandboxed, in an empty folder.',
+    install: 'Install Antigravity from Google and run "agy" once to sign in.',
+    detect: cliCheck('agy'),
+    async run({ system, user, config, timeoutMs, env }) {
+      const c = cleanToolConfig('antigravity', config).value;
+      const key = config.useGeminiKey ? getKey('gemini', env) : null;
+      if (config.useGeminiKey && !key) throw new AiError('"Use my Gemini key" is on, but no Gemini key is saved. Paste one in Settings.', 'auth');
+      const question = `${system}\n\n${user}`;
+      const args = ['-p', question, ...antigravityArgs(c, Math.round(timeoutMs / 1000))];
+      if (question.length > 100_000) throw new AiError('The question is too long to pass to Antigravity.', 'config');
+      const r = await runCli({ command: 'agy', args, timeoutMs: timeoutMs + 15_000, extraEnv: { NO_COLOR: '1', ...(key ? { GEMINI_API_KEY: key } : {}) }, env });
+      if (r.code !== 0 || r.timedOut || r.tooLong) throw explainFailure('Antigravity', r, [key]);
+      let out = null;
+      const a = r.stdout.indexOf('{'), b = r.stdout.lastIndexOf('}');
+      if (a >= 0 && b > a) { try { out = JSON.parse(r.stdout.slice(a, b + 1)); } catch { /* plain text */ } }
+      if (out?.error) throw new AiError(`Antigravity: ${redact(text(typeof out.error === 'string' ? out.error : out.error.message ?? JSON.stringify(out.error)), [key])}`, 'failed');
+      return { text: out ? String(out.response ?? '') : r.stdout, meta: { tool: 'antigravity', model: c.model ?? null, effort: c.effort ?? null } };
     },
   },
   'generic-cli': {
@@ -85,7 +104,9 @@ export const ADAPTERS = {
     detect: (config = {}) => { const path = config.command ? resolveExecutable(config.command) : null; return { found: !!path, where: path }; },
     async run({ system, user, config, timeoutMs }) {
       if (!config.command) throw new AiError('No program is set for the other tool yet. An administrator can set it in Settings.', 'config');
-      const args = Array.isArray(config.args) ? config.args.map(String) : [];
+      // {model} and {effort} in the options are replaced by the chosen model and level (so any tool's own option names can be used).
+      const fill = (a) => a.replace(/\{model\}/g, config.model ?? '').replace(/\{effort\}/g, config.effort ?? '');
+      const args = (Array.isArray(config.args) ? config.args.map(String) : []).map(fill).filter((a) => a !== '');
       const question = `${system}\n\n${user}`;
       const viaArg = config.promptVia === 'arg';
       if (viaArg && question.length > 100_000) throw new AiError('The question is too long to pass as an option; set the tool to read it from its standard input.', 'config');
@@ -108,6 +129,7 @@ export const ADAPTERS = {
       const client = new Anthropic({ apiKey: key, baseURL: config.baseUrl ? checkEndpoint(config.baseUrl).href.replace(/\/$/, '') : undefined, maxRetries: 1, timeout: timeoutMs });
       const model = config.model || 'claude-opus-5-5';
       const request = { model, max_tokens: 16000, system, messages: [{ role: 'user', content: user }] };
+      if (config.effort) request.output_config = { effort: config.effort };   // how hard to think (the models that take one)
       let response;
       try {
         // A policy decline is passed to a fallback model by the service itself (the "default" fallback), when it is allowed for this account; if it is not, the plain call is made.
@@ -136,6 +158,7 @@ export const ADAPTERS = {
       if (!key && !local) throw new AiError('There is no key for this service yet. Paste one in Settings.', 'auth');
       if (!config.model) throw new AiError('Set the model name for this service in Settings.', 'config');
       const body = { model: config.model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], response_format: { type: 'json_object' } };
+      if (config.effort) body.reasoning_effort = config.effort;   // for the models that think
       const headers = key ? { authorization: `Bearer ${key}` } : {};
       let json;
       try { json = await postJson(`${base}/chat/completions`, headers, body, { timeoutMs, secrets: [key], label: 'The service' }); } catch (e) {
@@ -160,7 +183,8 @@ export const ADAPTERS = {
       if (!config.model || !/^[A-Za-z0-9._-]+$/.test(config.model)) throw new AiError('Set the Gemini model name in Settings.', 'config');
       const base = checkEndpoint(config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta').href.replace(/\/$/, '');
       const json = await postJson(`${base}/models/${config.model}:generateContent`, { 'x-goog-api-key': key }, {
-        systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }], generationConfig: { responseMimeType: 'application/json' },
+        systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: { responseMimeType: 'application/json', ...(Number.isInteger(config.thinkingBudget) ? { thinkingConfig: { thinkingBudget: config.thinkingBudget } } : {}) },
       }, { timeoutMs, secrets: [key], label: 'Gemini' });
       if (json?.promptFeedback?.blockReason) throw new AiError('Gemini declined to answer. Nothing was changed.', 'refused');
       const parts = json?.candidates?.[0]?.content?.parts ?? [];

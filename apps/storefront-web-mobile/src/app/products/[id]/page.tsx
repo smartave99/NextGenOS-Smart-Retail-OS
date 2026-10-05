@@ -17,6 +17,7 @@ import { constructMetadata } from "@/lib/seo-utils";
 import { Metadata } from "next";
 import WhatsAppOrderButton from "@/components/WhatsAppOrderButton";
 import BarcodeDisplay from "@/components/BarcodeDisplay";
+import { SITE_URL } from "@/lib/site-url";
 
 export const revalidate = 3600;
 
@@ -244,7 +245,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         "sku": product.id,
                         "offers": {
                             "@type": "Offer",
-                            "url": `https://smartavenue99.com/products/${product.id}`,
+                            "url": `${SITE_URL}/products/${product.id}`,
                             "priceCurrency": "INR",
                             "price": product.price,
                             "itemCondition": "https://schema.org/NewCondition",

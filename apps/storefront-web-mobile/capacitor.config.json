@@ -1,14 +1,18 @@
 {
-  "appId": "com.smartavenue.app",
-  "appName": "Smart Avenue",
-  "webDir": "public",
-  "bundledWebRuntime": false,
+  "appId": "com.nextgenos.smartretail",
+  "appName": "Smart Retail POS",
+  "webDir": "android-shell",
   "server": {
-    "url": "https://smartavenue99.com",
-    "cleartext": true,
+    "url": "https://example.com",
+    "cleartext": false,
     "allowNavigation": [
-      "smartavenue99.com",
-      "*.smartavenue99.com"
+      "example.com",
+      "*.example.com"
     ]
-  }
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "loggingBehavior": "none"
 }

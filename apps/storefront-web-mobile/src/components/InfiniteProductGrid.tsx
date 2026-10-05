@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, ChevronRight, Package, RefreshCcw, Star, Tag
 import { Product, getProducts, Offer, Category } from "@/app/actions";
 import SocialProofBadge from "@/components/ai/SocialProofBadge";
 import GenieRequestTrigger from "@/components/GenieRequestTrigger";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface InfiniteProductGridProps {
     initialProducts: Product[];
@@ -145,7 +146,7 @@ export default function InfiniteProductGrid({
                             <div className="relative aspect-square overflow-hidden bg-slate-100 sm:aspect-[4/3]">
                                 <Image
                                     src={product.imageUrl}
-                                    alt={`${product.name} - ${categoryName} available at Smart Avenue`}
+                                    alt={`${product.name} - ${categoryName} available at ${SHOP_NAME}`}
                                     fill
                                     className="sa-card-image object-cover"
                                     quality={95}

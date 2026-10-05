@@ -1,5 +1,6 @@
 import { getSiteConfig } from "@/app/actions/site-config";
 import { NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/site-url";
 
 export const dynamic = "force-dynamic"; // Ensure it's always up to date with the config
 
@@ -27,7 +28,7 @@ export async function GET() {
             dynamicSection += products.map(p => {
                 const price = p.price ? `₹${p.price.toLocaleString()}` : "Price on request";
                 const descSnippet = p.description ? ` - ${p.description.substring(0, 100)}...` : "";
-                return `- [${p.name}](https://smartavenue99.com/products/${p.id}) (${price})${descSnippet}`;
+                return `- [${p.name}](${SITE_URL}/products/${p.id}) (${price})${descSnippet}`;
             }).join("\n");
         }
 

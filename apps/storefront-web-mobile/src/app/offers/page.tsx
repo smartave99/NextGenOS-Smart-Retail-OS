@@ -6,6 +6,7 @@ import OfferFilterSidebar from "@/components/OfferFilterSidebar";
 import { constructMetadata } from "@/lib/seo-utils";
 import { Metadata } from "next";
 import { Suspense } from "react";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export const revalidate = 600;
 
@@ -14,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const config = await getSiteConfig();
     return constructMetadata({
         title: "Weekly Offers & Deals",
-        description: "Discover exclusive deals, weekly offers, and smart club privileges at Smart Avenue 99.",
+        description: `Discover exclusive deals, weekly offers, and smart club privileges at ${SHOP_NAME}.`,
         urlPath: "/offers",
         config
     });

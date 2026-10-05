@@ -20,7 +20,7 @@ const week = (from: string, to: string, over: Record<string, unknown> = {}) => (
 
 const live = (demo = false) => ({
     version: 1,
-    shop: "Smart Avenue",
+    shop: "Demo Mart",
     demo,
     sentAt: new Date().toISOString(),
     today: { day: "2026-09-27", sales: 900, bills: 3, credit: 0, lastBillAt: "18:57", vsLastWeek: 0.12, comparedAt: "18:58", lastWeekSales: 800 },
@@ -63,7 +63,7 @@ function fakeSupabase({ demo = false, reportsTable = true, productsTable = true,
 } = {}) {
     const sentAt = new Date().toISOString();
     const rows: Record<string, unknown[]> = {
-        shops: [{ id: "shop-1", name: "Smart Avenue" }],
+        shops: [{ id: "shop-1", name: "Demo Mart" }],
         shop_devices: devices ?? [{ id: "pc-1", label: "Counter PC", connected_at: sentAt, last_seen_at: sentAt }],
         shop_days: [],
         shop_questions: [],

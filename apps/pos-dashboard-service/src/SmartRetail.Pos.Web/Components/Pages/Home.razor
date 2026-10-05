@@ -228,12 +228,7 @@ else
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
-    private string Greeting => Clock.GetLocalNow().Hour switch
-    {
-        < 12 => "Good morning",
-        < 17 => "Good afternoon",
-        _ => "Good evening",
-    };
+    private string Greeting => Clock.GetLocalNow().Hour < 12 ? "Good morning" : Clock.GetLocalNow().Hour < 17 ? "Good afternoon" : "Good evening";
 
     protected override void OnInitialized()
     {
@@ -358,12 +353,9 @@ else
         var tips = new List<Suggestion>();
         if (report.ReorderNow.FirstOrDefault() is { } reorder)
         {
-            var when = reorder.DaysOfStock switch
-            {
-                < 1m => "today",
-                < 2m => "tomorrow",
-                _ => $"in about {Formats.Days(reorder.DaysOfStock)} days",
-            };
+            var when = reorder.DaysOfStock < 1m ? "today"
+                : reorder.DaysOfStock < 2m ? "tomorrow"
+                : $"in about {Formats.Days(reorder.DaysOfStock)} days";
             tips.Add(new("stock", "orange", $"{reorder.Name} may run out {when}",
                 $"{Money.FormatQty(reorder.StockInHand)} left, and it sells about {Formats.Days(reorder.QtyPerDay)} a day. Reorder soon.",
                 "Low stock", "stock"));

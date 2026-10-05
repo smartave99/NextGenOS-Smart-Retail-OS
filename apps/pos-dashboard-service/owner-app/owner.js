@@ -177,7 +177,7 @@
   }
 
   function createShopView(note = null) {
-    const name = h('input', { id: 'shop-name', required: true, maxlength: 120, placeholder: 'Smart Avenue 99' });
+    const name = h('input', { id: 'shop-name', required: true, maxlength: 120, placeholder: 'Demo Mart 99' });
     const message = h('p', { class: note ? 'note problem' : 'note hidden', role: 'status' }, note || '');
     async function submit(event) {
       event.preventDefault();

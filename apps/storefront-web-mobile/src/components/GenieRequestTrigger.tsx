@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import ProductRequestModal from "./ProductRequestModal";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface GenieRequestTriggerProps {
     searchQuery?: string;
@@ -50,7 +51,7 @@ export default function GenieRequestTrigger({ searchQuery }: GenieRequestTrigger
                             </h3>
 
                             <p className="text-slate-600 mb-10 max-w-md mx-auto leading-relaxed text-lg font-light">
-                                Send the Smart Avenue team a product suggestion. This does not place an order or reserve an item.
+                                Send the {SHOP_NAME} team a product suggestion. This does not place an order or reserve an item.
                             </p>
 
                             <motion.button

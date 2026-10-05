@@ -7,6 +7,7 @@ import { DepartmentContent } from "@/app/actions";
 import Image from "next/image";
 import Link from "next/link";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 const iconMap: Record<string, LucideIcon> = {
     PenTool,
@@ -149,7 +150,7 @@ export default function DepartmentsGrid({ departments }: { departments: Departme
                                 <h2 id="department-dialog-title" className="pr-10 text-3xl font-extrabold text-slate-950">{selectedDepartment.title}</h2>
                                 <p id="department-dialog-description" className="mt-4 text-base leading-7 text-slate-600">{selectedDepartment.description}</p>
                                 <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-                                    Browse available products online, then purchase in person at the Smart Avenue store.
+                                    Browse available products online, then purchase in person at the {SHOP_NAME} store.
                                 </p>
                                 <Link
                                     href={selectedDepartment.link || `/products?search=${encodeURIComponent(selectedDepartment.title)}`}

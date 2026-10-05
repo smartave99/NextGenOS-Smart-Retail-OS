@@ -1,5 +1,6 @@
 import { extractBarcodeCandidate } from "./barcode";
 import type { IntentAnalysis, RecommendationResponse } from "@/types/assistant-types";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export type AssistantScope = "shopping" | "greeting" | "out_of_scope";
 
@@ -71,7 +72,7 @@ function scopeIntent(scope: AssistantScope): IntentAnalysis {
         requirements: [],
         budget: { min: null, max: null },
         preferences: [],
-        useCase: scope === "greeting" ? "Storefront greeting" : "Outside Smart Avenue shopping scope",
+        useCase: scope === "greeting" ? "Storefront greeting" : `Outside ${SHOP_NAME} shopping scope`,
         searchTerm: null,
         confidence: 1,
         // The client uses this flag to avoid offering a product-request link
@@ -96,8 +97,8 @@ export function createScopedAssistantResponse(
         intent: scopeIntent(decision.scope),
         recommendations: [],
         summary: isGreeting
-            ? "Hi, I’m Genie, Smart Avenue’s shopping assistant. I can help you find products, compare options, check current offers, plan a store visit, or request an item. What are you shopping for?"
-            : "I can help only with Smart Avenue products, current offers, store visits, availability, comparisons, and product requests. Tell me what you’re shopping for.",
+            ? `Hi, I’m Genie, ${SHOP_NAME}’s shopping assistant. I can help you find products, compare options, check current offers, plan a store visit, or request an item. What are you shopping for?`
+            : `I can help only with ${SHOP_NAME} products, current offers, store visits, availability, comparisons, and product requests. Tell me what you’re shopping for.`,
         processingTime,
     };
 }

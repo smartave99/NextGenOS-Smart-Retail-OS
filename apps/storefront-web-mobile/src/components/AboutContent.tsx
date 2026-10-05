@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Globe, ShieldCheck, Users, Zap, TrendingUp, MapPin, Phone, Mail, Clock, Check, Star, Heart, Award } from "lucide-react";
 import Image from "next/image";
 import { AboutPageContent, ContactContent } from "@/app/actions";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 // Map string icon names to Lucide icons
 const iconMap: Record<string, React.ElementType> = {
@@ -13,11 +14,11 @@ const iconMap: Record<string, React.ElementType> = {
 export default function AboutContent({ content, contact }: { content: AboutPageContent | null, contact: ContactContent | null }) {
     // Default fallback content
     const data = content || {
-        heroTitle: "Smart Avenue",
+        heroTitle: SHOP_NAME,
         heroSubtitle: "Building the future of retail, right here in your city.",
         heroImage: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=2340&auto=format&fit=crop",
         visionTitle: "Redefining Retail in Patna",
-        visionText1: "We are not just a store; we are a logistics ecosystem designed for modern living. Smart Avenue bridges the gap between premium global brands and optimal local convenience.",
+        visionText1: `We are not just a store; we are a logistics ecosystem designed for modern living. ${SHOP_NAME} bridges the gap between premium global brands and optimal local convenience.`,
         visionText2: "Our platform leverages cutting-edge technology to ensure that quality, affordability, and speed are not mutually exclusive, but the standard for every interaction.",
         visionImage: "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2301&auto=format&fit=crop",
         heroLabel: "Our Story",
@@ -194,7 +195,7 @@ export default function AboutContent({ content, contact }: { content: AboutPageC
                                 <div>
                                     <h4 className="font-bold text-lg mb-1 text-brand-dark">Address</h4>
                                     <p className="text-slate-600 leading-relaxed whitespace-pre-line">
-                                        {contact?.address || "Smart Avenue Retail Complex,\nLevel 3, P&M Mall, Patliputra Colony,\nPatna, Bihar 800013"}
+                                        {contact?.address || `${SHOP_NAME} Retail Complex,\nLevel 3, P&M Mall, Patliputra Colony,\nPatna, Bihar 800013`}
                                     </p>
                                 </div>
                             </div>
@@ -225,7 +226,7 @@ export default function AboutContent({ content, contact }: { content: AboutPageC
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-lg mb-1 text-brand-dark">Email</h4>
-                                    <p className="text-slate-600">{contact?.email || "support@smartavenue.com"}</p>
+                                    <p className="text-slate-600">{contact?.email || "support@demomart.com"}</p>
                                 </div>
                             </div>
                         </div>

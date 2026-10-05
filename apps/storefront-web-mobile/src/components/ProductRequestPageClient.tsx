@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, Camera, CheckCircle2, PackagePlus, Store } from "lucide-react";
 import ProductRequestModal from "@/components/ProductRequestModal";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface ProductRequestPageClientProps {
     initialQuery?: string;
@@ -48,7 +49,7 @@ export default function ProductRequestPageClient({
                                 Can&apos;t find what you need?
                             </h1>
                             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-                                Tell the Smart Avenue team what you would like us to stock. Add a photo,
+                                Tell the {SHOP_NAME} team what you would like us to stock. Add a photo,
                                 preferred brand, and budget to help us understand your request.
                             </p>
                             <button

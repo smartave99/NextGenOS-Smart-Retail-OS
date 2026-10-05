@@ -61,7 +61,7 @@
 **/*.db-shm
 **/*.db-wal
 **/SmartRetail.db
-**/smart_avenue.db
+**/demo_shop.db
 
 # OS Generated
 Thumbs.db

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { Film, Zap, Play, Pause, RotateCw } from "lucide-react";
 import { useReducedMotion } from "framer-motion";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface ImageGalleryProps {
     images: string[];
@@ -138,7 +139,7 @@ export default function ImageGallery({
                     {currentMedia.type === "image" ? (
                         <Image
                             src={currentMedia.url}
-                            alt={`${productName} - product image at Smart Avenue`}
+                            alt={`${productName} - product image at ${SHOP_NAME}`}
                             fill
                             className="object-cover"
                             priority

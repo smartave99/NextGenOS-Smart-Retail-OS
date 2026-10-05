@@ -17,7 +17,7 @@ vi.mock("@/context/auth-context", () => ({ useAuth: () => ({ user: mocks.user.cu
 
 import FromTheShop from "./FromTheShop";
 
-const SHOP = { id: "5b8f1a0e-1111-4222-8333-944455556666", name: "Smart Avenue 99" };
+const SHOP = { id: "5b8f1a0e-1111-4222-8333-944455556666", name: "Demo Mart 99" };
 
 const WEBSITE_CATEGORIES = [
     { id: "c-groc", name: "Grocery", parentId: null },

@@ -94,7 +94,7 @@ function stopApp(app) {
     await owner.fill('#password', 'a-long-test-password');
     await owner.getByRole('button', { name: 'Create account' }).click();
     await owner.getByRole('heading', { name: 'Name your shop' }).waitFor({ timeout: 20000 });
-    await owner.fill('#shop-name', 'Smart Avenue 99');
+    await owner.fill('#shop-name', 'Demo Mart 99');
     await owner.getByRole('button', { name: 'Create the shop' }).click();
     await owner.getByRole('heading', { name: 'No figures yet' }).waitFor({ timeout: 20000 });
     step('the owner created an account and the shop');
@@ -111,7 +111,7 @@ function stopApp(app) {
     await pc.fill('#owner-key', status.ANON_KEY);
     await pc.fill('#owner-code', code);
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor({ timeout: 20000 });
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor({ timeout: 20000 });
     await owner.locator('#shop-pcs .note', { hasText: 'is connected' }).waitFor({ timeout: 20000 });
     await owner.locator('.hero .figure').waitFor({ timeout: 30000 });
     step(`the shop PC connected with ${code}; the page said so and showed the figures by itself`);

@@ -109,11 +109,11 @@ else
             {
                 <p class="small muted">Includes @release.Includes, which @(release.Includes.Contains(',') ? "were" : "was") not released on @(release.Includes.Contains(',') ? "their" : "its") own.</p>
             }
-            @foreach (var section in release.Sections)
+            @foreach (var group in release.Sections)
             {
-                <div class="change-kind"><span class="pill @Tone(section.Kind)">@section.Kind</span></div>
+                <div class="change-kind"><span class="pill @Tone(group.Kind)">@group.Kind</span></div>
                 <ul class="change-list">
-                    @foreach (var item in section.Items)
+                    @foreach (var item in group.Items)
                     {
                         <li><MarkdownView Text="@item" /></li>
                     }

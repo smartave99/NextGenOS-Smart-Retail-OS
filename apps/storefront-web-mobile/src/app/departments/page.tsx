@@ -5,6 +5,7 @@ import Image from "next/image";
 import { constructMetadata } from "@/lib/seo-utils";
 import { Metadata } from "next";
 import { Suspense } from "react";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export const revalidate = 3600;
 
@@ -13,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const config = await getSiteConfig();
     return constructMetadata({
         title: "Departments",
-        description: "Explore our curated departments including Electronics, Fashion, Home Goods, and Groceries at Smart Avenue 99.",
+        description: `Explore our curated departments including Electronics, Fashion, Home Goods, and Groceries at ${SHOP_NAME}.`,
         urlPath: "/departments",
         config
     });

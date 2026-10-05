@@ -110,7 +110,7 @@ async function until(check, timeout, what) {
 
     // The owner signs up on the website, creates the shop and makes a code.
     project.psql(`insert into auth.users (id, email) values ('${OWNER}', 'owner@example.com');`);
-    shop = project.asUser(OWNER, "select public.create_shop('Smart Avenue 99');");
+    shop = project.asUser(OWNER, "select public.create_shop('Demo Mart 99');");
     const code = project.asUser(OWNER, `select public.new_pairing_code('${shop}');`);
 
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -132,7 +132,7 @@ async function until(check, timeout, what) {
     await page.fill('#owner-key', project.anonKey);
     await page.fill('#owner-code', code);
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     await section.locator('.owner-state', { hasText: /Last sent at \d/ }).waitFor({ timeout: 30000 });
     assert.deepStrictEqual((await devices()).map(d => d.main), [true], 'the first PC to connect is the main PC');
     assert.strictEqual(await section.locator('#owner-counter').count(), 0, 'the main PC is not told it is a counter');

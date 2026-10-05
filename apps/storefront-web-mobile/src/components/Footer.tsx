@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Facebook, Instagram, Mail, MapPin, Store, Twitter } from "lucide-react";
 import { useSiteConfig } from "@/context/SiteConfigContext";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export default function Footer() {
     const { config } = useSiteConfig();
@@ -37,7 +38,7 @@ export default function Footer() {
 
                 <div className="grid gap-10 border-b border-white/10 pb-10 md:grid-cols-2 lg:grid-cols-12">
                     <div className="lg:col-span-4">
-                        <Link href="/" aria-label="Smart Avenue home" className="inline-flex items-center gap-3 rounded-xl">
+                        <Link href="/" aria-label={`${SHOP_NAME} home`} className="inline-flex items-center gap-3 rounded-xl">
                             <span className="relative h-14 w-14 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
                                 <Image
                                     src={branding.logoUrl || "/logo.png"}
@@ -48,7 +49,7 @@ export default function Footer() {
                                 />
                             </span>
                             <span>
-                                <span className="block text-lg font-extrabold">{branding.siteName || "Smart Avenue 99"}</span>
+                                <span className="block text-lg font-extrabold">{branding.siteName || SHOP_NAME}</span>
                                 <span className="block text-sm text-slate-300">Patna&apos;s local discovery catalogue</span>
                             </span>
                         </Link>
@@ -119,7 +120,7 @@ export default function Footer() {
                     <p>
                         {config.labels?.messages?.copyright
                             ? config.labels.messages.copyright.replace("{year}", new Date().getFullYear().toString())
-                            : `© ${new Date().getFullYear()} ${branding.siteName || "Smart Avenue 99"}. All rights reserved.`}
+                            : `© ${new Date().getFullYear()} ${branding.siteName || "${SHOP_NAME}"}. All rights reserved.`}
                     </p>
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                         {footer.bottomLinks.map((link) => (
@@ -128,7 +129,7 @@ export default function Footer() {
                             </Link>
                         ))}
                         {socialLinks.map(({ label, Icon, url }) => (
-                            <a key={label} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Open Smart Avenue on ${label}`} className="grid h-11 w-11 place-items-center rounded-xl border border-white/15 text-slate-300 transition-colors duration-100 hover:bg-white/10 hover:text-white">
+                            <a key={label} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${SHOP_NAME} on ${label}`} className="grid h-11 w-11 place-items-center rounded-xl border border-white/15 text-slate-300 transition-colors duration-100 hover:bg-white/10 hover:text-white">
                                 <Icon className="h-4 w-4" aria-hidden="true" />
                             </a>
                         ))}

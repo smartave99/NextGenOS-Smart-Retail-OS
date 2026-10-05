@@ -3,6 +3,7 @@ import {
     classifyAssistantScope,
     createScopedAssistantResponse,
 } from "./assistant-scope";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 describe("assistant business scope", () => {
     it("allows direct product searches, including Groq Vision descriptions", () => {
@@ -28,7 +29,7 @@ describe("assistant business scope", () => {
         const response = createScopedAssistantResponse(decision);
 
         expect(decision).toEqual({ scope: "greeting" });
-        expect(response.summary).toContain("Smart Avenue’s shopping assistant");
+        expect(response.summary).toContain(`${SHOP_NAME}’s shopping assistant`);
         expect(response.intent?.isGeneralChat).toBe(true);
     });
 
@@ -37,7 +38,7 @@ describe("assistant business scope", () => {
         const response = createScopedAssistantResponse(decision);
 
         expect(decision).toEqual({ scope: "out_of_scope" });
-        expect(response.summary).toContain("only with Smart Avenue products");
+        expect(response.summary).toContain(`only with ${SHOP_NAME} products`);
         expect(classifyAssistantScope("Tell me a joke about bangles")).toEqual({
             scope: "out_of_scope",
         });

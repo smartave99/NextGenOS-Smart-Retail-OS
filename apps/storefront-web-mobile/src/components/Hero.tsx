@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play, ShieldCheck, Sparkles, Store } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSiteConfig } from "@/context/SiteConfigContext";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export default function Hero() {
     const { config } = useSiteConfig();
@@ -81,7 +82,7 @@ export default function Hero() {
                 >
                     <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-blue-100 backdrop-blur-md">
                         <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                        Plan your Smart Avenue store visit
+                        Plan your {SHOP_NAME} store visit
                     </div>
                     <h1 className="max-w-3xl text-balance text-4xl font-black leading-[1.02] tracking-[-0.045em] text-white sm:text-6xl lg:text-7xl">
                         {slide.title}

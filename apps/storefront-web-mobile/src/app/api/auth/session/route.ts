@@ -6,6 +6,7 @@ import {
     ADMIN_SESSION_MAX_AGE_SECONDS,
 } from "@/lib/auth-server";
 import { getWriteClient } from "@/lib/db-manager";
+import { isOwnerAdmin } from "@/lib/owner-admins";
 
 const sessionSchema = z.object({
     idToken: z.string().min(100).max(10_000),
@@ -18,10 +19,10 @@ export async function POST(request: NextRequest) {
         const decoded = await auth.verifyIdToken(payload.idToken, true);
         const email = decoded.email?.trim().toLowerCase();
 
-        if (!email || (email !== "admin@smartavenue99.com" && decoded.email_verified === false)) {
+        if (!email || decoded.email_verified !== true) {
             return NextResponse.json({ success: false, error: "Verified email required" }, { status: 403 });
         }
-        if (email !== "admin@smartavenue99.com") {
+        if (!isOwnerAdmin(email)) {
             const staff = await getWriteClient().staff.findFirst({
                 where: { email: { equals: email, mode: "insensitive" } },
                 select: { id: true },

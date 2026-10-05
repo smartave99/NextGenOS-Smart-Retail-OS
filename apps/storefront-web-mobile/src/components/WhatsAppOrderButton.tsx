@@ -2,6 +2,8 @@
 
 import { MapPin, MessageSquare } from "lucide-react";
 import { useSiteConfig } from "@/context/SiteConfigContext";
+import { SITE_URL } from "@/lib/site-url";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface WhatsAppOrderButtonProps {
     productName: string;
@@ -25,8 +27,8 @@ export default function WhatsAppOrderButton({
         }
 
         const phone = whatsappUrl.replace(/\D/g, "");
-        const productUrl = `https://smartavenue99.com/products/${productId}`;
-        const message = `*In-store availability enquiry - Smart Avenue 99*
+        const productUrl = `${SITE_URL}/products/${productId}`;
+        const message = `*In-store availability enquiry - {SHOP_NAME}*
 
 *${productName}*
 Price: ₹${productPrice.toLocaleString("en-IN")}

@@ -4,6 +4,8 @@ import AboutContent from "@/components/AboutContent";
 import { constructMetadata } from "@/lib/seo-utils";
 import { Metadata } from "next";
 import { Suspense } from "react";
+import { SITE_URL } from "@/lib/site-url";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export const revalidate = 3600;
 
@@ -12,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const config = await getSiteConfig();
     return constructMetadata({
         title: "About Us",
-        description: "Learn about Smart Avenue 99's story, our curated collections, and our Genie AI shopping assistants.",
+        description: `Learn about ${SHOP_NAME}'s story, our curated collections, and our Genie AI shopping assistants.`,
         urlPath: "/about",
         config
     });
@@ -39,7 +41,7 @@ async function AboutPageContentLoader() {
         "@type": "LocalBusiness",
         "name": siteConfig.branding.siteName,
         "image": siteConfig.branding.logoUrl,
-        "url": "https://smartavenue99.com/about",
+        "url": `${SITE_URL}/about`,
         "telephone": siteConfig.contact.phone,
         "address": {
             "@type": "PostalAddress",

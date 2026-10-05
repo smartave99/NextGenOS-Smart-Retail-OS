@@ -8,6 +8,7 @@ import { MapPin, Menu, PackagePlus, ScanLine, Search, Sparkles, X } from "lucide
 import { useSiteConfig } from "@/context/SiteConfigContext";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 const PRODUCT_REQUEST_LINK = { label: "Request a Product", href: "/request-product" };
 
@@ -119,7 +120,7 @@ export default function Header() {
                 }`}
                 style={{ color: textColor }}
             >
-                <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="Smart Avenue home">
+                <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={`${SHOP_NAME} home`}>
                     <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
                         <Image
                             src={config.branding.logoUrl || "/logo.png"}
@@ -131,7 +132,7 @@ export default function Header() {
                     </span>
                     <span className="hidden min-w-0 xl:block">
                         <span className="block truncate text-sm font-extrabold tracking-tight text-slate-950">
-                            {config.branding.siteName || "Smart Avenue 99"}
+                            {config.branding.siteName || SHOP_NAME}
                         </span>
                         <span className="block text-xs font-semibold text-slate-500">Find something brilliant</span>
                     </span>
@@ -211,7 +212,7 @@ export default function Header() {
                 <div ref={searchDialogRef} tabIndex={-1} className="fixed inset-0 z-[70] bg-slate-950/50 p-3 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-labelledby="site-search-title">
                     <button className="absolute inset-0 cursor-default" onClick={closeSearch} aria-label="Close search" />
                     <form onSubmit={handleSearch} className="relative mx-auto mt-20 flex max-w-2xl items-center gap-2 rounded-2xl bg-white p-2 shadow-2xl">
-                        <h2 id="site-search-title" className="sr-only">Search Smart Avenue products</h2>
+                        <h2 id="site-search-title" className="sr-only">Search {SHOP_NAME} products</h2>
                         <Search className="ml-3 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
                         <label htmlFor="site-search" className="sr-only">Search products</label>
                         <input
@@ -254,7 +255,7 @@ export default function Header() {
                     <div className="absolute inset-y-0 right-0 flex w-[min(90vw,380px)] flex-col bg-white p-5 shadow-2xl">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-5">
                             <div>
-                                <h2 id="mobile-navigation-title" className="font-extrabold text-slate-950">{config.branding.siteName || "Smart Avenue 99"}</h2>
+                                <h2 id="mobile-navigation-title" className="font-extrabold text-slate-950">{config.branding.siteName || SHOP_NAME}</h2>
                                 <p className="text-sm text-slate-500">Explore the store</p>
                             </div>
                             <button ref={menuCloseRef} type="button" onClick={closeMenu} className="grid h-11 w-11 place-items-center rounded-xl bg-slate-100 text-slate-700" aria-label="Close menu">

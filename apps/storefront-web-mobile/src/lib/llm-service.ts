@@ -23,6 +23,7 @@ import {
 } from "./groq-config";
 import { withAIResponseCache } from "./ai-response-cache";
 import { z } from "zod";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 // Extended intent response to include product requests
 interface GenericIntentResponse extends LLMIntentResponse {
@@ -541,7 +542,7 @@ async function callLLM(
 
 /**
  * LLM call with dynamic generation settings from admin configuration.
- * Provider priority is deliberately ignored because SmartAvenue now has one
+ * Provider priority is deliberately ignored because the shop now has one
  * LLM provider: Groq. Gemini remains isolated to vector embeddings only.
  */
 async function callLLMWithConfig(prompt: string, overrideProvider?: LLMProvider | "auto", overrideModel?: string): Promise<string> {
@@ -740,7 +741,7 @@ export async function rankProducts(
         tags: p.tags,
     }));
 
-    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at Smart Avenue.
+    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at {SHOP_NAME}.
 
 Customer query: "${query}"
 
@@ -799,7 +800,7 @@ export async function generateSummary(
     const config = await getAIConfig();
     const persona = config.personaName;
 
-    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at Smart Avenue.
+    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at {SHOP_NAME}.
 
 Customer asked: "${query}"
 
@@ -1055,7 +1056,7 @@ export async function generateDealExplanation(
     const savings = product.originalPrice ? product.originalPrice - product.price : 0;
     const savingsPercent = product.originalPrice ? Math.round((savings / product.originalPrice) * 100) : 0;
 
-    const prompt = `You are a charismatic sales associate at Smart Avenue.
+    const prompt = `You are a charismatic sales associate at {SHOP_NAME}.
 Explain why the current deal on "${product.name}" is amazing for the customer.
 
 Product Info:
@@ -1331,7 +1332,7 @@ export async function generateBackInStockMessage(
     productName: string,
     customerName: string
 ): Promise<{ subject: string; body: string; discountCode?: string }> {
-    const prompt = `You are a customer loyalty bot for Smart Avenue.
+    const prompt = `You are a customer loyalty bot for {SHOP_NAME}.
     Context:
     - Customer: ${customerName}
     - Item Back in Stock: ${productName}

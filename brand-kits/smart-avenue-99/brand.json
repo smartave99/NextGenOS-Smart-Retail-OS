@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "name": "Smart Avenue 99",
+  "shortName": "Smart Avenue",
+  "legalName": "",
+  "tagline": "Where Luxury Meets Convenience",
+  "primaryColor": "#064e3b",
+  "accentColor": "#d4af37",
+  "theme": "auto",
+  "logo": "logo.png",
+  "contact": { "email": "", "phone": "", "address": "Patna, Bihar, India" },
+  "country": "IN",
+  "currency": "INR",
+  "language": "en-IN",
+  "storefront": { "siteUrl": "https://smartavenue99.com" },
+  "android": { "appId": "com.smartavenue99.shop", "storefrontUrl": "https://smartavenue99.com" },
+  "receipt": { "header": "", "footer": "Thank you! Please visit again." },
+  "poweredBy": true
+}

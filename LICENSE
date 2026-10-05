@@ -1,6 +1,6 @@
-NextGen OS Proprietary Software Licence Notice
+NextGenOS Proprietary Software Licence Notice
 
-Copyright (c) 2026 NextGen OS. All rights reserved.
+Copyright (c) 2026 NextGenOS. All rights reserved.
 
 
 1. OWNERSHIP
@@ -8,7 +8,7 @@ Copyright (c) 2026 NextGen OS. All rights reserved.
 This repository and everything in it (the source code, compiled programs,
 installers, database scripts, designs, AI prompts, documentation and
 other materials, together the "Software") is the confidential and
-proprietary property of NextGen OS ("NextGen OS"), except for the
+proprietary property of NextGenOS ("NextGenOS"), except for the
 third-party components described in section 6.
 
 
@@ -16,7 +16,7 @@ third-party components described in section 6.
 
 Having access to this repository, or to a copy, a download, a build or an
 installer of the Software, does not give you any licence or right in it.
-Without a written agreement signed or accepted by NextGen OS that says
+Without a written agreement signed or accepted by NextGenOS that says
 otherwise, you may not:
 
   a) use, run, install or evaluate the Software;
@@ -36,23 +36,23 @@ otherwise, you may not:
 
 3. LICENSED USE
 
-The Software may be used only under a written licence from NextGen OS:
+The Software may be used only under a written licence from NextGenOS:
 
   - a shop or business that buys or is given the Software uses it under
     the End User Licence Agreement in the file EULA.txt, or the agreement
-    it signed with NextGen OS;
+    it signed with NextGenOS;
   - a reseller, partner or white-label customer acts only under a separate
-    written reseller or white-label agreement signed by NextGen OS.
+    written reseller or white-label agreement signed by NextGenOS.
 
 Permission to sell, resell, distribute, host or rebrand the Software is
-never implied. It exists only where NextGen OS has given it in writing.
+never implied. It exists only where NextGenOS has given it in writing.
 
 
 4. CONFIDENTIALITY
 
 The source code and everything else in this repository that is not
-published by NextGen OS is confidential. Keep it private, do not share it
-outside the people NextGen OS has authorised in writing, and do not
+published by NextGenOS is confidential. Keep it private, do not share it
+outside the people NextGenOS has authorised in writing, and do not
 publish any part of it (including in public repositories, issue trackers,
 forums or AI services that keep or train on what they receive).
 
@@ -60,14 +60,14 @@ forums or AI services that keep or train on what they receive).
 5. CONTRIBUTIONS
 
 A contribution to the Software is accepted only from a person who has a
-written agreement with NextGen OS that gives NextGen OS the ownership of,
+written agreement with NextGenOS that gives NextGenOS the ownership of,
 or an exclusive licence to, what they contribute.
 
 
 6. THIRD-PARTY COMPONENTS
 
 The Software includes or uses third-party components that are not owned by
-NextGen OS and are not covered by this notice. Each remains under its own
+NextGenOS and are not covered by this notice. Each remains under its own
 licence, which is listed in THIRD-PARTY-NOTICES.md and in the licenses
 folder. Nothing in this notice limits the rights those licences give you
 in those components.
@@ -75,9 +75,9 @@ in those components.
 
 7. NAMES
 
-The names "NextGen OS" and "Smart Retail OS", and the logos and product
-names used with them, identify NextGen OS and its products. No right to use
-them is granted, except as an agreement with NextGen OS says.
+The names "NextGenOS" and "Smart Retail POS", and the logos and product
+names used with them, identify NextGenOS and its products. No right to use
+them is granted, except as an agreement with NextGenOS says.
 
 
 8. NO WARRANTY
@@ -94,7 +94,7 @@ OR ITS USE, EXCEPT TO THE EXTENT THE LAW DOES NOT ALLOW THIS TO BE LIMITED.
 
 Use of the Software that this notice or a written agreement does not
 allow is an infringement of copyright and a breach of confidence, and
-NextGen OS will take the steps the law allows against it.
+NextGenOS will take the steps the law allows against it.
 
 To ask for a licence, or to report a suspected unlicensed copy, contact
-NextGen OS: smartave99@gmail.com, +91 6123115368.
+NextGenOS: smartave99@gmail.com, +91 6123115368.

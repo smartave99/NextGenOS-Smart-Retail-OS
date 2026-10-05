@@ -26,6 +26,7 @@ import dynamic from "next/dynamic";
 import { analyzeImage } from "@/app/actions/image-search-action";
 import { processVoiceSearch } from "@/app/actions/voice-search-action";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 // Lazy-load ProductRequestModal (18KB) — only needed when user requests a product
 const ProductRequestModal = dynamic(() => import("@/components/ProductRequestModal"), { ssr: false });
@@ -145,7 +146,7 @@ export default function AssistantChat() {
             .catch(() => setAiSettings({
                 enabled: true,
                 personaName: "Genie",
-                greeting: "Hey there! ✨ I'm Genie, your personal shopping assistant at Smart Avenue 99! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️",
+                greeting: `Hey there! ✨ I'm Genie, your personal shopping assistant at ${SHOP_NAME}! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️`,
                 enableVoiceInput: false,
                 enableProductRequests: true,
             }));
@@ -868,7 +869,7 @@ export default function AssistantChat() {
                                     </button>
                                 </div>
                                 <p className="text-xs text-slate-400 text-center mt-3 font-medium tracking-wide">
-                                    Smart Avenue 99 • Product, image, voice & barcode search
+                                    {SHOP_NAME} • Product, image, voice & barcode search
                                 </p>
                             </form>
                         </motion.div>

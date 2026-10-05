@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { createProductRequest, ProductRequestInput } from "@/app/actions/request-actions";
 import ImageUpload from "./CloudinaryUpload";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface ProductRequestModalProps {
     isOpen: boolean;
@@ -267,7 +268,7 @@ export default function ProductRequestModal({
 
                                         <div className="pt-4">
                                             <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs font-medium leading-5 text-amber-900">
-                                                Suggestions do not reserve products. All purchases happen in person at the Smart Avenue store.
+                                                Suggestions do not reserve products. All purchases happen in person at the {SHOP_NAME} store.
                                             </p>
                                             <button
                                                 type="submit"

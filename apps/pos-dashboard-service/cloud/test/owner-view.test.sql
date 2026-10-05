@@ -38,7 +38,7 @@ reset role;
 -- The owner creates the shop and a code.
 set role authenticated;
 set request.jwt.claim.sub = :'owner';
-select public.create_shop('Smart Avenue 99') as shop \gset
+select public.create_shop('Demo Mart 99') as shop \gset
 select public.new_pairing_code(:'shop') as code \gset
 select pg_temp.check(:'code' ~ '^[A-HJ-NP-Z2-9]{8}$', 'the code is 8 easy-to-read letters and digits');
 select pg_temp.fails('select public.create_shop(''Second shop'')', 'already has its shop');
@@ -57,7 +57,7 @@ select pg_temp.fails('select public.connect_shop_pc(''WRONG-CODE'')', 'wrong or 
 select public.connect_shop_pc(lower(left(:'code', 4) || '-' || right(:'code', 4)), 'Counter PC') as pairing \gset
 select pg_temp.fails(format('select public.connect_shop_pc(%L)', :'code'), 'wrong or has expired');
 select (:'pairing')::jsonb ->> 'key' as key \gset
-select pg_temp.check(length(:'key') = 64 and ((:'pairing')::jsonb ->> 'shop_name') = 'Smart Avenue 99', 'the PC gets a long key and the shop''s name');
+select pg_temp.check(length(:'key') = 64 and ((:'pairing')::jsonb ->> 'shop_name') = 'Demo Mart 99', 'the PC gets a long key and the shop''s name');
 
 -- It sends figures; a wrong key, too much, or not an object is refused.
 select public.send_live_figures(:'key', '{"today": {"sales": 5723, "bills": 5}}',

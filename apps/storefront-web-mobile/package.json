@@ -1,5 +1,5 @@
 {
-  "name": "smart_avenue",
+  "name": "smart-retail-storefront",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -19,8 +19,8 @@
     "verify:ai": "ts-node -P tsconfig.scripts.json scripts/verify-all-api-keys.ts"
   },
   "build": {
-    "appId": "com.smartavenue.app",
-    "productName": "Smart Avenue",
+    "appId": "com.nextgenos.smartretail",
+    "productName": "Smart Retail POS",
     "directories": {
       "output": "dist-electron"
     },

@@ -60,7 +60,7 @@ namespace SmartRetail.AI.Tests
                 var machine = new FakeMachine { Running = { @"C:\Windows\System32", pos.Path }, Instances = { "MSSQLSERVER" } };
                 var sql = new FakeSqlServers();
                 var server = sql.Add(".", "SHOP-PC", logins: "sa");
-                server.Databases["Raintech_DB1"] = new FakeDatabase { Bills = 2998, LastBill = September15, Company = "Smart Avenue", CanWrite = true };
+                server.Databases["Raintech_DB1"] = new FakeDatabase { Bills = 2998, LastBill = September15, Company = "Demo Mart", CanWrite = true };
                 server.Databases["Raintech_DB2"] = new FakeDatabase { Bills = 9000, LastBill = September15.AddDays(3) };
                 server.Databases["RaintechMaster_DB"] = new FakeDatabase { IsPos = false };
                 server.Databases["ShopAccounts"] = new FakeDatabase { IsPos = false };
@@ -73,13 +73,13 @@ namespace SmartRetail.AI.Tests
                 Assert.True(best.InUseByPos);
                 Assert.Equal("sa", best.Login.UserName);
                 Assert.Equal("12345", best.Login.Password);
-                Assert.Equal("Smart Avenue", best.CompanyName);
+                Assert.Equal("Demo Mart", best.CompanyName);
                 Assert.Equal(2998, best.Bills);
                 Assert.Equal(September15, best.LastBill);
                 Assert.True(best.LoginCanWrite);
                 Assert.Equal(pos.Path, best.PosFolder);
                 Assert.Equal(new[] { "Raintech_DB1", "Raintech_DB2" }, search.Candidates.Select(candidate => candidate.Database));
-                Assert.Equal("Smart Avenue (Raintech_DB1 on SHOP-PC): 2,998 bills, the latest on 15 Sep 2026.", best.Describe());
+                Assert.Equal("Demo Mart (Raintech_DB1 on SHOP-PC): 2,998 bills, the latest on 15 Sep 2026.", best.Describe());
 
                 // The registry's MSSQLSERVER is the same server as SHOP-PC, so it was searched once:
                 // Windows sign-in first (refused), then the POS's login.
@@ -171,7 +171,7 @@ namespace SmartRetail.AI.Tests
         {
             using (var drive = new TempFolder())
             {
-                var pos = Directory.CreateDirectory(Path.Combine(drive.Path, "NextGenOS", "SmartAvenue99 POS")).FullName;
+                var pos = Directory.CreateDirectory(Path.Combine(drive.Path, "NextGenOS", "DemoMart99 POS")).FullName;
                 File.WriteAllText(Path.Combine(pos, PosConnectionDetector.DatabaseFile), "Raintech_DB1");
                 var tooDeep = Directory.CreateDirectory(Path.Combine(drive.Path, "a", "b", "c")).FullName;
                 File.WriteAllText(Path.Combine(tooDeep, PosConnectionDetector.DatabaseFile), "Other_DB");

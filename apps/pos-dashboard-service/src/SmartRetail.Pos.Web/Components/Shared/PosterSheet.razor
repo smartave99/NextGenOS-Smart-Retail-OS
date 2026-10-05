@@ -76,13 +76,7 @@
     /// <summary>"print-me" on the one sheet the Print button prints.</summary>
     [Parameter] public string? Class { get; set; }
 
-    private string Layout => Poster.Items.Count switch
-    {
-        <= 1 => "n1",
-        2 => "n2",
-        <= 4 => "n4",
-        _ => "n6",
-    };
+    private string Layout => Poster.Items.Count <= 1 ? "n1" : Poster.Items.Count == 2 ? "n2" : Poster.Items.Count <= 4 ? "n4" : "n6";
 
     /// <summary>As big as the headline can be: its longest word fits one line, and all of it fits two lines,
     /// beside the offer badge when there is one. Heavy capitals are about 0.7 of their size wide.</summary>

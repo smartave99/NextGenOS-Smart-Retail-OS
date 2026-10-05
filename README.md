@@ -1,6 +1,6 @@
 # Smart Retail Suite - Unified Enterprise Platform
 
-Welcome to the **Smart Retail Suite**, a complete, unified omnichannel retail platform created by combining the three core codebases of the **NextGenOS & Smart Avenue** ecosystem into a single unified monorepo.
+Welcome to the **Smart Retail Suite**, a complete, unified omnichannel retail platform created by combining the three core codebases of the **NextGenOS & Demo Mart** ecosystem into a single unified monorepo.
 
 ---
 
@@ -14,7 +14,7 @@ flowchart TD
         DesktopPOS["Core WinForms POS Station\n(.NET 4.8 / VB.NET)\n[apps/pos-desktop]"]
         AIAssistant["Smart Retail AI Companion\n(WPF / WebView2)\n[apps/pos-ai-companion]"]
         DashboardUI["Web Dashboard & Photo Studio\n(ASP.NET Core .NET 8)\n[apps/pos-dashboard-service]"]
-        WebStorefront["Smart Avenue Storefront\n(Next.js 15 / React 19)\n[apps/storefront-web-mobile]"]
+        WebStorefront["Demo Mart Storefront\n(Next.js 15 / React 19)\n[apps/storefront-web-mobile]"]
         MobileClient["Mobile Apps (Android & iOS)\n(Capacitor)"]
         ElectronClient["Desktop Shopping App\n(Electron 42)"]
     end
@@ -56,7 +56,7 @@ smart-retail-suite/
 │
 ├── apps/
 │   ├── pos-desktop/             # [From Smart-Retail-POS-by-NextGen-OS-main.zip]
-│   │   ├── Source/              # SmartAvenue99 Master Solution (13 WinForms & Library projects)
+│   │   ├── Source/              # DemoMart99 Master Solution (13 WinForms & Library projects)
 │   │   ├── Drivers/             # Receipt printers, barcode scanners, and peripheral drivers
 │   │   ├── Fonts/               # Barcode (Code128/39) and receipt fonts
 │   │   ├── Setup/               # SQL Server database restore files and deployment scripts
@@ -75,7 +75,7 @@ smart-retail-suite/
 │   │   ├── tests/               # Dashboard and Vision test suites
 │   │   └── SmartRetailPOS.sln   # Dedicated Visual Studio solution for web services
 │   │
-│   └── storefront-web-mobile/   # [From smart_avenue-master.zip]
+│   └── storefront-web-mobile/   # [From demo_shop-master.zip]
 │       ├── src/                 # Next.js 15, React 19, and Tailwind CSS app components
 │       ├── android/             # Native Android project configuration for Capacitor
 │       ├── prisma/              # Database schema (PostgreSQL) and Prisma client migrations
@@ -110,7 +110,7 @@ smart-retail-suite/
 - **Purpose**: The primary workstation running at the retail counter.
 - **Tech Stack**: Visual Basic .NET, C#, .NET Framework 4.8 x86, Windows Forms, Crystal Reports, ADO.NET SQL Server.
 - **Components**:
-  - `SmartAvenue99 POS`: Billing, batch tracking, inventory audits, cash drawer, and thermal printing.
+  - `DemoMart99 POS`: Billing, batch tracking, inventory audits, cash drawer, and thermal printing.
   - 12 Companion Libraries:
     - `MyDBLibrary`: ADO.NET SQL Server connection and query optimization layer.
     - `DevNet.PhonePe`: UPI dynamic QR generation with webhook confirmation.
@@ -161,7 +161,7 @@ This menu lets you launch any of the four applications, run builds, or verify AI
 
 ### Starting Individual Applications
 
-#### 1. Smart Avenue Web Storefront (Next.js)
+#### 1. Demo Mart Web Storefront (Next.js)
 ```cmd
 # Using root npm script
 npm run dev:storefront
@@ -171,7 +171,7 @@ scripts\start-storefront.bat
 ```
 Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
-#### 2. Smart Avenue Desktop Shopping Client (Electron)
+#### 2. Demo Mart Desktop Shopping Client (Electron)
 ```cmd
 # Using root npm script
 npm run desktop:storefront

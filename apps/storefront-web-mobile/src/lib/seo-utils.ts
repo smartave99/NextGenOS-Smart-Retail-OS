@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { SiteConfig } from "@/types/site-config";
+import { SITE_URL } from "@/lib/site-url";
 
 interface SeoProps {
     title: string;
@@ -14,7 +15,7 @@ interface SeoProps {
  */
 export function constructMetadata({ title, description, urlPath = "", imageUrl, config }: SeoProps): Metadata {
     const finalDescription = description || config.seo.metaDescription;
-    const finalUrl = urlPath ? `https://smartavenue99.com${urlPath.startsWith('/') ? urlPath : `/${urlPath}`}` : "https://smartavenue99.com";
+    const finalUrl = urlPath ? `${SITE_URL}${urlPath.startsWith('/') ? urlPath : `/${urlPath}`}` : SITE_URL;
     const finalImage = imageUrl || config.seo.ogImageUrl || "/logo.png";
 
     return {

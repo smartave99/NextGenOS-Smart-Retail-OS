@@ -93,7 +93,8 @@ function checkBypass() {
 }
 
 // Smart Avenue 99 is a customer. Its identity may live only in brand kits, documentation of that customer, and the (separate) decompiled POS source.
-const IDENTITY_ALLOW = /^(brand-kits\/|docs\/|CLAUDE\.md|CHANGELOG\.md|scripts\/verify-all\.mjs|apps\/pos-desktop\/(Source|Documentation)\/|licenses\/|.*package-lock\.json$|apps\/storefront-web-mobile\/(tmp\/|.*\.resolved$|build_log|test-output|compare-output|verification_result))/;
+// Internal names of the legacy POS source (assembly, exe, solution paths): renaming them needs a Windows build machine to regression-test.
+const IDENTITY_ALLOW = /^(SmartRetailSuite\.sln|scripts\/build-all\.ps1|apps\/pos-desktop\/|brand-kits\/|docs\/|CLAUDE\.md|CHANGELOG\.md|scripts\/verify-all\.mjs|apps\/pos-desktop\/(Source|Documentation)\/|licenses\/|.*package-lock\.json$|apps\/storefront-web-mobile\/(tmp\/|.*\.resolved$|build_log|test-output|compare-output|verification_result))/;
 function checkIdentity() {
   const hits = [];
   for (const f of repoFiles()) {

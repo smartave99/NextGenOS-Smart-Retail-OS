@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Lock, Mail, Loader2 } from "lucide-react";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export default function AdminLoginPage() {
     const [email, setEmail] = useState("");
@@ -107,7 +108,7 @@ export default function AdminLoginPage() {
 
                 <div className="text-center mt-8">
                     <p className="text-xs text-brand-gray">
-                        &copy; {new Date().getFullYear()} Smart Avenue Retail. Operations only.
+                        &copy; {new Date().getFullYear()} {SHOP_NAME} Retail. Operations only.
                     </p>
                 </div>
             </div>

@@ -33,7 +33,7 @@ After those come white-label branding, multi-tenant and chain support, localisat
 
 **To fill in before the EULA is shown to a customer** (search for `TO BE COMPLETED`): your legal entity name and registered address, the licensing contact e-mail, and the governing law and courts (*for counsel*).
 
-**What this does not change.** Copies that someone already received under the MIT licence stay under it. This repository was created on 5 October 2026, is **private**, has one commit and no forks, which is the best case. But the README says its code was merged from three earlier sources (`Smart-Retail-POS-by-NextGen-OS`, `Test`, `smart_avenue`). **Check whether any of those were ever public under MIT, make them private, and keep the history of what was released.**
+**What this does not change.** Copies that someone already received under the MIT licence stay under it. This repository was created on 5 October 2026, is **private**, has one commit and no forks, which is the best case. But the README says its code was merged from three earlier sources (`Smart-Retail-POS-by-NextGen-OS`, `Test`, `demo_shop`). **Check whether any of those were ever public under MIT, make them private, and keep the history of what was released.**
 
 Not changed on purpose (needs your decision, see section 2): the licence check, the activation script and the secrets. The `CHANGELOG.md` was left alone because its tooling is strict about headings; add a line about the licence when you cut the next version.
 
@@ -45,7 +45,7 @@ Not changed on purpose (needs your decision, see section 2): the licence check, 
 
 What the repository shows:
 
-- `apps/pos-desktop/Documentation/RECOVERY_REPORT.md` says the source was **recovered by decompiling** compiled binaries, installers and databases ("Original Files Provided: `D:\Test\POS\`") of a product formerly called "SmartAvenue99 POS". The code still carries decompiler markers (`Token: 0x… RID: … RVA: …`) in about 2,400 `.vb` and `.cs` files, original-product names such as `BillPoint`, and a database table called `RaintechMaster` that the start-up screen reads.
+- `apps/pos-desktop/Documentation/RECOVERY_REPORT.md` says the source was **recovered by decompiling** compiled binaries, installers and databases ("Original Files Provided: `D:\Test\POS\`") of a product formerly called "DemoMart99 POS". The code still carries decompiler markers (`Token: 0x… RID: … RVA: …`) in about 2,400 `.vb` and `.cs` files, original-product names such as `BillPoint`, and a database table called `RaintechMaster` that the start-up screen reads.
 - Seven helper libraries (`DevNet.ChromeDriverManager`, `DevNet.GS`, `DevNet.PhonePe`, `DevNet.QImage`, `DevNet.Translitration`, `DevNet.WhatsApp.V2`, `DevNetTRLN`) were protected with **Eziriz .NET Reactor and Agile.NET**, which a vendor uses to stop copying. What is in the repository for them was rebuilt from their public signatures, and hundreds of randomly named obfuscator files are still in the tree.
 - The POS project builds against `..\..\..\Original_Binaries\*.dll` (60 references). Those original binaries are not in the repository, so **the POS cannot be built from this repository alone**, and its real behaviour comes from files you did not write.
 - It talks to Firebase projects named `androidbillsoftreport`, `sdata-d4757`, `update-89a0d` and `softwarelicensemanager-a9582`. Whoever owns those projects can read, change or switch off every install that uses them.
@@ -91,11 +91,11 @@ Values are not repeated here. The repository's history keeps them, so removing t
 
 | What | Where | Do |
 |---|---|---|
-| An **OpenAI API key** (`sk-proj-…`) | `apps/pos-desktop/Source/SmartAvenue99_POS_VB/SmartAvenue99 POS/BillPoint/frmImageReader.vb:28` | Revoke it at OpenAI. Customers' AI calls must go through your own gateway (section 4) or their own key |
+| An **OpenAI API key** (`sk-proj-…`) | `apps/pos-desktop/Source/DemoMart99_POS_VB/DemoMart99 POS/BillPoint/frmImageReader.vb:28` | Revoke it at OpenAI. Customers' AI calls must go through your own gateway (section 4) or their own key |
 | A **Neon PostgreSQL connection string with its password** | `apps/storefront-web-mobile/tmp/wake_primary.mjs:4` | Reset the database password; delete the `tmp/` folder |
 | **Firebase database secrets** (full admin access) in the POS: `Form.vb:605`, `Receiver.vb:488`, `frmCustomerMobileRpt.vb:988`, `frmGodownInward.vb:398`, `frmGodownOutward.vb:826`, `frmGodownConfig.vb:246`, `frmInfoBrodcast.vb:289`, `ModFunc.vb:64,70`, and `Libraries/DevNetFB/DevNetFB/FirebaseService.cs:72,148` | `apps/pos-desktop/Source/…/BillPoint/` | Revoke on the Firebase projects you control; replace with per-tenant, short-lived credentials |
 | A hard-coded **password** in `Me.password` | `frmCategory.vb:37`, `frmLead_Product.vb:38` | Find what it unlocks and change it |
-| The **admin account password** in the user-creation scripts (one of them is trivially guessable), and the admin e-mail `admin@smartavenue99.com` that the code treats as super-admin | `apps/storefront-web-mobile/scripts/create-admin.ts:42`, `create-admin.js:52`, `recreate-admin.ts:35`, `recreate-admin.js` | Change the password on the live Firebase project now, remove it from the scripts, read it from the environment |
+| The **admin account password** in the user-creation scripts (one of them is trivially guessable), and the admin e-mail `admin@demomart99.com` that the code treats as super-admin | `apps/storefront-web-mobile/scripts/create-admin.ts:42`, `create-admin.js:52`, `recreate-admin.ts:35`, `recreate-admin.js` | Change the password on the live Firebase project now, remove it from the scripts, read it from the environment |
 | The **AES licence key** | `DevNetLM/Classes/Encryption.cs`, `Activate_POS.ps1` | Retire it; the new licence uses signatures (section 4) |
 
 Because the history is a single commit, the cleanest way to get rid of the old secrets in git is to make the fixes, rotate, and **start a fresh repository from the cleaned tree**. Turn on GitHub secret scanning with push protection so this cannot recur.
@@ -110,11 +110,11 @@ The POS reads and writes four Firebase projects with an admin secret that is the
 
 ### 3.1 White-label branding
 
-State today: the product identity is spread across the code. "Smart Avenue" appears in 74 files, "NextGen" in 65, "SmartRetail" in 460 (mostly code namespaces, which can stay). The identity strings that must become configuration:
+State today: the product identity is spread across the code. "Demo Mart" appears in 74 files, "NextGen" in 65, "SmartRetail" in 460 (mostly code namespaces, which can stay). The identity strings that must become configuration:
 
-- Display name, logo, colours, support contact and legal text; the app and package IDs (`com.smartavenue.app`, `productName: "Smart Avenue"` in the storefront; `AppId` GUID, `AppName`, `OutputBaseFilename`, `MyAppURL` in the Inno script; `Branding.cs` in the AI add-on, which already holds `Company`, `Product` and `AppFolderName`).
-- The executable name `SmartAvenue99 POS.exe`, registry keys `Software\SLM\…` and `Software\hdc\…`, the session cookie `smart_avenue_session`, the manifest and `llms.txt`, AI prompts that name "Smart Avenue".
-- The built-in super-admin e-mail `admin@smartavenue99.com`, which is **hard-coded in five places** (`src/lib/auth-server.ts:26`, `src/app/actions.ts:454` and `:1364`, `src/app/api/auth/session/route.ts:21,24`, `src/lib/data.ts:170`) and bypasses the e-mail-verified check. This is a back door that also carries your own shop's identity: remove it, and create the first admin per tenant at install time.
+- Display name, logo, colours, support contact and legal text; the app and package IDs (`com.demomart.app`, `productName: "Demo Mart"` in the storefront; `AppId` GUID, `AppName`, `OutputBaseFilename`, `MyAppURL` in the Inno script; `Branding.cs` in the AI add-on, which already holds `Company`, `Product` and `AppFolderName`).
+- The executable name `DemoMart99 POS.exe`, registry keys `Software\SLM\…` and `Software\hdc\…`, the session cookie `demo_shop_session`, the manifest and `llms.txt`, AI prompts that name "Demo Mart".
+- The built-in super-admin e-mail `admin@demomart99.com`, which is **hard-coded in five places** (`src/lib/auth-server.ts:26`, `src/app/actions.ts:454` and `:1364`, `src/app/api/auth/session/route.ts:21,24`, `src/lib/data.ts:170`) and bypasses the e-mail-verified check. This is a back door that also carries your own shop's identity: remove it, and create the first admin per tenant at install time.
 
 Build a **brand profile** (one signed JSON per customer or partner: names, logos, colours, domains, legal text, support links, update channel, feature flags) that every app reads at start, and a build pipeline that stamps it into the installer, the Electron/Capacitor shells and the storefront. Put the brand-profile ID **inside the signed licence** (section 4) so a partner can use only the branding you approved. The storefront already has `/admin/branding` and `/admin/appearance`; the POS and the installers have nothing.
 
@@ -226,7 +226,7 @@ The existing updater is a good start (a public feed plus a check that GitHub sig
 
 **Phase 1, weeks 2 to 6**
 5. Licensing core: signed licence files, a small private licence service (issue, activate, check-in, revoke), verifiers for the POS (.NET Framework 4.8), the add-on and dashboard (.NET) and the storefront (Node).
-6. Brand profile and the stamping pipeline; remove the hard-coded admin and the "Smart Avenue" identity; create the first admin per tenant.
+6. Brand profile and the stamping pipeline; remove the hard-coded admin and the "Demo Mart" identity; create the first admin per tenant.
 7. Root CI, dependency updates, removal of debug routes and scratch files, working tests.
 
 **Phase 2, months 2 to 3**

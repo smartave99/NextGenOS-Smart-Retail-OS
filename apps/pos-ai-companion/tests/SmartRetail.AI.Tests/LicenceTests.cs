@@ -59,8 +59,8 @@ namespace SmartRetail.AI.Tests
             var root = Repository.Root();
             var notices = Read("THIRD-PARTY-NOTICES.md");
             var missing = new List<string>();
-            foreach (var project in new[] { "SmartRetailAI", "SmartRetailPOS" }
-                         .SelectMany(product => Directory.GetFiles(Path.Combine(root, product, "src"), "*.csproj", SearchOption.AllDirectories)))
+            foreach (var project in new[] { Repository.Ai(), Repository.Dashboard() }
+                         .SelectMany(product => Directory.GetFiles(Path.Combine(product, "src"), "*.csproj", SearchOption.AllDirectories)))
             {
                 foreach (Match reference in Regex.Matches(File.ReadAllText(project), "<PackageReference Include=\"([^\"]+)\""))
                 {
@@ -97,9 +97,9 @@ namespace SmartRetail.AI.Tests
             // The fonts and supabase-js keep their own licence files beside them.
             foreach (var file in new[]
             {
-                "SmartRetailPOS/src/SmartRetail.Pos.Web/wwwroot/fonts/Inter-LICENSE.txt",
-                "SmartRetailPOS/src/SmartRetail.Pos.Web/wwwroot/fonts/NotoSansDevanagari-LICENSE.txt",
-                "SmartRetailPOS/owner-app/vendor/supabase-js.LICENSE",
+                Path.Combine("apps", "pos-dashboard-service", "src", "SmartRetail.Pos.Web", "wwwroot", "fonts", "Inter-LICENSE.txt"),
+                Path.Combine("apps", "pos-dashboard-service", "src", "SmartRetail.Pos.Web", "wwwroot", "fonts", "NotoSansDevanagari-LICENSE.txt"),
+                Path.Combine("apps", "pos-dashboard-service", "owner-app", "vendor", "supabase-js.LICENSE"),
             })
             {
                 Assert.True(File.Exists(Path.Combine(root, file)), file + " is missing");
@@ -138,7 +138,7 @@ namespace SmartRetail.AI.Tests
         [Fact]
         public void The_package_carries_the_licence_and_the_notices()
         {
-            var build = Read("SmartRetailAI", "build.ps1");
+            var build = File.ReadAllText(Path.Combine(Repository.Ai(), "build.ps1"));
 
             Assert.Matches(@"Copy-Item\s+""\.\./\.\./EULA\.txt""\s+\(Join-Path \$out ""EULA\.txt""\)", build);
             Assert.Matches(@"Copy-Item\s+""\.\./\.\./THIRD-PARTY-NOTICES\.md""\s+\$out", build);

@@ -555,18 +555,18 @@ public sealed class CreativeServiceTests : IDisposable
         Assert.Equal("Sharma General Store", service.Brand.ShopName);
         Assert.Equal(new[] { "#1D3557" }, service.Brand.Colours);
 
-        // A number is part of a name (Smart Avenue 99); a price sign would look like an offer, which only the app draws.
-        service.SaveBrand(new CreativeBrand { ShopName = "  Smart Avenue 99 " });
-        Assert.Equal("Smart Avenue 99", service.Brand.ShopName);
+        // A number is part of a name (Demo Mart 99); a price sign would look like an offer, which only the app draws.
+        service.SaveBrand(new CreativeBrand { ShopName = "  Demo Mart 99 " });
+        Assert.Equal("Demo Mart 99", service.Brand.ShopName);
         Assert.Throws<CreativeException>(() => service.SaveBrand(new CreativeBrand { ShopName = "Mega 50% Mart" }));
         Assert.Throws<CreativeException>(() => service.SaveBrand(new CreativeBrand { ShopName = "₹99 Store" }));
-        Assert.Equal("Smart Avenue 99", service.Brand.ShopName);
+        Assert.Equal("Demo Mart 99", service.Brand.ShopName);
     }
 
     [Fact]
     public void A_shop_name_with_a_number_does_not_stop_a_picture_whether_it_is_from_the_POS_or_saved()
     {
-        var service = Service("Smart Avenue 99");
+        var service = Service("Demo Mart 99");
         Assert.Null(service.Problem(new CreativeBrief()));
 
         service.SaveBrand(new CreativeBrand { ShopName = "1004 Ganesh" });

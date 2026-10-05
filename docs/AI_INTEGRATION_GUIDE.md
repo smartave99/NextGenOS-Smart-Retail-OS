@@ -74,7 +74,7 @@ Designed to be operated directly by store cashiers and store owners on the count
 ## 4. Automated Marketing & Creative Studio (`apps/pos-dashboard-service`)
 
 ### Photo Studio
-- Takes raw snapshots captured via phone camera and removes backgrounds, adjusts lighting, and generates 5 professional product angles suitable for Amazon, Shopify, or the Smart Avenue web catalog.
+- Takes raw snapshots captured via phone camera and removes backgrounds, adjusts lighting, and generates 5 professional product angles suitable for Amazon, Shopify, or the Demo Mart web catalog.
 
 ### Poster & Creative Studio
 - Generates print-ready A4 promotional posters (Clearance, Festival, Seasonal).

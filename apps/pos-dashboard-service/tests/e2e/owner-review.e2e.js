@@ -75,7 +75,7 @@ async function startProject() {
     if (req.headers.apikey !== KEY) return send(401, { message: 'Invalid API key' });
     if (fn === 'connect_shop_pc') {
       return body.p_code === 'ABCDEFGH'
-        ? send(200, { key: DEVICE_KEY, shop_id: 'shop-1', shop_name: 'Smart Avenue 99' })
+        ? send(200, { key: DEVICE_KEY, shop_id: 'shop-1', shop_name: 'Demo Mart 99' })
         : send(400, { code: 'P0001', message: 'That code is wrong or has expired. Make a new one on the website.' });
     }
     if (!body || body.p_key !== DEVICE_KEY) return send(403, { code: '28000', message: 'This shop PC is not connected' });
@@ -176,7 +176,7 @@ async function servePage(tables) {
     await pc.fill('#owner-key', KEY);
     await pc.fill('#owner-code', 'ABCD-EFGH');
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     await section.locator('.owner-state:not(.owner-review-state)', { hasText: /Last sent at \d/ }).waitFor({ timeout: 30000 });
     await section.locator('.owner-review-state.problem', { hasText: 'does not have the weekly review yet' }).waitFor({ timeout: 30000 });
     assert.ok(project.live && project.live.today, 'the live figures were sent');
@@ -255,7 +255,7 @@ async function servePage(tables) {
     // ---- Part 2: the owner's page ----
     const now = new Date().toISOString();
     const tables = {
-      shops: { data: [{ id: 'shop-1', name: 'Smart Avenue 99' }] },
+      shops: { data: [{ id: 'shop-1', name: 'Demo Mart 99' }] },
       shop_live: { data: [{ data: project.live, sent_at: now }] },
       shop_devices: { data: [{ id: 'd1', label: 'Shop PC (TILL-1)', connected_at: now, last_seen_at: now }] },
       shop_days: { data: [] },

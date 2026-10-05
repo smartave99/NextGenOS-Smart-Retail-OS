@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Release gate (all checks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Install the storefront's packages
+        run: npm ci --ignore-scripts
+        working-directory: apps/storefront-web-mobile
+      - name: Generate the Prisma client
+        run: npx prisma generate
+        working-directory: apps/storefront-web-mobile
+      - name: Run the release gate
+        run: node scripts/verify-all.mjs --full

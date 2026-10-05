@@ -193,7 +193,7 @@ namespace SmartRetail.AI.Tests
         }
 
         [Theory]
-        [InlineData("Smart Avenue 99")]
+        [InlineData("Demo Mart 99")]
         [InlineData("1004 GANESH")]
         [InlineData("Shop No. 12 Kirana")]
         [InlineData("स्मार्ट ९९")]
@@ -234,7 +234,7 @@ namespace SmartRetail.AI.Tests
         public void A_headline_with_a_number_is_still_refused_when_the_shops_name_has_one()
         {
             var request = Diwali();
-            request.ShopName = "Smart Avenue 99";
+            request.ShopName = "Demo Mart 99";
             request.Headline = "Avenue 99 sale";
 
             Assert.StartsWith("The headline has a number, ₹ or % in it.", request.Problem());
@@ -243,7 +243,7 @@ namespace SmartRetail.AI.Tests
         [Fact]
         public void Words_are_checked_for_numbers_and_length_but_instructions_may_have_numbers()
         {
-            Assert.Null(CreativeWords.NameProblem("The shop's name", "Smart Avenue 99", CreativeWords.MaxLine));
+            Assert.Null(CreativeWords.NameProblem("The shop's name", "Demo Mart 99", CreativeWords.MaxLine));
             Assert.Contains("too long", CreativeWords.NameProblem("The shop's name", new string('a', CreativeWords.MaxLine + 1), CreativeWords.MaxLine));
             Assert.Contains("a number is fine", CreativeWords.NameProblem("The shop's name", "Mart 50%", CreativeWords.MaxLine), StringComparison.OrdinalIgnoreCase);
             Assert.True(CreativeWords.HasDigits("Avenue 99"));

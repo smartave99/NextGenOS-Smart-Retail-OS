@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-The **Smart Retail Suite** by **NextGenOS & Smart Avenue** is an end-to-end retail operating system that bridges physical brick-and-mortar store operations with modern cloud services, automated AI marketing, and omnichannel web/mobile commerce.
+The **Smart Retail Suite** by **NextGenOS & Demo Mart** is an end-to-end retail operating system that bridges physical brick-and-mortar store operations with modern cloud services, automated AI marketing, and omnichannel web/mobile commerce.
 
 It unifies four core pillars:
 1. **Core Desktop POS (`apps/pos-desktop`)**: Low-latency, offline-capable Windows Forms POS workstation with hardware peripherals, GST billing, and local SQL Server database.
@@ -34,7 +34,7 @@ flowchart TB
     end
 
     subgraph Omnichannel["Digital Storefront & Customers"]
-        Storefront["Smart Avenue Storefront\n(Next.js 15 / React 19)\n[apps/storefront-web-mobile]"]
+        Storefront["Demo Mart Storefront\n(Next.js 15 / React 19)\n[apps/storefront-web-mobile]"]
         MobileApp["Mobile Apps (Android & iOS)\n(Capacitor)"]
         ElectronApp["Desktop Shopping Client\n(Electron)"]
         PrismaDB[(Prisma PostgreSQL)]
@@ -77,11 +77,11 @@ flowchart TB
 
 ## 3. Subsystem Breakdown
 
-### 3.1. `apps/pos-desktop` (Smart Retail POS / SmartAvenue99 POS)
+### 3.1. `apps/pos-desktop` (Smart Retail POS / DemoMart99 POS)
 - **Role**: The main in-store billing till and inventory ERP engine.
 - **Tech Stack**: Visual Basic .NET, C#, .NET Framework 4.8 (x86), Windows Forms, Crystal Reports, ADO.NET.
 - **Key Modules**:
-  - `SmartAvenue99 POS`: Billing engine, barcode generation, inventory stock audit, ledger accounting, and POS hardware peripheral driver integration.
+  - `DemoMart99 POS`: Billing engine, barcode generation, inventory stock audit, ledger accounting, and POS hardware peripheral driver integration.
   - `MyDBLibrary`: High-throughput ADO.NET SQL Server data access layer.
   - `DevNet.PhonePe`: Dynamic UPI QR generation and instant transaction verification.
   - `DevNet.WhatsApp.V2` & `DevNetWP`: Automated WhatsApp invoice PDF dispatching.
@@ -107,7 +107,7 @@ flowchart TB
   - `SmartRetail.Pos.Core`: Automated A4 Sale Poster generator (Clearance, Festival, Best Sellers) that enforces pricing safety rules (never selling below cost + GST).
   - `owner-app/`: Web client connecting to Supabase for live store figures without transmitting sensitive customer data.
 
-### 3.4. `apps/storefront-web-mobile` (Smart Avenue)
+### 3.4. `apps/storefront-web-mobile` (Demo Mart)
 - **Role**: Customer-facing digital storefront, mobile apps, and cross-platform desktop application.
 - **Tech Stack**: Next.js 15, React 19, TypeScript, Tailwind CSS, Prisma ORM, Capacitor 8 (Android/iOS), Electron 42.
 - **Key Modules**:

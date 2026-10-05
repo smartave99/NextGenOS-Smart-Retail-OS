@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ShopQuestion } from "@/lib/live-shop/types";
 import AskShop from "./AskShop";
 
-const shop = { id: "shop-1", name: "Smart Avenue" };
+const shop = { id: "shop-1", name: "Demo Mart" };
 
 /** A stand-in for the Supabase client: the questions to list, and what asking returns. */
 function fakeDb(

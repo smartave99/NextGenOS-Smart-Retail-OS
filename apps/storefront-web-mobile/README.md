@@ -102,7 +102,7 @@ owner's Supabase sign-in.
      the weekly review, 2.18.0 the products for this website and the main PC).
   2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the website's environment (see
      `.env.example`), then deploy again. Never the secret key: the page refuses it.
-  3. In Supabase, *Authentication*, then *URL Configuration*: set the Site URL to `https://smartavenue99.com/admin/live`
+  3. In Supabase, *Authentication*, then *URL Configuration*: set the Site URL to `https://demomart99.com/admin/live`
      (and add it to the Redirect URLs), so the sign-up and new-password e-mails come back to Live shop.
   4. Open Live shop, create the owner's account and name the shop. Then, in Supabase, *Authentication*, then
      *Sign In / Providers*: turn off *Allow new users to sign up*.
@@ -114,7 +114,7 @@ owner's Supabase sign-in.
 ## Features
 
 ### AI Shopping Assistant
-Smart Avenue includes a suite of intelligent assistants under the **Genie** brand (e.g., Genie Stylist, Genie Gift Finder) that help users find products and handle requests.
+Demo Mart includes a suite of intelligent assistants under the **Genie** brand (e.g., Genie Stylist, Genie Gift Finder) that help users find products and handle requests.
 -   [AI Naming Guidelines](docs/assistant-guidelines.md)
 -   [AI Product Request System Documentation](docs/ai-product-requests.md)
 

@@ -472,7 +472,7 @@ export default function ProductsManager() {
             ];
             ws['!cols'] = colWidths;
 
-            XLSX.writeFile(wb, `smart_avenue_products_${new Date().toISOString().split('T')[0]}.xlsx`);
+            XLSX.writeFile(wb, `products_${new Date().toISOString().split('T')[0]}.xlsx`);
         } catch (error) {
             console.error("Export failed:", error);
             alert("Failed to export products. Please try again.");

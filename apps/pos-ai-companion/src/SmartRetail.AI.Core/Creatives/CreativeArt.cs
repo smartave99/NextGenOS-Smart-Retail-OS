@@ -232,7 +232,7 @@ namespace SmartRetail.AI.Creatives
 
         /// <summary>
         /// What is wrong with the shop's own name, for the owner; null when it is fine. A name is the shop's brand, drawn exactly
-        /// as written, and may hold a number ("Smart Avenue 99", "Shop 24"). A ₹ or % sign in it would look like a price or an
+        /// as written, and may hold a number ("Demo Mart 99", "Shop 24"). A ₹ or % sign in it would look like a price or an
         /// offer, which only the app draws, so those are refused.
         /// </summary>
         public static string NameProblem(string label, string name, int maxLength)

@@ -159,7 +159,15 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
 
   // ---- the AI tools (settings, models and levels, updates) ----------------------------------------------------------------------
   const aiSettings = () => { const a = state.ws.settings().ai ?? {}; return { tool: a.tool ?? 'none', tools: a.tools ?? {} }; };
-  route('GET', '/api/settings', {}, () => ({ ai: aiSettings(), keys: keyStatus(env) }));
+  const companySettings = () => { const c = state.ws.settings().company ?? {}; return { name: c.name ?? '', supportEmail: c.supportEmail ?? '', supportPhone: c.supportPhone ?? '', website: c.website ?? '' }; };
+  route('GET', '/api/settings', {}, () => ({ ai: aiSettings(), company: companySettings(), keys: keyStatus(env), folder: state.folder }));
+  route('PUT', '/api/company', { limit: 5_000 }, ({ me, body }) => {
+    const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max);
+    const company = { name: clean(body.name, 80), supportEmail: clean(body.supportEmail, 120), supportPhone: clean(body.supportPhone, 40), website: clean(body.website, 120) };
+    if (company.supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.supportEmail)) throw new StudioError('That does not look like an email address.');
+    state.ws.saveSettings(me, { company });
+    return { company: companySettings() };
+  });
   route('PUT', '/api/settings', { limit: 60_000 }, ({ me, body }) => {
     const incoming = body.ai ?? {};
     const problems = [];
@@ -242,7 +250,7 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
 
       // The page itself and its files: the same for everyone who has the address.
       if (req.method === 'GET' && (path === '/' || path === '/index.html')) return send(res, 200, readFileSync(join(UI, 'index.html')), TYPES['.html']);
-      if (req.method === 'GET' && /^\/(studio\.css|js\/[a-z0-9-]+\.js|icon\.svg)$/.test(path)) { const f = join(UI, path.slice(1)); if (existsSync(f)) return send(res, 200, readFileSync(f), TYPES[extname(f)] ?? 'application/octet-stream'); }
+      if (req.method === 'GET' && /^\/(studio\.css|js\/(?:views\/)?[a-z0-9-]+\.js|icon\.svg)$/.test(path)) { const f = join(UI, path.slice(1)); if (existsSync(f)) return send(res, 200, readFileSync(f), TYPES[extname(f)] ?? 'application/octet-stream'); }
       if (req.method === 'GET' && (path === '/assets/hub.css' || path === '/assets/tokens.css')) { const b = readAsset(basename(path)); return b ? send(res, 200, b, TYPES['.css'], { 'Content-Security-Policy': PREVIEW_CSP }) : send(res, 404, { error: 'Not found.' }); }
 
       const found = routes.find((r) => r.method === req.method && r.re.test(path));

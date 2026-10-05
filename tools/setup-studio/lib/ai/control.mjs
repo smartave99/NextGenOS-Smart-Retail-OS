@@ -43,6 +43,7 @@ export const CLAUDE_ALIASES = [
   { id: 'sonnet', label: 'Claude Code\'s "sonnet" (newest Sonnet)', efforts: EFFORTS['claude-code'], defaultEffort: null },
 ];
 
+const whyNot = (e) => (e?.status === 401 || e?.status === 403 ? 'the service did not accept the key' : e?.status === 429 ? 'too many requests just now' : e?.name?.includes('Timeout') ? 'it took too long' : 'the service could not be reached');
 const effortWords = (levels) => levels.map((id) => ({ id, label: EFFORT_WORDS[id] ?? id }));
 const shape = (m, source) => ({ id: m.id, label: m.label ?? m.id, efforts: effortWords(m.efforts ?? []), defaultEffort: m.defaultEffort ?? null, source, notes: m.notes ?? null });
 
@@ -88,13 +89,13 @@ export async function listModels(tool, { config = {}, env = process.env } = {}) 
   switch (tool) {
     case 'claude-code': {
       let live = null, why = null;
-      try { live = await anthropicLive(config, env); } catch (e) { why = `The live list from Anthropic could not be read (${String(e.message).slice(0, 80)}).`; }
+      try { live = await anthropicLive(config, env); } catch (e) { why = `The live list from Anthropic could not be read (${whyNot(e)}).`; }
       if (live?.length) return { models: [...CLAUDE_ALIASES.map((m) => shape(m, 'tool')), ...live.map((m) => shape(m, 'anthropic'))], ...note('anthropic', 'The list comes live from Anthropic for your key.') };
       return { models: [...CLAUDE_ALIASES.map((m) => shape(m, 'tool')), ...CLAUDE_BUILT_IN.map((m) => shape(m, 'built-in'))], ...note('built-in', why ?? 'This list was written when the Studio was made and can be out of date. Add an Anthropic key in Settings to see the live list, or type any model name.') };
     }
     case 'anthropic': {
       let live = null, why = null;
-      try { live = await anthropicLive(config, env); } catch (e) { why = `The live list could not be read (${String(e.message).slice(0, 80)}).`; }
+      try { live = await anthropicLive(config, env); } catch (e) { why = `The live list could not be read (${whyNot(e)}).`; }
       if (live?.length) return { models: live.map((m) => shape(m, 'anthropic')), ...note('anthropic', 'The list comes live from Anthropic for your key.') };
       return { models: CLAUDE_BUILT_IN.map((m) => shape(m, 'built-in')), ...note('built-in', why ?? 'Built-in list (can be out of date). Paste a key to see the live list.') };
     }
@@ -112,7 +113,7 @@ export async function listModels(tool, { config = {}, env = process.env } = {}) 
         const json = await fetchJson(`${base}/models`, { headers });
         const models = (json.data ?? []).map((m) => m.id).filter((id) => typeof id === 'string').sort().map((id) => ({ id, label: id, efforts: /^(o\d|gpt-5|gpt-6)/.test(id) ? EFFORTS.openai : [], defaultEffort: null }));
         return { models: models.map((m) => shape(m, 'service')), ...note('service', 'The list comes live from the service.') };
-      } catch (e) { return { models: [], ...note('none', `The list could not be read (${String(e.message).slice(0, 80)}). Type the model name.`), defaultEfforts: effortWords(EFFORTS.openai) }; }
+      } catch (e) { return { models: [], ...note('none', `The list could not be read (${whyNot(e)}). Type the model name.`), defaultEfforts: effortWords(EFFORTS.openai) }; }
     }
     case 'gemini': {
       const key = getKey('gemini', env);
@@ -122,7 +123,7 @@ export async function listModels(tool, { config = {}, env = process.env } = {}) 
         const json = await fetchJson(`${base}/models?pageSize=200`, { headers: { 'x-goog-api-key': key } });
         const models = (json.models ?? []).filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent')).map((m) => ({ id: String(m.name).replace(/^models\//, ''), label: m.displayName ?? m.name, efforts: [], defaultEffort: null, notes: m.thinking ? 'Can think (set a thinking budget)' : null }));
         return { models: models.map((m) => shape(m, 'service')), ...note('service', 'The list comes live from Google.') };
-      } catch (e) { return { models: [], ...note('none', `The list could not be read (${String(e.message).slice(0, 80)}). Type the model name.`) }; }
+      } catch (e) { return { models: [], ...note('none', `The list could not be read (${whyNot(e)}). Type the model name.`) }; }
     }
     default: return { models: [], ...note('none', 'Type the model name the tool takes, if it takes one.') };
   }

@@ -126,8 +126,9 @@ export function reconcile(base, candidate, { merge = false } = {}) {
   const given = merge ? mergeOnto(base, candidate) : candidate;
   const setup = parseSetup(given?.setup);
   const theme = parseTheme(given?.theme ?? {});
+  const brandGiven = given?.brand !== undefined && given?.brand !== null;
   const brand = parseBrand(given?.brand ?? {});
-  problems.push(...setup.problems, ...theme.problems, ...brand.problems);
+  problems.push(...setup.problems, ...theme.problems, ...(brandGiven ? brand.problems : []));
   if (!setup.value) return { ok: false, error: 'The setup file could not be used: ' + (setup.problems.join(' ') || 'it is empty.'), proposal: null };
   const kept = [];
   const lock = (have, want, what) => { if (have !== undefined && have !== want) kept.push(what); };
@@ -143,7 +144,7 @@ export function reconcile(base, candidate, { merge = false } = {}) {
   // The first items and people are real data from the details; a proposal can neither add to them nor drop them.
   if (setup.value.starter !== undefined && canonical(setup.value.starter) !== canonical(base.setup.starter ?? null)) kept.push('the first items and people');
   if (base.setup.starter) setup.value.starter = base.setup.starter; else delete setup.value.starter;
-  if (canonical(brand.value) !== canonical(base.brand)) kept.push('the brand (name, colours, logo and contact)');
+  if (brandGiven && canonical(brand.value) !== canonical(base.brand)) kept.push('the brand (name, colours, logo and contact)');
   if (kept.length) problems.push(`The customer's own details were kept: the proposal tried to change ${kept.join(', ')}.`);
   return { ok: true, error: null, proposal: { setup: setup.value, theme: theme.value, brand: { ...base.brand }, problems, explain: base.explain } };
 }

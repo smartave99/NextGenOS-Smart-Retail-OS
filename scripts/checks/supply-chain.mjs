@@ -40,12 +40,12 @@ export function checks({ root, sh, has, join, existsSync }) {
     },
     {
       name: 'nuget-audit',
-      title: 'No known high or critical vulnerability in the .NET libraries (AI add-on, dashboard, licensing)',
+      title: 'No known high or critical vulnerability in the .NET libraries (AI add-on, dashboard, Business Hub, licensing)',
       full: true,
       run: () => {
         if (!has('dotnet')) return { status: 'SKIP', detail: 'dotnet is not installed here' };
         const problems = [];
-        for (const project of ['apps/pos-ai-companion/SmartRetailAI.sln', 'apps/pos-dashboard-service/SmartRetailPOS.sln', 'licensing/clients/dotnet/NextGenOS.Licensing/NextGenOS.Licensing.csproj']) {
+        for (const project of ['apps/pos-ai-companion/SmartRetailAI.sln', 'apps/pos-dashboard-service/SmartRetailPOS.sln', 'apps/business-hub/NextGenOS.Hub.slnx', 'licensing/clients/dotnet/NextGenOS.Licensing/NextGenOS.Licensing.csproj']) {
           const r = nuget(project);
           if (r.unreachable) return { status: 'SKIP', detail: `the NuGet service could not be reached for ${project}` };
           for (const line of r.bad) problems.push(`${project}: ${line.trim()}`);

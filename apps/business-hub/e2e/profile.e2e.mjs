@@ -133,7 +133,8 @@ try {
   await page.goto(hub.url + '/');
   await page.waitForURL('**/setup');
   assert.strictEqual(await page.locator('#prepared-note').count(), 0);
-  assert.strictEqual(await page.locator('#country').inputValue(), 'IN');
+  assert.strictEqual(await page.locator('#country').inputValue(), '', 'no country is chosen for the owner');
+  assert.strictEqual(await page.locator('#region').count(), 0, 'nothing that depends on a country is shown before one is chosen');
   await page.context().close();
   assert.deepStrictEqual(problems, [], 'the browser saw problems');
   console.log('\nThe prepared setup works.');

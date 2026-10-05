@@ -7,8 +7,8 @@ import { join, basename } from 'node:path';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { writeAtomic, writeJson, readJson, sha256, canonical, inside, withLock, makeReadOnly } from './fsx.mjs';
 import { checkIntake, blankIntake, slugFor, SLUG } from './intake.mjs';
-import { propose, setupFor, themeFor, brandFor } from './template.mjs';
-import { parseSetup, parseTheme, parseBrand, logoProblem } from './rules.mjs';
+import { propose, reconcile } from './template.mjs';
+import { logoProblem } from './rules.mjs';
 import { makeZip, entriesOf } from './zip.mjs';
 
 export class StudioError extends Error {
@@ -320,27 +320,10 @@ export class Workspace {
     if (meta.state === 'review') throw new StudioError('This setup is waiting for approval. Ask the reviewer to send it back first.', 409);
     const intake = checkIntake(this.#intake(id));
     if (!intake.complete) throw new StudioError('The details are not complete yet.', 400, 'incomplete', intake.errors);
-    const problems = [];
-    const setup = parseSetup(candidate?.setup);
-    const theme = parseTheme(candidate?.theme ?? {});
-    const brand = parseBrand(candidate?.brand ?? {});
-    problems.push(...setup.problems, ...theme.problems, ...brand.problems);
-    if (!setup.value) throw new StudioError('The setup file could not be used: ' + (setup.problems.join(' ') || 'it is empty.'), 400, 'invalid');
     const base = propose(intake.value, { logoUri: this.logoUri(id) }).proposal;
-    // The customer's identity comes from the details, never from a proposal.
-    const kept = [];
-    const lock = (have, want, what) => { if (have !== undefined && have !== want) kept.push(what); };
-    lock(setup.value.business?.name, base.setup.business.name, 'the business name');
-    lock(setup.value.business?.country, base.setup.business.country, 'the country');
-    lock(setup.value.business?.industry, base.setup.business.industry, 'the kind of business');
-    lock(setup.value.business?.region, base.setup.business.region, 'the region');
-    setup.value.business = { ...base.setup.business };
-    if (base.setup.settings?.taxRegistered !== undefined) setup.value.settings = { ...setup.value.settings, taxRegistered: base.setup.settings.taxRegistered };
-    if (canonical(brand.value) !== canonical(base.brand)) kept.push('the brand (name, colours, logo and contact)');
-    brand.value = { ...base.brand };
-    if (kept.length) problems.push(`The customer's own details were kept: the proposal tried to change ${kept.join(', ')}.`);
-    const proposal = { setup: setup.value, theme: theme.value, brand: brand.value, problems, source };
-    proposal.explain = base.explain;
+    const r = reconcile(base, candidate);
+    if (!r.ok) throw new StudioError(r.error, 400, 'invalid');
+    const proposal = r.proposal;
     return this.#store(actor, id, meta, proposal, source, note || 'Setup changed');
   }
 

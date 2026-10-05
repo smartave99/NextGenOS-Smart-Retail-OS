@@ -38,13 +38,14 @@
 
         <label for="country">Country</label>
         <select id="country" value="@country" @onchange="CountryChanged">
+            @if (country == "") { <option value="">Choose your country…</option> }
             @foreach (var c in Countries)
             {
                 <option value="@c.Country">@c.Name</option>
             }
         </select>
 
-        @if (pack.Tax.Regions?.List is { Count: > 1 } regions)
+        @if (country != "" && pack.Tax.Regions?.List is { Count: > 1 } regions)
         {
             <label for="region">@(pack.Tax.Regions.Label ?? "Region")</label>
             <select id="region" @bind="region">
@@ -56,18 +57,18 @@
             </select>
         }
 
-        @foreach (var part in EditableParts())
+        @foreach (var part in EditableParts())   // (none until a country is chosen)
         {
             <label for="part-@part.Key">@part.Name at your shop (%)</label>
             <input id="part-@part.Key" inputmode="decimal" @bind="partValues[part.Key]" />
         }
 
-        @if (pack.Tax.Rates.Any(r => r.Taxable))
+        @if (country != "" && pack.Tax.Rates.Any(r => r.Taxable))
         {
             <label class="check"><input type="checkbox" @bind="registered" /> My business is registered for @pack.Tax.Name</label>
         }
 
-        @if (pack.Tax.BusinessId is { } idRule)
+        @if (country != "" && pack.Tax.BusinessId is { } idRule)
         {
             <label for="taxid">@idRule.Label (if you have one)</label>
             <input id="taxid" @bind="taxId" maxlength="40" autocapitalize="characters" spellcheck="false" />
@@ -78,6 +79,8 @@
         <label for="address">Address (shown on bills)</label>
         <textarea id="address" @bind="address" rows="2" maxlength="300"></textarea>
 
+        @if (country != "")
+        {
         <div class="notice warn">
             @if (pack.IsReviewed)
             {
@@ -88,6 +91,7 @@
                 <span>The @pack.Name tax rules in this program have <strong>not yet been checked by a local tax adviser</strong>. Before you issue real bills, have your accountant confirm the rates and the invoice wording; you can change the rates in Settings.</span>
             }
         </div>
+        }
         <button type="button" class="btn primary wide" @onclick="ToType">Next</button>
     </div>
 }
@@ -165,7 +169,7 @@ else
     private bool busy;
 
     private string name = "";
-    private string country = "IN";
+    private string country = "";
     private string region = "";
     private string taxId = "";
     private string phone = "";
@@ -216,6 +220,7 @@ else
 
     private void SetDefaults()
     {
+        if (country == "") { region = ""; partValues.Clear(); registered = true; return; }
         region = pack.Tax.Regions?.List is { Count: 1 } one ? one[0].Code : "";
         partValues.Clear();
         foreach (var part in EditableParts()) partValues[part.Key] = part.Percent;
@@ -224,7 +229,7 @@ else
 
     private void CountryChanged(ChangeEventArgs e)
     {
-        country = e.Value?.ToString() ?? "IN";
+        country = e.Value?.ToString() ?? "";
         SetDefaults();
     }
 
@@ -233,6 +238,7 @@ else
     /// <summary>Tax parts the shop sets itself (the sales tax of its town, in a country with no single national rate).</summary>
     private IEnumerable<Part> EditableParts()
     {
+        if (country == "") yield break;
         var regionCode = pack.Tax.Regions?.List is { Count: 1 } one ? one[0].Code : region;
         var r = pack.Tax.Regions?.List?.FirstOrDefault(x => x.Code == regionCode);
         foreach (var c in r?.Components ?? new List<RegionComponent>())
@@ -243,6 +249,7 @@ else
     {
         error = null;
         if (string.IsNullOrWhiteSpace(name)) { error = "Please type the name of your business."; return; }
+        if (country == "") { error = "Please choose your country."; return; }
         if (pack.Tax.Regions?.List is { Count: > 1 } && string.IsNullOrEmpty(region)) { error = $"Please choose your {(pack.Tax.Regions.Label ?? "region").ToLowerInvariant()}."; return; }
         foreach (var part in EditableParts())
             if (!decimal.TryParse(partValues[part.Key], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var p) || p < 0 || p > 100)

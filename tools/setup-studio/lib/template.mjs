@@ -3,6 +3,7 @@
 import { parseSetup, parseTheme, parseBrand, logoProblem, usableColour, resolveTheme, THEME_DEFAULTS, DEVICE_TOKENS } from './rules.mjs';
 import { checkIntake, OPTIONS } from './intake.mjs';
 import { countryPack, industryPack } from './packs.mjs';
+import { canonical } from './fsx.mjs';
 
 /** How a kind of style becomes the named choices of a look. */
 export const STYLES = {
@@ -112,3 +113,34 @@ export function propose(intakeInput, { logoUri = null } = {}) {
 /** What the customer's screens will show, for a licence level: the proposal's theme as the Hub resolves it. */
 export const shown = (level, proposal) => resolveTheme(level, proposal.theme, null);
 export { DEVICE_TOKENS };
+
+/**
+ * Reads a proposal that came from somewhere else (an AI tool, or a person's edit) through the same rules as the Hub's. The customer's own identity (name, country, region, kind of
+ * business, whether they are registered for tax, and the whole brand) is put back from the base proposal made from the details, whatever the candidate said, and what could not be
+ * used is named. Returns { ok, error, proposal } where proposal is { setup, theme, brand, problems, explain }.
+ */
+export function reconcile(base, candidate) {
+  const problems = [];
+  const setup = parseSetup(candidate?.setup);
+  const theme = parseTheme(candidate?.theme ?? {});
+  const brand = parseBrand(candidate?.brand ?? {});
+  problems.push(...setup.problems, ...theme.problems, ...brand.problems);
+  if (!setup.value) return { ok: false, error: 'The setup file could not be used: ' + (setup.problems.join(' ') || 'it is empty.'), proposal: null };
+  const kept = [];
+  const lock = (have, want, what) => { if (have !== undefined && have !== want) kept.push(what); };
+  lock(setup.value.business?.name, base.setup.business.name, 'the business name');
+  lock(setup.value.business?.country, base.setup.business.country, 'the country');
+  lock(setup.value.business?.industry, base.setup.business.industry, 'the kind of business');
+  lock(setup.value.business?.region, base.setup.business.region, 'the region');
+  setup.value.business = { ...base.setup.business };
+  if (base.setup.settings?.taxRegistered !== undefined) {
+    lock(setup.value.settings?.taxRegistered, base.setup.settings.taxRegistered, 'whether the business is registered for tax');
+    setup.value.settings = { ...setup.value.settings, taxRegistered: base.setup.settings.taxRegistered };
+  }
+  // The first items and people are real data from the details; a proposal can neither add to them nor drop them.
+  if (setup.value.starter !== undefined && canonical(setup.value.starter) !== canonical(base.setup.starter ?? null)) kept.push('the first items and people');
+  if (base.setup.starter) setup.value.starter = base.setup.starter; else delete setup.value.starter;
+  if (canonical(brand.value) !== canonical(base.brand)) kept.push('the brand (name, colours, logo and contact)');
+  if (kept.length) problems.push(`The customer's own details were kept: the proposal tried to change ${kept.join(', ')}.`);
+  return { ok: true, error: null, proposal: { setup: setup.value, theme: theme.value, brand: { ...base.brand }, problems, explain: base.explain } };
+}

@@ -254,3 +254,32 @@ public class SetupProfileVectorTests
         Assert.Equal(expect["problems"]!.AsArray().Select(x => x!.GetValue<string>()).ToArray(), p.Problems.ToArray());
     }
 }
+
+/// <summary>Nothing is chosen for the owner (CLAUDE.md, section 8): no country, until set-up or the customer's profile names one.</summary>
+public class NoFixedMarketTests
+{
+    [Fact]
+    public void A_new_shop_has_no_country_and_says_so_in_plain_words_until_set_up_chooses_one()
+    {
+        Assert.Equal("", new ShopSettings().Country);
+        var path = Path.Combine(Path.GetTempPath(), "hub-nomarket-" + Guid.NewGuid().ToString("N") + ".db");
+        try
+        {
+            var app = HubApp.Open(path);
+            var ex = Assert.Throws<HubException>(() => app.Shop.Current);
+            Assert.Equal("not-set-up", ex.Code);
+            Assert.Contains("not set up yet", ex.Message);
+            app.Shop.Save(new ShopSettings { Name = "A", Country = "PH", Industry = "retail", SetupDone = true });
+            Assert.Equal("PHP", app.Shop.Current.CurrencyCode);
+        }
+        finally { foreach (var f in new[] { path, path + "-wal", path + "-shm" }) { try { File.Delete(f); } catch (IOException) { } } }
+    }
+
+    [Fact]
+    public void A_sample_company_is_never_made_for_a_country_nobody_named()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "hub-nomarket-" + Guid.NewGuid().ToString("N") + ".db");
+        try { Assert.Throws<ArgumentException>(() => NextGenOS.Hub.Demo.DemoCompany.Fill(path, new NextGenOS.Hub.Demo.DemoOptions { Industry = "retail" })); }
+        finally { foreach (var f in new[] { path, path + "-wal", path + "-shm" }) { try { File.Delete(f); } catch (IOException) { } } }
+    }
+}

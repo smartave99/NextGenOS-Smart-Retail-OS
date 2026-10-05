@@ -8,7 +8,7 @@ public sealed class ShopTime
 {
     private static readonly Dictionary<string, string> Windows = new(StringComparer.Ordinal)
     {
-        ["Asia/Kolkata"] = "India Standard Time", ["Asia/Manila"] = "Singapore Standard Time", ["Europe/London"] = "GMT Standard Time", ["Europe/Dublin"] = "GMT Standard Time",
+        ["Asia/Kolkata"] = "India Standard Time", /* white-label-ok: Windows names of time zones, for every country */ ["Asia/Manila"] = "Singapore Standard Time", ["Europe/London"] = "GMT Standard Time", ["Europe/Dublin"] = "GMT Standard Time",
         ["Europe/Berlin"] = "W. Europe Standard Time", ["Europe/Amsterdam"] = "W. Europe Standard Time", ["Europe/Rome"] = "W. Europe Standard Time",
         ["Europe/Paris"] = "Romance Standard Time", ["Europe/Madrid"] = "Romance Standard Time", ["Asia/Dubai"] = "Arabian Standard Time", ["Asia/Riyadh"] = "Arab Standard Time",
         ["Asia/Singapore"] = "Singapore Standard Time", ["Asia/Kuala_Lumpur"] = "Singapore Standard Time", ["Asia/Bangkok"] = "SE Asia Standard Time",

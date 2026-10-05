@@ -267,8 +267,8 @@ public class DemoCompanyTests
         var path = Path.Combine(Path.GetTempPath(), "hub-demo-" + Guid.NewGuid().ToString("N") + ".db");
         try
         {
-            DemoCompany.Fill(path, new DemoOptions { Industry = "retail" }, Now);
-            var ex = Assert.Throws<HubException>(() => DemoCompany.Fill(path, new DemoOptions { Industry = "retail" }, Now));
+            DemoCompany.Fill(path, new DemoOptions { Industry = "retail", Country = "PH" }, Now);
+            var ex = Assert.Throws<HubException>(() => DemoCompany.Fill(path, new DemoOptions { Industry = "retail", Country = "PH" }, Now));
             Assert.Equal("not-empty", ex.Code);
         }
         finally { Cleanup(path); }

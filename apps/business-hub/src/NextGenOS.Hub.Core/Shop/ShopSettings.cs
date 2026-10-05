@@ -12,7 +12,7 @@ public sealed class ShopSettings
     public string Email { get; set; } = "";
     /// <summary>The shop's own tax number (GSTIN, TIN, VAT number ...).</summary>
     public string TaxId { get; set; } = "";
-    public string Country { get; set; } = "IN";
+    public string Country { get; set; } = "";
     /// <summary>The state or province code that decides local tax (for India the GST state code, for Canada "ON").</summary>
     public string Region { get; set; } = "";
     public string Industry { get; set; } = "retail";

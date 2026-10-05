@@ -11,7 +11,7 @@ namespace NextGenOS.Hub.Demo;
 public sealed class DemoOptions
 {
     public string Industry { get; set; } = "retail";
-    public string Country { get; set; } = "IN";
+    public string Country { get; set; } = "";
     /// <summary>State or province, for countries whose tax depends on it. Left empty, a sensible one is chosen.</summary>
     public string? Region { get; set; }
     /// <summary>The business name to use; left empty, the industry pack's sample name is used.</summary>
@@ -75,7 +75,7 @@ public static class DemoCompany
             if (Convert.ToInt64(_app.Db.Scalar("SELECT (SELECT COUNT(*) FROM items) + (SELECT COUNT(*) FROM documents)") ?? 0L) > 0)
                 throw new HubException("not-empty", "A demo company can only be added to a new shop that has no items or invoices yet.");
 
-            var region = _o.Region ?? (country.Country == "IN" ? "27" : country.Tax.Regions?.List?.FirstOrDefault()?.Code ?? "");
+            var region = _o.Region ?? country.Tax.Regions?.List?.FirstOrDefault()?.Code ?? "";
             var existing = _app.SettingsStore.Load();
             existing.Name = !string.IsNullOrWhiteSpace(_o.Name) ? _o.Name!.Trim() : Text(industry.Demo, "company") ?? industry.Name + " demo";
             existing.Country = country.Country;

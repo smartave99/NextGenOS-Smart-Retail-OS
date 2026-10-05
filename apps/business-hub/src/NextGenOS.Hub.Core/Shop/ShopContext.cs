@@ -179,7 +179,14 @@ public sealed class ShopContextProvider(SettingsStore store)
     {
         get
         {
-            lock (_gate) return _current ??= new ShopContext(store.Load());
+            lock (_gate)
+            {
+                if (_current is not null) return _current;
+                var settings = store.Load();
+                // No country is chosen for the owner: until the set-up has chosen one there is no shop to describe.
+                if (string.IsNullOrEmpty(settings.Country)) throw new HubException("not-set-up", "This shop is not set up yet. Finish the set-up first.");
+                return _current = new ShopContext(settings);
+            }
         }
     }
 

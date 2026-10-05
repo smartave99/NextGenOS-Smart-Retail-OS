@@ -59,6 +59,16 @@ Every installer, package and app we make (the Business Hub for Windows and for L
 
 When a major piece is finished and its gate passes, build the trial outputs (installers, packages, the Studio, the website bundle, the app when it can be built) and give them to the owner to test, with plain test steps: send the files in the conversation, and say where the same files are in GitHub (the release). Say what each file is, what was and was not verified, and what to try. Trial builds that have no licence keys inside say so on their face and are never given to a customer.
 
-## 8. Style
+## 8. Nothing the customer sees is fixed (everything is a setting, white-labelled per customer)
+
+Anything a customer, an owner, a cashier or a shopper can see, hear or print is **data that belongs to that customer**, never a value written into program code. This covers names, logos, pictures and illustrations, colours, shapes, fonts, wording, languages, the country, the town or "typical place", the kind of people shown in generated photos, the set of images an AI makes, receipt and poster wording, and the sample content.
+
+- **Defaults are neutral and not a market.** No default may assume India, Hindi, a currency, a festival, a skin tone, a shop type or a company. The default comes from the country pack, the industry pack or the customer's profile; with nothing set, the result is plain and neutral, not "Indian" and not ours.
+- **Every such value is read from the customer's profile** (`profile/setup.json`, `theme.json`, `brand.json`, and the `images`/`assets` parts as they are added) or from a pack, set by the Setup Studio, and changed by the owner only as far as the licence's white-label level allows (`licensing/spec/LICENCE-FORMAT.md` sections 5.1 to 5.3). A value that is fixed in code is a bug, even when it looks harmless.
+- **Artwork is replaceable.** A built-in picture (an illustration, an icon, a splash) must either follow the brand (colours taken from the brand) or be replaceable by the customer's own file, or be absent when the customer has none. It may not carry a company's look as a fixed choice.
+- **AI-made content takes its settings from the profile**: which images are made, who is shown, in which place and language, in which style, with which brand notes. The prompts are built from those settings; none of it is written into the prompt text.
+- **New work is checked for this.** Before finishing any change that shows something to a person, ask: could another customer, in another country, in another trade, want this different? If so, it is a setting with a neutral default, with a test that changing the setting changes the result. `docs/WHITE-LABEL-AUDIT.md` lists what is still fixed; the list only shrinks.
+
+## 9. Style
 
 Plain words for the people who use the product: shop owners, cashiers, salespeople. No jargon in screens or messages. Match the code around you. Say what changed in `CHANGELOG.md` when a release is cut.

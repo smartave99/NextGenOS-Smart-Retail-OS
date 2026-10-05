@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Loader2, Gift, Home, BadgeIndianRupee, ShoppingBasket } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Gift, Home, Coins, ShoppingBasket } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { getVibeFilters } from "@/app/actions/vibe-check-action";
 
 const VIBES = [
     { id: "gift", label: "Birthday Gift", icon: Gift },
     { id: "home", label: "Home Refresh", icon: Home },
-    { id: "budget", label: "Under ₹499", icon: BadgeIndianRupee },
+    { id: "budget", label: "Budget Picks", icon: Coins },
     { id: "essentials", label: "Daily Essentials", icon: ShoppingBasket },
 ];
 
@@ -91,7 +91,7 @@ export default function VibeSelector() {
                                 type="text"
                                 value={customVibe}
                                 onChange={(e) => setCustomVibe(e.target.value)}
-                                placeholder="Try: a birthday gift for a 10-year-old under ₹700"
+                                placeholder="Try: a birthday gift for a 10-year-old on a small budget"
                                 aria-label="Describe what you are shopping for"
                                 className="w-full sm:flex-1 px-6 py-4 sm:py-3 rounded-2xl sm:rounded-full bg-white sm:bg-transparent border border-slate-200 sm:border-none shadow-sm sm:shadow-none text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/5 sm:focus:ring-0 transition-[transform,opacity,background-color,border-color,color,box-shadow] font-medium"
                                 onKeyDown={(e) => e.key === "Enter" && handleVibeCheck(customVibe)}

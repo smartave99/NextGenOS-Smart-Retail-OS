@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "country": "MX",
+  "name": "Mexico",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "MXN",
+    "symbol": "$",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "es-MX",
+  "languages": [
+    "es",
+    "en"
+  ],
+  "timezone": "America/Mexico_City",
+  "phoneCode": "+52",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "IVA",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "IVA16",
+        "label": "IVA 16%",
+        "percent": "16"
+      },
+      {
+        "code": "IVA8",
+        "label": "IVA 8% (border region)",
+        "percent": "8"
+      },
+      {
+        "code": "IVA0",
+        "label": "IVA 0%",
+        "zero": true
+      },
+      {
+        "code": "IVAEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "RFC",
+      "pattern": "^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Factura (CFDI)",
+    "requiredFields": [
+      "Seller name, RFC and address",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "IVA amount"
+    ],
+    "eInvoice": "Every invoice must be a CFDI electronic invoice stamped by an authorised provider (PAC).",
+    "retentionYears": 5
+  },
+  "notes": []
+}

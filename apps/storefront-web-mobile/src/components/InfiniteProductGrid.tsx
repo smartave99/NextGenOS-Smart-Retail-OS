@@ -5,9 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { AlertCircle, CheckCircle2, ChevronRight, Package, RefreshCcw, Star, Tag, Zap } from "lucide-react";
 import { Product, getProducts, Offer, Category } from "@/app/actions";
-import SocialProofBadge from "@/components/ai/SocialProofBadge";
 import GenieRequestTrigger from "@/components/GenieRequestTrigger";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { money } from "@/lib/region/lite";
 
 interface InfiniteProductGridProps {
     initialProducts: Product[];
@@ -24,12 +24,6 @@ interface InfiniteProductGridProps {
         available?: boolean | "all";
     };
 }
-
-const inrFormatter = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-});
 
 export default function InfiniteProductGrid({
     initialProducts,
@@ -169,7 +163,6 @@ export default function InfiniteProductGrid({
                                     {product.available === false ? "Check availability" : "Available in store"}
                                 </span>
                                 <div className="absolute bottom-3 left-3 right-3 flex justify-end">
-                                    <SocialProofBadge product={product} compact={true} />
                                 </div>
                             </div>
 
@@ -210,11 +203,11 @@ export default function InfiniteProductGrid({
                                         <span className="text-xs font-medium text-slate-500">In-store price</span>
                                         <div className="flex flex-wrap items-baseline gap-x-2">
                                             <span className="text-base font-black text-slate-950 sm:text-xl">
-                                                {inrFormatter.format(product.price)}
+                                                {money(product.price)}
                                             </span>
                                             {product.originalPrice && (
                                                 <span className="hidden text-sm text-slate-400 line-through sm:inline">
-                                                    {inrFormatter.format(product.originalPrice)}
+                                                    {money(product.originalPrice)}
                                                 </span>
                                             )}
                                         </div>

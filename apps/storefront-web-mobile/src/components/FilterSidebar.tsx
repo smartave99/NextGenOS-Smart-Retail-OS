@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X, Filter, ChevronDown, Check, Search } from "lucide-react";
 import { FilterState, parseSearchParams, buildSearchParams, SORT_OPTIONS } from "@/lib/filter-utils";
 import { Category, ProductsPageContent } from "@/app/actions";
+import { CURRENCY } from "@/lib/region/lite";
 
 interface FilterSidebarProps {
     categories: Category[];
@@ -157,7 +158,7 @@ export default function FilterSidebar({ categories, settings }: FilterSidebarPro
                                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Price Range</h3>
                                 <div className="flex items-center gap-4 mb-4">
                                     <div className="relative flex-1">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{CURRENCY.symbol}</span>
                                         <input
                                             type="number"
                                             placeholder="Min"
@@ -168,7 +169,7 @@ export default function FilterSidebar({ categories, settings }: FilterSidebarPro
                                     </div>
                                     <span className="text-slate-400">-</span>
                                     <div className="relative flex-1">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{CURRENCY.symbol}</span>
                                         <input
                                             type="number"
                                             placeholder="Max"
@@ -344,7 +345,7 @@ export default function FilterSidebar({ categories, settings }: FilterSidebarPro
                                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Price Range</h3>
                                         <div className="flex items-center gap-4 mb-4">
                                             <div className="relative flex-1">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{CURRENCY.symbol}</span>
                                                 <input
                                                     type="number"
                                                     placeholder="Min"
@@ -355,7 +356,7 @@ export default function FilterSidebar({ categories, settings }: FilterSidebarPro
                                             </div>
                                             <span className="text-slate-400">-</span>
                                             <div className="relative flex-1">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{CURRENCY.symbol}</span>
                                                 <input
                                                     type="number"
                                                     placeholder="Max"

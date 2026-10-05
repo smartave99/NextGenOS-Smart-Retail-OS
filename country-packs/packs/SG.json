@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "country": "SG",
+  "name": "Singapore",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "SGD",
+    "symbol": "$",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-SG",
+  "languages": [
+    "en",
+    "zh",
+    "ms",
+    "ta"
+  ],
+  "timezone": "Asia/Singapore",
+  "phoneCode": "+65",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "GST",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "GST9",
+        "label": "GST 9%",
+        "percent": "9"
+      },
+      {
+        "code": "GST0",
+        "label": "GST 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "GSTEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "GST registration no.",
+      "pattern": "^[0-9]{9}[A-Z]$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.05",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and GST registration number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "GST amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 5
+  },
+  "notes": [
+    "Cash totals are rounded to 5 cents."
+  ]
+}

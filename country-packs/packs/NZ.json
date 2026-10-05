@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "country": "NZ",
+  "name": "New Zealand",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "NZD",
+    "symbol": "$",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-NZ",
+  "languages": [
+    "en",
+    "mi"
+  ],
+  "timezone": "Pacific/Auckland",
+  "phoneCode": "+64",
+  "fiscalYearStart": {
+    "month": 4,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "GST",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "GST15",
+        "label": "GST 15%",
+        "percent": "15"
+      },
+      {
+        "code": "GST0",
+        "label": "GST 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "GSTEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "GST number",
+      "pattern": "^[0-9]{8,9}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.10",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name and GST number",
+      "Invoice date",
+      "Description, quantity and price",
+      "GST amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 7
+  },
+  "notes": [
+    "Cash totals are rounded to 10 cents."
+  ]
+}

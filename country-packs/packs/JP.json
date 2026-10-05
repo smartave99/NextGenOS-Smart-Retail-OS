@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "country": "JP",
+  "name": "Japan",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "JPY",
+    "symbol": "¥",
+    "decimals": 0,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "ja-JP",
+  "languages": [
+    "ja",
+    "en"
+  ],
+  "timezone": "Asia/Tokyo",
+  "phoneCode": "+81",
+  "fiscalYearStart": {
+    "month": 4,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "Consumption tax",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "JCT10",
+        "label": "Consumption tax 10%",
+        "percent": "10"
+      },
+      {
+        "code": "JCT8",
+        "label": "Consumption tax 8% (food, reduced rate)",
+        "percent": "8"
+      },
+      {
+        "code": "JCT0",
+        "label": "Zero-rated (exports)",
+        "zero": true
+      },
+      {
+        "code": "JCTEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "Invoice registration number",
+      "pattern": "^T[0-9]{13}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Qualified invoice",
+    "requiredFields": [
+      "Seller name and registration number (T and 13 digits)",
+      "Date",
+      "Description of each item, marking reduced-rate items",
+      "Total by rate and the tax amount by rate"
+    ],
+    "eInvoice": null,
+    "retentionYears": 7
+  },
+  "notes": [
+    "The reduced 8% rate is for food and drink (not eating in) and newspapers."
+  ]
+}

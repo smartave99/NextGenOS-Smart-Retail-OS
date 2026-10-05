@@ -7,6 +7,7 @@ import { createProductRequest, ProductRequestInput } from "@/app/actions/request
 import ImageUpload from "./CloudinaryUpload";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { CURRENCY } from "@/lib/region/lite";
 
 interface ProductRequestModalProps {
     isOpen: boolean;
@@ -200,7 +201,7 @@ export default function ProductRequestModal({
                                                 <div>
                                                     <label htmlFor="request-min-price" className="mb-2 block text-sm font-semibold text-slate-700">Minimum price <span className="font-normal text-slate-500">(optional)</span></label>
                                                     <div className="relative">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₹</span>
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">{CURRENCY.symbol}</span>
                                                         <input
                                                             id="request-min-price"
                                                             type="number"
@@ -216,7 +217,7 @@ export default function ProductRequestModal({
                                                 <div>
                                                     <label htmlFor="request-max-price" className="mb-2 block text-sm font-semibold text-slate-700">Maximum price <span className="font-normal text-slate-500">(optional)</span></label>
                                                     <div className="relative">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₹</span>
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">{CURRENCY.symbol}</span>
                                                         <input
                                                             id="request-max-price"
                                                             type="number"

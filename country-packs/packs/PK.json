@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "country": "PK",
+  "name": "Pakistan",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "PKR",
+    "symbol": "Rs",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "indian",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-PK",
+  "languages": [
+    "en",
+    "ur"
+  ],
+  "timezone": "Asia/Karachi",
+  "phoneCode": "+92",
+  "fiscalYearStart": {
+    "month": 7,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "Sales tax",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "GST18",
+        "label": "Sales tax 18%",
+        "percent": "18"
+      },
+      {
+        "code": "GST0",
+        "label": "Sales tax 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "GSTEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "NTN / STRN",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Sales Tax Invoice",
+    "requiredFields": [
+      "Seller name, address, NTN and STRN",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "Sales tax amount"
+    ],
+    "eInvoice": "Retailers on the FBR scheme must integrate their point of sale with FBR for real-time invoicing.",
+    "retentionYears": 6
+  },
+  "notes": []
+}

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "country": "DE",
+  "name": "Germany",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "EUR",
+    "symbol": "€",
+    "decimals": 2,
+    "symbolPosition": "after",
+    "symbolSpace": true,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": "."
+  },
+  "locale": "de-DE",
+  "languages": [
+    "de",
+    "en"
+  ],
+  "timezone": "Europe/Berlin",
+  "phoneCode": "+49",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "MwSt",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "MWST19",
+        "label": "MwSt 19%",
+        "percent": "19"
+      },
+      {
+        "code": "MWST7",
+        "label": "MwSt 7%",
+        "percent": "7"
+      },
+      {
+        "code": "MWST0",
+        "label": "MwSt 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "MWSTEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "USt-IdNr.",
+      "pattern": "^DE[0-9]{9}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Rechnung",
+    "requiredFields": [
+      "Seller and buyer name and address",
+      "Tax number or USt-IdNr.",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "Net amount, tax rate and tax amount"
+    ],
+    "eInvoice": "Electronic invoices (XRechnung / ZUGFeRD) are being phased in between businesses; check the dates for your shop.",
+    "retentionYears": 10
+  },
+  "notes": [
+    "Receipts under €250 may be simplified (Kleinbetragsrechnung).",
+    "Cash registers must have a certified security device (TSE) and give a receipt (Belegausgabepflicht)."
+  ]
+}

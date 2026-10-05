@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "country": "ZA",
+  "name": "South Africa",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "ZAR",
+    "symbol": "R",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": " "
+  },
+  "locale": "en-ZA",
+  "languages": [
+    "en",
+    "af",
+    "zu"
+  ],
+  "timezone": "Africa/Johannesburg",
+  "phoneCode": "+27",
+  "fiscalYearStart": {
+    "month": 3,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT15",
+        "label": "VAT 15%",
+        "percent": "15"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "VAT vendor number",
+      "pattern": "^4[0-9]{9}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and VAT number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount (a tax invoice above R5,000 also needs the buyer's details)"
+    ],
+    "eInvoice": null,
+    "retentionYears": 5
+  },
+  "notes": []
+}

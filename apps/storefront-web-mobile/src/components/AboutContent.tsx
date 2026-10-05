@@ -2,66 +2,40 @@
 
 import { motion } from "framer-motion";
 import { CheckCircle2, Globe, ShieldCheck, Users, Zap, TrendingUp, MapPin, Phone, Mail, Clock, Check, Star, Heart, Award } from "lucide-react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { AboutPageContent, ContactContent } from "@/app/actions";
-import { SHOP_NAME } from "@/lib/shop-name";
+import { DEFAULT_ABOUT, safeMapEmbed } from "@/lib/default-pages";
 
 // Map string icon names to Lucide icons
 const iconMap: Record<string, React.ElementType> = {
     CheckCircle2, Globe, ShieldCheck, Users, Zap, TrendingUp, MapPin, Phone, Mail, Clock, Check, Star, Heart, Award
 };
 
+/** One line of store information (address, phone, hours, e-mail): shown only when the shop has filled it in. */
+function InfoCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+    return (
+        <div className="flex items-start gap-4 p-6 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="p-3 bg-brand-blue/10 text-brand-blue rounded-full">{icon}</div>
+            <div>
+                <h4 className="font-bold text-lg mb-1 text-brand-dark">{title}</h4>
+                {children}
+            </div>
+        </div>
+    );
+}
+
 export default function AboutContent({ content, contact }: { content: AboutPageContent | null, contact: ContactContent | null }) {
-    // Default fallback content
-    const data = content || {
-        heroTitle: SHOP_NAME,
-        heroSubtitle: "Building the future of retail, right here in your city.",
-        heroImage: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=2340&auto=format&fit=crop",
-        visionTitle: "Redefining Retail in Patna",
-        visionText1: `We are not just a store; we are a logistics ecosystem designed for modern living. ${SHOP_NAME} bridges the gap between premium global brands and optimal local convenience.`,
-        visionText2: "Our platform leverages cutting-edge technology to ensure that quality, affordability, and speed are not mutually exclusive, but the standard for every interaction.",
-        visionImage: "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2301&auto=format&fit=crop",
-        heroLabel: "Our Story",
-        visionLabel: "Our Vision",
-        statsCustomers: "10k+",
-        statsCustomersLabel: "Happy Customers",
-        statsSatisfaction: "98%",
-        statsSatisfactionLabel: "Satisfaction Rate",
-        contactTitle: "Visit Our Store",
-        contactSubtitle: "We'd love to see you in person. Here's where you can find us.",
-        valuesTitle: "The Smart Standard",
-        valuesSubtitle: "Driven by innovation, grounded in integrity.",
-        values: [
-            {
-                title: "Verified Quality",
-                desc: "Rigorous quality checks on 100% of inventory.",
-                icon: "ShieldCheck",
-                color: "text-brand-blue"
-            },
-            {
-                title: "Global Access",
-                desc: "Sourcing the best products from around the world.",
-                icon: "Globe",
-                color: "text-brand-lime"
-            },
-            {
-                title: "Instant Service",
-                desc: "Efficient billing and personalized assistance.",
-                icon: "Zap",
-                color: "text-orange-500"
-            },
-            {
-                title: "Total Transparency",
-                desc: "Clear pricing, no hidden fees, honest service.",
-                icon: "CheckCircle2",
-                color: "text-brand-dark"
-            }
-        ]
-    };
+    // Until the shop writes its own: plain words with no claims (lib/default-pages.ts). Parts left empty are left out.
+    const data = content || DEFAULT_ABOUT;
+    const mapUrl = safeMapEmbed(contact?.mapEmbed);
+    const hasStats = Boolean(data.statsCustomers || data.statsSatisfaction);
+    const values = data.values ?? [];
+    const hasContact = Boolean(contact?.address || contact?.phone || contact?.storeHours || contact?.email);
 
     return (
         <div className="bg-slate-50 min-h-screen">
-            {/* Tech Hero */}
+            {/* Hero */}
             <section className="relative h-[60vh] min-h-[500px] flex items-center justify-center overflow-hidden bg-brand-dark">
                 <div className="absolute inset-0">
                     <div className="absolute inset-0 bg-gradient-to-r from-brand-blue/20 to-brand-lime/20 mix-blend-overlay" />
@@ -84,170 +58,157 @@ export default function AboutContent({ content, contact }: { content: AboutPageC
                         <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
                             {data.heroTitle}
                         </h1>
-                        <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto font-light leading-relaxed">
-                            {data.heroSubtitle}
-                        </p>
+                        {data.heroSubtitle && (
+                            <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto font-light leading-relaxed">
+                                {data.heroSubtitle}
+                            </p>
+                        )}
                     </motion.div>
                 </div>
             </section>
 
-            {/* Vision Section */}
+            {/* Vision */}
             <section className="py-24 container mx-auto px-4 md:px-6">
                 <div className="flex flex-col md:flex-row items-center gap-16">
                     <div className="flex-1 space-y-8">
                         <div>
-                            <span className="text-brand-blue font-bold tracking-widest uppercase text-xs mb-2 block">{data.visionLabel || "Our Vision"}</span>
+                            <span className="text-brand-blue font-bold tracking-widest uppercase text-xs mb-2 block">{data.visionLabel || "Who we are"}</span>
                             <h2 className="text-4xl font-bold text-brand-dark mb-6 tracking-tight">{data.visionTitle}</h2>
                         </div>
                         <p className="text-slate-600 text-lg leading-relaxed">
                             {data.visionText1}
                         </p>
-                        <p className="text-slate-600 text-lg leading-relaxed">
-                            {data.visionText2}
-                        </p>
+                        {data.visionText2 && (
+                            <p className="text-slate-600 text-lg leading-relaxed">
+                                {data.visionText2}
+                            </p>
+                        )}
 
-                        <div className="grid grid-cols-2 gap-6 pt-6">
-                            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
-                                <Users className="w-6 h-6 text-brand-blue mb-2" />
-                                <div className="text-2xl font-bold text-brand-dark">{data.statsCustomers}</div>
-                                <div className="text-sm text-slate-500">{data.statsCustomersLabel || "Happy Customers"}</div>
+                        {hasStats && (
+                            <div className="grid grid-cols-2 gap-6 pt-6">
+                                {data.statsCustomers && (
+                                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
+                                        <Users className="w-6 h-6 text-brand-blue mb-2" />
+                                        <div className="text-2xl font-bold text-brand-dark">{data.statsCustomers}</div>
+                                        <div className="text-sm text-slate-500">{data.statsCustomersLabel}</div>
+                                    </div>
+                                )}
+                                {data.statsSatisfaction && (
+                                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
+                                        <TrendingUp className="w-6 h-6 text-brand-lime mb-2" />
+                                        <div className="text-2xl font-bold text-brand-dark">{data.statsSatisfaction}</div>
+                                        <div className="text-sm text-slate-500">{data.statsSatisfactionLabel}</div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
-                                <TrendingUp className="w-6 h-6 text-brand-lime mb-2" />
-                                <div className="text-2xl font-bold text-brand-dark">{data.statsSatisfaction}</div>
-                                <div className="text-sm text-slate-500">{data.statsSatisfactionLabel || "Satisfaction Rate"}</div>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
-                    <div className="flex-1 relative aspect-square w-full max-w-md mx-auto">
-                        <div className="absolute inset-0 bg-brand-blue rounded-full opacity-20 blur-3xl transform -translate-x-12 translate-y-12" />
-                        <div className="absolute inset-0 bg-brand-lime rounded-full opacity-20 blur-3xl transform translate-x-12 -translate-y-12" />
+                    {data.visionImage && (
+                        <div className="flex-1 relative aspect-square w-full max-w-md mx-auto">
+                            <div className="absolute inset-0 bg-brand-blue rounded-full opacity-20 blur-3xl transform -translate-x-12 translate-y-12" />
+                            <div className="absolute inset-0 bg-brand-lime rounded-full opacity-20 blur-3xl transform translate-x-12 -translate-y-12" />
 
-                        <div className="relative h-full w-full rounded-[2rem] overflow-hidden shadow-2xl border border-white/50">
-                            {data.visionImage ? (
+                            <div className="relative h-full w-full rounded-[2rem] overflow-hidden shadow-2xl border border-white/50">
                                 <Image
                                     src={data.visionImage}
                                     alt="Vision"
                                     fill
                                     className="object-cover hover:scale-105 transition-transform duration-300"
                                 />
-                            ) : (
-                                <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
-                                    No Image
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* Values */}
+            {values.length > 0 && (
+                <section className="py-24 bg-white relative overflow-hidden">
+                    <div className="container mx-auto px-4 md:px-6 relative z-10">
+                        <div className="text-center mb-20">
+                            <h2 className="text-4xl font-bold text-brand-dark mb-4 tracking-tight">{data.valuesTitle}</h2>
+                            {data.valuesSubtitle && <p className="text-slate-500 max-w-2xl mx-auto">{data.valuesSubtitle}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                            {values.map((value, index) => {
+                                const IconComponent = iconMap[value.icon] || ShieldCheck;
+                                return (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.1 }}
+                                        className="bg-slate-50 p-8 rounded-2xl border border-slate-100 hover:border-brand-lime/50 hover:bg-white hover:shadow-xl transition-[transform,opacity,background-color,border-color,color,box-shadow] duration-300 group"
+                                    >
+                                        <div className={`w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ${value.color ?? "text-brand-blue"}`}>
+                                            <IconComponent className="w-7 h-7" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-brand-dark mb-3 group-hover:text-brand-blue transition-colors">{value.title}</h3>
+                                        <p className="text-slate-500 leading-relaxed group-hover:text-slate-600">{value.desc}</p>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* Contact: only what the shop has filled in */}
+            {(hasContact || mapUrl) && (
+                <section className="py-24 bg-slate-50 border-t border-slate-200">
+                    <div className="container mx-auto px-4 md:px-6">
+                        <div className="text-center mb-16">
+                            <span className="text-brand-blue font-bold tracking-widest uppercase text-sm mb-2 block">Get in Touch</span>
+                            <h2 className="text-4xl font-bold text-brand-dark mb-4 tracking-tight">{data.contactTitle || "Visit Our Store"}</h2>
+                            {data.contactSubtitle && <p className="text-slate-500 max-w-2xl mx-auto">{data.contactSubtitle}</p>}
+                        </div>
+
+                        <div className={`grid grid-cols-1 gap-12 ${mapUrl ? "lg:grid-cols-2" : ""}`}>
+                            <div className="space-y-6">
+                                <h3 className="text-2xl font-bold text-brand-dark mb-6">Store Information</h3>
+                                {contact?.address && (
+                                    <InfoCard icon={<MapPin className="w-6 h-6" />} title="Address">
+                                        <p className="text-slate-600 leading-relaxed whitespace-pre-line">{contact.address}</p>
+                                    </InfoCard>
+                                )}
+                                {contact?.phone && (
+                                    <InfoCard icon={<Phone className="w-6 h-6" />} title="Phone">
+                                        <p className="text-slate-600">{contact.phone}</p>
+                                    </InfoCard>
+                                )}
+                                {contact?.storeHours && (
+                                    <InfoCard icon={<Clock className="w-6 h-6" />} title="Opening Hours">
+                                        <p className="text-slate-600 whitespace-pre-line">{contact.storeHours}</p>
+                                    </InfoCard>
+                                )}
+                                {contact?.email && (
+                                    <InfoCard icon={<Mail className="w-6 h-6" />} title="Email">
+                                        <p className="text-slate-600">{contact.email}</p>
+                                    </InfoCard>
+                                )}
+                            </div>
+
+                            {mapUrl && (
+                                <div className="h-full min-h-[400px] w-full bg-slate-200 rounded-3xl overflow-hidden shadow-lg border border-slate-200 relative">
+                                    <iframe
+                                        src={mapUrl}
+                                        title="Map"
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        allowFullScreen
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        className="absolute inset-0 grayscale hover:grayscale-0 transition-[transform,opacity,background-color,border-color,color,box-shadow] duration-300"
+                                    />
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>
-            </section>
-
-            {/* Values Section */}
-            <section className="py-24 bg-white relative overflow-hidden">
-                <div className="container mx-auto px-4 md:px-6 relative z-10">
-                    <div className="text-center mb-20">
-                        <span className="text-brand-lime font-bold tracking-widest uppercase text-sm mb-2 block">Core Principles</span>
-                        <h2 className="text-4xl font-bold text-brand-dark mb-4 tracking-tight">{data.valuesTitle}</h2>
-                        <p className="text-slate-500 max-w-2xl mx-auto">{data.valuesSubtitle}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {data.values.map((value, index) => {
-                            const IconComponent = iconMap[value.icon] || ShieldCheck;
-                            return (
-                                <motion.div
-                                    key={index}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.1 }}
-                                    className="bg-slate-50 p-8 rounded-2xl border border-slate-100 hover:border-brand-lime/50 hover:bg-white hover:shadow-xl transition-[transform,opacity,background-color,border-color,color,box-shadow] duration-300 group"
-                                >
-                                    <div className={`w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ${value.color || "text-brand-blue"}`}>
-                                        <IconComponent className="w-7 h-7" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-brand-dark mb-3 group-hover:text-brand-blue transition-colors">{value.title}</h3>
-                                    <p className="text-slate-500 leading-relaxed group-hover:text-slate-600">{value.desc}</p>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </section>
-
-            {/* Contact Section (Merged) */}
-            <section className="py-24 bg-slate-50 border-t border-slate-200">
-                <div className="container mx-auto px-4 md:px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-brand-blue font-bold tracking-widest uppercase text-sm mb-2 block">Get in Touch</span>
-                        <h2 className="text-4xl font-bold text-brand-dark mb-4 tracking-tight">{data.contactTitle || "Visit Our Store"}</h2>
-                        <p className="text-slate-500 max-w-2xl mx-auto">{data.contactSubtitle || "We'd love to see you in person. Here's where you can find us."}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                        {/* Contact Info */}
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-bold text-brand-dark mb-6">Store Information</h3>
-
-                            <div className="flex items-start gap-4 p-6 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                                <div className="p-3 bg-brand-blue/10 text-brand-blue rounded-full">
-                                    <MapPin className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg mb-1 text-brand-dark">Address</h4>
-                                    <p className="text-slate-600 leading-relaxed whitespace-pre-line">
-                                        {contact?.address || `${SHOP_NAME} Retail Complex,\nLevel 3, P&M Mall, Patliputra Colony,\nPatna, Bihar 800013`}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-4 p-6 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                                <div className="p-3 bg-brand-blue/10 text-brand-blue rounded-full">
-                                    <Phone className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg mb-1 text-brand-dark">Phone</h4>
-                                    <p className="text-slate-600">{contact?.phone || "+91 612 2xxx xxx"}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-4 p-6 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                                <div className="p-3 bg-brand-blue/10 text-brand-blue rounded-full">
-                                    <Clock className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg mb-1 text-brand-dark">Opening Hours</h4>
-                                    <p className="text-slate-600 whitespace-pre-line">{contact?.storeHours || "Monday - Sunday\n10:00 AM - 10:00 PM"}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-4 p-6 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                                <div className="p-3 bg-brand-blue/10 text-brand-blue rounded-full">
-                                    <Mail className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg mb-1 text-brand-dark">Email</h4>
-                                    <p className="text-slate-600">{contact?.email || "support@demomart.com"}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Map Embed */}
-                        <div className="h-full min-h-[400px] w-full bg-slate-200 rounded-3xl overflow-hidden shadow-lg border border-slate-200 relative">
-                            <iframe
-                                src={contact?.mapEmbed || "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d115133.01016839848!2d85.07300225139396!3d25.608020764124317!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39f29937c52d4f05%3A0x831218527871363d!2sPatna%2C%20Bihar!5e0!3m2!1sen!2sin!4v1717758362706!5m2!1sen!2sin"}
-                                width="100%"
-                                height="100%"
-                                style={{ border: 0 }}
-                                allowFullScreen
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                                className="absolute inset-0 grayscale hover:grayscale-0 transition-[transform,opacity,background-color,border-color,color,box-shadow] duration-300"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </section >
-        </div >
+                </section>
+            )}
+        </div>
     );
 }
-

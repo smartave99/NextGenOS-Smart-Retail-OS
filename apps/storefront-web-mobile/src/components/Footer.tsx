@@ -50,7 +50,7 @@ export default function Footer() {
                             </span>
                             <span>
                                 <span className="block text-lg font-extrabold">{branding.siteName || SHOP_NAME}</span>
-                                <span className="block text-sm text-slate-300">Patna&apos;s local discovery catalogue</span>
+                                <span className="block text-sm text-slate-300">Our catalogue, to browse before you visit</span>
                             </span>
                         </Link>
                         <p className="mt-5 max-w-sm text-sm leading-6 text-slate-300">

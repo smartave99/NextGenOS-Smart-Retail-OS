@@ -2,6 +2,8 @@ import { getSiteConfig } from "@/app/actions/site-config";
 import { NextResponse } from "next/server";
 import { SITE_URL } from "@/lib/site-url";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { COUNTRY } from "@/lib/region/lite";
+import { languageList } from "@/lib/shop-facts";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +28,7 @@ export async function GET() {
             "address": {
                 "@type": "PostalAddress",
                 "streetAddress": contact.address,
-                "addressCountry": seo.jsonLd.addressCountry || "IN"
+                "addressCountry": seo.jsonLd.addressCountry || COUNTRY
             },
             "contactPoint": [
                 {
@@ -34,7 +36,7 @@ export async function GET() {
                     "telephone": contact.phone,
                     "contactType": "customer service",
                     "email": contact.email,
-                    "availableLanguage": ["English", "Hindi"]
+                    "availableLanguage": languageList().split(", ")
                 }
             ],
             "sameAs": [

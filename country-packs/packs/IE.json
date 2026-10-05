@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "country": "IE",
+  "name": "Ireland",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "EUR",
+    "symbol": "€",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-IE",
+  "languages": [
+    "en",
+    "ga"
+  ],
+  "timezone": "Europe/Dublin",
+  "phoneCode": "+353",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT23",
+        "label": "VAT 23%",
+        "percent": "23"
+      },
+      {
+        "code": "VAT13P5",
+        "label": "VAT 13.5%",
+        "percent": "13.5"
+      },
+      {
+        "code": "VAT9",
+        "label": "VAT 9%",
+        "percent": "9"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "VAT number",
+      "pattern": "^IE[0-9][0-9A-Z+*][0-9]{5}[A-Z]{1,2}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "VAT Invoice",
+    "requiredFields": [
+      "Seller name, address and VAT number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT rate and amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 6
+  },
+  "notes": [
+    "Rates on the day of writing; some goods have special rates."
+  ]
+}

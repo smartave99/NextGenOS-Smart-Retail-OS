@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "country": "CN",
+  "name": "China",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "CNY",
+    "symbol": "¥",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "zh-CN",
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "timezone": "Asia/Shanghai",
+  "phoneCode": "+86",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT13",
+        "label": "VAT 13%",
+        "percent": "13"
+      },
+      {
+        "code": "VAT9",
+        "label": "VAT 9%",
+        "percent": "9"
+      },
+      {
+        "code": "VAT6",
+        "label": "VAT 6%",
+        "percent": "6"
+      },
+      {
+        "code": "VAT3",
+        "label": "VAT 3%",
+        "percent": "3"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "Unified social credit code",
+      "pattern": "^[0-9A-Z]{18}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Fapiao",
+    "requiredFields": [
+      "Seller name and tax number",
+      "Date",
+      "Description and price",
+      "VAT amount"
+    ],
+    "eInvoice": "Invoices are electronic fapiao issued through the government tax system.",
+    "retentionYears": 10
+  },
+  "notes": [
+    "13% is the standard rate for goods."
+  ]
+}

@@ -46,6 +46,7 @@ import Link from "next/link";
 import Image from "next/image";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
 import ExcelImportModal from "@/components/admin/ExcelImportModal";
+import { CURRENCY, money } from "@/lib/region/lite";
 
 export default function ProductsManager() {
     const { user, loading: authLoading } = useAuth();
@@ -681,7 +682,7 @@ export default function ProductsManager() {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Price ({CURRENCY.symbol}) *</label>
                                     <input
                                         type="number"
                                         value={formData.price}
@@ -692,7 +693,7 @@ export default function ProductsManager() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Original Price (₹)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Original Price ({CURRENCY.symbol})</label>
                                     <input
                                         type="number"
                                         value={formData.originalPrice}
@@ -982,9 +983,9 @@ export default function ProductsManager() {
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
-                                                    <div className="font-semibold text-gray-900">₹{product.price}</div>
+                                                    <div className="font-semibold text-gray-900">{money(product.price)}</div>
                                                     {product.originalPrice && (
-                                                        <div className="text-xs text-gray-400 line-through">₹{product.originalPrice}</div>
+                                                        <div className="text-xs text-gray-400 line-through">{money(product.originalPrice)}</div>
                                                     )}
                                                 </td>
                                                 <td className="p-4 text-center">

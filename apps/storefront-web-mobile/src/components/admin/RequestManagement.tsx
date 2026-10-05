@@ -10,12 +10,7 @@ import { format } from "date-fns";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
-
-const inrFormatter = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-});
+import { money } from "@/lib/region/lite";
 
 export default function RequestManagement() {
     const [requests, setRequests] = useState<ProductRequest[]>([]);
@@ -312,7 +307,7 @@ export default function RequestManagement() {
                                             <div className="flex-1 bg-gray-50 p-4 rounded-xl border border-gray-100">
                                                 <label className="text-xs text-gray-500 block mb-1">Price Range</label>
                                                 <p className="font-medium text-gray-900">
-                                                    {selectedRequest.minPrice ? inrFormatter.format(selectedRequest.minPrice) : "Any"} – {selectedRequest.maxPrice ? inrFormatter.format(selectedRequest.maxPrice) : "Any"}
+                                                    {selectedRequest.minPrice ? money(selectedRequest.minPrice) : "Any"} – {selectedRequest.maxPrice ? money(selectedRequest.maxPrice) : "Any"}
                                                 </p>
                                             </div>
                                         </div>

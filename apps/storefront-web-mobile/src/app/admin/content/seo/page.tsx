@@ -8,6 +8,7 @@ import { SiteConfig, SeoConfig, DEFAULT_SITE_CONFIG } from "@/types/site-config"
 import { ArrowLeft, Save, Loader2, Search, Plus, Trash2, Bot, ListPlus } from "lucide-react";
 import Link from "next/link";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { CURRENCY } from "@/lib/region/lite";
 
 
 
@@ -320,7 +321,7 @@ export default function SeoEditor() {
                                         type="text"
                                         value={seo.jsonLd.priceRange}
                                         onChange={(e) => setSeo({ ...seo, jsonLd: { ...seo.jsonLd, priceRange: e.target.value } })}
-                                        placeholder="₹₹"
+                                        placeholder={CURRENCY.symbol.repeat(2)}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                                     />
                                 </div>

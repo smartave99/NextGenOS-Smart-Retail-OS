@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/app/actions";
+import { money } from "@/lib/region/lite";
 
 interface StylistAdviceResult {
     advice: string;
@@ -253,7 +254,7 @@ export default function StylistInterface() {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <h5 className="text-sm font-bold text-slate-900 truncate group-hover:text-brand-blue transition-colors">{matchedProduct.name}</h5>
-                                                        <span className="text-xs font-medium text-slate-500">₹{matchedProduct.price}</span>
+                                                        <span className="text-xs font-medium text-slate-500">{money(matchedProduct.price)}</span>
                                                     </div>
                                                 </Link>
                                             ) : (

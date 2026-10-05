@@ -4,6 +4,7 @@ import { MapPin, MessageSquare } from "lucide-react";
 import { useSiteConfig } from "@/context/SiteConfigContext";
 import { SITE_URL } from "@/lib/site-url";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { money } from "@/lib/region/lite";
 
 interface WhatsAppOrderButtonProps {
     productName: string;
@@ -31,7 +32,7 @@ export default function WhatsAppOrderButton({
         const message = `*In-store availability enquiry - ${SHOP_NAME}*
 
 *${productName}*
-Price: ₹${productPrice.toLocaleString("en-IN")}
+Price: ${money(productPrice)}
 
 ${productUrl}
 

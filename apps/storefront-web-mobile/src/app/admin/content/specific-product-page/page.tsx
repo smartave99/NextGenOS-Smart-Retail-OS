@@ -6,17 +6,18 @@ import { useAuth } from "@/context/auth-context";
 import { getSiteContent, updateSiteContent, ProductDetailPageContent } from "@/app/actions";
 import { Loader2, ArrowLeft, Save, MapPin, Phone, ShieldCheck, Clock, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { SHOP_PLACE } from "@/lib/region/lite";
 
 const defaultContent: ProductDetailPageContent = {
-    availabilityText: "Available In-Store Only",
-    availabilityBadge: "In-Store Only",
-    callToActionNumber: "+91-9876543210",
+    availabilityText: "Available in store",
+    availabilityBadge: "In store",
+    callToActionNumber: "",
     visitStoreLink: "/content/contact",
-    authenticityTitle: "Authenticity Guaranteed",
-    authenticityText: "Directly from authorized distributors with full manufacturer warranty.",
+    authenticityTitle: "",
+    authenticityText: "",
     storeLocationTitle: "Store Location",
-    storeLocationText: "Patliputra colony, P&M Mall, Patna",
-    storeHoursText: "Open Daily: 10:00 AM - 9:00 PM"
+    storeLocationText: SHOP_PLACE,
+    storeHoursText: ""
 };
 
 export default function SpecificProductPageEditor() {

@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "country": "SA",
+  "name": "Saudi Arabia",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "SAR",
+    "symbol": "SAR",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": true,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "ar-SA",
+  "languages": [
+    "ar",
+    "en"
+  ],
+  "timezone": "Asia/Riyadh",
+  "phoneCode": "+966",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT15",
+        "label": "VAT 15%",
+        "percent": "15"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "VAT number",
+      "pattern": "^3[0-9]{13}3$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and VAT number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT rate and amount",
+      "QR code"
+    ],
+    "eInvoice": "ZATCA e-invoicing (FATOORA) is compulsory in phases: invoices must be generated and sent through approved software.",
+    "retentionYears": 6
+  },
+  "notes": []
+}

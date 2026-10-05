@@ -48,7 +48,7 @@ export default function Features({ content }: { content?: FeaturesContent }) {
                         </h2>
                     </div>
                     <p className="text-slate-500 text-lg max-w-md pt-4">
-                        {content.description || "We bridge global trends with local needs through a curated selection you can explore and purchase at our Patna store."}
+                        {content.description || "Explore our selection here, then visit the store to see it and buy in person."}
                     </p>
                 </div>
 

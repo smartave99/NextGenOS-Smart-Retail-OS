@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "country": "TH",
+  "name": "Thailand",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "THB",
+    "symbol": "฿",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "th-TH",
+  "languages": [
+    "th",
+    "en"
+  ],
+  "timezone": "Asia/Bangkok",
+  "phoneCode": "+66",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT7",
+        "label": "VAT 7%",
+        "percent": "7"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "Tax ID",
+      "pattern": "^[0-9]{13}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and tax ID",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 5
+  },
+  "notes": [
+    "7% is the reduced rate that has been extended year by year; the law's own rate is 10%. Confirm the rate in force."
+  ]
+}

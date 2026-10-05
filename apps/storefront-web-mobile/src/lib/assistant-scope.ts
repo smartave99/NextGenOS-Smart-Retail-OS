@@ -17,7 +17,7 @@ const OFF_TOPIC_PATTERN = /\b(?:poem|essay|story|joke|lyrics?|song|homework|codi
 
 const GENERIC_ANSWER_REQUEST_PATTERN = /\b(?:write|compose|draft|tell(?:\s+me)?|explain|solve|teach|translate|summari[sz]e|calculate|diagnose|predict)\b/i;
 
-const SHOPPING_SIGNAL_PATTERN = /(?:\b(?:smart\s*avenue|product|products|item|items|shop|store|visit|department|category|categories|browse|find|show|search|recommend|recommendation|compare|comparison|gift|present|offer|offers|deal|deals|discount|sale|price|cost|budget|available|availability|stock|arrival|arrivals|trending|popular|barcode|ean|upc|sku|scan|image|photo|camera|colour|color|size|brand|material|feature|variant|quality|delivery|order|purchase|buy|pickup|reservation|reserve|address|location|timings?|hours|open|close|contact|whatsapp)\b|₹|\brs\.?\s*\d)/i;
+const SHOPPING_SIGNAL_PATTERN = /(?:\b(?:product|products|item|items|shop|store|visit|department|category|categories|browse|find|show|search|recommend|recommendation|compare|comparison|gift|present|offer|offers|deal|deals|discount|sale|price|cost|budget|available|availability|stock|arrival|arrivals|trending|popular|barcode|ean|upc|sku|scan|image|photo|camera|colour|color|size|brand|material|feature|variant|quality|delivery|order|purchase|buy|pickup|reservation|reserve|address|location|timings?|hours|open|close|contact|whatsapp)\b|[\u20B9$\u20AC\u00A3\u00A5\u20B1]|\b(?:rs|inr|usd|eur|gbp|php)\.?\s*\d)/i;
 
 // Covers direct catalogue-style searches, including the concise phrases Groq
 // Vision returns after reading a product photo. Customers can still ask for an

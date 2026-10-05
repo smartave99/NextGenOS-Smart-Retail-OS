@@ -7,6 +7,7 @@ import { answerCell, isNumberColumn, readAnswer, type Inline } from "@/lib/live-
 import { calendarDate, clockTime } from "@/lib/live-shop/format";
 import type { OwnerAnswer, Shop, ShopQuestion } from "@/lib/live-shop/types";
 import { Card, CardHead, Note, Pill, inputClass, primaryButton } from "./ui";
+import { languageList } from "@/lib/shop-facts";
 
 const MAX_LENGTH = 1000;
 const SHOWN = 20;
@@ -107,7 +108,7 @@ export default function AskShop({ db, shop, pcLive }: { db: SupabaseClient; shop
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         onKeyDown={onKey}
-                        placeholder="Ask about sales, stock or bills, in English or Hindi…"
+                        placeholder={`Ask about sales, stock or bills, in ${languageList()}…`}
                         className={`${inputClass} resize-none`}
                     />
                     <button type="submit" className={`${primaryButton} shrink-0 px-3`} disabled={sending || text.trim() === ""} aria-label="Ask">

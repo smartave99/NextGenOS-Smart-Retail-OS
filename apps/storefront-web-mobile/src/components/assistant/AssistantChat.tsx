@@ -27,6 +27,7 @@ import { analyzeImage } from "@/app/actions/image-search-action";
 import { processVoiceSearch } from "@/app/actions/voice-search-action";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { money } from "@/lib/region/lite";
 
 // Lazy-load ProductRequestModal (18KB) — only needed when user requests a product
 const ProductRequestModal = dynamic(() => import("@/components/ProductRequestModal"), { ssr: false });
@@ -647,11 +648,11 @@ export default function AssistantChat() {
                                                             </p>
                                                             <div className="flex items-baseline gap-2">
                                                                 <span className="font-bold text-sm text-gray-900">
-                                                                    ₹{product.price.toLocaleString()}
+                                                                    {money(product.price)}
                                                                 </span>
                                                                 {product.originalPrice && (
                                                                     <span className="text-xs text-gray-400 line-through">
-                                                                        ₹{product.originalPrice.toLocaleString()}
+                                                                        {money(product.originalPrice)}
                                                                     </span>
                                                                 )}
                                                                 {product.originalPrice && (

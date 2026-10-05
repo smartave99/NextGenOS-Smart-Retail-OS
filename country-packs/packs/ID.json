@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "country": "ID",
+  "name": "Indonesia",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "IDR",
+    "symbol": "Rp",
+    "decimals": 0,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": "."
+  },
+  "locale": "id-ID",
+  "languages": [
+    "id",
+    "en"
+  ],
+  "timezone": "Asia/Jakarta",
+  "phoneCode": "+62",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "PPN",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "PPN11",
+        "label": "PPN 11%",
+        "percent": "11"
+      },
+      {
+        "code": "PPN12",
+        "label": "PPN 12%",
+        "percent": "12"
+      },
+      {
+        "code": "PPN0",
+        "label": "PPN 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "PPNEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "NPWP",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Faktur Pajak",
+    "requiredFields": [
+      "Seller name, address and NPWP",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "PPN amount"
+    ],
+    "eInvoice": "Tax invoices are electronic (e-Faktur).",
+    "retentionYears": 10
+  },
+  "notes": [
+    "11% applies to most goods; 12% to luxury goods. Confirm the rates in force."
+  ]
+}

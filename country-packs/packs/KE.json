@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "country": "KE",
+  "name": "Kenya",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "KES",
+    "symbol": "KSh",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-KE",
+  "languages": [
+    "en",
+    "sw"
+  ],
+  "timezone": "Africa/Nairobi",
+  "phoneCode": "+254",
+  "fiscalYearStart": {
+    "month": 7,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT16",
+        "label": "VAT 16%",
+        "percent": "16"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "KRA PIN",
+      "pattern": "^[AP][0-9]{9}[A-Z]$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and KRA PIN",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount",
+      "eTIMS control code"
+    ],
+    "eInvoice": "Invoices must be issued through KRA's eTIMS system.",
+    "retentionYears": 5
+  },
+  "notes": []
+}

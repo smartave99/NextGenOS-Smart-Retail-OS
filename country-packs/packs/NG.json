@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "country": "NG",
+  "name": "Nigeria",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "NGN",
+    "symbol": "₦",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-NG",
+  "languages": [
+    "en"
+  ],
+  "timezone": "Africa/Lagos",
+  "phoneCode": "+234",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT7P5",
+        "label": "VAT 7.5%",
+        "percent": "7.5"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "TIN",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and TIN",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 6
+  },
+  "notes": []
+}

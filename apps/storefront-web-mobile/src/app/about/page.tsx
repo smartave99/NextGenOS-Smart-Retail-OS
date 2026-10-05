@@ -6,6 +6,7 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site-url";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { CURRENCY } from "@/lib/region/lite";
 
 export const revalidate = 3600;
 
@@ -48,7 +49,7 @@ async function AboutPageContentLoader() {
             "streetAddress": siteConfig.contact.address,
             "addressCountry": siteConfig.seo.jsonLd.addressCountry || "IN"
         },
-        "priceRange": siteConfig.seo.jsonLd.priceRange || "₹₹"
+        "priceRange": siteConfig.seo.jsonLd.priceRange || CURRENCY.symbol.repeat(2)
     };
 
     // Add FAQ Schema for AI Search / GEO

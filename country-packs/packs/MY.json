@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "country": "MY",
+  "name": "Malaysia",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "MYR",
+    "symbol": "RM",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-MY",
+  "languages": [
+    "ms",
+    "en",
+    "zh"
+  ],
+  "timezone": "Asia/Kuala_Lumpur",
+  "phoneCode": "+60",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "SST",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "SST10",
+        "label": "Sales tax 10%",
+        "percent": "10"
+      },
+      {
+        "code": "SST5",
+        "label": "Sales tax 5%",
+        "percent": "5"
+      },
+      {
+        "code": "SVC8",
+        "label": "Service tax 8%",
+        "percent": "8"
+      },
+      {
+        "code": "SVC6",
+        "label": "Service tax 6%",
+        "percent": "6"
+      },
+      {
+        "code": "SST0",
+        "label": "No tax",
+        "zero": true
+      },
+      {
+        "code": "SSTEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "SST registration number",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.05",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Invoice",
+    "requiredFields": [
+      "Seller name, address and SST number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "Tax amount"
+    ],
+    "eInvoice": "MyInvois electronic invoicing is being phased in by business size.",
+    "retentionYears": 7
+  },
+  "notes": [
+    "Sales and Service Tax is charged by registered manufacturers and service providers. A normal retail shop does not charge it on goods.",
+    "Cash totals are rounded to 5 sen."
+  ]
+}

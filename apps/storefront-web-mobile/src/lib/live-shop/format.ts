@@ -1,20 +1,21 @@
-// Words and numbers for the Live shop section, the Indian way: ₹1,23,456 and "6:57 pm".
+// Words and numbers for the Live shop section, the way the shop's country writes them (for India: ₹1,23,456 and "6:57 pm").
 import type { OwnerDay, OwnerLive } from "./types";
+import { LOCALE, CURRENCY } from "@/lib/region/lite";
 
-const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
-const number = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
-const clock = new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" });
-const clockSeconds = new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" });
-const dayName = new Intl.DateTimeFormat("en-IN", { weekday: "short" });
-const weekdayName = new Intl.DateTimeFormat("en-IN", { weekday: "long" });
-const short = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" });
-const long = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const money = new Intl.NumberFormat(LOCALE, { style: "currency", currency: CURRENCY.code, maximumFractionDigits: 0 });
+const number = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
+const clock = new Intl.DateTimeFormat(LOCALE, { hour: "numeric", minute: "2-digit" });
+const clockSeconds = new Intl.DateTimeFormat(LOCALE, { hour: "numeric", minute: "2-digit", second: "2-digit" });
+const dayName = new Intl.DateTimeFormat(LOCALE, { weekday: "short" });
+const weekdayName = new Intl.DateTimeFormat(LOCALE, { weekday: "long" });
+const short = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short" });
+const long = new Intl.DateTimeFormat(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-const exact = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const exact = new Intl.NumberFormat(LOCALE, { style: "currency", currency: CURRENCY.code, minimumFractionDigits: CURRENCY.decimals, maximumFractionDigits: CURRENCY.decimals });
 
 export const rupees = (value: number | null | undefined) => money.format(Math.round(Number(value) || 0));
 
-/** A price as the shop charges it: ₹155 when whole, ₹99.50 with paise. */
+/** A price as the shop charges it: ₹155 when whole, ₹99.50 with paise (or the same in the shop's currency). */
 export const price = (value: number) => (Number.isInteger(value) ? money : exact).format(value);
 export const quantity = (value: number) => number.format(value);
 

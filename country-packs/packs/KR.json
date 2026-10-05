@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "country": "KR",
+  "name": "South Korea",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "KRW",
+    "symbol": "₩",
+    "decimals": 0,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "ko-KR",
+  "languages": [
+    "ko",
+    "en"
+  ],
+  "timezone": "Asia/Seoul",
+  "phoneCode": "+82",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT10",
+        "label": "VAT 10%",
+        "percent": "10"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "businessId": {
+      "label": "Business registration number",
+      "pattern": "^[0-9]{3}-?[0-9]{2}-?[0-9]{5}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name and registration number",
+      "Date",
+      "Description and price",
+      "VAT amount"
+    ],
+    "eInvoice": "Corporations and large sellers must issue electronic tax invoices.",
+    "retentionYears": 5
+  },
+  "notes": []
+}

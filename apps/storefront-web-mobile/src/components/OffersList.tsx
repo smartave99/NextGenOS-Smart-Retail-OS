@@ -6,8 +6,9 @@ import { useSiteConfig } from "@/context/SiteConfigContext";
 import { Offer } from "@/app/actions";
 import Link from "next/link";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { LOCALE } from "@/lib/region/lite";
 
-const dateFormatter = new Intl.DateTimeFormat("en-IN", {
+const dateFormatter = new Intl.DateTimeFormat(LOCALE, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -29,7 +30,7 @@ export default function OffersList({ offers, catalogueUrl, catalogueTitle, catal
                         {catalogueTitle || "Browse before you visit"}
                     </h2>
                     <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200">
-                        {catalogueSubtitle || `See the current ${SHOP_NAME} catalogue, then visit the Patna store to confirm availability and purchase in person.`}
+                        {catalogueSubtitle || `See the current ${SHOP_NAME} catalogue, then visit the store to confirm availability and purchase in person.`}
                     </p>
                     {catalogueUrl ? (
                         <a href={catalogueUrl} target="_blank" rel="noopener noreferrer" className="sa-press mt-6 inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-blue-700 px-6 py-3 font-bold text-white transition-[transform,background-color] duration-100 hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-white">

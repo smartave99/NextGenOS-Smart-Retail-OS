@@ -1,0 +1,116 @@
+@page "/projects"
+@attribute [Authorize(Policy = Perm.Projects)]
+@inherits HubPage
+@using NextGenOS.Hub.Projects
+
+<PageTitle>Projects</PageTitle>
+<h1>Projects</h1>
+<p class="sub">Contracts for your clients: what was agreed, what is built, what is billed and what is still to come in.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <div class="seg" role="group" aria-label="Show">
+        @foreach (var (key, label) in new[] { ("active", "Running"), ("quoted", "Quoted"), ("complete", "Finished"), ("", "All") })
+        {
+            <button type="button" class="@(filter == key ? "on" : "")" aria-pressed="@(filter == key)" @onclick="() => Pick(key)">@label</button>
+        }
+    </div>
+    <span class="spacer"></span>
+    <button type="button" class="btn primary" id="add-project" @onclick="NewProject">New project</button>
+</div>
+
+<div class="card tbl-wrap">
+    @if (rows.Count == 0) { <div class="empty">No projects here.</div> }
+    else
+    {
+        <table class="tbl">
+            <thead><tr><th>Project</th><th>Client</th><th class="num">Contract</th><th class="num">Billed</th><th class="num">To come in</th><th>Done</th></tr></thead>
+            <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td><a href="projects/@r.Project.Id"><strong>@r.Project.Code</strong> @r.Project.Name</a> <span class="chip @(r.Project.Status == "active" ? "ok" : "")">@StatusLabel(r.Project.Status)</span></td>
+                    <td>@r.Status.ClientName</td>
+                    <td class="num">@Money(r.Status.ContractMinor + r.Status.VariationsMinor)</td>
+                    <td class="num">@Money(r.Status.BilledGrossMinor)</td>
+                    <td class="num">@Money(r.Status.OutstandingMinor)</td>
+                    <td style="min-width:110px"><div class="bar" role="progressbar" aria-valuenow="@(r.Status.PercentCompleteMilli / 1000)" aria-valuemin="0" aria-valuemax="100"><span style="width:@(Math.Min(100, r.Status.PercentCompleteMilli / 1000))%"></span></div></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (form)
+{
+    <div class="sheet-back" @onclick="() => form = false">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="New project" @onclick:stopPropagation="true">
+            <h2>New project</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <div class="field-row">
+                    <div><label for="pr-code">Code</label><input id="pr-code" @bind="code" maxlength="20" /></div>
+                    <div><label for="pr-ret">Retention (%)</label><input id="pr-ret" inputmode="decimal" @bind="retention" /></div>
+                </div>
+                <label for="pr-name">Name of the project</label><input id="pr-name" @bind="name" maxlength="120" />
+                <label for="pr-client">@Shop.Singular("customer")</label>
+                <select id="pr-client" @bind="clientId">
+                    <option value="">Choose…</option>
+                    @foreach (var c in clients) { <option value="@c.Id">@c.Name</option> }
+                </select>
+                @if (clients.Count == 0) { <p class="muted small">Add a @Shop.Singular("customer").ToLowerInvariant() under People first.</p> }
+                <label for="pr-site">Site address</label><input id="pr-site" @bind="site" maxlength="200" />
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = false">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-project" @onclick="Save">Create</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private record Row(NextGenOS.Hub.Projects.Project Project, ProjectStatus Status);
+
+    private string filter = "active";
+    private IReadOnlyList<Row> rows = Array.Empty<Row>();
+    private IReadOnlyList<Party> clients = Array.Empty<Party>();
+    private bool form;
+    private string code = "", name = "", site = "", retention = "", clientId = "", formError = "";
+
+    protected override Task LoadAsync()
+    {
+        Pick(filter);
+        return Task.CompletedTask;
+    }
+
+    private static string StatusLabel(string s) => s switch { "quoted" => "Quoted", "active" => "Running", "complete" => "Finished", "closed" => "Closed", _ => s };
+
+    private void Pick(string key)
+    {
+        filter = key;
+        rows = App.Projects.List(key.Length > 0 ? key : null).Select(p => new Row(p, App.Projects.Status(p.Id))).ToList();
+    }
+
+    private void NewProject()
+    {
+        clients = App.Parties.Search("client", null, 300);
+        code = "P-" + (App.Projects.List().Count + 1).ToString("000", System.Globalization.CultureInfo.InvariantCulture);
+        name = site = clientId = formError = "";
+        retention = Shop.Industry.RuleText("retentionPercent", "0");
+        form = true;
+    }
+
+    private void Save()
+    {
+        formError = "";
+        try
+        {
+            if (!long.TryParse(clientId, out var client)) throw new HubException("client", $"Please choose the {Shop.Singular("customer").ToLowerInvariant()}.");
+            var project = App.Projects.Create(code, name, client, site, retention);
+            Nav.NavigateTo("/projects/" + project.Id);
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

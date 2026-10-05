@@ -262,4 +262,18 @@ public class LibraryTests
         Assert.Null(f.App.Library.FindMember("nobody"));
         Assert.Equal("duplicate-card", Assert.Throws<HubException>(() => Member(f, "Other", "adult", "M-0001")).Code);
     }
+
+    [Fact]
+    public void The_list_of_waiting_members_shows_title_member_and_phone()
+    {
+        using var f = new HubFixture("IN", "library");
+        var title = f.App.Library.AddTitle("Dune", "Frank Herbert");
+        f.App.Library.AddCopies(title.Id, 1);
+        var a = f.App.Parties.Create(new PartyInput { Kind = "member", Name = "Asha", MemberType = "adult", Phone = "+910000000001" });
+        var b = f.App.Parties.Create(new PartyInput { Kind = "member", Name = "Ravi", MemberType = "adult" });
+        f.App.Library.Issue(a.Id, f.App.Library.CopiesOf(title.Id)[0].Barcode);
+        f.App.Library.Reserve(title.Id, b.Id);
+        var row = Assert.Single(f.App.Library.ActiveReservations());
+        Assert.Equal(("Dune", "Ravi", "waiting"), (row.Title, row.MemberName, row.Reservation.Status));
+    }
 }

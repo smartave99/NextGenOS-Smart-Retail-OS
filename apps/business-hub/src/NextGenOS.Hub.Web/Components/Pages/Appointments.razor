@@ -1,0 +1,278 @@
+@page "/appointments"
+@attribute [Authorize(Policy = Perm.Appointments)]
+@inherits HubPage
+@using NextGenOS.Hub.Appointments
+
+<PageTitle>Bookings</PageTitle>
+<h1>Bookings</h1>
+<p class="sub">Who is booked with whom, and when. Open a booking to check in, charge or cancel it.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <button type="button" class="btn ghost small" aria-label="Day before" @onclick="() => Go(-1)">‹</button>
+    <input id="day" class="date" type="date" value="@date.ToString("yyyy-MM-dd")" @onchange="SetDate" aria-label="Day" />
+    <button type="button" class="btn ghost small" aria-label="Day after" @onclick="() => Go(1)">›</button>
+    <button type="button" class="btn secondary small" @onclick="() => SetTo(Today)">Today</button>
+    <strong>@date.ToString("dddd d MMMM", System.Globalization.CultureInfo.InvariantCulture)</strong>
+    <span class="spacer"></span>
+    <button type="button" class="btn primary" id="new-booking" @onclick="OpenBook">New booking</button>
+</div>
+
+@if (staff.Count == 0)
+{
+    <div class="card"><div class="empty">Add the people who serve customers under People first (kind: @Shop.Singular("staff")).</div></div>
+}
+else
+{
+    <div class="cols">
+        @foreach (var s in staff)
+        {
+            var mine = day.Where(a => a.Appointment.StaffId == s.Id).OrderBy(a => a.Appointment.Start).ToList();
+            <section class="card">
+                <h2>@s.Name</h2>
+                @if (mine.Count == 0) { <div class="empty">Nothing booked.</div> }
+                @foreach (var a in mine)
+                {
+                    <div class="line">
+                        <span class="nm">@Hours(a.Appointment) · @a.Service</span>
+                        <span class="amt">@StatusChip(a.Appointment.Status)</span>
+                        <div class="ctl">
+                            <span class="muted">@a.ClientName</span>
+                            <span class="spacer"></span>
+                            @if (a.Appointment.Status == "booked") { <button type="button" class="btn secondary small" @onclick="() => Arrive(a)">Arrived</button> }
+                            @if (a.Appointment.Status is "booked" or "arrived") { <button type="button" class="btn primary small" @onclick="() => OpenInvoice(a)">Charge</button> }
+                            @if (a.Appointment.Status == "booked") { <button type="button" class="btn ghost small" @onclick="() => SetStatus(a, "no-show")">No-show</button> }
+                            @if (a.Appointment.Status is "booked" or "arrived") { <button type="button" class="btn ghost small" @onclick="() => SetStatus(a, "cancelled")">Cancel</button> }
+                            @if (a.Appointment.DocumentId is { } doc) { <a class="btn ghost small" href="documents/@doc">Bill</a> }
+                        </div>
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+@if (booking)
+{
+    <div class="sheet-back" @onclick="() => booking = false">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="New booking" @onclick:stopPropagation="true">
+            <h2>New booking</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <label for="bk-client">@Shop.Singular("customer")</label>
+                <select id="bk-client" @bind="clientId"><option value="">Walk-in, no name</option>@foreach (var c in clients) { <option value="@c.Id">@c.Name</option> }</select>
+                <label for="bk-service">@Shop.Singular("item")</label>
+                <select id="bk-service" @bind="serviceId" @bind:after="LoadSlots"><option value="">Choose…</option>@foreach (var sv in services) { <option value="@sv.Id">@sv.Name (@(sv.DurationMin ?? 30) min, @Money(sv.PriceMinor))</option> }</select>
+                <label for="bk-staff">With</label>
+                <select id="bk-staff" @bind="staffId" @bind:after="LoadSlots"><option value="">Choose…</option>@foreach (var s in staff) { <option value="@s.Id">@s.Name</option> }</select>
+                <label for="bk-date">Day</label>
+                <input id="bk-date" type="date" value="@bookDate.ToString("yyyy-MM-dd")" @onchange="SetBookDate" />
+                <label for="bk-walkin" class="check"><input id="bk-walkin" type="checkbox" @bind="walkIn" @bind:after="LoadSlots" /> The customer is here now (walk-in)</label>
+                @if (walkIn)
+                {
+                    <label for="bk-time">Time</label>
+                    <input id="bk-time" type="time" @bind="walkTime" />
+                }
+                else if (slots.Count > 0)
+                {
+                    <label>Free times</label>
+                    <div class="slots" role="group" aria-label="Free times">
+                        @foreach (var t in slots) { <button type="button" class="chip-btn @(t == time ? "on" : "")" aria-pressed="@(t == time)" @onclick="() => time = t">@t.ToString("HH:mm")</button> }
+                    </div>
+                }
+                else if (serviceId.Length > 0 && staffId.Length > 0) { <p class="muted">No free time that day. Try another day or another person.</p> }
+                <label for="bk-notes">Note</label><input id="bk-notes" @bind="notes" maxlength="160" />
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => booking = false">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-booking" @onclick="Book">Book</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (charging is not null && preview is not null)
+{
+    <div class="sheet-back" @onclick="() => charging = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Charge" @onclick:stopPropagation="true">
+            <h2>@charging.Service for @charging.ClientName</h2>
+            <Notice Error="@formError" />
+            <label for="ex-item">Add something sold with it</label>
+            <div class="inline-form">
+                <div><select id="ex-item" @bind="extraId"><option value="">Choose…</option>@foreach (var i in products) { <option value="@i.Id">@i.Name (@Money(i.PriceMinor))</option> }</select></div>
+                <button type="button" class="btn secondary" @onclick="AddExtra">Add</button>
+            </div>
+            @foreach (var (e, n) in extras.Select((e, n) => (e, n)))
+            {
+                <div class="total-row"><span>@(products.FirstOrDefault(p => p.Id == e.ItemId)?.Name)</span><button type="button" class="btn ghost small" @onclick="() => RemoveExtra(n)">Remove</button></div>
+            }
+            @if (Shop.Industry.Defaults.Adjustments.Any(a => a.Kind == "tip"))
+            {
+                <label for="tip">Tip (optional)</label><input id="tip" inputmode="decimal" @bind="tip" @bind:after="Refresh" />
+            }
+            <div class="total-row big"><span>Total</span><span id="total">@Money(preview.Document.PayableMinor)</span></div>
+            <div class="pay-methods" role="group" aria-label="Way of paying">
+                @foreach (var m in Shop.PaymentMethods) { <button type="button" class="@(method == m ? "on" : "")" aria-pressed="@(method == m)" @onclick="() => method = m">@(char.ToUpperInvariant(m[0]) + m[1..])</button> }
+            </div>
+            <input class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(preview.Document.PayableMinor)" @bind="tender" />
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => charging = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="charge" @onclick="Charge">Take payment</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private DateOnly date;
+    private IReadOnlyList<Party> staff = Array.Empty<Party>(), clients = Array.Empty<Party>();
+    private IReadOnlyList<Item> services = Array.Empty<Item>(), products = Array.Empty<Item>();
+    private IReadOnlyList<AppointmentRow> day = Array.Empty<AppointmentRow>();
+    private bool booking, walkIn;
+    private string clientId = "", serviceId = "", staffId = "", notes = "", formError = "", extraId = "", tip = "", tender = "", method = "cash";
+    private DateOnly bookDate;
+    private TimeOnly? time;
+    private TimeOnly walkTime = TimeOnly.FromDateTime(DateTime.Now);
+    private IReadOnlyList<TimeOnly> slots = Array.Empty<TimeOnly>();
+    private AppointmentRow? charging;
+    private DocumentView? preview;
+    private readonly List<LineInput> extras = new();
+
+    protected override Task LoadAsync()
+    {
+        date = date == default ? Today : date;
+        staff = App.Appointments.Staff();
+        services = App.Catalog.Search(null, "service", null, 300);
+        products = App.Catalog.Search(null, "stock", null, 300);
+        day = App.Appointments.Day(date);
+        return Task.CompletedTask;
+    }
+
+    private void Go(int by) => SetTo(date.AddDays(by));
+
+    private void SetTo(DateOnly d)
+    {
+        date = d;
+        day = App.Appointments.Day(date);
+    }
+
+    private void SetDate(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var d)) SetTo(d);
+    }
+
+    private string Hours(Appointment a) => Shop.Time.ToLocal(a.Start).ToString("HH:mm") + "–" + Shop.Time.ToLocal(a.End).ToString("HH:mm");
+
+    private MarkupString StatusChip(string s) => new(s switch
+    {
+        "booked" => "<span class=\"chip\">Booked</span>", "arrived" => "<span class=\"chip warn\">Here</span>", "done" => "<span class=\"chip ok\">Done</span>",
+        "cancelled" => "<span class=\"chip bad\">Cancelled</span>", "no-show" => "<span class=\"chip bad\">No-show</span>", _ => s,
+    });
+
+    private Task SetStatus(AppointmentRow a, string status) => Run(() =>
+    {
+        App.Appointments.SetStatus(a.Appointment.Id, status);
+        day = App.Appointments.Day(date);
+    });
+
+    private Task Arrive(AppointmentRow a) => SetStatus(a, "arrived");
+
+    // ---- new booking ---------------------------------------------------------------------------------------------------------------
+
+    private void OpenBook()
+    {
+        clients = App.Parties.Search("customer", null, 300);
+        booking = true;
+        formError = "";
+        clientId = serviceId = staffId = notes = "";
+        bookDate = date;
+        time = null;
+        walkIn = false;
+        slots = Array.Empty<TimeOnly>();
+    }
+
+    private void SetBookDate(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var d)) { bookDate = d; LoadSlots(); }
+    }
+
+    private void LoadSlots()
+    {
+        time = null;
+        slots = !walkIn && long.TryParse(staffId, out var st) && long.TryParse(serviceId, out var sv) ? App.Appointments.FreeSlots(st, sv, bookDate) : Array.Empty<TimeOnly>();
+    }
+
+    private void Book()
+    {
+        formError = "";
+        try
+        {
+            if (!long.TryParse(serviceId, out var sv)) throw new HubException("service", "Please choose what the booking is for.");
+            if (!long.TryParse(staffId, out var st)) throw new HubException("staff", "Please choose who will serve.");
+            var at = walkIn ? walkTime : time ?? throw new HubException("time", "Please choose a time.");
+            App.Appointments.Book(long.TryParse(clientId, out var c) ? c : null, st, sv, bookDate, at, string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(), walkIn);
+            booking = false;
+            SetTo(bookDate);
+            Info = "Booked.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    // ---- charging ------------------------------------------------------------------------------------------------------------------
+
+    private void OpenInvoice(AppointmentRow a)
+    {
+        charging = a;
+        extras.Clear();
+        tip = tender = formError = extraId = "";
+        method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        Refresh();
+    }
+
+    private List<NextGenOS.Tax.TaxAdjustmentInput> Adjustments()
+    {
+        var list = new List<NextGenOS.Tax.TaxAdjustmentInput>();
+        if (tip.Trim().Length > 0)
+        {
+            if (!TryMoney(Shop, tip, out var t) || t < 0) throw new HubException("tip", "Please type the tip as a number, like 50.");
+            if (t > 0) list.Add(new NextGenOS.Tax.TaxAdjustmentInput { Code = "TIP", Kind = "tip", Label = "Tip", Amount = Shop.Text(t) });
+        }
+        return list;
+    }
+
+    private void Refresh()
+    {
+        formError = "";
+        try { preview = App.Appointments.Preview(charging!.Appointment.Id, extras.ToList(), Adjustments()); }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void AddExtra()
+    {
+        if (!long.TryParse(extraId, out var id)) return;
+        extras.Add(new LineInput { ItemId = id });
+        extraId = "";
+        Refresh();
+    }
+
+    private void RemoveExtra(int index)
+    {
+        extras.RemoveAt(index);
+        Refresh();
+    }
+
+    private void Charge()
+    {
+        formError = "";
+        try
+        {
+            var payable = preview!.Document.PayableMinor;
+            var amount = payable;
+            if (tender.Trim().Length > 0 && (!TryMoney(Shop, tender, out amount) || amount <= 0)) throw new HubException("amount", "Please type the amount as a number, like 250 or 99.50.");
+            var view = App.Appointments.Invoice(charging!.Appointment.Id, extras.ToList(), new[] { new PaymentInput { Method = method, AmountMinor = amount } }, Adjustments(), Me.Id);
+            charging = null;
+            Nav.NavigateTo("/documents/" + view.Document.Id);
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

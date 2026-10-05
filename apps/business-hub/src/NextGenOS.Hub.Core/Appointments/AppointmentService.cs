@@ -120,6 +120,17 @@ public sealed class AppointmentService(HubDb db, ShopContextProvider shop, ICloc
         return view;
     }
 
+    /// <summary>What the visit would come to with these extras and adjustments (a tip), worked out by the tax engine, without keeping anything.</summary>
+    public DocumentView Preview(long appointmentId, IEnumerable<LineInput>? extras, IEnumerable<Tax.TaxAdjustmentInput>? adjustments = null)
+    {
+        var a = Get(appointmentId) ?? throw new HubException("not-found", "That booking was not found.");
+        var lines = new List<LineInput> { new() { ItemId = a.ItemId } };
+        if (extras is not null) lines.AddRange(extras);
+        var draft = documents.CreateDraft(new DraftOptions { PartyId = a.PartyId, Lines = lines, Adjustments = adjustments?.ToList() ?? new() });
+        documents.Discard(draft.Document.Id);
+        return draft;
+    }
+
     public IReadOnlyList<StaffSales> SalesByStaff(DateTimeOffset from, DateTimeOffset to) => db.Query(
         "SELECT s.id, s.name, COUNT(*) AS visits, COALESCE(SUM(d.total_minor), 0) AS sales FROM appointments a JOIN parties s ON s.id = a.staff_id JOIN documents d ON d.id = a.document_id " +
         "WHERE d.status = 'issued' AND d.issued_at >= $f AND d.issued_at < $t GROUP BY s.id ORDER BY sales DESC",

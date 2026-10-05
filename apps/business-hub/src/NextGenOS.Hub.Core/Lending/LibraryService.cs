@@ -25,6 +25,8 @@ public sealed record ReturnResult(Loan Loan, string Title, string MemberName, lo
 
 public sealed record OverdueRow(long LoanId, string Title, string CopyBarcode, long MemberId, string MemberName, string? Phone, DateOnly DueDate, int DaysLate, long FineSoFarMinor);
 
+public sealed record ReservationRow(Reservation Reservation, string Title, string MemberName, string? MemberPhone);
+
 public sealed record PopularTitle(long ItemId, string Title, int Loans, int Copies);
 
 /// <summary>Members, copies of titles, lending and returning, due dates, renewals, reservations and fines, by the rules of the industry pack.</summary>
@@ -270,6 +272,12 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
 
     public IReadOnlyList<Reservation> ReservationsFor(long itemId) =>
         db.Query("SELECT id, item_id, party_id, at, status, copy_id, hold_until FROM reservations WHERE item_id = $i AND status IN ('waiting','ready') ORDER BY at, id", MapReservation, ("$i", itemId));
+
+    /// <summary>Everyone waiting for a title or holding one that is kept for them, oldest first.</summary>
+    public IReadOnlyList<ReservationRow> ActiveReservations() =>
+        db.Query("SELECT r.id, r.item_id, r.party_id, r.at, r.status, r.copy_id, r.hold_until, i.name AS title, p.name AS member_name, p.phone AS phone FROM reservations r " +
+                 "JOIN items i ON i.id = r.item_id JOIN parties p ON p.id = r.party_id WHERE r.status IN ('waiting','ready') ORDER BY r.at, r.id",
+            r => new ReservationRow(MapReservation(r), r.Text("title"), r.Text("member_name"), r.TextOrNull("phone")));
 
     public IReadOnlyList<Reservation> ReservationsOf(long memberId) =>
         db.Query("SELECT id, item_id, party_id, at, status, copy_id, hold_until FROM reservations WHERE party_id = $p AND status IN ('waiting','ready') ORDER BY at, id", MapReservation, ("$p", memberId));

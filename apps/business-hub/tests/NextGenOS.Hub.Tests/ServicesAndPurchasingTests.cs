@@ -99,6 +99,21 @@ public class AppointmentTests
     }
 
     [Fact]
+    public void A_preview_gives_the_total_of_a_visit_and_keeps_nothing()
+    {
+        var (f, kavya, _, cut, _, client) = Studio();
+        using (f)
+        {
+            var serum = f.App.Catalog.Create(new ItemInput { Kind = "stock", Name = "Serum", PriceMinor = 75_000, TrackStock = true });
+            var a = f.App.Appointments.Book(client.Id, kavya.Id, cut.Id, Tuesday, new TimeOnly(10, 0));
+            var before = Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents"));
+            var view = f.App.Appointments.Preview(a.Id, new[] { new LineInput { ItemId = serum.Id } });
+            Assert.Equal(115_000, view.Document.PayableMinor);
+            Assert.Equal(before, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents")));
+        }
+    }
+
+    [Fact]
     public void A_cancelled_booking_frees_the_time_and_cannot_be_invoiced()
     {
         var (f, kavya, _, cut, _, client) = Studio();

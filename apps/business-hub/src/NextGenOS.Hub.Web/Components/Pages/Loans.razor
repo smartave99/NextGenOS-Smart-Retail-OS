@@ -1,0 +1,261 @@
+@page "/loans"
+@attribute [Authorize(Policy = Perm.Loans)]
+@inherits HubPage
+@inject IJSRuntime Js
+@using NextGenOS.Hub.Lending
+
+<PageTitle>Desk</PageTitle>
+<h1>Desk</h1>
+<p class="sub">Scan the member's card, then the book. To take a book back, scan the book alone.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="cols">
+    <section class="card">
+        <h2>Lend</h2>
+        <label for="member">Member (scan the card, or type the name)</label>
+        <input id="member" autocomplete="off" @bind="memberText" @onkeydown="MemberKey" placeholder="Card or name" />
+        @if (member is not null)
+        {
+            <div class="card flat" id="member-card">
+                <div class="head"><strong>@member.Name</strong><span class="chip">@MemberTypeLabel()</span></div>
+                <div class="muted small">@openLoans.Count on loan@(maxLoans > 0 ? " of up to " + maxLoans : "")@(fines > 0 ? " · owes " + Money(fines) + " in fines" : "")</div>
+                @if (fines > 0)
+                {
+                    <div class="notice warn">@member.Name has fines to pay before borrowing again.</div>
+                    <button type="button" class="btn secondary small" id="pay-fines" @onclick="PayFines">Take @Money(fines) now</button>
+                }
+                @foreach (var l in openLoans)
+                {
+                    <div class="total-row"><span>@l.Title <span class="muted small">due @Day(l.Loan.DueAt)</span>@if (l.Loan.DueAt < App.Clock.UtcNow) { <span class="chip bad">Late</span> }</span><button type="button" class="btn ghost small" @onclick="() => Renew(l)">Renew</button></div>
+                }
+            </div>
+            <label for="copy">Book (scan the barcode on the copy)</label>
+            <input id="copy" autocomplete="off" @bind="copyText" @onkeydown="CopyKey" placeholder="Copy barcode" />
+        }
+
+        <h2 class="gap">Take back</h2>
+        <label for="back">Book (scan the barcode on the copy)</label>
+        <input id="back" autocomplete="off" @bind="backText" @onkeydown="BackKey" placeholder="Copy barcode" />
+        @if (returned is not null)
+        {
+            <div class="notice @(returned.FineMinor > 0 ? "warn" : "ok")" id="returned" role="status">
+                <strong>@returned.Title</strong> is back from @returned.MemberName.
+                @if (returned.FineMinor > 0) { <span> It was @returned.DaysLate @(returned.DaysLate == 1 ? "day" : "days") late: fine @Money(returned.FineMinor).</span> }
+                @if (returned.HeldForMember is { } who) { <span> Keep it aside: @who is waiting for it.</span> }
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <div class="tabs" role="tablist">
+            @foreach (var (key, label) in new[] { ("out", "On loan"), ("late", "Overdue"), ("fines", "Fines"), ("holds", "Waiting") })
+            {
+                <button type="button" role="tab" class="@(tab == key ? "on" : "")" aria-selected="@(tab == key)" @onclick="() => OpenTab(key)">@label</button>
+            }
+        </div>
+        @if (tab == "out")
+        {
+            @if (allOut.Count == 0) { <div class="empty">Nothing is out.</div> }
+            else
+            {
+                <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Title</th><th>Member</th><th>Due</th><th></th></tr></thead>
+                    <tbody>@foreach (var l in allOut) { <tr><td>@l.Title</td><td>@l.MemberName</td><td>@Day(l.Loan.DueAt)@if (l.Loan.DueAt < App.Clock.UtcNow) { <span class="chip bad">Late</span> }</td><td class="right"><button type="button" class="btn ghost small" @onclick="() => Renew(l)">Renew</button></td></tr> }</tbody></table></div>
+            }
+        }
+        else if (tab == "late")
+        {
+            @if (late.Count == 0) { <div class="empty">Nothing is overdue.</div> }
+            else
+            {
+                <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Title</th><th>Member</th><th class="num">Days</th><th class="num">Fine so far</th><th></th></tr></thead>
+                    <tbody>@foreach (var o in late) { <tr><td>@o.Title</td><td>@o.MemberName@if (o.Phone is { Length: > 0 }) { <br /><span class="muted small">@o.Phone</span> }</td><td class="num">@o.DaysLate</td><td class="num">@Money(o.FineSoFarMinor)</td>
+                        <td class="right"><button type="button" class="btn ghost small" @onclick="() => MarkLost(o.LoanId)">Lost</button></td></tr> }</tbody></table></div>
+            }
+        }
+        else if (tab == "fines")
+        {
+            @if (allFines.Count == 0) { <div class="empty">No fines.</div> }
+            else
+            {
+                <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Member</th><th>For</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+                    <tbody>@foreach (var f in allFines) { <tr><td>@MemberName(f.PartyId)</td><td>@f.Reason</td><td class="num">@Money(f.AmountMinor)</td><td><span class="chip @(f.Status == "unpaid" ? "warn" : "")">@f.Status</span></td>
+                        <td class="right">@if (f.Status == "unpaid" && Me.Can(Perm.Void)) { <button type="button" class="btn ghost small" @onclick="() => waiving = f">Waive</button> }</td></tr> }</tbody></table></div>
+            }
+        }
+        else
+        {
+            @if (holds.Count == 0) { <div class="empty">Nobody is waiting for a book.</div> }
+            else
+            {
+                <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Title</th><th>Member</th><th>Since</th><th></th></tr></thead>
+                    <tbody>@foreach (var h in holds) { <tr><td>@h.Title</td><td>@h.MemberName@if (h.MemberPhone is { Length: > 0 }) { <br /><span class="muted small">@h.MemberPhone</span> }</td><td>@Day(h.Reservation.At)</td>
+                        <td>@if (h.Reservation.Status == "ready") { <span class="chip ok">Ready until @(h.Reservation.HoldUntil is { } u ? Day(u) : "")</span> } else { <span class="chip">Waiting</span> }
+                            <button type="button" class="btn ghost small" @onclick="() => CancelHold(h.Reservation.Id)">Cancel</button></td></tr> }</tbody></table></div>
+            }
+            <h3>Add a hold</h3>
+            <div class="inline-form">
+                <div><label for="hold-title">Title</label><select id="hold-title" @bind="holdTitle">@foreach (var t in titles) { <option value="@t.Id">@t.Name</option> }</select></div>
+                <button type="button" class="btn secondary" id="add-hold" disabled="@(member is null)" @onclick="AddHold">For @(member?.Name ?? "the member above")</button>
+            </div>
+        }
+    </section>
+</div>
+
+@if (waiving is not null)
+{
+    <div class="sheet-back" @onclick="() => waiving = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Waive fine" @onclick:stopPropagation="true">
+            <h2>Waive @Money(waiving.AmountMinor)</h2>
+            <Notice Error="@formError" />
+            <label for="waive-why">Why</label><input id="waive-why" @bind="waiveWhy" maxlength="120" />
+            <div class="row"><button type="button" class="btn secondary" @onclick="() => waiving = null">Cancel</button><button type="button" class="btn primary grow" @onclick="Waive">Waive the fine</button></div>
+        </div>
+    </div>
+}
+
+@code {
+    private string memberText = "", copyText = "", backText = "", tab = "out", waiveWhy = "", holdTitle = "";
+    private Party? member;
+    private IReadOnlyList<LoanRow> openLoans = Array.Empty<LoanRow>(), allOut = Array.Empty<LoanRow>();
+    private IReadOnlyList<OverdueRow> late = Array.Empty<OverdueRow>();
+    private IReadOnlyList<Fine> allFines = Array.Empty<Fine>();
+    private IReadOnlyList<ReservationRow> holds = Array.Empty<ReservationRow>();
+    private IReadOnlyList<Item> titles = Array.Empty<Item>();
+    private ReturnResult? returned;
+    private Fine? waiving;
+    private string? formError;
+    private long fines;
+    private int maxLoans;
+    private readonly Dictionary<long, string> names = new();
+
+    protected override Task LoadAsync()
+    {
+        App.Library.ProcessHolds();
+        allOut = App.Library.OpenLoans();
+        late = App.Library.Overdue();
+        allFines = App.Library.AllFines(200);
+        holds = App.Library.ActiveReservations();
+        titles = App.Catalog.Search(null, "title", null, 500);
+        if (holdTitle.Length == 0 && titles.Count > 0) holdTitle = titles[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        RefreshMember();
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.InvokeVoidAsync("hub.focus", "member");
+    }
+
+    private string MemberName(long id)
+    {
+        if (!names.TryGetValue(id, out var n)) names[id] = n = App.Parties.Get(id)?.Name ?? "";
+        return n;
+    }
+
+    private string MemberTypeLabel() => App.Library.MemberTypes().FirstOrDefault(t => t.Id == member?.MemberType)?.Label ?? "Member";
+
+    private void RefreshMember()
+    {
+        if (member is null) return;
+        member = App.Parties.Get(member.Id);
+        openLoans = member is null ? Array.Empty<LoanRow>() : App.Library.OpenLoansOf(member.Id);
+        fines = member is null ? 0 : App.Library.UnpaidFines(member.Id).Sum(f => f.AmountMinor);
+        maxLoans = member is null ? 0 : App.Library.MemberTypes().FirstOrDefault(t => t.Id == member.MemberType)?.MaxLoans ?? 0;
+    }
+
+    private void OpenTab(string key)
+    {
+        tab = key;
+        _ = Reload();
+    }
+
+    private async Task MemberKey(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter") return;
+        await Run(() =>
+        {
+            var found = App.Library.FindMember(memberText);
+            if (found is null) throw new HubException("member-not-found", $"No member matches \"{memberText.Trim()}\".");
+            member = found;
+            returned = null;
+            RefreshMember();
+            memberText = "";
+        });
+        if (member is not null) await Js.InvokeVoidAsync("hub.focus", "copy");
+    }
+
+    private async Task CopyKey(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter" || member is null) return;
+        await Run(() =>
+        {
+            var loan = App.Library.Issue(member.Id, copyText, Me.Id);
+            var row = App.Library.OpenLoansOf(member.Id).First(l => l.Loan.Id == loan.Id);
+            copyText = "";
+            Info = $"{row.Title} is lent to {member.Name}, due back {Day(loan.DueAt)}.";
+            _ = Reload();
+        });
+        await Js.InvokeVoidAsync("hub.focus", "copy");
+    }
+
+    private async Task BackKey(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter") return;
+        await Run(() =>
+        {
+            returned = App.Library.Return(backText, Me.Id);
+            backText = "";
+            _ = Reload();
+        });
+        await Js.InvokeVoidAsync("hub.focus", "back");
+    }
+
+    private Task Renew(LoanRow l) => Run(() =>
+    {
+        var loan = App.Library.Renew(l.Loan.Id, Me.Id);
+        Info = $"{l.Title} is renewed until {Day(loan.DueAt)}.";
+        _ = Reload();
+    });
+
+    private Task MarkLost(long loanId) => Run(() =>
+    {
+        var fine = App.Library.MarkLost(loanId, Me.Id);
+        Info = $"Marked as lost. A fine of {Money(fine.AmountMinor)} was added.";
+        _ = Reload();
+    });
+
+    private Task PayFines() => Run(() =>
+    {
+        var method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        var doc = App.Library.PayFines(member!.Id, new[] { new PaymentInput { Method = method, AmountMinor = fines } }, Me.Id);
+        Info = "Fines paid. Receipt " + doc.Document.Number + ".";
+        _ = Reload();
+    });
+
+    private void Waive()
+    {
+        formError = null;
+        try
+        {
+            App.Library.Waive(waiving!.Id, waiveWhy, Me.Id);
+            waiving = null;
+            waiveWhy = "";
+            Info = "The fine is waived.";
+            _ = Reload();
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private Task CancelHold(long id) => Run(() =>
+    {
+        App.Library.CancelReservation(id);
+        _ = Reload();
+    });
+
+    private Task AddHold() => Run(() =>
+    {
+        App.Library.Reserve(long.Parse(holdTitle, System.Globalization.CultureInfo.InvariantCulture), member!.Id);
+        Info = "Added. " + member.Name + " will be told when it is back.";
+        _ = Reload();
+    });
+}

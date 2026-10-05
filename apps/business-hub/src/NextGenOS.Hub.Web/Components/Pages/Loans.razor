@@ -14,6 +14,7 @@
         <h2>Lend</h2>
         <label for="member">Member (scan the card, or type the name)</label>
         <input id="member" autocomplete="off" @bind="memberText" @bind:event="oninput" @onkeydown="MemberKey" placeholder="Card or name" />
+        <CameraScan Id="cam-member" Label="Scan the card with the camera" OnScanned="MemberFromCamera" />
         @if (member is not null)
         {
             <div class="card flat" id="member-card">
@@ -31,11 +32,13 @@
             </div>
             <label for="copy">Book (scan the barcode on the copy)</label>
             <input id="copy" autocomplete="off" @bind="copyText" @bind:event="oninput" @onkeydown="CopyKey" placeholder="Copy barcode" />
+            <CameraScan Id="cam-copy" Label="Scan the book with the camera" OnScanned="CopyFromCamera" />
         }
 
         <h2 class="gap">Take back</h2>
         <label for="back">Book (scan the barcode on the copy)</label>
         <input id="back" autocomplete="off" @bind="backText" @bind:event="oninput" @onkeydown="BackKey" placeholder="Copy barcode" />
+        <CameraScan Id="cam-back" Label="Scan the book with the camera" OnScanned="BackFromCamera" />
         @if (returned is not null)
         {
             <div class="notice @(returned.FineMinor > 0 ? "warn" : "ok")" id="returned" role="status">
@@ -168,6 +171,12 @@
         tab = key;
         _ = Reload();
     }
+
+    private async Task MemberFromCamera(string code) { memberText = code; await MemberKey(new KeyboardEventArgs { Key = "Enter" }); }
+
+    private async Task CopyFromCamera(string code) { copyText = code; await CopyKey(new KeyboardEventArgs { Key = "Enter" }); }
+
+    private async Task BackFromCamera(string code) { backText = code; await BackKey(new KeyboardEventArgs { Key = "Enter" }); }
 
     private async Task MemberKey(KeyboardEventArgs e)
     {

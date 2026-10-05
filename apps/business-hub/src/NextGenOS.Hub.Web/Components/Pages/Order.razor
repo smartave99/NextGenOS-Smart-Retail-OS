@@ -180,11 +180,14 @@ else
 
     private void SetNote(DocLine line, ChangeEventArgs e) => Run(() => view = App.Documents.UpdateLine(Id, line.Id, null, null, e.Value?.ToString() ?? ""));
 
-    private void Send() => Run(() =>
+    private Task Send() => Run(async () =>
     {
         var tickets = App.Restaurant.Fire(Id, Me.Id);
         view = App.Documents.Get(Id);
         Info = tickets.Count == 0 ? "Nothing new to send." : "Sent to " + string.Join(" and ", tickets.Select(t => t.Station.ToLowerInvariant())) + ".";
+        // Kitchen printers, if there are any. A printer that does not answer never holds up the order: the kitchen screen has it.
+        var problems = await App.Printing.PrintTicketsAsync(tickets);
+        if (problems.Count > 0) Error = "The order is on the kitchen screen, but a printer did not print it. " + string.Join(" ", problems);
     });
 
     private void ToggleService(ChangeEventArgs e) => Run(() =>
@@ -233,7 +236,7 @@ else
         if (tender.Trim().Length > 0) AddPayment();
         if (payments.Count == 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });
         var done = App.Restaurant.Pay(Id, payments.ToList(), Me.Id);
-        Nav.NavigateTo("/documents/" + done.Document.Id);
+        Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");
     });
 
     private void Move(long tableId) => Run(() =>

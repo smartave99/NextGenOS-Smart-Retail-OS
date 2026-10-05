@@ -36,7 +36,7 @@ export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) 
     },
     {
       name: 'dotnet-hub',
-      title: 'Business Hub: build, domain tests (every industry and country) and web tests (licence gate, sign-in, roles, headers)',
+      title: 'Business Hub and Devices library: build, domain tests (every industry and country), printer languages, web tests (licence gate, sign-in, roles, headers)',
       full: true,
       run: () => {
         if (!has('dotnet')) return { status: 'SKIP', detail: 'dotnet is not installed here' };

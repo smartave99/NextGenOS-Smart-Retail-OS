@@ -43,7 +43,7 @@ try {
   await page.getByLabel(/Built to date: Brickwork walls/).fill('80');
   await page.getByLabel(/Built to date: Roof slab/).fill('60');
   await page.locator('#make-bill').click();
-  await page.waitForURL(/\/documents\/\d+$/);
+  await page.waitForURL(/\/documents\/\d+(\?.*)?$/);
   await page.locator('.receipt').waitFor();
   const bill = await page.locator('.receipt').innerText();
   assert.match(bill, /Progress bill/);

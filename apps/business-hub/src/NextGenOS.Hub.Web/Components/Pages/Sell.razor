@@ -6,13 +6,14 @@
 
 <PageTitle>@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</PageTitle>
 <h1>@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</h1>
-<p class="sub">Scan a barcode, or type a name and press Enter.</p>
+<p class="sub">Scan a barcode, or type a name and press Enter.@if (drawerPrinter) { <button type="button" class="btn ghost small" id="drawer" @onclick="OpenDrawer">Open the cash drawer</button> }</p>
 <Notice Error="@Error" Info="@Info" />
 
 <div class="pos">
     <div>
         <div class="card">
             <input id="scan" class="big-input-left" placeholder="Scan or search" autocomplete="off" @bind="query" @bind:event="oninput" @onkeydown="OnKey" aria-label="Scan or search" />
+            <div class="row"><CameraScan Id="cam-sell" Label="Scan with the camera" OnScanned="ScanFromCamera" /></div>
             @if (categories.Count > 0)
             {
                 <div class="chips" role="group" aria-label="Categories">
@@ -144,6 +145,9 @@
     private string tender = "";
     private readonly List<PaymentInput> payments = new();
     private bool finished;
+    private bool drawerPrinter;
+
+    private Task OpenDrawer() => Run(async () => { await App.Printing.OpenDrawerAsync(null, Me.Id); });
 
     private long Paid => payments.Sum(p => p.AmountMinor);
     private long Remaining => Math.Max(0, (cart?.Document.PayableMinor ?? 0) - Paid);
@@ -154,6 +158,7 @@
     {
         method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
         categories = App.Catalog.Categories();
+        drawerPrinter = App.PrinterProfiles.For("receipt") is not null;
         Search();
         return Task.CompletedTask;
     }
@@ -169,6 +174,12 @@
     {
         category = c;
         Search();
+    }
+
+    private async Task ScanFromCamera(string code)
+    {
+        query = code;
+        await OnKey(new KeyboardEventArgs { Key = "Enter" });
     }
 
     private async Task OnKey(KeyboardEventArgs e)
@@ -278,7 +289,7 @@
             if (!onAccount && payments.Count == 0 && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });
             var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount });
             finished = true;
-            Nav.NavigateTo("/documents/" + done.Document.Id);
+            Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");
         });
     }
 

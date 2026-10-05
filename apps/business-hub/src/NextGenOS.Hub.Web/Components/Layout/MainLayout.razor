@@ -59,6 +59,7 @@
         if (f.Projects && Can(Perm.Projects)) yield return new Link("projects", "Projects", "hammer");
         if (f.Appointments && Can(Perm.Appointments)) yield return new Link("appointments", "Bookings", "calendar");
         if (Can(Perm.Catalog)) yield return new Link("items", Shop.Plural("item"), "box");
+        if (Can(Perm.Catalog) && !Shop.Features.Lending) yield return new Link("posters", "Price tags", "tag");
         if (Can(Perm.Parties)) yield return new Link("people", "People", "people");
         if (f.Purchases && Can(Perm.Purchases)) yield return new Link("purchases", "Buying", "truck");
         if (Can(Perm.Sell) || Can(Perm.Reports) || Can(Perm.Loans)) yield return new Link("documents", Shop.Plural("invoice"), "receipt");

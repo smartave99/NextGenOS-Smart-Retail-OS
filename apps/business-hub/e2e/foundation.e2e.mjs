@@ -84,7 +84,7 @@ try {
   await page.locator('#scan').fill('cup');
   await page.locator('#scan').press('Enter');
   await page.locator('#complete').click();
-  await page.waitForURL(/\/documents\/\d+$/);
+  await page.waitForURL(/\/documents\/\d+(\?.*)?$/);
   const receipt = await page.locator('.receipt').innerText();
   assert.match(receipt, /CGST/);
   assert.match(receipt, /₹118\.00/);
@@ -164,11 +164,11 @@ try {
   await setUp(ph, hub, { name: 'Manila Mart', country: 'Philippines', industry: 'retail', demo: true });
   await signIn(ph, hub);
   await go(ph, 'New sale');
-  await ph.locator('#scan').fill('8901000000011');
+  await ph.locator('#scan').fill('8901000000019');
   await ph.locator('#scan').press('Enter');
   await ph.locator('.line').first().waitFor();
   await ph.locator('#complete').click();
-  await ph.waitForURL(/\/documents\/\d+$/);
+  await ph.waitForURL(/\/documents\/\d+(\?.*)?$/);
   const phReceipt = await ph.locator('.receipt').innerText();
   assert.match(phReceipt, /₱/);
   assert.match(phReceipt, /VAT/);
@@ -192,7 +192,7 @@ try {
   await us.locator('#scan').fill('mug');
   await us.locator('#scan').press('Enter');
   await us.locator('#complete').click();
-  await us.waitForURL(/\/documents\/\d+$/);
+  await us.waitForURL(/\/documents\/\d+(\?.*)?$/);
   const usReceipt = await us.locator('.receipt').innerText();
   assert.match(usReceipt, /\$10\.80/);
   assert.match(usReceipt, /Sales tax/);

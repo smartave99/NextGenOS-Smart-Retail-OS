@@ -18,11 +18,11 @@ try {
   const scan = page.locator('#scan');
   await scan.waitFor();
   assert.ok(await scan.evaluate((el) => el === document.activeElement), 'the scan box has focus on arrival');
-  await scan.fill('8901000000011');           // a scanner types the barcode, then Enter
+  await scan.fill('8901000000019');           // a scanner types the barcode, then Enter
   await scan.press('Enter');
   await page.locator('.line').first().waitFor();
   assert.match(await page.locator('.line .nm').first().innerText(), /Basmati rice/);
-  await scan.fill('8901000000011');
+  await scan.fill('8901000000019');
   await scan.press('Enter');
   await page.waitForFunction(() => document.querySelector('.line .qty')?.value === '2');
   step('scanning the same barcode twice makes one line of 2');
@@ -36,7 +36,7 @@ try {
   step('cash of 1000 shows the change to give');
 
   await page.locator('#complete').click();
-  await page.waitForURL(/\/documents\/\d+$/);
+  await page.waitForURL(/\/documents\/\d+(\?.*)?$/);
   await page.locator('.receipt').waitFor();
   const receipt = await page.locator('.receipt').innerText();
   assert.match(receipt, /Corner Mart/);
@@ -53,7 +53,7 @@ try {
   await page.locator('#give-back').click();
   await page.getByLabel(/Giving back: Basmati/).fill('1');
   await page.locator('#save-return').click();
-  await page.waitForURL((u) => /\/documents\/\d+$/.test(u.pathname) && u.toString() !== billUrl);
+  await page.waitForURL((u) => /\/documents\/\d+(\?.*)?$/.test(u.pathname) && u.toString() !== billUrl);
   await page.locator('.receipt', { hasText: 'Credit note' }).waitFor();
   step('taking one bag back makes a credit note');
 

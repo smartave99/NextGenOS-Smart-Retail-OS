@@ -25,6 +25,7 @@ else
         <Notice Error="@Error" Info="@Info" />
         <div class="row wrap">
             <button type="button" class="btn primary" id="print" @onclick="Print">Print</button>
+            @if (receiptPrinter is not null) { <button type="button" class="btn secondary" id="print-receipt" @onclick="PrintReceipt">Print on @receiptPrinter.Name</button> }
             @if (d.BalanceMinor > 0 && Me.Can(Perm.Sell)) { <button type="button" class="btn secondary" id="take-payment" @onclick="() => Toggle(PayPanel)">Take payment (@Money(d.BalanceMinor) owed)</button> }
             @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn">Take something back</button> }
             @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)">Cancel this bill</button> }
@@ -89,6 +90,12 @@ else
 @code {
     [Parameter] public long Id { get; set; }
 
+    /// <summary>Set by the screens that just finished a bill: the bill is printed by itself if a printer is set to.</summary>
+    [SupplyParameterFromQuery(Name = "new")] public bool JustMade { get; set; }
+
+    private NextGenOS.Devices.Printing.PrinterProfile? receiptPrinter;
+    private bool autoDone;
+
     private DocumentView? view;
     private IReadOnlyList<NextGenOS.Hub.Documents.Document> credits = Array.Empty<Document>();
     private string? panel;
@@ -108,8 +115,19 @@ else
         }
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (JustMade && !autoDone && view is not null && App.Printing.AutoPrinter() is { } auto)
+        {
+            autoDone = true;
+            await Run(async () => { await App.Printing.PrintBillAsync(Id, auto.Id, Me.Id); Info = $"Printed on {auto.Name}."; });
+        }
+    }
+
     protected override Task LoadAsync()
     {
+        receiptPrinter = App.PrinterProfiles.For("receipt");
         loaded = Id;
         view = App.Documents.Get(Id);
         if (view is null) return Task.CompletedTask;
@@ -131,6 +149,12 @@ else
     private bool CanVoid() => view!.Document is { Status: DocStatus.Issued } && view.Document.Type is DocTypes.Invoice && Me.Can(Perm.Void);
 
     private async Task Print() => await Js.InvokeVoidAsync("hub.print");
+
+    private Task PrintReceipt() => Run(async () =>
+    {
+        await App.Printing.PrintBillAsync(Id, receiptPrinter!.Id, Me.Id);
+        Info = $"Printed on {receiptPrinter.Name}.";
+    });
 
     private const string PayPanel = "pay", ReturnPanel = "return", VoidPanel = "void";
 

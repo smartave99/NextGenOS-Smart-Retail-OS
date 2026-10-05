@@ -275,7 +275,7 @@ else
             if (tender.Trim().Length > 0 && (!TryMoney(Shop, tender, out amount) || amount <= 0)) throw new HubException("amount", "Please type the amount as a number, like 250 or 99.50.");
             var view = App.Appointments.Invoice(charging!.Appointment.Id, extras.ToList(), new[] { new PaymentInput { Method = method, AmountMinor = amount } }, Adjustments(), Me.Id);
             charging = null;
-            Nav.NavigateTo("/documents/" + view.Document.Id);
+            Nav.NavigateTo("/documents/" + view.Document.Id + "?new=true");
         }
         catch (HubException ex) { formError = ex.Message; }
     }

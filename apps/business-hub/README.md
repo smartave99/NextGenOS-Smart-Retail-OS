@@ -18,10 +18,16 @@ Money and tax come from the **country packs** (`country-packs/`, 33 countries) t
 
 ## What it does not do yet
 
-- Printing straight to receipt printers and label printers (today: print from the browser; the Device Hub is separate work).
+- Printing on receipt printers and label printers is built and tested against stand-in printers on this PC; it has **not** been tried on real printers (see Devices below).
 - Several shops in one database, or syncing between PCs.
 - The tax rules of any country have **not been checked by a local tax adviser**: the Hub says so on the setup, tax and report screens.
 - The Windows POS desktop program and the dashboard are separate programs and remain India-GST editions.
+
+## Devices
+
+`libs/dotnet/NextGenOS.Devices` speaks the languages of shop printers: **ESC/POS** (nearly every receipt printer), **ZPL**, **TSPL**, **EPL** and **CPCL** (label printers), and reaches them over the **network** (port 9100), a **serial or Bluetooth port**, a **USB device file**, the **system print queue (CUPS)** or the **Windows spooler** (raw). Letters a printer's character set lacks (other alphabets, Chinese, Japanese, Korean) are printed as pictures; receipt currency signs it cannot write are spelled (₹ as Rs). Scanners: USB and Bluetooth scanners that type like a keyboard work in every box; any camera (phone, tablet, webcam) reads barcodes through the browser or, where the browser cannot, through the Hub. Price tags and posters (shelf labels, A4 and A3) print from the browser to any printer. Set it all up in **Settings → Printers**.
+
+Tested: the encoders byte by byte, the transports against a stand-in network printer, a stand-in print command and device files, the camera path in a real browser with a fake camera showing a barcode. **Not tested here: real printers, real Bluetooth or USB hardware, the Windows spooler** — so test each make of printer you sell once, and say so in the sales material.
 
 ## Run it (developers)
 

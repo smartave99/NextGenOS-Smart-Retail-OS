@@ -15,7 +15,7 @@ try {
 
   await go(page, 'Take an order');
   await page.locator('#scan').waitFor();
-  await page.locator('#scan').fill('8902000000019');
+  await page.locator('#scan').fill('8902000000016');
   await page.locator('#scan').press('Enter');
   await page.locator('.line').first().waitFor();
   const retail = await page.locator('.line .amt').first().innerText();
@@ -26,7 +26,7 @@ try {
   step('choosing the trade customer changes the price from ' + retail + ' to the trade price ' + trade);
 
   await page.getByRole('button', { name: 'Put on account' }).click();
-  await page.waitForURL(/\/documents\/\d+$/);
+  await page.waitForURL(/\/documents\/\d+(\?.*)?$/);
   await page.locator('.receipt').waitFor();
   assert.match(await page.locator('.receipt').innerText(), /Balance due/);
   assert.match(await page.locator('main').innerText(), /Unpaid/);
@@ -46,7 +46,7 @@ try {
 
   // A customer over the limit is refused
   await go(page, 'Take an order');
-  await page.locator('#scan').fill('8902000000019');
+  await page.locator('#scan').fill('8902000000016');
   await page.locator('#scan').press('Enter');
   await page.getByPlaceholder('Search by name or phone (or leave empty)').fill('Sharma');
   await page.getByRole('button', { name: 'Sharma General Store' }).click();

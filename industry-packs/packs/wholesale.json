@@ -105,7 +105,7 @@
         "class": "reduced",
         "unit": "bag",
         "stock": "150",
-        "barcode": "8902000000019",
+        "barcode": "8902000000016",
         "tradePrice": "1580.00"
       },
       {
@@ -116,7 +116,7 @@
         "class": "reduced",
         "unit": "tin",
         "stock": "60",
-        "barcode": "8902000000026",
+        "barcode": "8902000000023",
         "tradePrice": "2100.00"
       },
       {
@@ -127,7 +127,7 @@
         "class": "reduced",
         "unit": "bag",
         "stock": "90",
-        "barcode": "8902000000033",
+        "barcode": "8902000000030",
         "tradePrice": "2180.00"
       },
       {
@@ -138,7 +138,7 @@
         "class": "standard",
         "unit": "carton",
         "stock": "75",
-        "barcode": "8902000000040",
+        "barcode": "8902000000047",
         "tradePrice": "1100.00"
       },
       {
@@ -149,7 +149,7 @@
         "class": "standard",
         "unit": "carton",
         "stock": "55",
-        "barcode": "8902000000057",
+        "barcode": "8902000000054",
         "tradePrice": "1750.00"
       }
     ],

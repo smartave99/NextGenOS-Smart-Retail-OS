@@ -118,6 +118,7 @@ public static class HubHost
             return Results.Ok();
         });
         app.MapGet("/export/{report}.csv", ExportEndpoint.Handle).RequireAuthorization(Perm.Reports);
+        DeviceEndpoints.Map(app);
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode(o => o.ContentSecurityFrameAncestorsPolicy = "'none'");
 
         var hub = app.Services.GetRequiredService<HubApp>();

@@ -1,11 +1,12 @@
 // A café: seat guests, take an order, send it to the kitchen, cook it, add service charge and tip, split the bill.
 import assert from 'node:assert';
-import { build, startHub, launch, newPage, setUp, signIn, shots, go } from './lib.mjs';
+import { build, startHub, launch, newPage, setUp, signIn, shots, go, fakePrinter } from './lib.mjs';
 
 build();
 const hub = await startHub();
 const browser = await launch();
 const problems = [];
+const bar = await fakePrinter();
 const shot = shots('restaurant');
 const step = (s) => console.log('✓ ' + s);
 try {
@@ -15,6 +16,17 @@ try {
   const side = await page.getByRole('navigation', { name: 'Main' }).innerText();
   assert.match(side, /Tables/); assert.match(side, /Kitchen/); assert.doesNotMatch(side, /Desk|Projects|Bookings/);
   step('a café sees Tables and Kitchen, and not the library desk or projects');
+
+  // A printer for the bar: its orders print as they are sent.
+  await go(page, 'Settings');
+  await page.getByRole('tab', { name: 'Printers' }).click();
+  await page.locator('#add-printer').click();
+  await page.getByLabel('Name', { exact: true }).fill('Bar printer');
+  await page.getByLabel('It prints').selectOption('kitchen');
+  await page.getByLabel('Address of the printer').fill(`127.0.0.1:${bar.port}`);
+  await page.getByLabel('Prints the orders of').fill('Bar');
+  await page.locator('#save-printer').click();
+  await page.getByText(/Saved\. Press/).waitFor();
 
   await go(page, 'Tables');
   await page.locator('.tile').first().waitFor();
@@ -39,6 +51,9 @@ try {
   await page.locator('#send').click();
   await page.getByText(/Sent to/).waitFor();
   assert.strictEqual(await page.locator('.line .chip', { hasText: 'Sent' }).count(), 3);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.match(bar.text(), /BAR/); assert.match(bar.text(), /Table T1/); assert.match(bar.text(), /Espresso/); assert.match(bar.text(), />> Extra hot/);
+  assert.doesNotMatch(bar.text(), /croissant/i);
   step('table T1: three guests, three lines (one with a note) sent to the kitchen and the bar');
 
   // The kitchen
@@ -67,7 +82,7 @@ try {
   await page.locator('#add-payment').click();
   await shot(page, '3-bill');
   await page.locator('#pay').click();
-  await page.waitForURL(/\/documents\/\d+$/);
+  await page.waitForURL(/\/documents\/\d+(\?.*)?$/);
   const receipt = await page.locator('.receipt').innerText();
   assert.match(receipt, /Service charge/);
   assert.match(receipt, /Tip/);
@@ -97,6 +112,7 @@ try {
   step('the report has table turnover');
 } finally {
   await browser.close();
+  await bar.close();
   if (problems.length) console.log('browser problems:', problems);
   await hub.stop();
   process.exitCode = problems.length ? 1 : process.exitCode;

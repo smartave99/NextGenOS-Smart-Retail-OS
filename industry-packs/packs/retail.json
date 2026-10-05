@@ -101,7 +101,7 @@
         "class": "reduced",
         "unit": "bag",
         "stock": "40",
-        "barcode": "8901000000011"
+        "barcode": "8901000000019"
       },
       {
         "name": "Sunflower oil 1 L",
@@ -111,7 +111,7 @@
         "class": "reduced",
         "unit": "bottle",
         "stock": "60",
-        "barcode": "8901000000028"
+        "barcode": "8901000000026"
       },
       {
         "name": "Loose sugar",
@@ -121,7 +121,7 @@
         "class": "reduced",
         "unit": "kg",
         "stock": "120",
-        "barcode": "8901000000035"
+        "barcode": "8901000000033"
       },
       {
         "name": "Fresh milk 500 ml",
@@ -131,7 +131,7 @@
         "class": "zero",
         "unit": "pack",
         "stock": "80",
-        "barcode": "8901000000042"
+        "barcode": "8901000000040"
       },
       {
         "name": "Whole wheat bread",
@@ -141,7 +141,7 @@
         "class": "reduced",
         "unit": "loaf",
         "stock": "30",
-        "barcode": "8901000000059"
+        "barcode": "8901000000057"
       },
       {
         "name": "Tea leaves 250 g",
@@ -151,7 +151,7 @@
         "class": "reduced",
         "unit": "pack",
         "stock": "50",
-        "barcode": "8901000000066"
+        "barcode": "8901000000064"
       },
       {
         "name": "Notebook A5",
@@ -161,7 +161,7 @@
         "class": "standard",
         "unit": "pc",
         "stock": "100",
-        "barcode": "8901000000073"
+        "barcode": "8901000000071"
       },
       {
         "name": "Ball pen (blue)",
@@ -171,7 +171,7 @@
         "class": "standard",
         "unit": "pc",
         "stock": "300",
-        "barcode": "8901000000080"
+        "barcode": "8901000000088"
       },
       {
         "name": "Dish-wash liquid 500 ml",
@@ -181,7 +181,7 @@
         "class": "standard",
         "unit": "bottle",
         "stock": "45",
-        "barcode": "8901000000097"
+        "barcode": "8901000000095"
       },
       {
         "name": "Toothpaste 150 g",
@@ -191,7 +191,7 @@
         "class": "standard",
         "unit": "tube",
         "stock": "70",
-        "barcode": "8901000000103"
+        "barcode": "8901000000101"
       },
       {
         "name": "LED bulb 9 W",
@@ -201,7 +201,7 @@
         "class": "standard",
         "unit": "pc",
         "stock": "35",
-        "barcode": "8901000000110"
+        "barcode": "8901000000118"
       },
       {
         "name": "Gift wrapping",

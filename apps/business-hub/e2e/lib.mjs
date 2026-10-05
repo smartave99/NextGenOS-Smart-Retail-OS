@@ -40,15 +40,15 @@ export async function startHub(extraArgs = []) {
   };
 }
 
-export async function launch() {
+export async function launch(args = []) {
   const { chromium } = await import('playwright');
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args });
   return browser;
 }
 
 /** A page that records every problem the browser sees: console errors, failed requests, page errors. */
-export async function newPage(browser, problems, viewport = { width: 1360, height: 860 }) {
-  const context = await browser.newContext({ viewport });
+export async function newPage(browser, problems, viewport = { width: 1360, height: 860 }, permissions = []) {
+  const context = await browser.newContext({ viewport, permissions });
   const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
@@ -106,3 +106,20 @@ export function shots(name) {
 export async function go(page, name) {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true }).click();
 }
+
+/** A stand-in network printer: it keeps every byte it is sent, so a test can see what would have been printed. */
+export async function fakePrinter() {
+  const chunks = [];
+  const server = net.createServer((socket) => { socket.on('data', (d) => chunks.push(d)); socket.on('error', () => {}); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return {
+    port: server.address().port,
+    bytes: () => Buffer.concat(chunks),
+    text: () => Buffer.concat(chunks).toString('latin1'),
+    clear: () => { chunks.length = 0; },
+    close: () => new Promise((r) => server.close(r)),
+  };
+}
+
+/** A port nothing listens on: a printer that is switched off. */
+export function deadPort() { return new Promise((res) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); }); }

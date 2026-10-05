@@ -110,6 +110,128 @@ else if (tab == "parts")
         <div class="row"><button type="button" class="btn primary" id="save-parts" @onclick="SaveParts">Save</button></div>
     </section>
 }
+else if (tab == "printers")
+{
+    <section class="card">
+        <h2>Printers</h2>
+        <p class="muted">Receipt printers, label printers and kitchen printers of any make: the program speaks ESC/POS (nearly all receipt printers), ZPL, TSPL, EPL and CPCL (label printers).</p>
+        @if (printers.Count == 0) { <div class="empty">No printer is set up. Bills can still be printed from the browser.</div> }
+        else
+        {
+            <div class="tbl-wrap"><table class="tbl">
+                <thead><tr><th>Name</th><th>For</th><th>Connected by</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var p in printers)
+                {
+                    <tr>
+                        <td><strong>@p.Name</strong>@if (p.AutoPrint) { <span class="chip ok">Prints every bill</span> }</td>
+                        <td>@RoleLabel(p.Role)@(p.Role == "label" ? " · " + p.Language.ToString().ToUpperInvariant() : "")</td>
+                        <td>@ConnectionLabel(p.Connection): @p.Address</td>
+                        <td class="right nowrap">
+                            <button type="button" class="btn secondary small" @onclick="() => TestPrinter(p)">Test page</button>
+                            <button type="button" class="btn ghost small" @onclick="() => EditPrinter(p)">Edit</button>
+                            <button type="button" class="btn ghost small" @onclick="() => RemovePrinter(p)">Remove</button>
+                        </td>
+                    </tr>
+                }
+                </tbody></table></div>
+        }
+        <div class="row"><button type="button" class="btn primary" id="add-printer" @onclick="NewPrinter">Add a printer</button></div>
+    </section>
+    @if (printer is not null)
+    {
+        <div class="sheet-back" @onclick="() => printer = null">
+            <div class="sheet" role="dialog" aria-modal="true" aria-label="Printer" @onclick:stopPropagation="true">
+                <h2>@(printerIsNew ? "Add a printer" : "Printer")</h2>
+                <Notice Error="@formError" />
+                <div class="stack">
+                    <label for="pr-name">Name</label><input id="pr-name" @bind="printer.Name" maxlength="40" placeholder="Counter, Bar, Shelf labels" />
+                    <label for="pr-role">It prints</label>
+                    <select id="pr-role" @bind="printer.Role" @bind:after="RoleChanged">
+                        <option value="receipt">Bills and receipts</option>
+                        <option value="label">Labels and price tags</option>
+                        @if (Shop.Features.Kitchen) { <option value="kitchen">Orders for the kitchen or bar</option> }
+                    </select>
+                    @if (printer.Role == "label")
+                    {
+                        <label for="pr-lang">Language of the label printer</label>
+                        <select id="pr-lang" @bind="printer.Language">
+                            <option value="Zpl">ZPL (Zebra and many others)</option>
+                            <option value="Tspl">TSPL (TSC, Xprinter, Gprinter, many low-cost makes)</option>
+                            <option value="Epl">EPL (older Zebra and Eltron)</option>
+                            <option value="Cpcl">CPCL (mobile and Bluetooth label printers)</option>
+                        </select>
+                        <p class="muted small">Not sure? The manual of the printer names the language. Most shop label printers sold now speak TSPL or ZPL.</p>
+                    }
+                    <label for="pr-conn">Connected by</label>
+                    <select id="pr-conn" @bind="printer.Connection" @bind:after="ConnectionChanged">
+                        <option value="network">Network (an address like 192.168.1.50)</option>
+                        <option value="serial">USB or Bluetooth that shows up as a port (COM4, /dev/rfcomm0)</option>
+                        <option value="device">USB printer file (/dev/usb/lp0)</option>
+                        <option value="queue">Print queue of this computer (Linux and Mac)</option>
+                        <option value="spooler">Printer installed in Windows</option>
+                    </select>
+                    <label for="pr-addr">@AddressLabel()</label>
+                    <input id="pr-addr" @bind="printer.Address" maxlength="200" list="found" autocomplete="off" />
+                    <datalist id="found">@foreach (var d in found.Where(d => d.Connection == printer.Connection)) { <option value="@d.Address">@d.Label</option> }</datalist>
+                    <div class="row"><button type="button" class="btn ghost small" @onclick="Detect">Find printers on this computer</button><span class="muted small">@(found.Count == 0 ? "" : found.Count + " found")</span></div>
+                    @if (found.Count > 0)
+                    {
+                        <div class="chips">@foreach (var d in found) { <button type="button" @onclick="() => Pick(d)">@d.Label</button> }</div>
+                    }
+                    @if (printer.Connection == "serial")
+                    {
+                        <label for="pr-baud">Speed of the port (baud)</label>
+                        <select id="pr-baud" @bind="printer.BaudRate">@foreach (var b in new[] { 9600, 19200, 38400, 57600, 115200 }) { <option value="@b">@b</option> }</select>
+                    }
+                    @if (printer.Role != "label")
+                    {
+                        <label for="pr-paper">Paper</label>
+                        <select id="pr-paper" @bind="paper">
+                            <option value="58">58 mm (small receipts)</option>
+                            <option value="80">80 mm (usual receipts)</option>
+                            <option value="80w">80 mm, small print (48 characters)</option>
+                        </select>
+                        <label for="pr-code">Character set</label>
+                        <select id="pr-code" @bind="printer.CodePage">
+                            <option value="Pc858">Western European with euro (PC858): the usual choice</option>
+                            <option value="Pc437">US (PC437)</option>
+                            <option value="Pc850">Western European (PC850)</option>
+                            <option value="Wpc1252">Windows Western (1252)</option>
+                            <option value="Pc852">Central European (PC852)</option>
+                            <option value="Pc866">Cyrillic (PC866)</option>
+                        </select>
+                        <p class="muted small">Letters the printer cannot write (other alphabets, Chinese, Japanese, Korean) are printed as pictures, so any language works.</p>
+                        <label class="check"><input type="checkbox" @bind="printer.Cut" /> Cut the paper after each bill</label>
+                        @if (printer.Role == "receipt")
+                        {
+                            <label class="check"><input type="checkbox" @bind="printer.OpenDrawer" /> Open the cash drawer (connected to this printer) with each bill</label>
+                            <label class="check"><input type="checkbox" @bind="printer.AutoPrint" /> Print every finished bill by itself</label>
+                        }
+                        else
+                        {
+                            <label for="pr-station">Prints the orders of</label>
+                            <input id="pr-station" @bind="printer.Station" maxlength="30" placeholder="Kitchen, Bar (empty for everything)" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="field-row">
+                            <div><label for="pr-w">Label width (mm)</label><input id="pr-w" type="number" step="0.5" @bind="printer.LabelWidthMm" /></div>
+                            <div><label for="pr-h">Label height (mm)</label><input id="pr-h" type="number" step="0.5" @bind="printer.LabelHeightMm" /></div>
+                            <div><label for="pr-gap">Gap between labels (mm)</label><input id="pr-gap" type="number" step="0.5" @bind="printer.LabelGapMm" /></div>
+                            <div><label for="pr-dpi">Detail (dots per inch)</label><select id="pr-dpi" @bind="printer.Dpi"><option value="203">203 (usual)</option><option value="300">300</option><option value="600">600</option></select></div>
+                        </div>
+                    }
+                </div>
+                <div class="row">
+                    <button type="button" class="btn secondary" @onclick="() => printer = null">Cancel</button>
+                    <button type="button" class="btn primary grow" id="save-printer" @onclick="SavePrinter">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+}
 else if (tab == "users")
 {
     <section class="card">
@@ -215,6 +337,7 @@ else if (tab == "activity")
         yield return ("shop", "Business");
         yield return ("tax", "Tax");
         yield return ("parts", "Parts and words");
+        yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         yield return ("licence", "Licence");
         yield return ("activity", "Activity");
@@ -237,6 +360,7 @@ else if (tab == "activity")
             words.Add(new Word { Term = term, One = has ? pair![0] : "", Many = has ? pair![1] : "" });
         }
         users = App.Users.List();
+        printers = App.PrinterProfiles.List();
         return Task.CompletedTask;
     }
 
@@ -395,6 +519,102 @@ else if (tab == "activity")
         App.Audit.Log(Me.Id, "settings", "shop", null, "parts and words");
         Nav.NavigateTo("/settings", forceLoad: true);
     }, "Saved.");
+
+
+    // ---- printers ------------------------------------------------------------------------------------------------------------------
+
+    private IReadOnlyList<NextGenOS.Devices.Printing.PrinterProfile> printers = Array.Empty<NextGenOS.Devices.Printing.PrinterProfile>();
+    private NextGenOS.Devices.Printing.PrinterProfile? printer;
+    private bool printerIsNew;
+    private string paper = "80";
+    private IReadOnlyList<(string Connection, string Address, string Label)> found = Array.Empty<(string, string, string)>();
+
+    private static string RoleLabel(string role) => role switch { "label" => "Labels", "kitchen" => "Kitchen and bar orders", _ => "Bills and receipts" };
+
+    private static string ConnectionLabel(string c) => c switch { "network" => "Network", "serial" => "Port", "device" => "USB file", "queue" => "Print queue", "spooler" => "Windows printer", _ => c };
+
+    private string AddressLabel() => printer?.Connection switch
+    {
+        "network" => "Address of the printer (for example 192.168.1.50 or 192.168.1.50:9100)",
+        "serial" => "Port (for example COM4)",
+        "device" => "Printer file (for example /dev/usb/lp0)",
+        "queue" => "Name of the print queue",
+        "spooler" => "Name of the printer in Windows",
+        _ => "Where",
+    };
+
+    private void NewPrinter()
+    {
+        printer = new NextGenOS.Devices.Printing.PrinterProfile { Role = "receipt" };
+        printerIsNew = true;
+        paper = "80";
+        formError = null;
+        found = Array.Empty<(string, string, string)>();
+    }
+
+    private void EditPrinter(NextGenOS.Devices.Printing.PrinterProfile p)
+    {
+        printer = JsonClone(p);
+        printerIsNew = false;
+        paper = p.Columns <= 34 ? "58" : p.Columns >= 46 ? "80w" : "80";
+        formError = null;
+        found = Array.Empty<(string, string, string)>();
+    }
+
+    private static NextGenOS.Devices.Printing.PrinterProfile JsonClone(NextGenOS.Devices.Printing.PrinterProfile p) =>
+        System.Text.Json.JsonSerializer.Deserialize<NextGenOS.Devices.Printing.PrinterProfile>(System.Text.Json.JsonSerializer.Serialize(p))!;
+
+    private void RoleChanged()
+    {
+        if (printer is null) return;
+        printer.Language = printer.Role == "label" ? NextGenOS.Devices.Printing.PrinterLanguage.Tspl : NextGenOS.Devices.Printing.PrinterLanguage.EscPos;
+    }
+
+    private void ConnectionChanged()
+    {
+        if (printer is not null) printer.Address = "";
+    }
+
+    private void Detect() => found = NextGenOS.Devices.Transport.PrinterTransports.Discover();
+
+    private void Pick((string Connection, string Address, string Label) d)
+    {
+        printer!.Connection = d.Connection;
+        printer.Address = d.Address;
+    }
+
+    private Task SavePrinter() => Run(() =>
+    {
+        formError = null;
+        try
+        {
+            if (printer is null) return;
+            if (printer.Role != "label")
+            {
+                (printer.Columns, printer.PaperDots) = paper switch { "58" => (32, 384), "80w" => (48, 576), _ => (42, 576) };
+                printer.Language = NextGenOS.Devices.Printing.PrinterLanguage.EscPos;
+            }
+            if (printer.Role != "kitchen") printer.Station = null;
+            if (string.IsNullOrWhiteSpace(printer.Station)) printer.Station = null;
+            App.PrinterProfiles.Save(printer, Me.Id);
+            printer = null;
+            printers = App.PrinterProfiles.List();
+            Info = "Saved. Press “Test page” to see that it prints.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    });
+
+    private Task TestPrinter(NextGenOS.Devices.Printing.PrinterProfile p) => Run(async () =>
+    {
+        await App.Printing.TestAsync(p.Id);
+        Info = $"A test page was sent to {p.Name}.";
+    });
+
+    private Task RemovePrinter(NextGenOS.Devices.Printing.PrinterProfile p) => Run(() =>
+    {
+        App.PrinterProfiles.Remove(p.Id, Me.Id);
+        printers = App.PrinterProfiles.List();
+    }, "Removed.");
 
     // ---- users ---------------------------------------------------------------------------------------------------------------------
 

@@ -85,16 +85,31 @@ public class TransportTests
             var script = Path.Combine(folder, "lp");
             await File.WriteAllTextAsync(script, "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + folder + "/args\"\ncat > \"" + folder + "/data\"\n");
             File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            await new CupsTransport("Kitchen_Printer", script).SendAsync(new byte[] { 0x1B, 0x40, 65 });
+            await SendWithRetry(new CupsTransport("Kitchen_Printer", script), new byte[] { 0x1B, 0x40, 65 });
             Assert.Equal(new byte[] { 0x1B, 0x40, 65 }, await File.ReadAllBytesAsync(Path.Combine(folder, "data")));
             Assert.Equal(new[] { "-d", "Kitchen_Printer", "-o", "raw" }, (await File.ReadAllTextAsync(Path.Combine(folder, "args"))).Split('\n', StringSplitOptions.RemoveEmptyEntries));
             var bad = Path.Combine(folder, "lp-fails");
             await File.WriteAllTextAsync(bad, "#!/bin/sh\necho 'printer is offline' >&2\nexit 1\n");
             File.SetUnixFileMode(bad, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            var ex = await Assert.ThrowsAsync<PrinterException>(() => new CupsTransport("X", bad).SendAsync(new byte[] { 1 }));
-            Assert.Contains("printer is offline", ex.Message);
+            PrinterException? ex = null;
+            for (var attempt = 0; attempt < 8 && (ex is null || ex.Message.Contains("no print service")); attempt++)
+            {
+                ex = await Assert.ThrowsAsync<PrinterException>(() => new CupsTransport("X", bad).SendAsync(new byte[] { 1 }));
+                if (ex.Message.Contains("no print service")) await Task.Delay(150);
+            }
+            Assert.Contains("printer is offline", ex!.Message);
         }
         finally { Directory.Delete(folder, true); }
+    }
+
+    /// <summary>A script just written can be "busy" for a moment when other tests start programs at the same time: try again.</summary>
+    private static async Task SendWithRetry(CupsTransport transport, byte[] data)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try { await transport.SendAsync(data); return; }
+            catch (PrinterException ex) when (attempt < 8 && ex.Message.Contains("no print service")) { await Task.Delay(150); }
+        }
     }
 
     [Theory]

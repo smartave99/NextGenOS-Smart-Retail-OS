@@ -23,11 +23,11 @@ public class CoreTests
     public void Items_are_found_by_barcode_and_name_and_a_barcode_cannot_be_used_twice()
     {
         using var f = new HubFixture();
-        var rice = Product(f, "Basmati rice 5 kg", "425.00", "reduced", "8901000000011");
-        Assert.Equal(rice.Id, f.App.Catalog.FindByCode(" 8901000000011 ")!.Id);
+        var rice = Product(f, "Basmati rice 5 kg", "425.00", "reduced", "8901000000019");
+        Assert.Equal(rice.Id, f.App.Catalog.FindByCode(" 8901000000019 ")!.Id);
         Assert.Contains(f.App.Catalog.Search("rice"), i => i.Id == rice.Id);
         Assert.Equal("GST5", rice.TaxCode);
-        var ex = Assert.Throws<HubException>(() => Product(f, "Another", "1.00", "standard", "8901000000011"));
+        var ex = Assert.Throws<HubException>(() => Product(f, "Another", "1.00", "standard", "8901000000019"));
         Assert.Equal("duplicate-barcode", ex.Code);
         Assert.Throws<HubException>(() => f.App.Catalog.Create(new ItemInput { Name = "", PriceMinor = 1 }));
         Assert.Throws<HubException>(() => f.App.Catalog.Create(new ItemInput { Name = "x", PriceMinor = -1 }));

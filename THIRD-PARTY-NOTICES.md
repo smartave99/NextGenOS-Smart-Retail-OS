@@ -22,6 +22,7 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | Microsoft.IdentityModel.JsonWebTokens | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Logging | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Protocols | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
+| Microsoft.Data.Sqlite / Microsoft.Data.Sqlite.Core | 10.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Protocols.OpenIdConnect | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Tokens | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.ML.OnnxRuntime | 1.30.0 | MIT | © Microsoft Corporation. All rights reserved. |
@@ -30,10 +31,12 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | Microsoft.Web.WebView2 | 1.0.4191.47 | BSD-3-Clause (Microsoft) | © Microsoft Corporation. All rights reserved. |
 | Newtonsoft.Json | 13.0.3 | MIT | Copyright © James Newton-King 2008 |
 | SkiaSharp | 4.152.1 | MIT | © Microsoft Corporation. All rights reserved. |
-| SkiaSharp.NativeAssets.Win32 | 4.152.1 | MIT | © Microsoft Corporation. All rights reserved. |
+| SkiaSharp.NativeAssets.Linux.NoDependencies / .macOS / .Win32 | 4.152.1 | MIT | © Microsoft Corporation. All rights reserved. |
+| SQLitePCLRaw (core, provider and lib.e_sqlite3) | 2.1.13 | Apache-2.0 | Copyright 2014-2024 SourceGear, LLC (SQLite itself is in the public domain) |
 | System.Buffers | 4.6.1 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Collections.Immutable | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Configuration.ConfigurationManager | 9.0.18 | MIT | © Microsoft Corporation. All rights reserved. |
+| System.IO.Ports | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IdentityModel.Tokens.Jwt | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IO.Pipelines | 10.0.6 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Memory | 4.6.3 | MIT | © Microsoft Corporation. All rights reserved. |
@@ -49,7 +52,7 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | System.ValueTuple | 4.6.2 | MIT | © Microsoft Corporation. All rights reserved. |
 | ZXing.Net | 0.16.11 | Apache-2.0 | Michael Jahn |
 
-The packages marked MIT are used under the MIT License, whose text is at the end of this file; each keeps its own copyright line above. Markdig is under the BSD 2-Clause License and ZXing.Net under the Apache License 2.0 (full text in [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt)). WebView2's SDK is under Microsoft's BSD-style licence, and the SQL Server client's native network library (`Microsoft.Data.SqlClient.SNI.runtime`) is **not** under the MIT License: it is Microsoft's "Distributable Code" under the terms in [licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt](licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt). It is in the binary downloads only (never in this repository's source), may be passed on only as a part of an application and not by itself, and whoever passes this app on has to keep those terms.
+The packages marked MIT are used under the MIT License, whose text is at the end of this file; each keeps its own copyright line above. Markdig is under the BSD 2-Clause License, and ZXing.Net and SQLitePCLRaw under the Apache License 2.0 (full text in [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt)). WebView2's SDK is under Microsoft's BSD-style licence, and the SQL Server client's native network library (`Microsoft.Data.SqlClient.SNI.runtime`) is **not** under the MIT License: it is Microsoft's "Distributable Code" under the terms in [licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt](licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt). It is in the binary downloads only (never in this repository's source), may be passed on only as a part of an application and not by itself, and whoever passes this app on has to keep those terms.
 
 ## Other components
 

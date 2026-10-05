@@ -74,7 +74,7 @@ try {
   await page.waitForFunction((t) => document.querySelector('#total').innerText !== t, without);
   await shot(page, '2-charge');
   await page.locator('#charge').click();
-  await page.waitForURL(/\/documents\/\d+$/);
+  await page.waitForURL(/\/documents\/\d+(\?.*)?$/);
   const receipt = await page.locator('.receipt').innerText();
   assert.match(receipt, /Tip/);
   assert.match(receipt, /CGST/);

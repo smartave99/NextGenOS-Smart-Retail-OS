@@ -116,11 +116,19 @@ public sealed class CupsTransport(string queue, string command = "lp") : IPrinte
         }
         using (process)
         {
-            await process.StandardInput.BaseStream.WriteAsync(data, cancellationToken).ConfigureAwait(false);
-            process.StandardInput.Close();
+            var wroteAll = true;
+            try
+            {
+                await process.StandardInput.BaseStream.WriteAsync(data, cancellationToken).ConfigureAwait(false);
+                process.StandardInput.Close();
+            }
+            catch (IOException)
+            {
+                wroteAll = false;                                  // the print command ended before reading everything: what it says explains why
+            }
             var error = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            if (process.ExitCode != 0) throw new PrinterException($"The printer \"{queue}\" refused the job. {error.Trim()}".Trim());
+            if (process.ExitCode != 0 || !wroteAll) throw new PrinterException($"The printer \"{queue}\" refused the job. {error.Trim()}".Trim());
         }
     }
 }

@@ -178,7 +178,9 @@ namespace SmartRetail.AI.Tests
             Assert.Matches(@"(?m)^  android:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
             // The Windows setup is built after the gate too, and the release is published only when the gate passed (the builds may report their own failure in the notes).
             Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, android, windows\]\s*\n", workflow);
+            // So is the Linux package of the Hub; the release waits for all three builds to report.
+            Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, android, windows, linux\]\s*\n", workflow);
             Assert.Contains("needs.gate.result == 'success'", workflow);
         }
 

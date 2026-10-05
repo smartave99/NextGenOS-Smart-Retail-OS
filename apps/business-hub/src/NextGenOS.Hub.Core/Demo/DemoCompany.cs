@@ -199,6 +199,9 @@ public static class DemoCompany
 
         private string PayMethod() => Pick(_shop.PaymentMethods.Where(m => m != "credit").ToList());
 
+        /// <summary>The way of paying the story wants ("bank", "cash"), or the shop's own first way when its list of ways does not have it (a customer's prepared setup can choose its own list).</summary>
+        private string Way(string wanted) => _shop.PaymentMethods.Contains(wanted) ? wanted : _shop.PaymentMethods.FirstOrDefault(m => m != "credit") ?? wanted;
+
         /// <summary>What a customer would hand over: the exact amount, or for cash the next note.</summary>
         private long Tender(string method, long payable)
         {
@@ -246,7 +249,7 @@ public static class DemoCompany
                     At(day, 18, 30);
                     var buyer = Pick(trade);
                     var sale = Sale(buyer, onCredit: true, lines: 2);
-                    if (day % 8 == 0) _app.Documents.AddPayment(sale.Document.Id, new PaymentInput { Method = "bank", AmountMinor = sale.Document.PayableMinor / 2, Reference = "Part payment" });
+                    if (day % 8 == 0) _app.Documents.AddPayment(sale.Document.Id, new PaymentInput { Method = Way("bank"), AmountMinor = sale.Document.PayableMinor / 2, Reference = "Part payment" });
                 }
             }
 
@@ -267,7 +270,7 @@ public static class DemoCompany
             var original = invoices.Where(v => v.Document.PartyId is null && v.Lines.Count > 0).Skip(1).LastOrDefault();
             if (original is null) return;
             var line = original.Lines[0];
-            _app.Documents.CreateCreditNote(original.Document.Id, new[] { (line.Id, Math.Min(line.QtyMilli, 1_000L)) }, "Customer returned it", "cash", null);
+            _app.Documents.CreateCreditNote(original.Document.Id, new[] { (line.Id, Math.Min(line.QtyMilli, 1_000L)) }, "Customer returned it", Way("cash"), null);
         }
 
         /// <summary>Goods arrive from the supplier: stock goes up and the supplier is paid half now, or nothing yet.</summary>
@@ -280,7 +283,7 @@ public static class DemoCompany
             At(daysAgo, 7);
             var order = _app.Purchasing.CreateOrder(supplier.Id, stocked.Select(i => new PurchaseLine { ItemId = i.Id, QtyMilli = 20_000, CostMinor = i.CostMinor }));
             var received = _app.Purchasing.Receive(order.Document.Id);
-            if (payHalf) _app.Purchasing.Pay(order.Document.Id, received.Document.PayableMinor / 2, "bank", "Part payment");
+            if (payHalf) _app.Purchasing.Pay(order.Document.Id, received.Document.PayableMinor / 2, Way("bank"), "Part payment");
         }
 
         // ---- restaurant: tables, kitchen, bills --------------------------------------------------------------------------------------------
@@ -369,7 +372,7 @@ public static class DemoCompany
             // Tara brings hers back three days late and pays the fine at the desk.
             At(3, 10); _app.Library.Return(Copy(titles[4], 0));
             var fine = _app.Library.UnpaidFines(tara.Id).Sum(f => f.AmountMinor);
-            _app.Library.PayFines(tara.Id, new[] { new PaymentInput { Method = "cash", AmountMinor = fine } }, null);
+            _app.Library.PayFines(tara.Id, new[] { new PaymentInput { Method = Way("cash"), AmountMinor = fine } }, null);
             At(3, 11); _app.Library.Renew(_app.Library.OpenLoansOf(meera.Id).First().Loan.Id);
 
             // Every copy of one title is out, so a member asks for it to be kept for them.
@@ -408,7 +411,7 @@ public static class DemoCompany
             var (shop, shopBoq) = projects[1];
 
             At(11, 10); _app.Projects.AddCost(house.Id, "material", "Cement, steel and sand for the foundation", Minor("120000.00"), supplier?.Id, houseBoq[0].Id, "BILL-4471");
-            At(10, 10); _app.Projects.ReceiveAdvance(shop.Id, _app.Projects.ContractValue(shop.Id) / 10, "bank", "Advance 10%");
+            At(10, 10); _app.Projects.ReceiveAdvance(shop.Id, _app.Projects.ContractValue(shop.Id) / 10, Way("bank"), "Advance 10%");
             At(9, 14); _app.Projects.AddCost(house.Id, "labour", "Mason gang, two weeks", Minor("40000.00"), null, houseBoq[1].Id);
 
             At(8, 11);
@@ -428,7 +431,7 @@ public static class DemoCompany
                 new ProgressInput { BoqId = shopBoq[0].Id, CumulativePctMilli = 50_000 },
                 new ProgressInput { BoqId = shopBoq[1].Id, CumulativePctMilli = 40_000 },
             }, "Progress bill 1");
-            At(4, 9); _app.Projects.ReceivePayment(bill1.Document.Id, bill1.Document.PayableMinor, "bank", "Transfer received");
+            At(4, 9); _app.Projects.ReceivePayment(bill1.Document.Id, bill1.Document.PayableMinor, Way("bank"), "Transfer received");
             At(4, 15); _app.Projects.AddCost(shop.Id, "labour", "Partition crew", Minor("65000.00"));
 
             At(3, 11);
@@ -468,7 +471,9 @@ public static class DemoCompany
                     _clock.Advance(TimeSpan.FromMinutes(service.Id % 2 == 0 ? 45 : 30));
                     var extras = products.Count > 0 && _rng.Next(3) == 0 ? new[] { new LineInput { ItemId = Pick(products).Id } } : null;
                     var worth = service.PriceMinor + (extras is null ? 0 : _items.First(i => i.Id == extras[0].ItemId).PriceMinor);
-                    _app.Appointments.Invoice(visit.Id, extras, new[] { new PaymentInput { Method = "cash", AmountMinor = Tender("cash", worth * 3 / 2) } });
+                    var way = Way("cash");
+                    var due = way == "cash" ? worth * 3 / 2 : _app.Appointments.Preview(visit.Id, extras).Document.PayableMinor;   // only cash can be over-paid (change is given)
+                    _app.Appointments.Invoice(visit.Id, extras, new[] { new PaymentInput { Method = way, AmountMinor = Tender(way, due) } });
                     _bookings++;
                 }
             }

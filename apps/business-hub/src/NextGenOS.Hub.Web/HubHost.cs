@@ -105,7 +105,8 @@ public static class HubHost
         services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalThemeStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ThemeService>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalBrandStore>();
-        services.AddSingleton<NextGenOS.Licensing.AspNetCore.IBrandOverrides>(sp => sp.GetRequiredService<NextGenOS.Hub.Web.Branding.LocalBrandStore>());
+        services.AddSingleton<NextGenOS.Hub.Web.Branding.ProfiledBrand>();
+        services.AddSingleton<NextGenOS.Licensing.AspNetCore.IBrandOverrides>(sp => sp.GetRequiredService<NextGenOS.Hub.Web.Branding.ProfiledBrand>());
         services.AddLicensedWorker<HubWorker>();
 
         // The signed licence: the Hub runs only with a valid one that includes the "hub" module.

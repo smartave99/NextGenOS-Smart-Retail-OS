@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const scenarios = ['retail', 'restaurant', 'library', 'construction', 'services', 'wholesale', 'devices', 'look', 'foundation'];
+const scenarios = ['retail', 'restaurant', 'library', 'construction', 'services', 'wholesale', 'devices', 'look', 'theme', 'profile', 'foundation'];
 let failed = 0;
 for (const name of scenarios) {
   console.log(`\n== ${name} ==`);

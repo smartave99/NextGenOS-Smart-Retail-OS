@@ -32,6 +32,23 @@ public class DemoCompanyTests
 
     [Theory]
     [MemberData(nameof(Industries))]
+    public void A_shop_that_chose_its_own_ways_of_paying_still_gets_a_sample_company(string industry)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "hub-demo-" + Guid.NewGuid().ToString("N") + ".db");
+        try
+        {
+            var first = HubApp.Open(path, new FixedClock(Now));
+            first.Shop.Save(new ShopSettings { Name = "Own ways", Country = "PH", Industry = industry, PaymentMethods = new List<string> { "gcash", "card" } });
+            var summary = DemoCompany.Fill(path, new DemoOptions { Industry = industry, Country = "PH", Days = 7 }, Now);
+            Assert.True(summary.Documents > 0);
+            var app = HubApp.Open(path, new FixedClock(Now));
+            Assert.Equal(new[] { "gcash", "card" }, app.Shop.Settings.PaymentMethods);
+        }
+        finally { Cleanup(path); }
+    }
+
+    [Theory]
+    [MemberData(nameof(Industries))]
     public void Every_industry_makes_a_company_with_items_people_and_trading_history(string industry)
     {
         var (app, summary, path) = Make(industry, "IN");

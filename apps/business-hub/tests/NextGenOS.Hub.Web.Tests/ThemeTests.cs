@@ -109,4 +109,42 @@ public class ThemeTests : IDisposable
         var resolved = BrandPolicy.Resolve(BrandProfile.Default(), "none", profile.Brand);
         Assert.Equal("#0f6cbd", resolved.PrimaryColor);
     }
+
+    [Fact]
+    public void The_profiles_brand_and_the_owners_brand_are_put_together_field_by_field_with_the_owner_on_top()
+    {
+        var profile = Profile(brand: "{\"primaryColor\":\"#aa2233\",\"name\":\"Profile Name\",\"supportPhone\":\"+63 2 5555 0100\"}");
+        var brand = new ProfiledBrand(profile, LocalBrandStore.Over(app));
+        Assert.Equal("#aa2233", brand.Current!.PrimaryColor);
+        LocalBrandStore.Over(app).Save(new LocalBrand { PrimaryColor = "#0a7d4b" }, null);
+        var both = new ProfiledBrand(profile, LocalBrandStore.Over(app)).Current!;
+        Assert.Equal("#0a7d4b", both.PrimaryColor);          // the owner's own colour wins
+        Assert.Equal("Profile Name", both.Name);              // what the owner left alone comes from the profile
+        Assert.Equal("+63 2 5555 0100", both.SupportPhone);
+    }
+
+    [Fact]
+    public void With_neither_a_profile_nor_a_choice_there_is_no_brand_to_merge()
+    {
+        Assert.Null(ProfiledBrand.Merge(null, null));
+        Assert.Null(ProfiledBrand.Merge(new LocalBrand(), new LocalBrand()));
+        Assert.Equal("#aa2233", ProfiledBrand.Merge(new LocalBrand { PrimaryColor = "#aa2233" }, null)!.PrimaryColor);
+    }
+
+    [Theory]
+    [InlineData("none", "Luzon Fresh", "#0f6cbd")]    // a fixed look ignores the profile's colour and keeps the licence's name
+    [InlineData("theme", "Luzon Fresh", "#aa2233")]   // a style licence shows the colour but never the profile's name
+    [InlineData("full", "Profile Name", "#aa2233")]   // a full licence shows both
+    public void The_licence_level_decides_how_much_of_the_profiles_brand_shows(string level, string expectedName, string expectedColour)
+    {
+        var profile = Profile(brand: "{\"primaryColor\":\"#aa2233\",\"name\":\"Profile Name\"}");
+        var brand = new BrandService(new ProductLicence(() => new LicenceState
+        {
+            Status = LicenceStatus.Valid,
+            Licence = new LicenceClaims { Modules = ["hub"], White = new WhiteLabel { Level = level }, Brand = new BrandProfile { Id = "B-1", Name = "Luzon Fresh", PrimaryColor = "#0f6cbd" } },
+        }), new ProfiledBrand(profile, LocalBrandStore.Over(app)));
+        Assert.Equal(expectedName, brand.Name);
+        Assert.Contains(expectedColour, brand.Style);
+        if (level == "none") Assert.DoesNotContain("#aa2233", brand.Style);
+    }
 }

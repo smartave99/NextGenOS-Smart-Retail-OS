@@ -3,8 +3,10 @@
 @attribute [AllowAnonymous]
 @using System.Text.RegularExpressions
 @using NextGenOS.Hub.Demo
+@using NextGenOS.Hub.Setup
 @using NextGenOS.Tax
 @inject HubApp App
+@inject NextGenOS.Hub.Web.Branding.ProfileStore Profiles
 @inject NavigationManager Nav
 @inject SetupState State
 @inject ILogger<Setup> Log
@@ -23,6 +25,12 @@
 @if (step == 1)
 {
     <h1 class="public-title">Tell us about your business</h1>
+    @if (prepared)
+    {
+        <div class="notice" id="prepared-note">
+            <span>We have already filled in what we know about your business. Please check it and change anything that is not right.@(profile.Problems.Count > 0 ? " A few prepared details could not be used and were left out." : "")</span>
+        </div>
+    }
     <p class="muted">Your country decides the money, the tax and the invoice words. You can change the details later, but not the country once you have sold something.</p>
     <div class="stack">
         <label for="name">Business name</label>
@@ -139,6 +147,10 @@ else
         <dt>Type</dt><dd>@IndustryCatalog.Get(industry).Name</dd>
         <dt>Owner</dt><dd>@ownerName (@ownerUser)</dd>
     </dl>
+    @if (profile.HasStarter)
+    {
+        <p id="starter-note" class="muted">@(StarterSentence()) will be added for you.</p>
+    }
     <label class="check"><input type="checkbox" @bind="demo" /> Fill with a sample business so I can look around</label>
     <p class="muted small">The sample is a made-up @IndustryCatalog.Get(industry).Name.ToLowerInvariant() with two weeks of trading, so every screen has something to show. It cannot be taken out afterwards, so choose it only to try the program, not for your real shop.</p>
     <div class="row">
@@ -166,6 +178,8 @@ else
     private string ownerPass2 = "";
     private bool demo;
     private readonly Dictionary<string, string> partValues = new();
+    private SetupProfile profile = new();
+    private bool prepared;
 
     private static IReadOnlyList<CountryPack> Countries => PackCatalog.All().OrderBy(c => c.Name, StringComparer.Ordinal).ToList();
     private static IReadOnlyList<IndustryPack> Industries => IndustryCatalog.All().OrderBy(p => p.Id == "generic" ? 1 : 0).ThenBy(p => p.Name, StringComparer.Ordinal).ToList();
@@ -176,6 +190,27 @@ else
     {
         if (App.Users.Any()) Nav.NavigateTo("/login");
         SetDefaults();
+        UseProfile();
+    }
+
+    /// <summary>The details NextGenOS prepared for this business (profile/setup.json), if any: they fill the first page, and the owner can change every one.</summary>
+    private void UseProfile()
+    {
+        profile = SetupProfile.Parse(Profiles.ReadText("setup.json"));
+        foreach (var problem in profile.Problems) Log.LogWarning("Prepared setup: {Problem}", problem);
+        if (profile.Name is not null) name = profile.Name;
+        if (profile.Country is not null) { country = profile.Country; SetDefaults(); }
+        if (profile.Region is not null) region = profile.Region;
+        if (profile.Industry is not null) industry = profile.Industry;
+        prepared = profile.Name is not null || profile.Country is not null || profile.Industry is not null || profile.HasStarter;
+    }
+
+    private string StarterSentence()
+    {
+        var parts = new List<string>();
+        if (profile.Items.Count > 0) parts.Add(profile.Items.Count == 1 ? "1 item" : $"{profile.Items.Count} items");
+        if (profile.People.Count > 0) parts.Add(profile.People.Count == 1 ? "1 person" : $"{profile.People.Count} people");
+        return "Your first " + string.Join(" and ", parts);
     }
 
     private void SetDefaults()
@@ -255,6 +290,7 @@ else
                 PricesIncludeTax = pack.Tax.PricesIncludeTaxDefault, RoundTotal = pack.Tax.Rounding?.DefaultOn ?? false, TaxRegistered = registered, SetupDone = false,
             };
             foreach (var part in EditableParts()) settings.ComponentOverrides[part.Key] = partValues[part.Key].Trim();
+            profile.ApplyTo(settings);
             App.Shop.Save(settings);
             var owner = App.Users.Create(ownerUser.Trim(), ownerName.Trim(), Roles.Owner, ownerPass);
             if (demo)
@@ -262,10 +298,12 @@ else
                 DemoCompany.Fill(App.Db.Path, new DemoOptions { Industry = industry, Country = country, Region = region, Name = name.Trim() });
                 App.Shop.Invalidate();
             }
+            var starter = !demo && profile.HasStarter ? profile.ApplyStarter(App) : null;
             var done = App.Shop.Settings;
             done.SetupDone = true;
             App.Shop.Save(done);
-            App.Audit.Log(owner.Id, "setup", "shop", null, $"{country}/{industry}{(demo ? "/demo" : "")}");
+            App.Audit.Log(owner.Id, "setup", "shop", null, $"{country}/{industry}{(demo ? "/demo" : "")}{(starter is null ? "" : $"/starter {starter.Items} items {starter.People} people")}");
+            if (starter is not null) foreach (var skipped in starter.Skipped) Log.LogWarning("Prepared setup: {Skipped}", skipped);
             State.Finished();
             Nav.NavigateTo("/login", forceLoad: true);
         }

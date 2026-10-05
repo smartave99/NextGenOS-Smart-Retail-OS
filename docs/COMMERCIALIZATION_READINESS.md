@@ -18,6 +18,29 @@ After those come white-label branding, multi-tenant and chain support, localisat
 
 ---
 
+## 0a. Status now (updated after the licensing, Hub and release work)
+
+The audit below was written first; this table says where each finding stands today. "Checked by" is the part of `node scripts/verify-all.mjs --full` that covers it. Anything marked **open** is still true.
+
+| Finding | State | Where / checked by |
+|---|---|---|
+| Licence not enforced; keygen; fixed AES key; installer runs an activation script (2.2) | **Fixed in the code.** Signed (ECDSA) licences tied to the PC, revocable, with grace and offline activation, enforced in the Windows POS, AI add-on, dashboard, website and the Business Hub. The keygen and activation scripts are gone, and tripwires fail the gate if one comes back. | `licensing/`, checks `bypass`, `enforcement`, `hub-enforcement`, `dotnet-live`, `hub-release` |
+| Secrets in the files (2.3) | **Removed from the files; a scan fails the gate if one returns.** The back-door super-admin e-mail is removed. | check `secrets` |
+| Secrets in the git **history** (2.3) | **Open.** The OpenAI key, the Neon password, the Firebase secrets and the SQL Server `sa` password are still readable in the history. **Rotate every one**, or start a fresh repository from the cleaned tree. | you |
+| Who owns the decompiled Windows POS (2.1) | **Open. Needs a lawyer and the original paperwork.** Not a coding task. | you, counsel |
+| Third-party licences for the old POS (2.1) | **Open** for `apps/pos-desktop`. The Business Hub's own packages are checked and noticed (`THIRD-PARTY-NOTICES.md`; the gate refuses GPL-type licences in the new work). | check `nuget-audit`, `npm-audit` |
+| Shared Firebase backends of the old POS (2.4) | **Open** for `apps/pos-desktop`. The Business Hub has no shared backend: each shop's data is on its own PC. | |
+| White-label (3.1) | **Done:** the brand rides inside the licence; the Brand Studio makes brand kits; the Hub's *Look* page lets an owner change colours and logo within the licence's white-label level (one rule, shared test vectors in .NET and TypeScript). **Open:** fonts and a light/dark default are allowed but not applied; no way yet to make a Windows setup under a customer's own file name. | `docs/BRAND-STUDIO.md`, checks `brand-studio`, `brand-studio-wizard`, `hub-e2e`, `dotnet-live` |
+| Any country (3.3) | **Done for the Business Hub and the website:** 34 country packs (tax, money, formats) through one tax engine, tested in every country. **Open:** the older Windows POS, AI add-on and dashboard remain India-GST; no country pack has been checked by a local tax adviser; no fiscal-printer or e-invoicing integrations. | checks `country-packs`, `dotnet-tax`, `dotnet-hub` |
+| Any kind of business | **Done in the Business Hub:** retail, restaurant, library, construction, services, wholesale and generic, each worked through in a real browser; honest "works / not yet" list per business. | check `hub-e2e` |
+| Hardware (printers, scanners) | **Built and tested against stand-ins:** ESC/POS, ZPL, TSPL, EPL, CPCL; network, serial, USB file, CUPS, Windows spooler; camera scanning. **Open:** not tried on real hardware. | check `dotnet-hub` |
+| Source-code protection | **Built for the Business Hub:** compiled code only, names hidden, symbols removed, every package audited, the protected build tested in a browser and with a real licence. **Open:** no integrity self-check, no per-customer watermark, not code-signed; the old Windows POS is not yet packaged this way. Name hiding is a deterrent, not a lock. | `docs/SECURITY-MODEL.md`, checks `package-audit-tests`, `hub-release`, `hub-protected-e2e` |
+| Installers and release | **Business Hub:** Windows setup (service, protected data folder, clean uninstall) tested under Wine here and on a real Windows machine by the release workflow; Android app built and signed by the workflow. **Open:** the old Windows programs have their own installers, which this workflow does not build; nothing is code-signed until you add a certificate. | `docs/RELEASE-GUIDE.md`, check `hub-installer` |
+| Chains and several shops (3.2) | **Open.** Not built: each shop PC is its own. | |
+| Independent security test, legal review | **Open.** | you |
+
+---
+
 ## 1. Done in this change (licence conversion)
 
 | Change | Where |

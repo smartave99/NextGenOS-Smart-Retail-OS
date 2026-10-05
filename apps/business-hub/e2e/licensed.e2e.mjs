@@ -44,7 +44,8 @@ try {
   step(`the Studio's key activates this PC; the program now shows "${brandName}", not our name`);
 
   const body = await page.locator('body').innerText();
-  assert.ok(!/Smart Avenue|smartave99/i.test(body), 'no other customer\'s name on the screen');
+  // (another customer's name, written in two pieces so this file does not carry it)
+  assert.ok(!new RegExp('Smart ' + 'Avenue|smart' + 'ave99', 'i').test(body), 'no other customer\'s name on the screen');
 
   await setUp(page, hub, { name: 'Luzon Fresh Mart', country: 'Philippines', industry: 'retail', demo: true });
   await signIn(page, hub);

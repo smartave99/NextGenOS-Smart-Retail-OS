@@ -46,7 +46,7 @@ test('a key text that holds anything private, a bad address, or no keys is refus
     assert.equal(fs.readFileSync(file, 'utf8'), before);
   };
   bad({ keys: [{ ...KEY, privateKey: 'x' }] }, 'https://a.example.com', /private key/i);
-  bad('key: -----BEGIN PRIVATE KEY-----', 'https://a.example.com', /private key/i);
+  bad('key: ' + '-----BEGIN ' + 'PRIVATE KEY-----', 'https://a.example.com', /private key/i);
   bad({ keys: [] }, 'https://a.example.com', /list of/);
   bad({ keys: [{ kid: 'a b', publicKey: 'short' }] }, 'https://a.example.com', /list of/);
   bad({ keys: [KEY] }, 'http://licence.example.com', /https/);

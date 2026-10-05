@@ -14,7 +14,7 @@ The part of the **Smart Retail AI Ecosystem** that runs *any* kind of business: 
 | Wholesale | Trade prices, credit sales with limits, part payments, what is owed, buying stock | `e2e/wholesale.e2e.mjs` |
 | Any other business | Items, parties, invoices, payments; switch on only the parts you need and rename the words | `e2e/foundation.e2e.mjs` |
 
-Money and tax come from the **country packs** (`country-packs/`, 33 countries) through the same integer tax engine the other NextGenOS programs use; the words, screens and rules of each business come from the **industry packs** (`industry-packs/`). Each industry pack lists, in plain words, what works and what is not built yet (`coverage`); the setup wizard shows that list to the person choosing.
+Money and tax come from the **country packs** (`country-packs/`, 34 countries) through the same integer tax engine the other NextGenOS programs use; the words, screens and rules of each business come from the **industry packs** (`industry-packs/`). Each industry pack lists, in plain words, what works and what is not built yet (`coverage`); the setup wizard shows that list to the person choosing.
 
 ## What it does not do yet
 
@@ -28,6 +28,14 @@ Money and tax come from the **country packs** (`country-packs/`, 33 countries) t
 `libs/dotnet/NextGenOS.Devices` speaks the languages of shop printers: **ESC/POS** (nearly every receipt printer), **ZPL**, **TSPL**, **EPL** and **CPCL** (label printers), and reaches them over the **network** (port 9100), a **serial or Bluetooth port**, a **USB device file**, the **system print queue (CUPS)** or the **Windows spooler** (raw). Letters a printer's character set lacks (other alphabets, Chinese, Japanese, Korean) are printed as pictures; receipt currency signs it cannot write are spelled (₹ as Rs). Scanners: USB and Bluetooth scanners that type like a keyboard work in every box; any camera (phone, tablet, webcam) reads barcodes through the browser or, where the browser cannot, through the Hub. Price tags and posters (shelf labels, A4 and A3) print from the browser to any printer. Set it all up in **Settings → Printers**.
 
 Tested: the encoders byte by byte, the transports against a stand-in network printer, a stand-in print command and device files, the camera path in a real browser with a fake camera showing a barcode. **Not tested here: real printers, real Bluetooth or USB hardware, the Windows spooler** — so test each make of printer you sell once, and say so in the sales material.
+
+## Look and brand
+
+The program wears the customer's brand from their licence. In **Settings → Look** the owner changes colours, the logo and the help details (and, with a `full` licence, the program's name) **only as far as the licence's white-label level allows**; a look file made with the Brand Studio can be loaded there. See `docs/BRAND-STUDIO.md` and `licensing/spec/LICENCE-FORMAT.md` section 5.2.
+
+## Install on Windows
+
+`installer/build.mjs` makes the setup (`node apps/business-hub/installer/build.mjs --version 1.0.0`): it publishes the Hub as one self-contained folder, hides the names in our programs (`scripts/protect-dotnet.mjs`), audits the folder (`scripts/audit-package.mjs`), and writes the NSIS setup and a zip. The setup installs a Windows service (`NextGenOSHub`, Local Service account, starts with the PC, restarts after a crash) that listens on `127.0.0.1:5280` only, keeps the shop's data in `%ProgramData%\NextGenOS\Hub` (readable only by the service and administrators), and **never removes that data** on uninstall. `installer/test-installer.sh` runs the setup under Wine with a stand-in program (install, update, uninstall). The release workflow builds it on a real Windows machine, installs it, checks the service and uninstalls it. How to make a release: `docs/RELEASE-GUIDE.md`; what the protection does and does not do: `docs/SECURITY-MODEL.md`.
 
 ## Run it (developers)
 
@@ -43,6 +51,7 @@ Data lives in one SQLite file per shop (`shop.db`) in the data folder (`Hub:Data
 dotnet test apps/business-hub/NextGenOS.Hub.slnx                   # domain tests (every industry, every country) and web tests
 node apps/business-hub/e2e/hub.e2e.mjs                             # real browser, after: cd apps/business-hub/e2e && npm install
 node scripts/verify-all.mjs --only hub-enforcement,dotnet-hub,hub-e2e
+node scripts/verify-all.mjs --full --only hub-release,hub-protected-e2e,hub-installer   # the shipped build: protected, audited, run with a real licence, installed
 ```
 
 The browser tests start `tests/NextGenOS.Hub.E2EHost`, which builds the Hub exactly as the program does but stands in for the licence (as the licence gate tests do). That host is a test tool: it is never packaged, and the Hub program itself has **no** switch, setting or environment variable that skips the licence.
@@ -52,7 +61,8 @@ The browser tests start `tests/NextGenOS.Hub.E2EHost`, which builds the Hub exac
 - `src/NextGenOS.Hub.Core` — the domain: settings, catalogue, documents with the tax engine, restaurant, library, projects, appointments, purchasing, reports, the demo company builder.
 - `src/NextGenOS.Hub.Web` — the Blazor program: licence gate, sign-in, setup wizard, screens.
 - `tests/` — domain tests, web tests, and the browser-test host.
-- `e2e/` — browser tests (Playwright).
+- `e2e/` — browser tests (Playwright); `e2e/protected.mjs` runs them all against the protected build; `e2e/licensed.e2e.mjs` is run by `licensing/e2e/hub-e2e.mjs` with a real licence.
+- `installer/` — the Windows setup (NSIS), its build script and its test.
 
 ## Demo company
 

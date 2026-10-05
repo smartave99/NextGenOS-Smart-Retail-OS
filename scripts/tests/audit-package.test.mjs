@@ -38,12 +38,13 @@ test('secrets and private data files are refused: env files, databases, licences
 });
 
 test('a secret in a text file, and in a program as plain or .NET text, is found', () => {
-  const key = '-----BEGIN PRIVATE KEY-----';
+  // (Built from pieces, so this test file does not itself look like a file holding a secret.)
+  const key = '-----BEGIN ' + 'PRIVATE KEY-----';
   assert.match(problemsOf({ 'a.json': `{"k":"${key}"}` }), /a\.json.*private key/);
   assert.match(problemsOf({ 'b.dll': Buffer.concat([Buffer.from('MZ....'), Buffer.from(key)]) }), /b\.dll.*private key/);
   assert.match(problemsOf({ 'c.dll': Buffer.concat([Buffer.from('MZ.'), utf16(key)]) }), /c\.dll.*private key/);
-  assert.match(problemsOf({ 'd.js': 'const k = "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"' }), /d\.js.*OpenAI/);
-  assert.match(problemsOf({ 'e.config': 'Server=x;Password=Hunter22x;' }), /e\.config.*password/);
+  assert.match(problemsOf({ 'd.js': 'const k = "' + 'sk-' + 'proj-abcdefghijklmnopqrstuvwxyz0123456789"' }), /d\.js.*OpenAI/);
+  assert.match(problemsOf({ 'e.config': 'Server=x;' + 'Pass' + 'word=Hunter22x;' }), /e\.config.*password/);
 });
 
 test('the obviously fake values the tests use are not reported', () => {

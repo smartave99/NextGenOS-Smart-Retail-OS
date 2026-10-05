@@ -168,14 +168,18 @@ if (existsSync(extraDir)) {
 
 // What this gate can never prove from here. Printed every time so that nobody forgets it.
 const NOT_VERIFIED = [
+  'The Business Hub installed and used on a real Windows 10/11 PC (the release workflow installs it on a Windows runner and checks the service, but that is not a shop; here the setup program is run under Wine with a stand-in program, because a self-contained .NET program does not start under Wine).',
   'The Windows programs (POS, AI add-on, dashboard host) running on a real Windows PC with a real shop database.',
   'The dashboard tests that need a live SQL Server with a POS database or the DINOv2 model (skipped here), and the AI test that needs the real Codex program.',
-  'Real printers, barcode scanners, cash drawers and cameras (the device layer is tested with virtual devices and loop-back connections).',
-  'The Android app on a real phone (it is built and signed by the release workflow in GitHub Actions).',
+  'Real printers, barcode scanners, cash drawers, Bluetooth devices and cameras, and the Windows print spooler (the device layer is tested with virtual devices and loop-back connections).',
+  'The Android app (.apk and .aab): built and signed only by the release workflow (there is no Android SDK here), and never run on a real phone.',
   'Code signing of installers (needs your certificate), and the Windows SmartScreen reputation.',
+  'Name hiding on a real Windows build (it was run on the Windows build files from Linux, and the protected Linux build was fully tested), and whether determined reverse engineering can still read the protected programs (name hiding is a deterrent, not a lock: docs/SECURITY-MODEL.md).',
   "Each country's tax and invoicing law (the packs are data, to be reviewed by a local adviser before use).",
-  'A penetration test by an independent security firm.',
-  'Legal review of EULA.txt, the reseller agreement and your company details (counsel).',
+  'Several shops in one database, and sync between PCs (not built); fonts and a light/dark default from a brand kit (allowed by the licence, not applied by the Hub).',
+  'A penetration test by an independent security firm. The secrets that were committed before this work are still in the repository history and must be rotated.',
+  'Legal review of EULA.txt, the reseller agreement and your company details (counsel); the legal name and governing-law placeholders in EULA.txt.',
+  'Ownership of the decompiled Windows POS source (apps/pos-desktop): proof that NextGenOS may resell it.',
 ];
 
 // ---------------------------------------------------------------------------------------------------------------------

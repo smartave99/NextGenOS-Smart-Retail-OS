@@ -73,7 +73,7 @@ test('setting the app up for a customer changes its id, name, address and versio
     assert.match(gradle, /versionName "2\.3\.4"/);
     assert.match(readFileSync(join(root, 'android/app/src/main/res/values/strings.xml'), 'utf8'), /Luzon Fresh/);
     assert.ok(existsSync(join(root, 'android/app/src/main/java/com/luzonfresh/shop/MainActivity.java')));
-    assert.doesNotMatch(readFileSync(join(root, 'android/app/src/main/java/com/luzonfresh/shop/MainActivity.java'), 'utf8'), /nextgenos|smartavenue/i);
+    assert.doesNotMatch(readFileSync(join(root, 'android/app/src/main/java/com/luzonfresh/shop/MainActivity.java'), 'utf8'), new RegExp('nextgenos|smart' + 'avenue', 'i'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

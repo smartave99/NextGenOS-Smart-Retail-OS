@@ -1,3 +1,25 @@
+# Smart Retail AI Ecosystem, created by NextGenOS
+
+**Smart Retail POS** by **NextGenOS**: proprietary software for any kind of business, in any country, with the customer's own name on it. (A customer's name and look live only in that customer's brand kit and licence, never in the product.)
+
+## Start here
+
+| I want to ... | Read |
+|---|---|
+| sell it | `docs/SALES-PLAYBOOK.md` |
+| install it and use it | `docs/CUSTOMER-GUIDE.md` |
+| make and test a release | `docs/RELEASE-GUIDE.md` |
+| set up the Licence Studio and hand out licences | `licensing/README.md` |
+| give a customer their own look | `docs/BRAND-STUDIO.md` |
+| know what is protected, and what is not | `docs/SECURITY-MODEL.md` |
+| see what must still be done before selling | `docs/COMMERCIALIZATION_READINESS.md` |
+| work on the code | `CLAUDE.md` (rules for everyone, human or AI), then the folder's README |
+| check that everything works | `node scripts/verify-all.mjs --full` |
+
+The **Business Hub** (`apps/business-hub`) is the program for every kind of business; the older Windows POS, AI add-on and dashboard (`apps/pos-*`) are India-GST editions; the website and Android app are in `apps/storefront-web-mobile`.
+
+---
+
 # Smart Retail Suite - Unified Enterprise Platform
 
 Welcome to the **Smart Retail Suite**, a complete, unified omnichannel retail platform created by combining the three core codebases of the **NextGenOS & Demo Mart** ecosystem into a single unified monorepo.

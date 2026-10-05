@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using NextGenOS.Hub.Setup;
 using NextGenOS.Hub.Shop;
 
@@ -187,5 +188,69 @@ public class SetupProfileTests
     {
         var p = SetupProfile.Parse("""{ "schema": 1, "business": { "industry": "library" }, "starter": { "items": [ { "name": "Moby Dick", "price": "0", "kind": "gadget" } ] } }""");
         Assert.Equal("title", p.Items[0].Kind);
+    }
+}
+
+/// <summary>The shared vectors (apps/business-hub/tests/vectors/setup-profile.json): the same cases the Setup Studio's own rules (tools/setup-studio/lib/rules.mjs) pass.</summary>
+public class SetupProfileVectorTests
+{
+    private static readonly JsonNode Vectors = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "setup-profile.json")))!;
+
+    public static IEnumerable<object[]> Cases() => Vectors["cases"]!.AsArray().Select((c, i) => new object[] { i, c!["name"]!.GetValue<string>() });
+
+    /// <summary>The profile in the one plain form the vectors use (a part with nothing in it is left out, as is a missing field).</summary>
+    private static JsonNode? Plain(SetupProfile p)
+    {
+        if (!p.IsProfile) return null;
+        var o = new JsonObject { ["schema"] = 1 };
+        var business = new JsonObject();
+        if (p.Name is not null) business["name"] = p.Name;
+        if (p.Country is not null) business["country"] = p.Country;
+        if (p.Industry is not null) business["industry"] = p.Industry;
+        if (p.Region is not null) business["region"] = p.Region;
+        if (business.Count > 0) o["business"] = business;
+        var settings = new JsonObject();
+        if (p.PricesIncludeTax is { } a) settings["pricesIncludeTax"] = a;
+        if (p.TaxRegistered is { } b) settings["taxRegistered"] = b;
+        if (p.RoundTotal is { } c) settings["roundTotal"] = c;
+        if (p.AllowNegativeStock is { } d) settings["allowNegativeStock"] = d;
+        if (p.ReceiptFooter is not null) settings["receiptFooter"] = p.ReceiptFooter;
+        if (p.PaymentMethods.Count > 0) settings["paymentMethods"] = new JsonArray(p.PaymentMethods.Select(m => (JsonNode)JsonValue.Create(m)!).ToArray());
+        if (settings.Count > 0) o["settings"] = settings;
+        if (p.Vocabulary.Count > 0) o["vocabulary"] = new JsonObject(p.Vocabulary.Select(v => KeyValuePair.Create(v.Key, (JsonNode?)new JsonArray(v.Value.Select(w => (JsonNode)JsonValue.Create(w)!).ToArray()))));
+        if (p.FeatureChoices.Count > 0) o["features"] = new JsonObject(p.FeatureChoices.Select(f => KeyValuePair.Create(f.Key, (JsonNode?)JsonValue.Create(f.Value))));
+        var starter = new JsonObject();
+        if (p.Items.Count > 0)
+            starter["items"] = new JsonArray(p.Items.Select(i =>
+            {
+                var item = new JsonObject { ["name"] = i.Name, ["price"] = i.Price, ["kind"] = i.Kind, ["taxClass"] = i.TaxClass };
+                if (i.Barcode is not null) item["barcode"] = i.Barcode;
+                if (i.Unit is not null) item["unit"] = i.Unit;
+                if (i.Category is not null) item["category"] = i.Category;
+                return (JsonNode)item;
+            }).ToArray());
+        if (p.People.Count > 0)
+            starter["people"] = new JsonArray(p.People.Select(x =>
+            {
+                var person = new JsonObject { ["kind"] = x.Kind, ["name"] = x.Name };
+                if (x.Phone is not null) person["phone"] = x.Phone;
+                if (x.Email is not null) person["email"] = x.Email;
+                return (JsonNode)person;
+            }).ToArray());
+        if (starter.Count > 0) o["starter"] = starter;
+        if (p.Notes is not null) o["notes"] = p.Notes;
+        return o;
+    }
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void The_profile_is_read_the_way_the_vectors_say(int index, string name)
+    {
+        var c = Vectors["cases"]![index]!;
+        var text = c["raw"] is { } raw ? raw.GetValue<string>() : c["input"]!.ToJsonString();
+        var p = SetupProfile.Parse(text);
+        var expect = c["expect"]!;
+        Assert.True(JsonNode.DeepEquals(expect["value"], Plain(p)), $"{name}\nexpected: {expect["value"]?.ToJsonString()}\nread:     {Plain(p)?.ToJsonString()}");
+        Assert.Equal(expect["problems"]!.AsArray().Select(x => x!.GetValue<string>()).ToArray(), p.Problems.ToArray());
     }
 }

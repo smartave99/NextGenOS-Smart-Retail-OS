@@ -1,7 +1,7 @@
 // What a kit is turned into, so each place that needs it has it in the form it takes. Written to brand-exports/<kit>/ (never into the programs' own folders).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadKit, readLogo, inspectLogo, check, countryCodes, industryIds, MAX_LOGO_BYTES, repoRoot } from './kit.mjs';
+import { loadKit, readLogo, inspectLogo, check, countryCodes, industryIds, contrastWithWhite, MAX_LOGO_BYTES, repoRoot } from './kit.mjs';
 import { previewHtml, logoDataUri } from './preview.mjs';
 
 const shellQuote = (t) => `"${String(t).replace(/(["\\$`])/g, '\\$1')}"`;
@@ -26,7 +26,11 @@ export function makeExports(slug, { root = repoRoot, outRoot = join(root, 'brand
   look.name = kit.name;
   if (kit.shortName) look.shortName = kit.shortName;
   look.primaryColor = kit.primaryColor.toLowerCase();
-  if (kit.accentColor) look.accentColor = kit.accentColor.toLowerCase();
+  // The Hub refuses a second colour that white words cannot be read on (licensing/spec section 5.2), and it would refuse the whole file: so a light one is left out here.
+  if (kit.accentColor) {
+    if (contrastWithWhite(kit.accentColor) >= 3) look.accentColor = kit.accentColor.toLowerCase();
+    else warnings.push(`The second colour ${kit.accentColor} is too light to read white words on, so it is left out of hub-look.json (the Hub does not take it). The main colour is used.`);
+  }
   if (small) look.logo = logoDataUri(bytes, info.kind);
   if (kit.contact?.email) look.supportEmail = kit.contact.email;
   if (kit.contact?.phone) look.supportPhone = kit.contact.phone;

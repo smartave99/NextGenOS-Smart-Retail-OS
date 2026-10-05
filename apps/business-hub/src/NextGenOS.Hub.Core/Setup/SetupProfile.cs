@@ -26,6 +26,8 @@ public sealed class SetupProfile
     private static readonly Regex Price = new(@"^\d{1,12}(\.\d{1,4})?$", RegexOptions.CultureInvariant);
     private static readonly Regex Word = new(@"^[\p{L}\p{N} \-]{1,20}$", RegexOptions.CultureInvariant);
 
+    /// <summary>True when the text was a setup profile (it said "schema": 1); false for no text or for text that is not one.</summary>
+    public bool IsProfile { get; private set; }
     public string? Name { get; private set; }
     public string? Country { get; private set; }
     public string? Region { get; private set; }
@@ -60,7 +62,8 @@ public sealed class SetupProfile
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) { p.Problems.Add("The setup file is not a setup profile."); return p; }
             foreach (var prop in root.EnumerateObject()) if (Array.IndexOf(Known, prop.Name) < 0) p.Problems.Add($"\"{prop.Name}\" is not a part of a setup profile and is ignored.");
-            if (!root.TryGetProperty("schema", out var schema) || schema.ValueKind != JsonValueKind.Number || schema.GetInt32() != 1) { p.Problems.Add("The setup file must say \"schema\": 1."); return p; }
+            if (!root.TryGetProperty("schema", out var schema) || schema.ValueKind != JsonValueKind.Number || !schema.TryGetInt32(out var version) || version != 1) { p.Problems.Add("The setup file must say \"schema\": 1."); return p; }
+            p.IsProfile = true;
             p.ReadBusiness(root);
             p.ReadSettings(root);
             p.ReadWords(root);
@@ -187,11 +190,13 @@ public sealed class SetupProfile
         }
     }
 
-    /// <summary>Puts the profile's settings, words and parts into a shop's settings (what the owner sets up later can still change them).</summary>
+    /// <summary>
+    /// Puts the profile's settings, words and parts into a shop's settings (what the owner sets up later can still change them). Whether the business is registered for the tax
+    /// is not put in here: the set-up wizard asks the owner, and the profile only fills in the answer to start from.
+    /// </summary>
     public void ApplyTo(ShopSettings settings)
     {
         if (PricesIncludeTax is { } a) settings.PricesIncludeTax = a;
-        if (TaxRegistered is { } b) settings.TaxRegistered = b;
         if (RoundTotal is { } c) settings.RoundTotal = c;
         if (AllowNegativeStock is { } d) settings.AllowNegativeStock = d;
         if (ReceiptFooter is not null) settings.ReceiptFooter = ReceiptFooter;

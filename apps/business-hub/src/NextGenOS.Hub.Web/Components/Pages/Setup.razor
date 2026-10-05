@@ -201,6 +201,7 @@ else
         if (profile.Name is not null) name = profile.Name;
         if (profile.Country is not null) { country = profile.Country; SetDefaults(); }
         if (profile.Region is not null) region = profile.Region;
+        if (profile.TaxRegistered is { } taxed) registered = taxed;
         if (profile.Industry is not null) industry = profile.Industry;
         prepared = profile.Name is not null || profile.Country is not null || profile.Industry is not null || profile.HasStarter;
     }

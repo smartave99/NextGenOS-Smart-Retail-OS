@@ -81,6 +81,8 @@ test('the command line makes, checks, changes and exports a kit', () => {
     assert.match(look.logo, /^data:image\/png;base64,/);
     assert.equal(look.poweredBy, false);
     assert.equal(look.schema, undefined);
+    assert.equal(look.accentColor, undefined, 'a second colour white words cannot be read on is left out: the Hub would refuse the whole file');
+    assert.match(out.stdout, /second colour #f59e0b is too light/);
     assert.match(readFileSync(join(dir, 'licence-brand.txt'), 'utf8'), /create-brand --name "Luzon Fresh Mart" --primary #aa2233 --accent #f59e0b --email "help@luzonfresh.example" --powered no/);
     assert.match(readFileSync(join(dir, 'website.env'), 'utf8'), /NEXT_PUBLIC_SITE_NAME=Luzon Fresh Mart\nNEXT_PUBLIC_SITE_URL=https:\/\/shop\.luzonfresh\.example\nNEXT_PUBLIC_COUNTRY=PH/);
     assert.match(readFileSync(join(dir, 'ANDROID.txt'), 'utf8'), /--app-id com\.luzonfresh\.shop/);

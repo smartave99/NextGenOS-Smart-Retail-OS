@@ -1,6 +1,8 @@
 // Release-gate checks for the Business Hub (apps/business-hub): the licence is wired into its program and cannot be skipped by anything
 // that ships, it builds, its tests pass, and every kind of business works in a real browser.
 
+import { browserProblem } from '../lib/playwright.mjs';
+
 export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) {
   const hub = 'apps/business-hub';
 
@@ -55,12 +57,8 @@ export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) 
       run: () => {
         if (!has('dotnet') || !has('node')) return { status: 'SKIP', detail: 'dotnet or node is not installed here' };
         const e2e = join(root, hub, 'e2e');
-        if (!existsSync(join(e2e, 'node_modules', 'playwright'))) {
-          const i = sh('npm', ['install', '--silent', '--no-audit', '--no-fund'], { cwd: e2e, env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }, timeout: 300_000 });
-          if (i.status !== 0 || !existsSync(join(e2e, 'node_modules', 'playwright'))) return { status: 'SKIP', detail: 'Playwright could not be installed here (npm install in apps/business-hub/e2e)' };
-        }
-        const probe = sh('node', ['-e', "import('playwright').then(async (p) => { const b = await p.chromium.launch(); await b.close(); }).catch((e) => { console.error(String(e).slice(0, 200)); process.exit(1); })"], { cwd: e2e, timeout: 60_000 });
-        if (probe.status !== 0) return { status: 'SKIP', detail: 'no browser for Playwright here (run: npx playwright install chromium)' };
+        const why = browserProblem({ sh, join, existsSync, dir: e2e });
+        if (why) return { status: 'SKIP', detail: why };
         const r = runCmd('hub-e2e', 'node', ['hub.e2e.mjs'], { cwd: e2e, timeout: 1_500_000 });
         if (r.status !== 'PASS') return r;
         const steps = (r.out.match(/^✓ /gm) || []).length;

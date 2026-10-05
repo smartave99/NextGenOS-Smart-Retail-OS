@@ -1,6 +1,6 @@
 using NextGenOS.Hub.Web;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = HubHost.CreateBuilder(args);
 HubHost.AddHub(builder);
 var app = builder.Build();
 HubHost.UseHub(app);

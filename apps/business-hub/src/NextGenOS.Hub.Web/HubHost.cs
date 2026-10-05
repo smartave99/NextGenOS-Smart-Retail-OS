@@ -30,6 +30,13 @@ public static class HubHost
         return Path.Combine(root, "NextGenOS", "Hub");
     }
 
+    /// <summary>
+    /// The builder both programs start from. The program's own folder is its home, not whatever folder it was started from: a Windows service
+    /// starts in System32, and a shortcut can start it anywhere, so looking for files in "the current folder" would find none of ours.
+    /// </summary>
+    public static WebApplicationBuilder CreateBuilder(string[] args) =>
+        WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
+
     public static void AddHub(WebApplicationBuilder builder)
     {
         var folder = DataFolder(builder.Configuration);

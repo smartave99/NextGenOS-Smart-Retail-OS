@@ -4,7 +4,7 @@ using NextGenOS.Licensing;
 using NextGenOS.Licensing.AspNetCore;
 
 // dotnet run -- --Hub:DataFolder=/tmp/shop --urls=http://127.0.0.1:5291 [--E2E:Licensed=false]
-var builder = WebApplication.CreateBuilder(args);
+var builder = HubHost.CreateBuilder(args);
 builder.WebHost.UseStaticWebAssets();
 HubHost.AddHub(builder);
 var licensed = builder.Configuration.GetValue("E2E:Licensed", true);

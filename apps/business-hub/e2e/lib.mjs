@@ -25,7 +25,7 @@ export async function startHub(extraArgs = []) {
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const dll = process.env.HUB_HOST_DLL || join(host, 'bin', 'Release', 'net10.0', 'NextGenOS.Hub.E2EHost.dll');
-  const child = spawn('dotnet', [dll, `--Hub:DataFolder=${data}`, `--urls=${url}`, '--Logging:LogLevel:Default=Warning', ...extraArgs], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ASPNETCORE_ENVIRONMENT: 'Production', DOTNET_NOLOGO: '1' } });
+  const child = spawn('dotnet', [dll, `--Hub:DataFolder=${data}`, `--urls=${url}`, `--Kestrel:Endpoints:Http:Url=${url}`, '--Logging:LogLevel:Default=Warning', ...extraArgs], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ASPNETCORE_ENVIRONMENT: 'Production', DOTNET_NOLOGO: '1' } });
   let log = '';
   child.stdout.on('data', (d) => { log += d; });
   child.stderr.on('data', (d) => { log += d; });

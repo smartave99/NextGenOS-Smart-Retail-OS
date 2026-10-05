@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SECRET_PATTERNS, SECRET_ALLOW } from './lib/secret-patterns.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -37,21 +38,6 @@ const read = (f) => { try { return readFileSync(join(root, f), 'utf8'); } catch 
 // Checks. Each returns { status: 'PASS' | 'FAIL' | 'SKIP', detail }.
 // ---------------------------------------------------------------------------------------------------------------------
 
-const SECRET_PATTERNS = [
-  [/sk-proj-[A-Za-z0-9_-]{20,}/, 'OpenAI project key'],
-  [/\bsk-[A-Za-z0-9]{32,}\b/, 'API key (sk-...)'],
-  [/\bnpg_[A-Za-z0-9]{10,}/, 'Neon database password'],
-  [/\bgsk_[A-Za-z0-9]{20,}/, 'Groq key'],
-  [/AIza[0-9A-Za-z_-]{35}/, 'Google API key'],
-  [/\bAKIA[0-9A-Z]{16}\b/, 'AWS access key'],
-  [/\bghp_[A-Za-z0-9]{30,}/, 'GitHub token'],
-  [/-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/, 'private key'],
-  [/postgres(?:ql)?:\/\/[^\s"'<>:@]+:[^\s"'<>@]{4,}@/, 'database URL with a password'],
-  [/AuthSecret\s*=\s*"[^"]{12,}"/, 'Firebase database secret'],
-  [/\b(?:Password|Pwd)=[^;"'\s${}(][^;"'\s]{5,};/i, 'password in a connection string'],
-];
-// Test and example files may hold obviously fake values; these exact fakes are allowed.
-const SECRET_ALLOW = [/Password=your_password/, /Password=not-a-real-password/, /sk-test-0+/, /postgres:\/\/user:secret@host/, /postgres:\/\/authenticator:\$\{/, /sk-abc/, /secret_test/];
 const SECRET_SKIP_PATH = /^(licenses\/|.*package-lock\.json$|.*\.min\.js$|apps\/pos-dashboard-service\/owner-app\/vendor\/|apps\/storefront-web-mobile\/android\/gradle)/;
 
 function checkSecrets() {

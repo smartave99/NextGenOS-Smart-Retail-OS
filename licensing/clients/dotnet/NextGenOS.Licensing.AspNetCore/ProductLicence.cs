@@ -1,17 +1,14 @@
 using NextGenOS.Licensing;
 
-namespace SmartRetail.Pos.Web.Services;
+namespace NextGenOS.Licensing.AspNetCore;
 
 /// <summary>
-/// The licence of this PC as the dashboard sees it. The licence files are shared with the Windows app and the POS (one
-/// licence per PC), so activating in either one is enough. The state is looked at again every half minute, not on every
+/// The licence of this PC as a NextGenOS web program sees it. The licence files are shared with the Windows app and the POS (one
+/// licence per PC), so activating in any one is enough. The state is looked at again every half minute, not on every
 /// request, because reading the PC's identity is not free.
 /// </summary>
-public sealed class DashboardLicence
+public sealed class ProductLicence
 {
-    /// <summary>The module of the licence this program needs.</summary>
-    public const string Module = "dashboard";
-
     private static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(30);
 
     private readonly Func<LicenceState> _evaluate;
@@ -20,17 +17,17 @@ public sealed class DashboardLicence
     private LicenceState? _state;
     private DateTimeOffset _readAt;
 
-    public DashboardLicence(Func<LicenceState> evaluate, TimeProvider? time = null)
+    public ProductLicence(Func<LicenceState> evaluate, TimeProvider? time = null)
     {
         _evaluate = evaluate;
         _time = time ?? TimeProvider.System;
     }
 
-    /// <summary>The licence manager for the dashboard (module "dashboard").</summary>
-    public static LicenceManager CreateManager() => new(new LicenceOptions
+    /// <summary>The licence manager of a program: it needs the given module ("dashboard", "hub", ...). The licence files are shared by all NextGenOS programs on the PC.</summary>
+    public static LicenceManager CreateManager(string module, string appVersion = "0.0.0") => new(new LicenceOptions
     {
-        RequiredModule = Module,
-        AppVersion = typeof(DashboardLicence).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+        RequiredModule = module,
+        AppVersion = appVersion,
     });
 
     public LicenceState State
@@ -50,7 +47,7 @@ public sealed class DashboardLicence
         }
     }
 
-    /// <summary>True when the dashboard may run.</summary>
+    /// <summary>True when the program may run.</summary>
     public bool IsUsable => State.IsUsable;
 
     /// <summary>Looks at the licence again now (after a check-in, or when the person pressed "Check again").</summary>

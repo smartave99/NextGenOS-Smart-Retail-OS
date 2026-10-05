@@ -8,6 +8,7 @@
     <ProjectReference Include="..\SmartRetail.Pos.Vision\SmartRetail.Pos.Vision.csproj" />
     <!-- The signed licence: the dashboard runs only on a PC with a valid licence that includes the "dashboard" module. -->
     <ProjectReference Include="..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
+    <ProjectReference Include="..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing.AspNetCore\NextGenOS.Licensing.AspNetCore.csproj" />
   </ItemGroup>
 
   <!-- The owner view's Supabase script, which Settings opens (Services/OwnerViewScript.cs). -->

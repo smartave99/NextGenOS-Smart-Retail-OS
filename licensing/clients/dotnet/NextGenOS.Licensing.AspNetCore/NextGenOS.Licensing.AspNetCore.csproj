@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Licence enforcement for NextGenOS web programs (the dashboard, the Business Hub): the gate in front of every request, the stop of a live
+       screen, background work that runs only while licensed, and the brand of the licence. One implementation, so every program does it the same way. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>NextGenOS.Licensing.AspNetCore</RootNamespace>
+    <AssemblyName>NextGenOS.Licensing.AspNetCore</AssemblyName>
+    <Company>NextGenOS</Company>
+    <Product>NextGenOS Licensing</Product>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
+    <Version>1.0.0</Version>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
+  </ItemGroup>
+
+</Project>

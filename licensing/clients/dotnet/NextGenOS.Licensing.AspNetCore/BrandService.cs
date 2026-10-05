@@ -1,13 +1,13 @@
 using System.Text.RegularExpressions;
 using NextGenOS.Licensing;
 
-namespace SmartRetail.Pos.Web.Services;
+namespace NextGenOS.Licensing.AspNetCore;
 
 /// <summary>
-/// The name and colours the dashboard shows: those of the licence's brand (a reseller or a customer with white label), or
+/// The name and colours the program shows: those of the licence's brand (a reseller or a customer with white label), or
 /// NextGenOS's own Smart Retail POS when the licence has none. Colours are checked as plain hex before they reach the page.
 /// </summary>
-public sealed partial class BrandService(DashboardLicence licence)
+public sealed partial class BrandService(ProductLicence licence)
 {
     public const string DefaultName = "Smart Retail POS";
 

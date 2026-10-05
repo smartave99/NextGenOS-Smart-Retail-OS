@@ -7,6 +7,7 @@ using SmartRetail.Pos.Core.Abstractions;
 using SmartRetail.Pos.Core.Bills;
 using SmartRetail.Pos.Data;
 using SmartRetail.Pos.Web.Components;
+using NextGenOS.Licensing.AspNetCore;
 using SmartRetail.Pos.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -142,14 +143,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<BillSession>();
 builder.Services.AddScoped<CameraSearchLauncher>();
 
-// The signed licence (one per PC, shared with the Windows app and the POS): the dashboard runs only with a valid one that
-// includes the dashboard module.
-var licenceManager = DashboardLicence.CreateManager();
-builder.Services.AddSingleton(licenceManager);
-builder.Services.AddSingleton(new DashboardLicence(licenceManager.Evaluate));
-builder.Services.AddSingleton<BrandService>();
-builder.Services.AddHostedService<LicenceWorker>();
-builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, LicenceCircuitHandler>();
+// The signed licence (one per PC, shared with the Windows app and the POS): the dashboard runs only with a valid one that includes the
+// dashboard module. The gate, the stop of live screens, the check-in and the brand come from NextGenOS.Licensing.AspNetCore.
+builder.Services.AddNextGenOSLicence("dashboard", typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0");
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

@@ -17,8 +17,7 @@ export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) 
         const problems = [
           ...mustContain('apps/pos-ai-companion/src/SmartRetail.AI.Desktop/Program.cs', ['LicenceGuard', 'EnsureLicensed']),
           ...mustContain('apps/pos-ai-companion/src/SmartRetail.AI.Desktop/AiLicence.cs', ['RequiredModule = Module', 'Module = "ai"']),
-          ...mustContain('apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Program.cs', ['UseLicenceGate()', 'AddLicensedWorker<', 'LicenceCircuitHandler']),
-          ...mustContain('apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Services/DashboardLicence.cs', ['Module = "dashboard"']),
+          ...mustContain('apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Program.cs', ['UseLicenceGate()', 'AddLicensedWorker<', 'AddNextGenOSLicence("dashboard"']),
           ...mustContain('apps/pos-desktop/Source/Libraries/DevNetLM/DevNetLM/DevNet.cs', ['PosLicence.Manager', 'LicenceHeartbeat']),
           ...mustContain('apps/pos-desktop/Source/Libraries/DevNetLM/DevNetLM/PosLicence.cs', ['RequiredModule = "pos"']),
           ...mustContain('apps/storefront-web-mobile/src/middleware.ts', ['licence']),

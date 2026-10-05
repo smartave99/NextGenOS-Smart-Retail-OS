@@ -1,12 +1,12 @@
 using NextGenOS.Licensing;
 
-namespace SmartRetail.Pos.Web.Services;
+namespace NextGenOS.Licensing.AspNetCore;
 
 /// <summary>
 /// Checks in with the licence server now and then (the library decides when it is due, and never waits long), and looks at
-/// the licence again, so a licence withdrawn or ended stops the dashboard in a running shop too.
+/// the licence again, so a licence withdrawn or ended stops the program in a running shop too.
 /// </summary>
-public sealed class LicenceWorker(LicenceManager manager, DashboardLicence licence, ILogger<LicenceWorker> log) : BackgroundService
+public sealed class LicenceWorker(LicenceManager manager, ProductLicence licence, ILogger<LicenceWorker> log) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

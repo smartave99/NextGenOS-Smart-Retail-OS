@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NextGenOS.Licensing;
-using SmartRetail.Pos.Web.Services;
+using NextGenOS.Licensing.AspNetCore;
 
 namespace SmartRetail.Pos.Tests;
 
@@ -28,7 +28,7 @@ public sealed class LicenceGateTests
     {
         public Rig(Func<LicenceState> state)
         {
-            Licence = new DashboardLicence(state, new MovingClock());
+            Licence = new ProductLicence(state, new MovingClock());
             Services = new ServiceCollection().AddSingleton(Licence).AddSingleton<BrandService>().BuildServiceProvider();
             var app = new ApplicationBuilder(Services);
             app.UseLicenceGate();
@@ -42,7 +42,7 @@ public sealed class LicenceGateTests
 
         public RequestDelegate Pipeline { get; }
 
-        public DashboardLicence Licence { get; }
+        public ProductLicence Licence { get; }
 
         public IServiceProvider Services { get; }
 
@@ -147,7 +147,7 @@ public sealed class LicenceGateTests
     [Fact]
     public void A_licence_that_cannot_be_read_stops_the_dashboard()
     {
-        var licence = new DashboardLicence(() => throw new IOException("disk"), new MovingClock());
+        var licence = new ProductLicence(() => throw new IOException("disk"), new MovingClock());
         Assert.False(licence.IsUsable);
         Assert.Equal(LicenceStatus.Invalid, licence.State.Status);
     }
@@ -157,7 +157,7 @@ public sealed class LicenceGateTests
     {
         var clock = new MovingClock();
         var calls = 0;
-        var licence = new DashboardLicence(() => { calls++; return calls == 1 ? Usable() : Unusable(LicenceStatus.Revoked); }, clock);
+        var licence = new ProductLicence(() => { calls++; return calls == 1 ? Usable() : Unusable(LicenceStatus.Revoked); }, clock);
 
         Assert.True(licence.IsUsable);
         Assert.True(licence.IsUsable);
@@ -170,12 +170,12 @@ public sealed class LicenceGateTests
     [Fact]
     public void The_brand_comes_from_the_licence_and_is_NextGenOS_Smart_Retail_POS_without_one()
     {
-        var plain = new BrandService(new DashboardLicence(() => Usable(), new MovingClock()));
+        var plain = new BrandService(new ProductLicence(() => Usable(), new MovingClock()));
         Assert.Equal("Smart Retail POS", plain.Name);
         Assert.Equal("by NextGenOS", plain.By);
         Assert.Equal(string.Empty, plain.Style);
 
-        var own = new BrandService(new DashboardLicence(() => Usable("Acme POS", "#00AA55"), new MovingClock()));
+        var own = new BrandService(new ProductLicence(() => Usable("Acme POS", "#00AA55"), new MovingClock()));
         Assert.Equal("Acme POS", own.Name);
         Assert.Null(own.By); // the reseller's own brand does not say "by NextGenOS" unless the licence says so
         Assert.Contains("--accent:#00aa55", own.Style);
@@ -197,7 +197,7 @@ public sealed class LicenceGateTests
     public async Task A_live_screen_stops_when_the_licence_is_lost()
     {
         var usable = true;
-        var licence = new DashboardLicence(() => usable ? Usable() : Unusable(LicenceStatus.Revoked), new MovingClock());
+        var licence = new ProductLicence(() => usable ? Usable() : Unusable(LicenceStatus.Revoked), new MovingClock());
         var handler = new LicenceCircuitHandler(licence);
         var ran = 0;
         var wrapped = handler.CreateInboundActivityHandler(_ => { ran++; return Task.CompletedTask; });
@@ -215,7 +215,7 @@ public sealed class LicenceGateTests
     public async Task A_background_worker_runs_only_while_the_licence_is_usable()
     {
         var usable = false;
-        var licence = new DashboardLicence(() => usable ? Usable() : Unusable(), new MovingClock());
+        var licence = new ProductLicence(() => usable ? Usable() : Unusable(), new MovingClock());
         CountingWorker.Reset();
         var services = new ServiceCollection().AddSingleton(licence).BuildServiceProvider();
         using var worker = new LicensedWorker<CountingWorker>(services, licence, NullLogger<LicensedWorker<CountingWorker>>.Instance, TimeSpan.FromMilliseconds(20));

@@ -2,21 +2,21 @@ using System.Net;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using NextGenOS.Licensing;
 
-namespace SmartRetail.Pos.Web.Services;
+namespace NextGenOS.Licensing.AspNetCore;
 
 /// <summary>
-/// Without a usable licence the dashboard shows one page that says why and what to do, and answers nothing else: a browser
+/// Without a usable licence the program shows one page that says why and what to do, and answers nothing else: a browser
 /// gets that page, anything else gets a short JSON answer, with status 402. It sits in front of everything, the static files
 /// and the live connection included.
 /// </summary>
 public static class LicenceGate
 {
-    /// <summary>Looks at the licence again, then goes back to the dashboard. Allowed with no licence: it changes nothing.</summary>
+    /// <summary>Looks at the licence again, then goes back to the program. Allowed with no licence: it changes nothing.</summary>
     public const string RecheckPath = "/licence-recheck";
 
     public static IApplicationBuilder UseLicenceGate(this IApplicationBuilder app) => app.Use(async (context, next) =>
     {
-        var licence = context.RequestServices.GetRequiredService<DashboardLicence>();
+        var licence = context.RequestServices.GetRequiredService<ProductLicence>();
         if (context.Request.Path.Equals(RecheckPath, StringComparison.OrdinalIgnoreCase))
         {
             licence.Reload();
@@ -95,7 +95,7 @@ public static class LicenceGate
 }
 
 /// <summary>A live screen stops the moment the licence is lost, not only the next page that is opened.</summary>
-public sealed class LicenceCircuitHandler(DashboardLicence licence) : CircuitHandler
+public sealed class LicenceCircuitHandler(ProductLicence licence) : CircuitHandler
 {
     public override Func<CircuitInboundActivityContext, Task> CreateInboundActivityHandler(Func<CircuitInboundActivityContext, Task> next) => async context =>
     {

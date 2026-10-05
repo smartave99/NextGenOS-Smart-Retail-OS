@@ -273,4 +273,10 @@ jobs:
           PRE=""
           case "${TAG}" in *-rc*|*-beta*|*-alpha*) PRE="--prerelease";; esac
           { cat .github/release-notes.md; echo; echo "Built from ${GITHUB_SHA}."; echo; echo '```'; cat dist/BUILD-STATUS.txt; echo '```'; } > "${RUNNER_TEMP}/notes.md"
-          gh release create "${TAG}" dist/* ${PRE} --repo "${GITHUB_REPOSITORY}" --title "Smart Retail POS ${TAG}" --notes-file "${RUNNER_TEMP}/notes.md"
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            # A re-run (for example after the licence keys were added): put the new files on the release that is already there.
+            gh release upload "${TAG}" dist/* --clobber --repo "${GITHUB_REPOSITORY}"
+            gh release edit "${TAG}" --notes-file "${RUNNER_TEMP}/notes.md" --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "${TAG}" dist/* ${PRE} --repo "${GITHUB_REPOSITORY}" --title "Smart Retail POS ${TAG}" --notes-file "${RUNNER_TEMP}/notes.md"
+          fi

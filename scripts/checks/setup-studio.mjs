@@ -1,5 +1,7 @@
 // Release-gate checks for the Setup Studio (tools/setup-studio) and for what every customer-facing program may not fix in code (CLAUDE.md, section 8).
 
+import { browserProblem } from '../lib/playwright.mjs';
+
 export function checks({ root, sh, has, runCmd, join, existsSync }) {
   const studio = join(root, 'tools', 'setup-studio');
   return [
@@ -25,6 +27,19 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
         if (r.status !== 'PASS') return r;
         const n = /# pass (\d+)/.exec(r.out);
         return { status: 'PASS', detail: `${n ? n[1] : 'all'} tests passed` };
+      },
+    },
+    {
+      name: 'setup-studio-e2e',
+      title: 'The Setup Studio in a real browser: first sign-in, a customer, the live preview in the customer\'s colours, an AI answer read again by the rules, a second person approving, the hand-over',
+      full: true,
+      run: () => {
+        if (!has('node')) return { status: 'SKIP', detail: 'node is not installed here' };
+        const why = browserProblem({ sh, join, existsSync, dir: join(root, 'apps', 'business-hub', 'e2e') });
+        if (why) return { status: 'SKIP', detail: why };
+        const r = runCmd('setup-studio-e2e', 'node', ['tests/studio.e2e.mjs'], { cwd: studio, timeout: 600_000 });
+        if (r.status !== 'PASS') return r;
+        return { status: 'PASS', detail: `${(r.out.match(/^✓ /gm) || []).length} steps passed in a real browser (Chromium)` };
       },
     },
   ];

@@ -1,0 +1,432 @@
+@page "/settings"
+@attribute [Authorize(Policy = Perm.Settings)]
+@inherits HubPage
+@using System.Text.RegularExpressions
+@using NextGenOS.Licensing.AspNetCore
+@inject ProductLicence Licence
+
+<PageTitle>Settings</PageTitle>
+<h1>Settings</h1>
+<p class="sub">How the shop is set up. Changes apply at once.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="tablist">
+    @foreach (var (key, label) in Tabs())
+    {
+        <button type="button" role="tab" class="@(tab == key ? "on" : "")" aria-selected="@(tab == key)" @onclick="() => OpenTab(key)">@label</button>
+    }
+</div>
+
+@if (tab == "shop")
+{
+    <section class="card">
+        <h2>Your business</h2>
+        <div class="stack">
+            <label for="s-name">Business name</label><input id="s-name" @bind="s.Name" maxlength="80" />
+            <label for="s-addr">Address (on bills)</label><textarea id="s-addr" rows="2" @bind="s.Address" maxlength="300"></textarea>
+            <div class="field-row">
+                <div><label for="s-phone">Phone</label><input id="s-phone" @bind="s.Phone" maxlength="40" /></div>
+                <div><label for="s-mail">Email</label><input id="s-mail" @bind="s.Email" maxlength="120" /></div>
+            </div>
+            @if (Shop.Country.Tax.BusinessId is { } idRule)
+            {
+                <label for="s-tax">@idRule.Label</label><input id="s-tax" @bind="s.TaxId" maxlength="40" />
+            }
+            @if (Shop.Country.Tax.Regions?.List is { Count: > 1 } regions)
+            {
+                <label for="s-region">@(Shop.Country.Tax.Regions.Label ?? "Region") of your business</label>
+                <select id="s-region" @bind="s.Region">@foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }</select>
+            }
+            <label for="s-foot">Words at the bottom of every bill</label><input id="s-foot" @bind="s.ReceiptFooter" maxlength="160" />
+            <label for="s-pay">Ways of paying (separated by commas)</label><input id="s-pay" @bind="payText" maxlength="200" />
+            <label class="check"><input type="checkbox" @bind="s.PricesIncludeTax" /> The prices I type already include tax</label>
+            <label class="check"><input type="checkbox" @bind="s.TaxRegistered" /> My business is registered for @Shop.Country.Tax.Name</label>
+            <label class="check"><input type="checkbox" @bind="s.RoundTotal" /> Round every total to the nearest whole unit</label>
+            <label class="check"><input type="checkbox" @bind="s.AllowNegativeStock" /> Allow selling when the count says there is none left</label>
+        </div>
+        <p class="muted small">Country: <strong>@Shop.Country.Name</strong> (@Shop.CurrencyCode). To use another country, set up a new data folder.</p>
+        <div class="row"><button type="button" class="btn primary" id="save-shop" @onclick="SaveShop">Save</button></div>
+    </section>
+}
+else if (tab == "tax")
+{
+    <section class="card">
+        <h2>Tax rates in @Shop.Country.Name</h2>
+        @if (Shop.Country.IsReviewed)
+        {
+            <p class="muted">These rules were checked by @Shop.Country.Review.By on @Shop.Country.Review.On.</p>
+        }
+        else
+        {
+            <div class="notice warn">The tax rules for @Shop.Country.Name in this program (as of @Shop.Country.AsOf) have <strong>not been checked by a local tax adviser</strong>. Rates change: confirm them with your accountant, and correct any below.</div>
+        }
+        @foreach (var note in Shop.Country.Notes ?? new List<string>()) { <p class="muted small">@note</p> }
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Code</th><th>Name</th><th class="num">Rate (%)</th></tr></thead>
+            <tbody>
+            @foreach (var rate in Shop.Country.Tax.Rates.Where(r => r.Percent != null && !r.Legacy && (r.Taxable || !r.Zero && !r.Exempt)))
+            {
+                var key = rate.Code;
+                <tr>
+                    <td>@rate.Code</td><td>@rate.Label</td>
+                    <td class="num"><input class="qty" inputmode="decimal" aria-label="Rate of @rate.Label" value="@RateValue(key, rate.Percent)" @onchange="e => SetRate(key, e)" /></td>
+                </tr>
+            }
+            @foreach (var part in RegionParts())
+            {
+                <tr>
+                    <td>@part.Region</td><td>@part.Name</td>
+                    <td class="num"><input class="qty" inputmode="decimal" aria-label="@part.Name" value="@PartValue(part.Key, part.Percent)" @onchange="e => SetPart(part.Key, e)" /></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="save-tax" @onclick="SaveTax">Save the rates</button><button type="button" class="btn secondary" @onclick="ResetTax">Go back to the program's rates</button></div>
+    </section>
+}
+else if (tab == "parts")
+{
+    <section class="card">
+        <h2>Parts of the program</h2>
+        <p class="muted">Switch off what you do not use. The screens and menus follow.</p>
+        <div class="stack">
+            @foreach (var f in FeatureList())
+            {
+                var name = f.Key;
+                <label class="check"><input type="checkbox" checked="@features[name]" @onchange="e => SetFeature(name, e)" /> @f.Label</label>
+            }
+        </div>
+        <h2>Words</h2>
+        <p class="muted">Change a word to the one your customers use. Leave empty to keep the program's.</p>
+        @foreach (var w in words)
+        {
+            <div class="field-row">
+                <div><label for="w-@w.Term-s">@Shop.Industry.Singular(w.Term) (one)</label><input id="w-@w.Term-s" @bind="w.One" maxlength="30" /></div>
+                <div><label for="w-@w.Term-p">@Shop.Industry.Plural(w.Term) (many)</label><input id="w-@w.Term-p" @bind="w.Many" maxlength="30" /></div>
+            </div>
+        }
+        <div class="row"><button type="button" class="btn primary" id="save-parts" @onclick="SaveParts">Save</button></div>
+    </section>
+}
+else if (tab == "users")
+{
+    <section class="card">
+        <h2>People who sign in</h2>
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Name</th><th>User name</th><th>Role</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in users)
+            {
+                <tr>
+                    <td><strong>@u.DisplayName</strong>@if (!u.Active) { <span class="chip">Off</span> }</td>
+                    <td>@u.Username</td>
+                    <td>
+                        <select aria-label="Role of @u.DisplayName" value="@u.Role" @onchange="e => ChangeRole(u, e.Value?.ToString())">
+                            @foreach (var r in Roles.All) { <option value="@r">@Roles.Label(r)</option> }
+                        </select>
+                    </td>
+                    <td class="right nowrap">
+                        <button type="button" class="btn ghost small" @onclick="() => ToggleUser(u)">@(u.Active ? "Switch off" : "Switch on")</button>
+                        <button type="button" class="btn ghost small" @onclick="() => resetFor = u">New password</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    </section>
+    <section class="card">
+        <h2>Add a person</h2>
+        <div class="field-row">
+            <div><label for="u-name">Name</label><input id="u-name" @bind="newName" maxlength="60" /></div>
+            <div><label for="u-user">User name</label><input id="u-user" @bind="newUser" maxlength="40" autocomplete="off" autocapitalize="none" /></div>
+            <div><label for="u-role">Role</label><select id="u-role" @bind="newRole">@foreach (var r in Roles.All.Where(r => r != Roles.Owner)) { <option value="@r">@Roles.Label(r)</option> }</select></div>
+            <div><label for="u-pass">Password</label><input id="u-pass" type="password" @bind="newPass" autocomplete="new-password" /></div>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="add-user" @onclick="AddUser">Add</button></div>
+        <p class="muted small">Cashiers can sell and look people up. Managers can also change items and see reports. Only owners change settings and add people.</p>
+    </section>
+    @if (resetFor is not null)
+    {
+        <div class="sheet-back" @onclick="() => resetFor = null">
+            <div class="sheet" role="dialog" aria-modal="true" aria-label="New password" @onclick:stopPropagation="true">
+                <h2>New password for @resetFor.DisplayName</h2>
+                <Notice Error="@formError" />
+                <label for="np">New password</label><input id="np" type="password" @bind="resetPass" autocomplete="new-password" />
+                <div class="row"><button type="button" class="btn secondary" @onclick="() => resetFor = null">Cancel</button><button type="button" class="btn primary grow" @onclick="ResetPassword">Save</button></div>
+            </div>
+        </div>
+    }
+}
+else if (tab == "licence")
+{
+    var state = Licence.State;
+    <section class="card">
+        <h2>Licence</h2>
+        <dl class="facts">
+            <dt>Status</dt><dd><span class="chip @(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "ok" : "warn")">@(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : state.IsUsable ? "Active, please connect to the internet soon" : "Not active")</span></dd>
+            @if (state.Licence is { } claims)
+            {
+                <dt>Licensed to</dt><dd>@(claims.Customer?.Name ?? "")</dd>
+                <dt>Edition</dt><dd>@claims.Edition</dd>
+                <dt>Parts</dt><dd>@string.Join(", ", claims.Modules ?? new List<string>())</dd>
+                @if (state.ExpiresUtc is { } until) { <dt>Valid until</dt><dd>@until.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</dd> }
+                else { <dt>Valid until</dt><dd>No end date</dd> }
+            }
+        </dl>
+        <p class="muted">@state.Message</p>
+        <div class="row"><button type="button" class="btn secondary" @onclick="RecheckLicence">Check again</button></div>
+        <p class="muted small">Need help or a new licence? @(brandHelp())</p>
+    </section>
+}
+else if (tab == "activity")
+{
+    <section class="card">
+        <h2>What people did</h2>
+        <p class="muted small">Voided bills, stock changes by hand, changed settings and sign-ins: kept for you, and never changed.</p>
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+            <tbody>@foreach (var a in App.Audit.Recent(100)) { <tr><td class="nowrap">@When(a.At)</td><td>@(a.Who ?? "")</td><td>@a.Action</td><td>@a.Detail</td></tr> }</tbody>
+        </table>
+        </div>
+    </section>
+}
+
+@code {
+    private string tab = "shop";
+    private ShopSettings s = new();
+    private string payText = "";
+    private readonly Dictionary<string, string> rates = new();
+    private readonly Dictionary<string, string> parts = new();
+    private readonly Dictionary<string, bool> features = new();
+    private sealed class Word { public string Term { get; init; } = ""; public string One { get; set; } = ""; public string Many { get; set; } = ""; }
+    private readonly List<Word> words = new();
+    private IReadOnlyList<User> users = Array.Empty<User>();
+    private string newName = "", newUser = "", newRole = Roles.Cashier, newPass = "", resetPass = "";
+    private User? resetFor;
+    private string? formError;
+
+    private IEnumerable<(string, string)> Tabs()
+    {
+        yield return ("shop", "Business");
+        yield return ("tax", "Tax");
+        yield return ("parts", "Parts and words");
+        if (Me.Can(Perm.Users)) yield return ("users", "People");
+        yield return ("licence", "Licence");
+        yield return ("activity", "Activity");
+    }
+
+    protected override Task LoadAsync()
+    {
+        s = App.Shop.Settings;
+        payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
+        rates.Clear();
+        foreach (var kv in s.RateOverrides) rates[kv.Key] = kv.Value;
+        parts.Clear();
+        foreach (var kv in s.ComponentOverrides) parts[kv.Key] = kv.Value;
+        features.Clear();
+        foreach (var f in FeatureList()) features[f.Key] = FeatureOn(f.Key);
+        words.Clear();
+        foreach (var term in new[] { "customer", "item", "sale", "invoice" })
+        {
+            var has = s.VocabularyOverrides.TryGetValue(term, out var pair) && pair.Length == 2;
+            words.Add(new Word { Term = term, One = has ? pair![0] : "", Many = has ? pair![1] : "" });
+        }
+        users = App.Users.List();
+        return Task.CompletedTask;
+    }
+
+    private void OpenTab(string key)
+    {
+        tab = key;
+        Error = Info = null;
+        _ = Reload();
+    }
+
+    private string brandHelp()
+    {
+        var brand = new BrandService(Licence);
+        var bits = new[] { brand.SupportEmail, brand.SupportPhone }.Where(x => !string.IsNullOrEmpty(x));
+        return bits.Any() ? string.Join(" · ", bits) : "Ask the company you bought it from.";
+    }
+
+    private void RecheckLicence()
+    {
+        Licence.Reload();
+        Info = "Checked.";
+    }
+
+    // ---- business ----------------------------------------------------------------------------------------------------------------
+
+    private Task SaveShop() => Run(() =>
+    {
+        if (string.IsNullOrWhiteSpace(s.Name)) throw new HubException("name-missing", "The business needs a name.");
+        if (!string.IsNullOrWhiteSpace(s.TaxId) && Shop.Country.Tax.BusinessId?.Pattern is { Length: > 0 } pattern)
+        {
+            bool ok;
+            try { ok = Regex.IsMatch(s.TaxId.Trim(), pattern, RegexOptions.None, TimeSpan.FromMilliseconds(200)); } catch (RegexMatchTimeoutException) { ok = false; }
+            if (!ok) throw new HubException("tax-id", $"That does not look like a {Shop.Country.Tax.BusinessId.Label}.");
+        }
+        s.Name = s.Name.Trim();
+        s.TaxId = s.TaxId.Trim().ToUpperInvariant();
+        var methods = payText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(m => m.ToLowerInvariant()).Distinct().ToList();
+        if (methods.Count == 0) throw new HubException("pay", "Please give at least one way of paying.");
+        if (methods.Any(m => m.Length > 20 || m.Any(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '-'))) throw new HubException("pay", "Ways of paying should be short words, like cash, card, upi.");
+        s.PaymentMethods = methods;
+        App.Shop.Save(s);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "business details");
+    }, "Saved.");
+
+    // ---- tax ----------------------------------------------------------------------------------------------------------------------
+
+    private void SetRate(string key, ChangeEventArgs e) => rates[key] = e.Value?.ToString() ?? "";
+
+    private void SetPart(string key, ChangeEventArgs e) => parts[key] = e.Value?.ToString() ?? "";
+
+    private void SetFeature(string key, ChangeEventArgs e) => features[key] = e.Value is true;
+
+    private string RateValue(string code, string original) => rates.TryGetValue(code, out var v) ? v : original;
+
+    private string PartValue(string key, string original) => parts.TryGetValue(key, out var v) ? v : original;
+
+    private record Part(string Key, string Region, string Name, string Percent);
+
+    private IEnumerable<Part> RegionParts()
+    {
+        var region = Shop.Country.Tax.Regions?.List?.FirstOrDefault(r => r.Code == Shop.Settings.Region) ?? (Shop.Country.Tax.Regions?.List is { Count: 1 } one ? one[0] : null);
+        foreach (var c in region?.Components ?? new List<NextGenOS.Tax.RegionComponent>())
+            if (c.Editable) yield return new Part(region!.Code + "/" + c.Name, region.Name, c.Name, c.Percent);
+    }
+
+    private static bool ValidPercent(string text, out string clean)
+    {
+        clean = text.Trim();
+        return decimal.TryParse(clean, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var d) && d >= 0 && d <= 100 && Math.Round(d, 3) == d;
+    }
+
+    private Task SaveTax() => Run(() =>
+    {
+        var next = App.Shop.Settings;
+        next.RateOverrides.Clear();
+        next.ComponentOverrides.Clear();
+        var original = PackOriginal();
+        foreach (var (code, text) in rates)
+        {
+            if (!ValidPercent(text, out var clean)) throw new HubException("rate", $"The rate of {code} should be a number between 0 and 100.");
+            if (original.Tax.Rates.FirstOrDefault(r => r.Code == code)?.Percent != clean) next.RateOverrides[code] = clean;
+        }
+        foreach (var (key, text) in parts)
+        {
+            if (!ValidPercent(text, out var clean)) throw new HubException("rate", $"The rate of {key.Split('/')[1]} should be a number between 0 and 100.");
+            var k = key.Split('/');
+            var was = original.Tax.Regions?.List?.FirstOrDefault(r => r.Code == k[0])?.Components?.FirstOrDefault(c => c.Name == k[1])?.Percent;
+            if (was != clean) next.ComponentOverrides[key] = clean;
+        }
+        App.Shop.Save(next);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "tax rates");
+    }, "The rates are saved. New bills use them; bills already made keep theirs.");
+
+    private NextGenOS.Tax.CountryPack PackOriginal() => NextGenOS.Tax.PackCatalog.Get(Shop.Settings.Country);
+
+    private Task ResetTax() => Run(() =>
+    {
+        var next = App.Shop.Settings;
+        next.RateOverrides.Clear();
+        next.ComponentOverrides.Clear();
+        App.Shop.Save(next);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "tax rates reset");
+        rates.Clear();
+        parts.Clear();
+    }, "Back to the program's rates.");
+
+    // ---- parts and words ----------------------------------------------------------------------------------------------------------
+
+    private record Feature(string Key, string Label);
+
+    private IEnumerable<Feature> FeatureList()
+    {
+        yield return new("counterSale", "Selling over the counter, with barcodes");
+        yield return new("tables", "Tables and orders");
+        yield return new("kitchen", "A kitchen screen");
+        yield return new("lending", "Lending (members, loans, fines)");
+        yield return new("projects", "Projects with progress bills");
+        yield return new("appointments", "Bookings with staff");
+        yield return new("credit", "Selling on credit to some customers");
+        yield return new("purchases", "Buying from suppliers");
+        yield return new("weighedItems", "Items sold by weight or volume");
+    }
+
+    private bool FeatureOn(string name) => name switch
+    {
+        "counterSale" => Shop.Features.CounterSale, "tables" => Shop.Features.Tables, "kitchen" => Shop.Features.Kitchen, "lending" => Shop.Features.Lending,
+        "projects" => Shop.Features.Projects, "appointments" => Shop.Features.Appointments, "credit" => Shop.Features.Credit, "purchases" => Shop.Features.Purchases,
+        "weighedItems" => Shop.Features.WeighedItems, _ => false,
+    };
+
+    private Task SaveParts() => Run(() =>
+    {
+        var next = App.Shop.Settings;
+        next.FeatureOverrides.Clear();
+        var pack = Shop.Industry.Features;
+        foreach (var f in FeatureList())
+        {
+            var packValue = f.Key switch
+            {
+                "counterSale" => pack.CounterSale, "tables" => pack.Tables, "kitchen" => pack.Kitchen, "lending" => pack.Lending, "projects" => pack.Projects, "appointments" => pack.Appointments,
+                "credit" => pack.Credit, "purchases" => pack.Purchases, _ => pack.WeighedItems,
+            };
+            if (features[f.Key] != packValue) next.FeatureOverrides[f.Key] = features[f.Key];
+        }
+        next.VocabularyOverrides.Clear();
+        foreach (var w in words)
+        {
+            var one = w.One.Trim();
+            var many = w.Many.Trim();
+            if (one.Length == 0 && many.Length == 0) continue;
+            if (one.Length == 0 || many.Length == 0) throw new HubException("words", $"Please give both the one and the many word for {Shop.Industry.Singular(w.Term).ToLowerInvariant()}.");
+            if (one.Length > 30 || many.Length > 30) throw new HubException("words", "Words should be short.");
+            next.VocabularyOverrides[w.Term] = new[] { one, many };
+        }
+        App.Shop.Save(next);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "parts and words");
+        Nav.NavigateTo("/settings", forceLoad: true);
+    }, "Saved.");
+
+    // ---- users ---------------------------------------------------------------------------------------------------------------------
+
+    private Task AddUser() => Run(() =>
+    {
+        App.Users.Create(newUser, newName, newRole, newPass, Me.Id);
+        newName = newUser = newPass = "";
+        users = App.Users.List();
+    }, "Added. Tell them their user name and password.");
+
+    private Task ChangeRole(User u, string? role) => Run(() =>
+    {
+        App.Users.SetRole(u.Id, role ?? u.Role, Me.Id);
+        users = App.Users.List();
+    }, "Role changed. It applies the next time they open a screen.");
+
+    private Task ToggleUser(User u) => Run(() =>
+    {
+        App.Users.SetActive(u.Id, !u.Active, Me.Id);
+        users = App.Users.List();
+    });
+
+    private void ResetPassword()
+    {
+        formError = null;
+        try
+        {
+            App.Users.ChangePassword(resetFor!.Id, resetPass, Me.Id);
+            resetFor = null;
+            resetPass = "";
+            Info = "The password was changed.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

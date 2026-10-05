@@ -15,9 +15,9 @@
     <ProjectReference Include="..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing.AspNetCore\NextGenOS.Licensing.AspNetCore.csproj" />
   </ItemGroup>
 
-  <!-- The design values every NextGenOS program shares (design/tokens.css), served beside the Hub's own style. -->
+  <!-- The design values every NextGenOS program shares (design/tokens.css), built into the program and served as /tokens.css beside the Hub's own style. -->
   <ItemGroup>
-    <Content Include="..\..\..\..\design\tokens.css" Link="wwwroot\tokens.css" />
+    <EmbeddedResource Include="..\..\..\..\design\tokens.css" LogicalName="tokens.css" />
     <InternalsVisibleTo Include="NextGenOS.Hub.Web.Tests" />
   </ItemGroup>
 

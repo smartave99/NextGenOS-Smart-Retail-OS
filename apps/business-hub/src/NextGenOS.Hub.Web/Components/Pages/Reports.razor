@@ -1,0 +1,250 @@
+@page "/reports"
+@attribute [Authorize(Policy = Perm.Reports)]
+@inherits HubPage
+@using NextGenOS.Hub.Reports
+
+<PageTitle>Reports</PageTitle>
+<h1>Reports</h1>
+<p class="sub">Choose the days you want to look at.</p>
+<Notice Error="@Error" />
+
+<div class="toolbar">
+    <div class="seg" role="group" aria-label="Period">
+        @foreach (var (key, label) in Presets)
+        {
+            <button type="button" class="@(preset == key ? "on" : "")" aria-pressed="@(preset == key)" @onclick="() => Pick(key)">@label</button>
+        }
+    </div>
+    <label class="sr" for="r-from">From</label>
+    <input id="r-from" class="date" type="date" value="@from.ToString("yyyy-MM-dd")" @onchange="e => SetFrom(e.Value?.ToString())" />
+    <label class="sr" for="r-to">To</label>
+    <input id="r-to" class="date" type="date" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" />
+</div>
+
+<div class="grid">
+    <div class="card stat"><span class="label">@Shop.Plural("sale")</span><span class="value" id="r-count">@summary.Documents</span><span class="note">in these days</span></div>
+    <div class="card stat"><span class="label">Sales</span><span class="value" id="r-total">@Money(summary.TotalMinor)</span><span class="note">@Money(summary.NetMinor) before tax</span></div>
+    <div class="card stat"><span class="label">Tax collected</span><span class="value">@Money(summary.TaxMinor)</span><span class="note">@(summary.RefundsMinor > 0 ? Money(summary.RefundsMinor) + " given back" : "")</span></div>
+    <div class="card stat"><span class="label">Average</span><span class="value">@Money(summary.AverageMinor)</span><span class="note">for each @Shop.Singular("sale").ToLowerInvariant()</span></div>
+</div>
+
+<div class="cols">
+    <section class="card">
+        <div class="head"><h2>By day</h2><a class="btn ghost small" href="export/sales.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        @if (days.Count == 0) { <div class="empty">No sales in these days.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>Day</th><th class="num">Count</th><th class="num">Total</th></tr></thead>
+                <tbody>@foreach (var d in days) { <tr><td>@d.Day.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</td><td class="num">@d.Documents</td><td class="num">@Money(d.TotalMinor)</td></tr> }</tbody></table>
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <div class="head"><h2>Best sellers</h2><a class="btn ghost small" href="export/items.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        @if (top.Count == 0) { <div class="empty">Nothing sold yet.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>@Shop.Singular("item")</th><th class="num">Sold</th><th class="num">Earned</th></tr></thead>
+                <tbody>@foreach (var t in top.Take(12)) { <tr><td>@t.Name</td><td class="num">@Qty(t.QtyMilli)</td><td class="num">@Money(t.RevenueMinor)</td></tr> }</tbody></table>
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <div class="head"><h2>Tax</h2><a class="btn ghost small" href="export/tax.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        @if (tax.Count == 0) { <div class="empty">No tax in these days.</div> }
+        else
+        {
+            <p class="muted small">The figures a tax return is made from. @(Shop.Country.IsReviewed ? "" : "The rates have not been checked by a local adviser: confirm them with your accountant.")</p>
+            <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>Rate</th><th class="num">On</th><th>Parts</th><th class="num">Tax</th></tr></thead>
+                <tbody>
+                @foreach (var t in tax)
+                {
+                    <tr>
+                        <td>@t.Code (@t.Percent%)</td><td class="num">@Money(t.TaxableMinor)</td>
+                        <td>@string.Join(", ", t.Components.Select(c => c.Name + " " + Money(c.AmountMinor)))</td>
+                        <td class="num">@Money(t.TaxMinor)</td>
+                    </tr>
+                }
+                </tbody></table>
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <div class="head"><h2>How it was paid</h2><a class="btn ghost small" href="export/payments.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        @if (payments.Count == 0) { <div class="empty">Nothing taken in these days.</div> }
+        else
+        {
+            <table class="tbl"><thead><tr><th>Method</th><th class="num">Amount</th></tr></thead>
+                <tbody>@foreach (var p in payments) { <tr><td>@p.Method</td><td class="num">@Money(p.AmountMinor)</td></tr> }</tbody></table>
+        }
+    </section>
+
+    @if (Shop.Features.Credit || Shop.Features.Projects)
+    {
+        <section class="card">
+            <div class="head"><h2>Owed to you</h2><a class="btn ghost small" href="export/owed.csv" download>Download</a></div>
+            @if (owed.Count == 0) { <div class="empty">Nobody owes you anything.</div> }
+            else
+            {
+                <div class="tbl-wrap">
+                <table class="tbl"><thead><tr><th>Name</th><th class="num">Not due</th><th class="num">1–30 late</th><th class="num">31–60</th><th class="num">Older</th><th class="num">Total</th></tr></thead>
+                    <tbody>@foreach (var a in owed) { <tr><td>@a.Name</td><td class="num">@Money(a.CurrentMinor)</td><td class="num">@Money(a.Days30Minor)</td><td class="num">@Money(a.Days60Minor)</td><td class="num">@Money(a.Days90Minor + a.Over90Minor)</td><td class="num"><strong>@Money(a.TotalMinor)</strong></td></tr> }</tbody></table>
+                </div>
+            }
+        </section>
+    }
+
+    @if (Shop.Features.CounterSale || Shop.Features.Credit)
+    {
+        <section class="card">
+            <div class="head"><h2>Best @Shop.Plural("customer").ToLowerInvariant()</h2><a class="btn ghost small" href="export/customers.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+            @if (customers.Count == 0) { <div class="empty">No named @Shop.Plural("customer").ToLowerInvariant() bought in these days.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>Name</th><th class="num">Count</th><th class="num">Total</th></tr></thead>
+                    <tbody>@foreach (var c in customers.Take(10)) { <tr><td>@c.Name</td><td class="num">@c.Documents</td><td class="num">@Money(c.TotalMinor)</td></tr> }</tbody></table>
+            }
+        </section>
+    }
+
+    @if (Shop.Industry.Features.StockTracking != "never" && !Shop.Features.Lending)
+    {
+        <section class="card">
+            <div class="head"><h2>Stock on the shelves</h2><a class="btn ghost small" href="export/stock.csv" download>Download</a></div>
+            <p>Worth <strong>@Money(stock.Sum(s => s.ValueMinor))</strong> at cost.</p>
+            @if (stock.Count > 0)
+            {
+                <div class="tbl-wrap">
+                <table class="tbl"><thead><tr><th>@Shop.Singular("item")</th><th class="num">On hand</th><th class="num">Worth</th></tr></thead>
+                    <tbody>@foreach (var s in stock.OrderByDescending(s => s.ValueMinor).Take(10)) { <tr><td>@s.Name</td><td class="num">@Qty(s.OnHandMilli)</td><td class="num">@Money(s.ValueMinor)</td></tr> }</tbody></table>
+                </div>
+            }
+        </section>
+    }
+
+    @if (Shop.Features.Purchases)
+    {
+        <section class="card">
+            <h2>Buying</h2>
+            <div class="total-row"><span>Goods received in these days</span><strong>@Money(purchases.ReceivedMinor)</strong></div>
+            <div class="total-row"><span>Still to pay to suppliers</span><strong>@Money(purchases.UnpaidMinor)</strong></div>
+        </section>
+    }
+
+    @if (Shop.Features.Tables)
+    {
+        <section class="card">
+            <h2>Tables</h2>
+            @if (turnover.Count == 0) { <div class="empty">No table bills in these days.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>Table</th><th class="num">Bills</th><th class="num">Sales</th><th class="num">Minutes</th></tr></thead>
+                    <tbody>@foreach (var t in turnover) { <tr><td>@t.Table</td><td class="num">@t.Bills</td><td class="num">@Money(t.SalesMinor)</td><td class="num">@t.AverageMinutes</td></tr> }</tbody></table>
+            }
+        </section>
+    }
+
+    @if (Shop.Features.Lending)
+    {
+        <section class="card">
+            <h2>Library</h2>
+            <div class="total-row"><span>Fines collected</span><strong>@Money(finesCollected)</strong></div>
+            <h3>Most borrowed</h3>
+            @if (popular.Count == 0) { <div class="empty">No loans in these days.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>Title</th><th class="num">Loans</th><th class="num">Copies</th></tr></thead>
+                    <tbody>@foreach (var p in popular) { <tr><td>@p.Title</td><td class="num">@p.Loans</td><td class="num">@p.Copies</td></tr> }</tbody></table>
+            }
+        </section>
+    }
+
+    @if (Shop.Features.Appointments)
+    {
+        <section class="card">
+            <h2>Staff sales</h2>
+            @if (staff.Count == 0) { <div class="empty">No visits in these days.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>Name</th><th class="num">Visits</th><th class="num">Sales</th></tr></thead>
+                    <tbody>@foreach (var s in staff) { <tr><td>@s.Name</td><td class="num">@s.Visits</td><td class="num">@Money(s.SalesMinor)</td></tr> }</tbody></table>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Presets = { ("today", "Today"), ("yesterday", "Yesterday"), ("week", "7 days"), ("month", "30 days"), ("year", "This year") };
+
+    private string preset = "month";
+    private DateOnly from, to;
+    private SalesSummary summary = new(0, 0, 0, 0, 0, 0, 0);
+    private IReadOnlyList<SalesDay> days = Array.Empty<SalesDay>();
+    private IReadOnlyList<TopItem> top = Array.Empty<TopItem>();
+    private IReadOnlyList<TaxSummaryRow> tax = Array.Empty<TaxSummaryRow>();
+    private IReadOnlyList<PaymentTotal> payments = Array.Empty<PaymentTotal>();
+    private IReadOnlyList<AgeingRow> owed = Array.Empty<AgeingRow>();
+    private IReadOnlyList<TopCustomer> customers = Array.Empty<TopCustomer>();
+    private IReadOnlyList<StockValue> stock = Array.Empty<StockValue>();
+    private (long ReceivedMinor, long UnpaidMinor) purchases;
+    private IReadOnlyList<Restaurant.TableTurnover> turnover = Array.Empty<Restaurant.TableTurnover>();
+    private IReadOnlyList<Lending.PopularTitle> popular = Array.Empty<Lending.PopularTitle>();
+    private IReadOnlyList<Appointments.StaffSales> staff = Array.Empty<Appointments.StaffSales>();
+    private long finesCollected;
+
+    protected override Task LoadAsync()
+    {
+        Pick(preset);
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string key)
+    {
+        preset = key;
+        (from, to) = key switch
+        {
+            "today" => (Today, Today),
+            "yesterday" => (Today.AddDays(-1), Today.AddDays(-1)),
+            "week" => (Today.AddDays(-6), Today),
+            "year" => (new DateOnly(Today.Year, 1, 1), Today),
+            _ => (Today.AddDays(-29), Today),
+        };
+        Read();
+    }
+
+    private void SetFrom(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { from = d; if (to < from) to = from; preset = ""; Read(); }
+    }
+
+    private void SetTo(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Read(); }
+    }
+
+    private void Read()
+    {
+        var r = App.Reports;
+        var f = Shop.Features;
+        summary = r.Summary(from, to);
+        days = r.DailySales(from, to);
+        top = r.TopItems(from, to, 12);
+        tax = r.TaxSummary(from, to);
+        payments = r.Payments(from, to);
+        if (f.Credit || f.Projects) owed = r.Outstanding();
+        if (f.CounterSale || f.Credit) customers = r.TopCustomers(from, to, 10);
+        if (Shop.Industry.Features.StockTracking != "never" && !f.Lending) stock = r.StockValues();
+        if (f.Purchases) purchases = r.Purchases(from, to);
+        var start = Shop.Time.StartOfDay(from);
+        var end = Shop.Time.StartOfNextDay(to);
+        if (f.Tables) turnover = App.Restaurant.Turnover(start, end);
+        if (f.Lending) { popular = App.Library.Popular(start, end, 10); finesCollected = App.Library.FinesCollected(start, end); }
+        if (f.Appointments) staff = App.Appointments.SalesByStaff(start, end);
+    }
+}

@@ -2,7 +2,14 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>
-                <Pages.Denied />
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <Pages.Denied />
+                }
+                else
+                {
+                    <SignInAgain />
+                }
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

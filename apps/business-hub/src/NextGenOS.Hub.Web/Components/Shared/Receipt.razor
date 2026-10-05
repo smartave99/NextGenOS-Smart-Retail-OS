@@ -1,0 +1,73 @@
+@* A bill or receipt as printed: the shop, the number, the lines, the tax by part, the total and what was paid. The same markup is used on the screen and for paper (80 mm wide or A4). *@
+@using NextGenOS.Tax
+<div class="receipt" id="receipt">
+    <h2>@Shop.Settings.Name</h2>
+    @if (!string.IsNullOrWhiteSpace(Shop.Settings.Address)) { <div class="c">@Shop.Settings.Address</div> }
+    @if (!string.IsNullOrWhiteSpace(Shop.Settings.Phone)) { <div class="c">@Shop.Settings.Phone</div> }
+    @if (!string.IsNullOrWhiteSpace(Shop.Settings.TaxId)) { <div class="c">@(Shop.Country.Tax.BusinessId?.Label ?? "Tax no."): @Shop.Settings.TaxId</div> }
+    <hr />
+    <div class="c"><strong>@Title</strong></div>
+    <div class="r"><span>No. @(View.Document.Number ?? "Draft")</span><span>@Shop.Time.ToLocal(View.Document.IssuedAt ?? View.Document.CreatedAt).ToString("d MMM yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span></div>
+    @if (View.Party is { } party)
+    {
+        <div>@party.Name@(string.IsNullOrWhiteSpace(party.TaxId) ? "" : " · " + party.TaxId)</div>
+        @if (!string.IsNullOrWhiteSpace(party.Address)) { <div class="muted">@party.Address</div> }
+    }
+    @if (View.Document.Status == DocStatus.Void) { <div class="c"><strong>VOID</strong></div> }
+    <hr />
+    @foreach (var line in View.Lines)
+    {
+        var r = View.Result?.Lines.ElementAtOrDefault(line.LineNo - 1);
+        <div>@line.Description</div>
+        <div class="r"><span>@Qty(line.QtyMilli) × @Shop.Money(line.UnitPriceMinor)@(line.DiscountPctMilli > 0 ? $" (−{Qty(line.DiscountPctMilli)}%)" : "")</span><span>@(r is null ? "" : Shop.Money(Shop.Minor(r.LineTotal)))</span></div>
+    }
+    <hr />
+    @if (View.Result is { } result)
+    {
+        var t = result.Totals;
+        <div class="r"><span>@(Shop.Settings.PricesIncludeTax ? "Before tax" : "Subtotal")</span><span>@Shop.Money(Shop.Minor(t.Taxable))</span></div>
+        @foreach (var c in t.Components ?? new List<Component>())
+        {
+            if (Shop.Minor(c.Amount) == 0) continue;
+            <div class="r"><span>@c.Name</span><span>@Shop.Money(Shop.Minor(c.Amount))</span></div>
+        }
+        @if (!string.IsNullOrEmpty(t.Cess) && Shop.Minor(t.Cess) != 0) { <div class="r"><span>Cess</span><span>@Shop.Money(Shop.Minor(t.Cess))</span></div> }
+        @foreach (var a in result.Adjustments ?? new List<AdjustmentResult>())
+        {
+            <div class="r"><span>@a.Label</span><span>@Shop.Money(Shop.Minor(a.Amount))</span></div>
+        }
+        @if (Shop.Minor(t.RoundOff) != 0) { <div class="r"><span>Rounding</span><span>@Shop.Money(Shop.Minor(t.RoundOff))</span></div> }
+        <div class="r b"><span>Total</span><span>@Shop.Money(View.Document.PayableMinor)</span></div>
+    }
+    @foreach (var p in View.Payments.Where(p => p.Kind == "payment"))
+    {
+        <div class="r"><span>@(char.ToUpperInvariant(p.Method[0]) + p.Method[1..])</span><span>@Shop.Money(p.AmountMinor)</span></div>
+    }
+    @if (View.Document.Meta.TryGetValue("changeGiven", out var change) && long.TryParse(change, out var given) && given > 0)
+    {
+        <div class="r"><span>Change</span><span>@Shop.Money(given)</span></div>
+    }
+    @if (View.Document.BalanceMinor > 0)
+    {
+        <div class="r b"><span>Balance due</span><span>@Shop.Money(View.Document.BalanceMinor)</span></div>
+    }
+    <hr />
+    <div class="c">@Shop.Settings.ReceiptFooter</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DocumentView View { get; set; } = default!;
+    [Parameter, EditorRequired] public ShopContext Shop { get; set; } = default!;
+
+    private string Title => View.Document.Type switch
+    {
+        DocTypes.CreditNote => "Credit note",
+        DocTypes.Quote => "Quote",
+        DocTypes.Purchase => "Purchase order",
+        DocTypes.ProgressBill => "Progress bill",
+        DocTypes.Order => "Order",
+        _ => Shop.Settings.TaxRegistered && !string.IsNullOrWhiteSpace(Shop.Country.Invoice?.Title) ? Shop.Country.Invoice.Title : "Bill",
+    };
+
+    private static string Qty(long milli) => ShopContext.Qty(milli).TrimEnd('0').TrimEnd('.');
+}

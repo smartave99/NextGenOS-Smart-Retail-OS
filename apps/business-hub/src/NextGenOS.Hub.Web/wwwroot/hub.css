@@ -185,3 +185,23 @@ label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; f
   h1 { font-size: 1.6rem; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Small additions */
+h1:focus { outline: none; }
+.big-input-left { font-size: 1.1rem; }
+.pay-methods button { min-height: 38px; padding: 0 16px; border-radius: var(--ngos-pill); border: 1px solid var(--ngos-line-strong); background: var(--ngos-surface); color: var(--ngos-text); font: inherit; font-weight: 600; cursor: pointer; }
+.pay-methods button.on { background: var(--ngos-accent); color: var(--ngos-accent-contrast); border-color: transparent; }
+.stack > .btn.wide, form.stack > .btn.wide { margin-top: 16px; }
+.cart h3 { margin-top: 16px; }
+.cart .row { margin-top: 8px; }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+.inline-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.inline-form > div { flex: 1; min-width: 140px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.toolbar input[type=search], .toolbar input.search { max-width: 320px; }
+select.narrow { max-width: 200px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.head h2 { margin: 0; }
+input.date { width: auto; min-width: 150px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

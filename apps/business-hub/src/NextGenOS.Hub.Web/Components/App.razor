@@ -14,9 +14,9 @@
     <title>@Brand.Name</title>
     <script src="theme.js"></script>
     <ResourcePreloader />
-    <link rel="stylesheet" href="@Assets["tokens.css"]" />
+    <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="@Assets["hub.css"]" />
-    <ImportMap />
+    @* No import map: it is an inline script, which the page's content policy does not allow. *@
     @if (Brand.Style.Length > 0)
     {
         @* The licence's brand colour in place of the default accent (BrandService lets through plain hex only). *@

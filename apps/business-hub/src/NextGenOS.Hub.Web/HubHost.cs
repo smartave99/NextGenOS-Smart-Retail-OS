@@ -17,6 +17,7 @@ public static class HubHost
 {
     public const string CookieName = "hub.session";
     public const string CsrfHeader = "RequestVerificationToken";
+    public const string DocumentsPolicy = "documents";
 
     /// <summary>Where the shop's data lives: the Hub:DataFolder setting, or a folder of the PC (ProgramData on Windows).</summary>
     public static string DataFolder(IConfiguration configuration)
@@ -68,8 +69,18 @@ public static class HubHost
         });
         services.AddAuthorization(o =>
         {
-            o.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+            // Everything needs a signed-in person, except the live connection (/_blazor): it is opened before anyone is known, by the sign-in and setup
+            // screens too, and what each screen shows is decided inside it by [Authorize] on every page (Components/Pages/_Imports.razor).
+            o.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                .RequireAssertion(c => c.User.Identity?.IsAuthenticated == true || (c.Resource is HttpContext http && http.Request.Path.StartsWithSegments("/_blazor")))
+                .Build();
             foreach (var permission in Permissions.All) o.AddPolicy(permission, p => p.RequireAuthenticatedUser().RequireAssertion(c => Roles.Can(c.User.FindFirstValue(ClaimTypes.Role) ?? "", permission)));
+            // Anyone who works with bills, loans or bookings may look at the bills.
+            o.AddPolicy(DocumentsPolicy, p => p.RequireAuthenticatedUser().RequireAssertion(c =>
+            {
+                var role = c.User.FindFirstValue(ClaimTypes.Role) ?? "";
+                return new[] { Perm.Sell, Perm.Orders, Perm.Loans, Perm.Appointments, Perm.Projects, Perm.Reports }.Any(x => Roles.Can(role, x));
+            }));
         });
         services.AddCascadingAuthenticationState();
         services.AddScoped<Session>();
@@ -92,9 +103,14 @@ public static class HubHost
         app.Use(SetupFirst);
         app.UseAuthorization();
         app.UseAntiforgery();
-        app.MapStaticAssets();
+        app.MapStaticAssets().AllowAnonymous();
 
         app.MapGet("/health", () => Results.Text("ok")).AllowAnonymous();
+        app.MapGet("/tokens.css", (HttpContext http) =>
+        {
+            http.Response.Headers.CacheControl = "no-cache";
+            return Results.File(Tokens.Value, "text/css; charset=utf-8", entityTag: Tokens.Tag);
+        }).AllowAnonymous();
         app.MapPost("/logout", async (HttpContext http, IAntiforgery antiforgery) =>
         {
             await antiforgery.ValidateRequestAsync(http);
@@ -106,6 +122,20 @@ public static class HubHost
 
         var hub = app.Services.GetRequiredService<HubApp>();
         hub.Documents.DiscardStaleDrafts();
+    }
+
+    private static class Tokens
+    {
+        public static readonly byte[] Value = Load();
+        public static readonly Microsoft.Net.Http.Headers.EntityTagHeaderValue Tag = new("\"" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Value))[..16] + "\"");
+
+        private static byte[] Load()
+        {
+            using var stream = typeof(HubHost).Assembly.GetManifestResourceStream("tokens.css") ?? throw new InvalidOperationException("tokens.css is missing from the program.");
+            using var copy = new MemoryStream();
+            stream.CopyTo(copy);
+            return copy.ToArray();
+        }
     }
 
     /// <summary>Headers on every answer: nothing from another site runs, the page cannot be framed, and nothing is guessed about file types.</summary>

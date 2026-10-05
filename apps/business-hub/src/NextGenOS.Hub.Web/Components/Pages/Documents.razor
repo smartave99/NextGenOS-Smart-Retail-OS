@@ -1,0 +1,82 @@
+@page "/documents"
+@attribute [Authorize(Policy = HubHost.DocumentsPolicy)]
+@inherits HubPage
+
+<PageTitle>@Shop.Plural("invoice")</PageTitle>
+<h1>@Shop.Plural("invoice")</h1>
+<p class="sub">Every finished bill, with what was paid and what is still owed.</p>
+<Notice Error="@Error" />
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Number or name" aria-label="Search" @bind="text" @bind:event="oninput" @onkeydown="SearchKey" />
+    <select class="narrow" aria-label="Kind" @bind="type" @bind:after="Find">
+        <option value="">Everything</option>
+        <option value="invoice">@Shop.Plural("invoice")</option>
+        <option value="credit-note">Credit notes</option>
+        @if (Shop.Features.Projects) { <option value="progress-bill">Progress bills</option> }
+        <option value="quote">Quotes</option>
+        @if (Shop.Features.Purchases) { <option value="purchase">Purchases</option> }
+    </select>
+    <label class="check"><input type="checkbox" @bind="unpaid" @bind:after="Find" /> Not paid in full</label>
+</div>
+
+<div class="card tbl-wrap">
+    @if (rows.Count == 0)
+    {
+        <div class="empty">Nothing found.</div>
+    }
+    else
+    {
+        <table class="tbl">
+            <thead><tr><th>Number</th><th>Date</th><th>Kind</th><th>Name</th><th class="num">Total</th><th class="num">Owed</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var d in rows)
+            {
+                <tr>
+                    <td><a href="documents/@d.Id"><strong>@(d.Number ?? "Draft")</strong></a></td>
+                    <td>@(d.IssuedAt is { } at ? When(at) : When(d.CreatedAt))</td>
+                    <td>@Kind(d.Type)</td>
+                    <td>@(d.PartyId is { } pid ? names.GetValueOrDefault(pid) : "")</td>
+                    <td class="num">@Money(d.TotalMinor)</td>
+                    <td class="num">@(d.BalanceMinor > 0 ? Money(d.BalanceMinor) : "")</td>
+                    <td>@Status(d)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private string text = "";
+    private string type = "";
+    private bool unpaid;
+    private IReadOnlyList<NextGenOS.Hub.Documents.Document> rows = Array.Empty<Document>();
+    private Dictionary<long, string> names = new();
+
+    protected override Task LoadAsync()
+    {
+        Find();
+        return Task.CompletedTask;
+    }
+
+    private void SearchKey(KeyboardEventArgs e) => Find();
+
+    private void Find()
+    {
+        rows = App.Documents.List(new DocumentFilter { Type = type.Length > 0 ? type : null, Text = string.IsNullOrWhiteSpace(text) ? null : text, OnlyUnpaid = unpaid, Limit = 200 });
+        names = rows.Where(r => r.PartyId is not null).Select(r => r.PartyId!.Value).Distinct().ToDictionary(id => id, id => App.Parties.Get(id)?.Name ?? "");
+    }
+
+    private string Kind(string t) => t switch
+    {
+        DocTypes.Invoice => Shop.Singular("invoice"), DocTypes.CreditNote => "Credit note", DocTypes.Quote => "Quote", DocTypes.Order => "Order", DocTypes.Purchase => "Purchase", DocTypes.ProgressBill => "Progress bill", _ => t,
+    };
+
+    private MarkupString Status(NextGenOS.Hub.Documents.Document d) => new(d.Status switch
+    {
+        DocStatus.Void => "<span class=\"chip bad\">Void</span>",
+        DocStatus.Open => "<span class=\"chip\">Open</span>",
+        _ => d.PaymentState switch { "paid" => "<span class=\"chip ok\">Paid</span>", "partial" => "<span class=\"chip warn\">Part paid</span>", "unpaid" => "<span class=\"chip warn\">Unpaid</span>", _ => "" },
+    });
+}

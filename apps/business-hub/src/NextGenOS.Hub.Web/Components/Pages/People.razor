@@ -1,0 +1,203 @@
+@page "/people"
+@attribute [Authorize(Policy = Perm.Parties)]
+@inherits HubPage
+
+<PageTitle>People</PageTitle>
+<h1>People</h1>
+<p class="sub">@PeopleHint()</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="tablist">
+    @foreach (var k in Shop.Industry.PartyKinds)
+    {
+        <button type="button" role="tab" class="@(kind == k.Id ? "on" : "")" aria-selected="@(kind == k.Id)" @onclick="() => Pick(k.Id)">@Plural(k)</button>
+    }
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Search by name or phone" aria-label="Search" @bind="text" @bind:event="oninput" @onkeydown="SearchKey" />
+    <span class="spacer"></span>
+    <button type="button" class="btn primary" id="add-person" @onclick="NewPerson">Add @Singular(CurrentKind).ToLowerInvariant()</button>
+</div>
+
+<div class="card tbl-wrap">
+    @if (rows.Count == 0)
+    {
+        <div class="empty">Nobody here yet.</div>
+    }
+    else
+    {
+        <table class="tbl">
+            <thead><tr><th>Name</th><th>Phone</th>@if (showOwed) { <th class="num">Owes</th> }@if (kind == "member") { <th>Card</th> }<th></th></tr></thead>
+            <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td><strong>@r.Party.Name</strong>@if (!r.Party.Active) { <span class="chip">Off</span> }@if (r.Party.MemberType is { } mt) { <span class="chip">@mt</span> }</td>
+                    <td>@r.Party.Phone</td>
+                    @if (showOwed) { <td class="num">@(r.Owed > 0 ? Money(r.Owed) : "")</td> }
+                    @if (kind == "member") { <td class="muted small">@r.Party.CardBarcode</td> }
+                    <td class="right"><button type="button" class="btn ghost small" @onclick="() => Edit(r.Party)">Edit</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (form is not null)
+{
+    <div class="sheet-back" @onclick="() => form = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="@(editing is null ? "New" : "Edit") @Singular(form.Kind).ToLowerInvariant()" @onclick:stopPropagation="true">
+            <h2>@(editing is null ? "New " : "Edit ")@Singular(form.Kind).ToLowerInvariant()</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <label for="p-name">Name</label>
+                <input id="p-name" @bind="form.Name" maxlength="120" />
+                <div class="field-row">
+                    <div><label for="p-phone">Phone</label><input id="p-phone" @bind="form.Phone" maxlength="40" inputmode="tel" /></div>
+                    <div><label for="p-email">Email</label><input id="p-email" @bind="form.Email" maxlength="120" inputmode="email" /></div>
+                </div>
+                <label for="p-addr">Address</label>
+                <textarea id="p-addr" rows="2" @bind="form.Address" maxlength="300"></textarea>
+                @if (Shop.Country.Tax.BusinessId is { } idRule)
+                {
+                    <label for="p-tax">@idRule.Label (if they have one)</label>
+                    <input id="p-tax" @bind="form.TaxId" maxlength="40" />
+                }
+                @if (Shop.Country.Tax.Regions?.List is { Count: > 1 } regions)
+                {
+                    <label for="p-region">@(Shop.Country.Tax.Regions.Label ?? "Region")</label>
+                    <select id="p-region" @bind="form.Region">
+                        <option value="">Same as the shop</option>
+                        @foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }
+                    </select>
+                }
+                @if (form.Kind == "member")
+                {
+                    <label for="p-type">Kind of member</label>
+                    <select id="p-type" @bind="form.MemberType">
+                        @foreach (var t in App.Library.MemberTypes()) { <option value="@t.Id">@t.Label (@t.LoanDays days, up to @t.MaxLoans books)</option> }
+                    </select>
+                    <label for="p-card">Card barcode (optional, scan it)</label>
+                    <input id="p-card" @bind="form.CardBarcode" maxlength="40" autocomplete="off" />
+                }
+                @if (Shop.Features.Credit && form.Kind is "customer" or "client")
+                {
+                    <div class="field-row">
+                        <div><label for="p-limit">Credit limit (0 = no credit)</label><input id="p-limit" inputmode="decimal" @bind="limit" /></div>
+                        <div><label for="p-terms">Days to pay</label><input id="p-terms" type="number" min="0" max="365" @bind="form.TermsDays" /></div>
+                    </div>
+                    @if (Shop.Industry.RuleText("tradePriceLabel", "") is { Length: > 0 })
+                    {
+                        <label for="p-level">Prices</label>
+                        <select id="p-level" @bind="form.PriceLevel"><option value="retail">Normal prices</option><option value="trade">Trade prices</option></select>
+                    }
+                }
+                <label for="p-notes">Notes</label>
+                <textarea id="p-notes" rows="2" @bind="form.Notes" maxlength="500"></textarea>
+                @if (editing is not null)
+                {
+                    <label class="check"><input type="checkbox" @bind="active" /> In use</label>
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-person" @onclick="Save">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private record Row(Party Party, long Owed);
+
+    private string kind = "";
+    private string text = "";
+    private IReadOnlyList<Row> rows = Array.Empty<Row>();
+    private PartyInput? form;
+    private Party? editing;
+    private string? formError;
+    private string limit = "";
+    private bool active = true;
+
+    private string CurrentKind => kind.Length > 0 ? kind : Shop.Industry.PartyKinds.First().Id;
+    private bool showOwed => Shop.Features.Credit && (kind is "customer" or "client");
+
+    private string Plural(PartyKind k) => k.Id switch
+    {
+        "customer" => Shop.Plural("customer"), "supplier" => Shop.Plural("supplier"), "staff" => Shop.Plural("staff"), _ => k.Label.EndsWith('s') ? k.Label : k.Label + "s",
+    };
+
+    private string Singular(string id) => id switch
+    {
+        "customer" => Shop.Singular("customer"), "supplier" => Shop.Singular("supplier"), "staff" => Shop.Singular("staff"), _ => Shop.Industry.PartyKinds.FirstOrDefault(k => k.Id == id)?.Label ?? id,
+    };
+
+    private string PeopleHint() => Shop.Features.Lending ? "Members, with their cards, and the people you buy from." : "Customers, suppliers and the people who work with you.";
+
+    protected override Task LoadAsync()
+    {
+        kind = Shop.Industry.PartyKinds.First().Id;
+        Find();
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string k)
+    {
+        kind = k;
+        Find();
+    }
+
+    private void SearchKey(KeyboardEventArgs e) => Find();
+
+    private void Find() =>
+        rows = App.Parties.Search(kind, string.IsNullOrWhiteSpace(text) ? null : text, 300, true).Select(p => new Row(p, showOwed ? App.Documents.Outstanding(p.Id) : 0)).ToList();
+
+    private void NewPerson()
+    {
+        editing = null;
+        formError = null;
+        form = new PartyInput { Kind = CurrentKind, MemberType = CurrentKind == "member" ? App.Library.MemberTypes().FirstOrDefault()?.Id : null };
+        limit = "";
+        active = true;
+    }
+
+    private void Edit(Party p)
+    {
+        editing = p;
+        formError = null;
+        form = new PartyInput
+        {
+            Kind = p.Kind, Code = p.Code, Name = p.Name, Phone = p.Phone, Email = p.Email, Address = p.Address, TaxId = p.TaxId, Region = p.Region, MemberType = p.MemberType,
+            PriceLevel = p.PriceLevel, CreditLimitMinor = p.CreditLimitMinor, TermsDays = p.TermsDays, CardBarcode = p.CardBarcode, Notes = p.Notes,
+        };
+        limit = p.CreditLimitMinor > 0 ? Shop.Text(p.CreditLimitMinor) : "";
+        active = p.Active;
+    }
+
+    private void Save()
+    {
+        formError = null;
+        try
+        {
+            if (form is null) return;
+            form.CreditLimitMinor = limit.Trim().Length == 0 ? 0 : TryMoney(Shop, limit, out var m) && m >= 0 ? m : throw new HubException("limit", "Please type the credit limit as a number, or leave it empty.");
+            foreach (var blank in new[] { nameof(form.Phone), nameof(form.Email), nameof(form.Address), nameof(form.TaxId), nameof(form.Region), nameof(form.CardBarcode), nameof(form.Notes) })
+            {
+                var prop = typeof(PartyInput).GetProperty(blank)!;
+                if (prop.GetValue(form) is string s && string.IsNullOrWhiteSpace(s)) prop.SetValue(form, null);
+            }
+            if (editing is null) App.Parties.Create(form);
+            else
+            {
+                App.Parties.Update(editing.Id, form);
+                if (active != editing.Active) App.Parties.SetActive(editing.Id, active);
+            }
+            form = null;
+            Find();
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

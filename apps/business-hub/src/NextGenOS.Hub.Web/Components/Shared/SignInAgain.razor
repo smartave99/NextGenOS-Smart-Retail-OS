@@ -1,0 +1,6 @@
+@inject NavigationManager Nav
+
+@code {
+    // The person is not signed in (or their sign-in ran out): the sign-in page, then back to where they were.
+    protected override void OnInitialized() => Nav.NavigateTo("/login?returnUrl=" + Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri) is { } p ? "/" + p : "/"), forceLoad: true);
+}

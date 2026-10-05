@@ -1,0 +1,13 @@
+{
+  "name": "nextgenos-licence-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NextGen OS Licence Studio: issues, activates and revokes signed licences. PRIVATE: never ship this to customers.",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node src/server.js",
+    "init": "node src/cli.js init",
+    "test": "node --no-warnings --test "test/*.test.js""
+  }
+}

@@ -69,3 +69,10 @@ $RECYCLE.BIN/
 # Logs
 *.log
 logs/
+
+# Licence Studio: never commit its data, keys, passphrase or settings
+licensing/studio/data/
+licensing/studio/.env
+licensing/studio/node_modules/
+**/passphrase.txt
+**/*.key.json

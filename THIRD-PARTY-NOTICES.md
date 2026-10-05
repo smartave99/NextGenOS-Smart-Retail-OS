@@ -25,6 +25,7 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | Microsoft.Data.Sqlite / Microsoft.Data.Sqlite.Core | 10.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Protocols.OpenIdConnect | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Tokens | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
+| Microsoft.Extensions.Hosting.WindowsServices | 10.0.12 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.ML.OnnxRuntime | 1.30.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.ML.OnnxRuntime.Managed | 1.30.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.SqlServer.Server | 1.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
@@ -37,6 +38,7 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | System.Collections.Immutable | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Configuration.ConfigurationManager | 9.0.18 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IO.Ports | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
+| System.Management / System.CodeDom | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IdentityModel.Tokens.Jwt | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IO.Pipelines | 10.0.6 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Memory | 4.6.3 | MIT | © Microsoft Corporation. All rights reserved. |

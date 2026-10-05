@@ -34,8 +34,16 @@ public static class HubHost
     /// The builder both programs start from. The program's own folder is its home, not whatever folder it was started from: a Windows service
     /// starts in System32, and a shortcut can start it anywhere, so looking for files in "the current folder" would find none of ours.
     /// </summary>
-    public static WebApplicationBuilder CreateBuilder(string[] args) =>
-        WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
+    public static WebApplicationBuilder CreateBuilder(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
+        // On a shop PC the Hub runs as a Windows service, so it is there when the PC starts, before anyone signs in. Started by hand (or on another
+        // system) this does nothing.
+        builder.Host.UseWindowsService(o => o.ServiceName = ServiceName);
+        return builder;
+    }
+
+    public const string ServiceName = "NextGenOSHub";
 
     public static void AddHub(WebApplicationBuilder builder)
     {

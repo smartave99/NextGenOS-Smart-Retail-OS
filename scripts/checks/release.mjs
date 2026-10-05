@@ -24,6 +24,16 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
       },
     },
     {
+      name: 'android-project',
+      title: 'The Android app project keeps its safety settings, and its set-up script works and refuses bad input (the app itself is built by the release workflow)',
+      run: () => {
+        const r = runCmd('android-project', 'node', ['--test', 'scripts/tests/android-project.test.mjs']);
+        if (r.status !== 'PASS') return r;
+        const n = /# pass (\d+)/.exec(r.out);
+        return { status: 'PASS', detail: `${n ? n[1] : 'all'} checks passed; the .apk and .aab are NOT built here (no Android SDK): the release workflow builds and signs them` };
+      },
+    },
+    {
       name: 'hub-release',
       title: 'The real Business Hub, published, hidden and audited, is brought into use with a real Licence Studio key (activation, brand, a sale, a restart)',
       full: true,
@@ -35,6 +45,20 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
         const audit = /^PASS\s+hub:.*$/m.exec(r.out);
         const steps = (r.out.match(/^✓ /gm) || []).length;
         return { status: 'PASS', detail: `${steps} steps passed; ${audit ? audit[0].replace(/^PASS\s+/, 'audit: ') : 'audit passed'}` };
+      },
+    },
+    {
+      name: 'hub-installer',
+      title: 'The Hub setup program installs, updates and uninstalls cleanly (under Wine, with a stand-in program), keeping the shop\'s data',
+      full: true,
+      run: () => {
+        const wine = has('wine64') || existsSync('/usr/lib/wine/wine64');
+        const missing = [['makensis', has('makensis')], ['wine64', wine], ['Xvfb', has('Xvfb')], ['node', has('node')]].filter(([, ok]) => !ok).map(([n]) => n);
+        if (missing.length) return { status: 'SKIP', detail: `not installed here: ${missing.join(', ')} (apt-get install nsis wine64 xvfb)` };
+        const r = runCmd('hub-installer', 'bash', ['apps/business-hub/installer/test-installer.sh'], { timeout: 900_000 });
+        if (r.status !== 'PASS') return r;
+        const passed = (r.out.match(/^PASS /gm) || []).length;
+        return { status: 'PASS', detail: `${passed} setup checks passed (installed, updated, uninstalled; the service itself and the real program need Windows)` };
       },
     },
     {

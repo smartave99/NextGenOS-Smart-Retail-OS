@@ -12,11 +12,29 @@ const { Studio, ApiError } = require('../lib/studio');
 const { Auth } = require('../lib/auth');
 const C = require('../lib/crypto');
 
-const REPO = path.resolve(__dirname, '..', '..', '..');
+// Where the programs' source files are (the tests point this at a copy).
+const REPO = process.env.NGOS_REPO_ROOT || path.resolve(__dirname, '..', '..', '..');
 const TARGETS = {
   dotnet: path.join(REPO, 'licensing', 'clients', 'dotnet', 'NextGenOS.Licensing', 'LicenceDefaults.cs'),
   storefront: path.join(REPO, 'apps', 'storefront-web-mobile', 'src', 'lib', 'licence', 'defaults.ts'),
 };
+
+function checkUrl(url) {
+  if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)) throw new Error('The address must start with https:// (http:// only for this PC).');
+}
+
+/** Builds the public keys and the Studio's address into the programs' source files (public data only). */
+function writeClients(keys, url) {
+  const cs = fs.readFileSync(TARGETS.dotnet, 'utf8');
+  const keyLines = keys.map((k) => `            new TrustedKey("${k.kid}", "${k.publicKey}"),`).join('\n');
+  fs.writeFileSync(TARGETS.dotnet, cs
+    .replace(/\/\/ GENERATED-KEYS-BEGIN[\s\S]*?\/\/ GENERATED-KEYS-END/, `// GENERATED-KEYS-BEGIN\n${keyLines}\n            // GENERATED-KEYS-END`)
+    .replace(/\/\/ GENERATED-URL-BEGIN[\s\S]*?\/\/ GENERATED-URL-END/, `// GENERATED-URL-BEGIN\n        public const string ServerUrl = "${url}";\n        // GENERATED-URL-END`));
+
+  fs.mkdirSync(path.dirname(TARGETS.storefront), { recursive: true });
+  fs.writeFileSync(TARGETS.storefront, `// Written by "node src/cli.js sync-clients" (licensing/studio). Public keys only.\nexport const TRUSTED_KEYS: { kid: string; publicKey: string }[] = ${JSON.stringify(keys.map((k) => ({ kid: k.kid, publicKey: k.publicKey })), null, 2)};\nexport const LICENCE_SERVER_URL = ${JSON.stringify(url)};\n`);
+  console.log(`Built ${keys.length} public key(s) and the address ${url} into:\n  ${TARGETS.dotnet}\n  ${TARGETS.storefront}\nNow rebuild the apps.`);
+}
 
 function parseArgs(argv) {
   const positional = [];
@@ -173,22 +191,29 @@ const commands = {
 
   async 'sync-clients'(flags) {
     const { db, studio } = openStudio();
-    const keys = studio.trustedKeys();
     const url = String(flags.url || studio.setting('public_url') || '').replace(/\/+$/, '');
     if (!url) throw new Error('Say where the Studio will be reached: --url https://licence.yourcompany.com (or set it in Settings).');
-    if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)) throw new Error('The address must start with https:// (http:// only for this PC).');
+    checkUrl(url);
     studio.setSetting('public_url', url);
-
-    const cs = fs.readFileSync(TARGETS.dotnet, 'utf8');
-    const keyLines = keys.map((k) => `            new TrustedKey("${k.kid}", "${k.publicKey}"),`).join('\n');
-    fs.writeFileSync(TARGETS.dotnet, cs
-      .replace(/\/\/ GENERATED-KEYS-BEGIN[\s\S]*?\/\/ GENERATED-KEYS-END/, `// GENERATED-KEYS-BEGIN\n${keyLines}\n            // GENERATED-KEYS-END`)
-      .replace(/\/\/ GENERATED-URL-BEGIN[\s\S]*?\/\/ GENERATED-URL-END/, `// GENERATED-URL-BEGIN\n        public const string ServerUrl = "${url}";\n        // GENERATED-URL-END`));
-
-    fs.mkdirSync(path.dirname(TARGETS.storefront), { recursive: true });
-    fs.writeFileSync(TARGETS.storefront, `// Written by "node src/cli.js sync-clients" (licensing/studio). Public keys only.\nexport const TRUSTED_KEYS: { kid: string; publicKey: string }[] = ${JSON.stringify(keys.map((k) => ({ kid: k.kid, publicKey: k.publicKey })), null, 2)};\nexport const LICENCE_SERVER_URL = ${JSON.stringify(url)};\n`);
-    console.log(`Built ${keys.length} public key(s) and the address ${url} into:\n  ${TARGETS.dotnet}\n  ${TARGETS.storefront}\nNow rebuild the apps.`);
+    writeClients(studio.trustedKeys(), url);
     db.close();
+  },
+
+  // For a build machine that has no Studio (the release workflow): the public keys come from "export-public-keys", kept as plain text in the
+  // repository's settings. Public keys only; a file with anything private in it is refused.
+  async 'apply-public-keys'(flags) {
+    const raw = String(flags.keys || '');
+    const text = raw.startsWith('@') ? fs.readFileSync(raw.slice(1), 'utf8') : raw;
+    if (!text.trim()) throw new Error('Give the public keys: --keys @file.json (the output of export-public-keys) or --keys \'{"keys":[...]}\'.');
+    if (/PRIVATE|"d"\s*:|privateKey|private_key|passphrase/i.test(text)) throw new Error('That looks like it holds a private key. Only the public keys (export-public-keys) may be built into the apps.');
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (e) { throw new Error('The keys are not valid JSON.'); }
+    const keys = Array.isArray(parsed) ? parsed : parsed.keys;
+    if (!Array.isArray(keys) || !keys.length || !keys.every((k) => /^[A-Za-z0-9_-]{1,64}$/.test(k.kid || '') && /^[A-Za-z0-9+/=_-]{40,200}$/.test(k.publicKey || ''))) throw new Error('The keys must be a list of { kid, publicKey }.');
+    const url = String(flags.url || '').replace(/\/+$/, '');
+    if (!url) throw new Error('Say where the Studio is reached: --url https://licence.yourcompany.com');
+    checkUrl(url);
+    writeClients(keys, url);
   },
 
   async backup(flags, [file]) {
@@ -217,7 +242,7 @@ async function main() {
   const { positional, flags } = parseArgs(process.argv.slice(2));
   const name = positional.shift();
   if (!name || !commands[name]) {
-    console.log('NextGenOS Licence Studio: command line\n\nCommands:\n  init                    create the signing key and the first administrator\n  add-user                --email --name --role sales|support|admin\n  reset-password <email>\n  create-licence          --customer "Name" --plan business --term y1 [--devices N] [--bind domain --domains a.com]\n  list | status\n  revoke|suspend|resume <licence id> [--reason "..."]\n  licence-file <licence id>   |   create-brand --name X [--primary #112233]\n  renew <licence id> [--term y1]   |   change <licence id> [--devices N --plan business]\n  free-devices <licence id>\n  offline-activate <request code>\n  sync-clients --url https://licence.example.com   build the public key into the apps\n  export-public-keys\n  backup [file]\n');
+    console.log('NextGenOS Licence Studio: command line\n\nCommands:\n  init                    create the signing key and the first administrator\n  add-user                --email --name --role sales|support|admin\n  reset-password <email>\n  create-licence          --customer "Name" --plan business --term y1 [--devices N] [--bind domain --domains a.com]\n  list | status\n  revoke|suspend|resume <licence id> [--reason "..."]\n  licence-file <licence id>   |   create-brand --name X [--primary #112233]\n  renew <licence id> [--term y1]   |   change <licence id> [--devices N --plan business]\n  free-devices <licence id>\n  offline-activate <request code>\n  sync-clients --url https://licence.example.com   build the public key into the apps\n  apply-public-keys --keys @keys.json --url https://licence.example.com   the same, on a machine without the Studio (release build)\n  export-public-keys\n  backup [file]\n');
     process.exit(name ? 1 : 0);
   }
   try {

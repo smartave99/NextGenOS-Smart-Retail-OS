@@ -29,5 +29,6 @@ jobs:
       - name: Generate the Prisma client
         run: npx prisma generate
         working-directory: apps/storefront-web-mobile
+      - uses: ./.github/actions/gate-tools
       - name: Run the release gate
         run: node scripts/verify-all.mjs --full

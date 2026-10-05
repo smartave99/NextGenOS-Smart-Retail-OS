@@ -1,0 +1,21 @@
+name: Tools for the release gate
+description: >
+  What scripts/verify-all.mjs --full needs besides node and dotnet: the code obfuscator, the NSIS setup compiler with Wine and a virtual screen
+  (to run the Hub's setup program), and a browser for the Business Hub's browser tests. Without them the gate refuses to pass (a skipped check is not a passed one).
+runs:
+  using: composite
+  steps:
+    - name: Setup compiler, Wine and a virtual screen
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends nsis wine64 xvfb
+    - name: Code obfuscator (a build tool, never shipped)
+      shell: bash
+      run: dotnet tool install --global Obfuscar.GlobalTool --version 2.2.50
+    - name: Browser for the Business Hub's browser tests
+      shell: bash
+      working-directory: apps/business-hub/e2e
+      run: |
+        npm install --no-audit --no-fund
+        npx playwright install --with-deps chromium

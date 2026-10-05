@@ -48,6 +48,7 @@ jobs:
         working-directory: apps/storefront-web-mobile
       - run: npx prisma generate
         working-directory: apps/storefront-web-mobile
+      - uses: ./.github/actions/gate-tools
       - run: node scripts/verify-all.mjs --full
 
   android:
@@ -141,16 +142,124 @@ jobs:
           name: android
           path: dist/*
 
+  windows:
+    name: Windows setup for the Business Hub
+    needs: gate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the licence keys in (public keys only)
+        # The owner's public keys are public data: repository variables NGOS_PUBLIC_KEYS (the text "export-public-keys" prints) and
+        # NGOS_LICENCE_URL (the Studio's address). Or they were already built in and committed with "sync-clients". With neither, the build stops.
+        shell: bash
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NGOS_PUBLIC_KEYS}" ]; then
+            printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+            node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+          fi
+      - name: Tools (code obfuscator and setup compiler; build tools, never shipped)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install --global Obfuscar.GlobalTool --version 2.2.50
+          choco install nsis -y --no-progress
+      - name: Build the setup (publish, hide the names, audit, write the setup and the zip)
+        shell: bash
+        run: node apps/business-hub/installer/build.mjs --version "${VERSION_NAME}" --out dist
+      - name: Start the program from the zip and check it refuses to work without a licence
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-*-win-x64.zip' | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP 'hub-zip'
+          Expand-Archive -Path $zip.FullName -DestinationPath $dir
+          node scripts/smoke-hub.mjs (Join-Path $dir 'NextGenOS.Hub.exe')
+          if ($LASTEXITCODE -ne 0) { throw 'The published program did not behave.' }
+      - name: Install the setup on this Windows PC, check the service, uninstall, check the shop's data stays
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-Setup-*.exe' | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "The setup ended with code $($p.ExitCode)." }
+          $svc = Get-Service -Name NextGenOSHub -ErrorAction Stop
+          $cfg = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\NextGenOSHub'
+          if ($cfg.ObjectName -ne 'NT AUTHORITY\LocalService') { throw "The service runs as $($cfg.ObjectName)." }
+          if ($cfg.Start -ne 2 -or $cfg.DelayedAutostart -ne 1) { throw 'The service does not start with the PC (delayed automatic start).' }
+          for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 2 }
+          if ((Get-Service NextGenOSHub).Status -ne 'Running') { Get-WinEvent -LogName Application -MaxEvents 20 | Format-List TimeCreated, ProviderName, Message; throw 'The service did not start.' }
+          $code = 0
+          for ($i = 0; $i -lt 30; $i++) {
+            try { $r = Invoke-WebRequest 'http://127.0.0.1:5280/' -UseBasicParsing -Headers @{ Accept = 'text/html' }; $code = [int]$r.StatusCode }
+            catch { if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode; break } }
+            if ($code -ne 0) { break }
+            Start-Sleep -Seconds 2
+          }
+          if ($code -ne 402) { throw "With no licence the Hub should answer 402, not $code." }
+          $acl = (Get-Acl 'C:\ProgramData\NextGenOS\Hub').Access | ForEach-Object { $_.IdentityReference.Value }
+          if ($acl -match 'Users|Everyone|Authenticated Users') { throw "The shop's data folder can be read by: $($acl -join ', ')" }
+          Write-Host 'Installed, the service runs, the Hub answers 402 without a licence, the data folder is closed to ordinary users.'
+          # Something in the data folder must survive the uninstall.
+          Set-Content 'C:\ProgramData\NextGenOS\Hub\keep-me.txt' 'shop data'
+          $un = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\Uninstall.exe'
+          Start-Process -FilePath $un -ArgumentList '/S' -Wait
+          for ($i = 0; $i -lt 60 -and (Test-Path (Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe')); $i++) { Start-Sleep -Seconds 2 }
+          if (Test-Path (Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe')) { throw 'The uninstall left the program behind.' }
+          if (Get-Service -Name NextGenOSHub -ErrorAction SilentlyContinue) { throw 'The uninstall left the service behind.' }
+          if (-not (Test-Path 'C:\ProgramData\NextGenOS\Hub\keep-me.txt')) { throw "The uninstall removed the shop's data." }
+          Write-Host "Uninstalled; the service is gone and the shop's data stayed."
+      - name: Sign the setup (only when a code-signing certificate is set up)
+        shell: pwsh
+        env:
+          CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:CERT_B64) { Write-Host 'No signing certificate set (repository secrets WINDOWS_CERT_B64 and WINDOWS_CERT_PASSWORD): the setup is NOT signed; Windows SmartScreen will warn.'; 'NOT signed' | Out-File dist\WINDOWS-SIGNING.txt; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP 'sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
+          $tool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match 'x64' } | Select-Object -Last 1
+          Get-ChildItem dist -Filter '*Setup*.exe' | ForEach-Object { & $tool.FullName sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName; if ($LASTEXITCODE -ne 0) { throw 'Signing failed.' } }
+          Remove-Item $pfx
+          'Signed with the owner certificate' | Out-File dist\WINDOWS-SIGNING.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
   publish:
     name: Publish the GitHub Release
-    needs: android
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [gate, android, windows]
+    # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') && needs.gate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: What was built
+        env:
+          ANDROID: ${{ needs.android.result }}
+          WINDOWS: ${{ needs.windows.result }}
+        run: |
+          set -euo pipefail
+          test -d dist && [ -n "$(ls -A dist)" ] || { echo "Nothing was built, so there is nothing to release."; exit 1; }
+          {
+            echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
+            echo "Windows setup for the Business Hub: ${WINDOWS}"
+            echo "Android app: ${ANDROID}"
+          } > dist/BUILD-STATUS.txt
+          cat dist/BUILD-STATUS.txt
       - name: Checksums
         run: cd dist && sha256sum * | grep -v SHA256SUMS > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Create the release
@@ -160,4 +269,5 @@ jobs:
         run: |
           PRE=""
           case "${TAG}" in *-rc*|*-beta*|*-alpha*) PRE="--prerelease";; esac
-          gh release create "${TAG}" dist/* ${PRE} --repo "${GITHUB_REPOSITORY}" --title "Smart Retail POS ${TAG}" --notes "Built by the release workflow from ${GITHUB_SHA}. The Android app is a shell around the customer's licensed website. See ANDROID-SIGNING.txt for how it was signed, and SHA256SUMS.txt to check the files."
+          { cat .github/release-notes.md; echo; echo "Built from ${GITHUB_SHA}."; echo; echo '```'; cat dist/BUILD-STATUS.txt; echo '```'; } > "${RUNNER_TEMP}/notes.md"
+          gh release create "${TAG}" dist/* ${PRE} --repo "${GITHUB_REPOSITORY}" --title "Smart Retail POS ${TAG}" --notes-file "${RUNNER_TEMP}/notes.md"

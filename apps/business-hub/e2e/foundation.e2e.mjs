@@ -151,8 +151,9 @@ try {
   await page.getByRole('tab', { name: 'Parts and words' }).click();
   await page.getByLabel('Customer (one)').fill('Client');
   await page.getByLabel('Customers (many)').fill('Clients');
-  await page.locator('#save-parts').click();
-  await page.waitForURL('**/settings');
+  // Saving reloads the page: wait for that reload itself (the address does not change, so waiting for the address would not wait for it).
+  await Promise.all([page.waitForEvent('load'), page.locator('#save-parts').click()]);
+  await page.getByRole('heading', { name: 'Settings' }).waitFor();
   await go(page, 'People');
   await page.getByRole('tab', { name: 'Clients' }).waitFor();
   step('a renamed word shows up on the screens');

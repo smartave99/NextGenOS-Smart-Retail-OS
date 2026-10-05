@@ -7,12 +7,15 @@ This page is for the people who set customers up. Programmers: the full specific
 
 ## What is ready
 
-Run `node country-packs/tools/cli.mjs list` to see every country. A pack is one of two kinds:
+Run `node country-packs/tools/cli.mjs list` to see every country. **No pack has yet been signed off by a local accountant.** Every pack was written from public knowledge of the law on the day in its `asOf` field; none was
+checked by an adviser in that country, and nobody at NextGenOS has checked them against the tax office's own pages. Tax law changes.
 
-* **Ready to use, checked by us against the tax office's own pages: India and the Philippines.** Even so, tax law changes: ask the shop's accountant to confirm
-  the rates on the day of the first bill, and write their name in the pack (see "After the accountant has checked it").
-* **Starter packs** (the rest): the best public knowledge on the day written (`asOf`), **not** checked by a local adviser. Use them to start, never to file taxes.
-  Each shows "starter" in `list` until an adviser's name is recorded.
+* **India and the Philippines** are the most detailed packs (India: all state codes, the 2025 GST slabs, the old rates kept for old bills; the Philippines:
+  VAT, senior citizen and disability discounts, the non-VAT shop). They are the first the product is built for.
+* **All other packs** are starters: rates and invoice notes only.
+
+Before the first real bill in any country the shop's accountant must confirm the pack, and their name is written in with the `review` command below.
+Until then `list` shows "starter (not reviewed by a local adviser)" and the programs say so in Settings.
 
 ## Set up a shop in a country that has a pack
 

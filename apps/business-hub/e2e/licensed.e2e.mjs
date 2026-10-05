@@ -2,7 +2,7 @@
 // real Licence Studio. Run through licensing/e2e/hub-e2e.mjs, which publishes and protects the program and sets these variables:
 //   HUB_HOST_DLL (the published program), HUB_E2E_KEY (a licence key from the Studio), HUB_E2E_BRAND (the name on that licence).
 import assert from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startHub, launch, newPage, setUp, signIn, go } from './lib.mjs';
@@ -27,7 +27,8 @@ try {
   for (const path of ['/setup', '/login', '/sell', '/export/sales.csv', '/_framework/blazor.web.js']) {
     assert.strictEqual((await page.request.get(hub.url + path)).status(), 402, path);
   }
-  step('the protected program, with no licence, refuses every address with 402');
+  assert.ok(!existsSync(join(data, 'shop.db')), 'with no licence the shop\'s database is neither opened nor made');
+  step('the protected program, with no licence, refuses every address with 402 and does not open the shop\'s database');
 
   await page.getByLabel('Licence key').fill('NGOS-AAAAA-BBBBB-CCCCC-DDDDD');
   await page.getByRole('button', { name: 'Activate' }).click();

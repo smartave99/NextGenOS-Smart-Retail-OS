@@ -138,9 +138,7 @@ public static class HubHost
         app.MapGet("/export/{report}.csv", ExportEndpoint.Handle).RequireAuthorization(Perm.Reports);
         DeviceEndpoints.Map(app);
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode(o => o.ContentSecurityFrameAncestorsPolicy = "'none'");
-
-        var hub = app.Services.GetRequiredService<HubApp>();
-        hub.Documents.DiscardStaleDrafts();
+        // Nothing is done in the shop's database until there is a licence: the background upkeep (HubWorker) starts with the licence, and the first request that needs the shop opens it.
     }
 
     private static class Tokens

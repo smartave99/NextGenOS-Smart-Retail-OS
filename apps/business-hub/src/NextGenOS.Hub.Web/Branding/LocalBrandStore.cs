@@ -8,9 +8,21 @@ namespace NextGenOS.Hub.Web.Branding;
 /// Kept in the shop's database. Whether it shows, and how much of it, is decided by the licence (<see cref="BrandPolicy"/>), so a licence with a
 /// fixed look keeps its look however this was filled in.
 /// </summary>
-public sealed class LocalBrandStore(HubApp app) : IBrandOverrides
+public sealed class LocalBrandStore : IBrandOverrides
 {
     public const string Key = "brand.local";
+    private readonly Func<HubApp> shop;
+
+    // The shop is found only when it is needed, so the "licence needed" page (which is built with the brand) never opens the shop's database.
+    public LocalBrandStore(IServiceProvider services) => shop = () => services.GetRequiredService<HubApp>();
+
+    private LocalBrandStore(HubApp app) => shop = () => app;
+
+    /// <summary>A store over a shop already open (the tests use this).</summary>
+    public static LocalBrandStore Over(HubApp app) => new(app);
+
+    private HubApp app => shop();
+
     private readonly object gate = new();
     private LocalBrand? cached;
     private bool loaded;

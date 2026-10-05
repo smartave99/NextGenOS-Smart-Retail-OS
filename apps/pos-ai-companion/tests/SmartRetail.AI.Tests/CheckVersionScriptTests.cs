@@ -176,7 +176,10 @@ namespace SmartRetail.AI.Tests
             Assert.Matches(@"(?m)^  gate:\s*\n", workflow);
             Assert.Contains("node scripts/verify-all.mjs --full", workflow);
             Assert.Matches(@"(?m)^  android:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: android\s*\n", workflow);
+            // The Windows setup is built after the gate too, and the release is published only when the gate passed (the builds may report their own failure in the notes).
+            Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, android, windows\]\s*\n", workflow);
+            Assert.Contains("needs.gate.result == 'success'", workflow);
         }
 
         [Fact]

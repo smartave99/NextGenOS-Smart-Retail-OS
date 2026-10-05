@@ -6,7 +6,7 @@
  * Exit code 0 only when all of that holds. The release workflow runs this on a real Windows runner against the program in the setup.
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import net from 'node:net';
@@ -48,6 +48,7 @@ try {
       check(`${path} is closed too (402)`, r.status === 402, String(r.status));
     }
     check('it listens on this PC only', !/0\.0\.0\.0|\[::\]/.test(log));
+    check('with no licence it has not opened or made the shop\'s database', !existsSync(join(data, 'shop.db')));
   }
 } finally {
   child.kill();

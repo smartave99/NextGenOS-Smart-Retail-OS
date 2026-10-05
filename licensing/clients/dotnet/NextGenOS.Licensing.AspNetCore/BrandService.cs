@@ -18,7 +18,16 @@ public sealed partial class BrandService(ProductLicence licence, IBrandOverrides
 {
     public const string DefaultName = "Smart Retail POS";
 
-    private BrandProfile Brand => BrandPolicy.Resolve(licence.State.Brand, WhiteLevel, local?.Current);
+    // The person's own choices are looked up only when the licence lets them change anything: a program with no licence, or a fixed look, never touches
+    // wherever they are kept (so the "licence needed" page does not depend on a database being there).
+    private BrandProfile Brand
+    {
+        get
+        {
+            var level = WhiteLevel;
+            return BrandPolicy.Resolve(licence.State.Brand, level, level == "none" ? null : local?.Current);
+        }
+    }
 
     /// <summary>What the licence lets the person change on their own: "none", "theme" or "full" (spec section 5.1).</summary>
     public string WhiteLevel => licence.State.Licence?.White?.Level is "theme" or "full" ? licence.State.Licence.White.Level : "none";

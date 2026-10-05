@@ -40,7 +40,7 @@ public class LookTests : IDisposable
     [InlineData("nonsense")]
     public void A_licence_with_a_fixed_look_keeps_its_look_whatever_was_saved(string? level)
     {
-        var store = new LocalBrandStore(app);
+        var store = LocalBrandStore.Over(app);
         store.Save(Chosen(), null);
         var brand = Brand(level, store);
         Assert.Equal("none", brand.WhiteLevel);
@@ -51,10 +51,29 @@ public class LookTests : IDisposable
         Assert.Equal("by NextGenOS", brand.By);
     }
 
+    private sealed class Explodes : IBrandOverrides
+    {
+        public LocalBrand? Current => throw new InvalidOperationException("the owner's choices must not be looked up");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("none")]
+    public void With_a_fixed_look_the_place_the_choices_are_kept_is_never_touched(string? level)
+    {
+        // This is what keeps the "licence needed" page working with no database.
+        var brand = new BrandService(Licence(level), new Explodes());
+        Assert.Equal("Luzon Fresh", brand.Name);
+        Assert.Contains("#0f6cbd", brand.Style);
+        Assert.Null(brand.Logo);
+        var none = new BrandService(new ProductLicence(() => new LicenceState { Status = LicenceStatus.Missing }), new Explodes());
+        Assert.Equal("Smart Retail POS", none.Name);
+    }
+
     [Fact]
     public void A_theme_licence_shows_the_colours_logo_and_help_but_keeps_the_program_name()
     {
-        var store = new LocalBrandStore(app);
+        var store = LocalBrandStore.Over(app);
         store.Save(Chosen(), null);
         var brand = Brand("theme", store);
         Assert.Equal("Luzon Fresh", brand.Name);
@@ -67,7 +86,7 @@ public class LookTests : IDisposable
     [Fact]
     public void A_full_licence_may_also_rename_the_program_and_drop_by_NextGenOS()
     {
-        var store = new LocalBrandStore(app);
+        var store = LocalBrandStore.Over(app);
         store.Save(Chosen(), null);
         var brand = Brand("full", store);
         Assert.Equal("Mine Mart", brand.Name);
@@ -77,7 +96,7 @@ public class LookTests : IDisposable
     [Fact]
     public void With_no_licence_brand_a_theme_licence_still_takes_the_owners_colour()
     {
-        var store = new LocalBrandStore(app);
+        var store = LocalBrandStore.Over(app);
         store.Save(new LocalBrand { PrimaryColor = "#aa2233" }, null);
         var brand = Brand("theme", store, brandName: null);
         Assert.Equal("Smart Retail POS", brand.Name);
@@ -90,9 +109,9 @@ public class LookTests : IDisposable
     [Fact]
     public void What_was_saved_is_still_there_after_a_restart_and_going_back_clears_it_and_is_written_in_the_activity_list()
     {
-        var first = new LocalBrandStore(app);
+        var first = LocalBrandStore.Over(app);
         first.Save(Chosen(), null);
-        var again = new LocalBrandStore(HubApp.Open(path));
+        var again = LocalBrandStore.Over(HubApp.Open(path));
         Assert.Equal("#aa2233", again.Current?.PrimaryColor);
         Assert.Equal("Mine Mart", again.Current?.Name);
         first.Reset(null);
@@ -111,7 +130,7 @@ public class LookTests : IDisposable
         var problem = LocalBrandStore.Check(new LocalBrand { PrimaryColor = colour });
         Assert.NotNull(problem);
         Assert.Contains(words, problem);
-        Assert.Throws<HubException>(() => new LocalBrandStore(app).Save(new LocalBrand { AccentColor = colour }, null));
+        Assert.Throws<HubException>(() => LocalBrandStore.Over(app).Save(new LocalBrand { AccentColor = colour }, null));
     }
 
     [Fact]
@@ -136,7 +155,7 @@ public class LookTests : IDisposable
     public void A_damaged_saved_value_is_an_empty_look_never_an_error()
     {
         app.SettingsStore.SetText(LocalBrandStore.Key, "{ this is not json");
-        var store = new LocalBrandStore(app);
+        var store = LocalBrandStore.Over(app);
         Assert.True(store.Current?.IsEmpty ?? true);
         Assert.Equal("Luzon Fresh", Brand("full", store).Name);
     }
@@ -144,7 +163,7 @@ public class LookTests : IDisposable
     [Fact]
     public void Text_is_cleaned_before_it_is_kept()
     {
-        var store = new LocalBrandStore(app);
+        var store = LocalBrandStore.Over(app);
         store.Save(new LocalBrand { Name = "  Mi\u0000ne\n  ", SupportEmail = "a@b.example\u0007" }, null);
         Assert.Equal("Mine", store.Current?.Name);
         Assert.Equal("a@b.example", store.Current?.SupportEmail);

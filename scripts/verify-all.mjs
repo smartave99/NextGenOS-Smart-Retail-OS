@@ -125,7 +125,7 @@ const checks = [
   },
   {
     name: 'dotnet-lib', title: '.NET licence library builds for .NET Framework 4.8 and .NET 8', full: true,
-    run: () => needs('dotnet', () => runCmd('dotnet-lib', 'dotnet', ['build', 'licensing/clients/dotnet/NextGenOS.Licensing', '-c', 'Release', '--nologo', '-v', 'q', '-warnaserror-'])),
+    run: () => needs('dotnet', () => runCmd('dotnet-lib', 'dotnet', ['build', 'licensing/clients/dotnet/NextGenOS.Licensing', '-c', 'Release', '--nologo', '-v', 'q'])),
   },
   {
     name: 'dotnet-live', title: '.NET licence library: vectors + live end-to-end against a real Studio (0 skipped)', full: true,

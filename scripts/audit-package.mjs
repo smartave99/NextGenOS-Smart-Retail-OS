@@ -45,6 +45,8 @@ const FORBIDDEN_DIR = [
   [/^\.github$/i, 'CI settings'],
   [/^licensing$/i, 'licensing folder (the Licence Studio is private)'],
   [/^studio$/i, 'Licence Studio'],
+  [/^(setup-studio|brand-studio)$/i, 'a NextGenOS staff tool (the Setup Studio and the Brand Studio never go to a customer)'],
+  [/^NextGenOS Setup Studio$/i, 'the Setup Studio\'s own workspace'],
   [/^(tests?|__tests__|e2e|testvectors)$/i, 'tests'],
   [/^(\.vs|\.idea|\.vscode)$/i, 'editor settings'],
 ];

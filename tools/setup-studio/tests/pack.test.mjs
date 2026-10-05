@@ -12,6 +12,7 @@ import { buildPack, planPack, PackError, brandKitFor, fileSafe, PROFILE_FILES } 
 import { readDeb } from '../lib/deb.mjs';
 import { listZip } from '../lib/zip.mjs';
 import { check as checkKit } from '../../brand-studio/lib/kit.mjs';
+import { auditFolder } from '../../../scripts/audit-package.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -118,6 +119,10 @@ test('a Windows pack: the setup as released, the profile beside it, a page of st
     assert.ok(names.includes('Luzon Fresh Mart/START HERE.html') && names.includes('Luzon Fresh Mart/1 - Shop PC (Windows)/profile/theme.json') && names.includes('Luzon Fresh Mart/PACK-CONTENTS.json'));
     assert.equal(names.filter((n) => n.startsWith('..') || n.startsWith('/')).length, 0);
     assert.equal(r.sha256, sha(readFileSync(r.zip)));
+    // what a customer receives is audited the way every other package is: no source, no key, no database, no licence file, no secret, no staff tool
+    const audit = auditFolder(r.dir);
+    assert.deepEqual(audit.problems, []);
+    assert.ok(audit.files >= 10);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

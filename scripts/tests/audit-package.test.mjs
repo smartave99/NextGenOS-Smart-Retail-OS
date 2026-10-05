@@ -32,6 +32,11 @@ test('test programs, the studio and node_modules are refused', () => {
   for (const needle of ['Hub.Tests.dll', 'E2EHost', 'xunit.core.dll', 'licensing/', 'node_modules/', 'e2e/', 'a.test.mjs']) assert.match(found, new RegExp(needle.replace('.', '\\.')));
 });
 
+test('the staff tools (Setup Studio, Brand Studio) and the Setup Studio\'s workspace are refused', () => {
+  const found = problemsOf({ 'tools/setup-studio/lib/pack.mjs': 'x', 'brand-studio/kit.mjs': 'x', 'NextGenOS Setup Studio/studio.json': '{}' });
+  for (const needle of ['setup-studio/', 'brand-studio/', 'NextGenOS Setup Studio/']) assert.match(found, new RegExp(needle));
+});
+
 test('secrets and private data files are refused: env files, databases, licences, keys, name maps', () => {
   const found = problemsOf({ '.env': 'A=1', '.env.production': 'A=1', 'shop.db': 'x', 'shop.db-wal': 'x', 'licence.ngos': 'NGOS1.x', 'signing.pem': 'x', 'cert.pfx': 'x', 'Mapping.txt': 'x', 'appsettings.Local.json': '{}', 'debug.log': 'x', 'private-key.json': '{}' });
   for (const needle of ['\\.env', 'shop\\.db', 'licence\\.ngos', 'signing\\.pem', 'cert\\.pfx', 'Mapping\\.txt', 'appsettings\\.Local', 'debug\\.log', 'private-key']) assert.match(found, new RegExp(needle));

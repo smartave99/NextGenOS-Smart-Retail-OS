@@ -29,6 +29,17 @@ The rule (`CLAUDE.md`, section 6): **every installer carries everything it needs
 - Culture and number formats: the Hub does not depend on the system's ICU (it formats money, dates and numbers itself, from the country pack).
 - For the website bundle: its own Node.js runtime and everything it needs to start. For the Android app: everything inside the package.
 
+## What is checked on the packages we build today
+
+| Package | How it is checked | Result |
+|---|---|---|
+| Hub for Windows (setup and zip) | `scripts/audit-prerequisites.mjs` runs inside `apps/business-hub/installer/build.mjs` on the published folder: every native file imports only DLLs that are in the folder or in Windows' own list | Passes (19 native files) |
+| Hub for Linux (`.deb`) | The same audit runs inside `build-linux.mjs`, and `test-linux-package.mjs` installs the package with real `dpkg`, starts it as its own unprivileged account and removes it | Passes. The runtime's tracing library (`libcoreclrtraceptprovider.so`, which asks for a library no desktop has) and its debugging and memory-dump helpers are taken out of the package |
+| AI assistant, dashboard, old POS | Not audited by this script yet | **Not checked** |
+| Website, Android app | The website has no package yet; the Android app is self-contained but is built only by the release workflow | **Not checked** |
+
+A static audit reads what a file *says* it needs. It cannot prove a program runs on a machine; only running it on a clean machine of that kind does (`docs/SETUP-STUDIO.md`, "What was and was not checked").
+
 ## What the audit checks
 
 - every program file in the package, and everything it imports or needs, is **in the package or on the lists above**;

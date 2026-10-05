@@ -67,6 +67,20 @@ The packages marked MIT are used under the MIT License, whose text is at the end
 | NSIS | Builds the setup program (`SmartRetailAI-Setup.exe`); its runtime is inside the setup | The NSIS licence (zlib/libpng style, with the licences of the compression code it includes), https://nsis.sourceforge.io/NSIS_License |
 | Microsoft Edge WebView2 Runtime bootstrapper | Inside the setup; run only on a PC that does not have WebView2 | Microsoft's redistribution terms for the WebView2 Runtime |
 
+## Tools used by NextGenOS staff (never in anything a customer receives)
+
+The Setup Studio (`tools/setup-studio`) is a staff tool. It runs on Node.js and has one dependency, the Anthropic SDK for TypeScript (used only when staff choose the Claude API as their AI tool), with the packages it needs. They are not part of any installer, zip, package or app; they are listed here because the Studio is distributed to NextGenOS staff.
+
+| Package | Version | Licence | Copyright |
+|---|---|---|---|
+| @anthropic-ai/sdk | 0.131.0 | MIT | Copyright 2023 Anthropic, PBC |
+| @babel/runtime | 7.29.7 | MIT | Copyright (c) 2014-present Sebastian McKenzie and other contributors |
+| @stablelib/base64 | 1.0.1 | MIT | Copyright (C) 2016 Dmitry Chestnykh |
+| fast-sha256 | 1.3.0 | Unlicense (public domain) | Dmitry Chestnykh |
+| json-schema-to-ts | 3.1.1 | MIT | Copyright (c) 2020 Thomas Aribart |
+| standardwebhooks | 1.1.1 | MIT | Standard Webhooks (its package states the MIT licence and names no other holder) |
+| ts-algebra | 2.0.0 | MIT | Copyright (c) 2020 Thomas Aribart |
+
 ## The vendors' own notices
 
 The files in [`licenses/third-party/`](licenses/third-party) are the licence and notice files that come with the packages above, unchanged (they are installed with the app, in `licenses\third-party\`).

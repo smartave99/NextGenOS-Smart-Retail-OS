@@ -14,6 +14,7 @@
     <!-- The SQLite engine itself: newer than the one Microsoft.Data.Sqlite pulls in, which has a known vulnerability. -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
     <ProjectReference Include="..\..\..\..\libs\dotnet\NextGenOS.Tax\NextGenOS.Tax.csproj" />
+    <ProjectReference Include="..\..\..\..\libs\dotnet\NextGenOS.Devices\NextGenOS.Devices.csproj" />
   </ItemGroup>
 
   <ItemGroup>

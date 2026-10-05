@@ -3,6 +3,7 @@ using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Lending;
+using NextGenOS.Hub.Printing;
 using NextGenOS.Hub.Projects;
 using NextGenOS.Hub.Purchasing;
 using NextGenOS.Hub.Reports;
@@ -18,7 +19,7 @@ namespace NextGenOS.Hub;
 /// </summary>
 public sealed class HubApp
 {
-    private HubApp(HubDb db, IClock clock)
+    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print)
     {
         Db = db;
         Clock = clock;
@@ -36,6 +37,8 @@ public sealed class HubApp
         Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
         Purchasing = new PurchaseService(Documents, Catalog, Parties);
         Reports = new ReportService(db, Shop, clock, Catalog);
+        PrinterProfiles = new PrinterStore(SettingsStore, Audit);
+        Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit);
     }
 
     public HubDb Db { get; }
@@ -54,12 +57,14 @@ public sealed class HubApp
     public AppointmentService Appointments { get; }
     public PurchaseService Purchasing { get; }
     public ReportService Reports { get; }
+    public PrinterStore PrinterProfiles { get; }
+    public HubPrinting Printing { get; }
 
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
-    public static HubApp Open(string path, IClock? clock = null)
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null)
     {
         var db = new HubDb(path);
         db.Migrate();
-        return new HubApp(db, clock ?? new SystemClock());
+        return new HubApp(db, clock ?? new SystemClock(), print);
     }
 }

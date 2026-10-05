@@ -119,11 +119,14 @@ export { DEVICE_TOKENS };
  * business, whether they are registered for tax, and the whole brand) is put back from the base proposal made from the details, whatever the candidate said, and what could not be
  * used is named. Returns { ok, error, proposal } where proposal is { setup, theme, brand, problems, explain }.
  */
-export function reconcile(base, candidate) {
+export function reconcile(base, candidate, { merge = false } = {}) {
   const problems = [];
-  const setup = parseSetup(candidate?.setup);
-  const theme = parseTheme(candidate?.theme ?? {});
-  const brand = parseBrand(candidate?.brand ?? {});
+  // An AI tool is asked to return the starting proposal with its improvements, but may return only what it changed: what it leaves out is unchanged (merge). A person's edit
+  // from the screen is the whole proposal as shown, so it replaces.
+  const given = merge ? mergeOnto(base, candidate) : candidate;
+  const setup = parseSetup(given?.setup);
+  const theme = parseTheme(given?.theme ?? {});
+  const brand = parseBrand(given?.brand ?? {});
   problems.push(...setup.problems, ...theme.problems, ...brand.problems);
   if (!setup.value) return { ok: false, error: 'The setup file could not be used: ' + (setup.problems.join(' ') || 'it is empty.'), proposal: null };
   const kept = [];
@@ -143,4 +146,15 @@ export function reconcile(base, candidate) {
   if (canonical(brand.value) !== canonical(base.brand)) kept.push('the brand (name, colours, logo and contact)');
   if (kept.length) problems.push(`The customer's own details were kept: the proposal tried to change ${kept.join(', ')}.`);
   return { ok: true, error: null, proposal: { setup: setup.value, theme: theme.value, brand: { ...base.brand }, problems, explain: base.explain } };
+}
+
+const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** The base with the candidate's parts laid over it, one level down for settings, words and parts (a part the candidate does not mention stays as it was). */
+function mergeOnto(base, candidate) {
+  const cs = isPlain(candidate?.setup) ? candidate.setup : null;
+  if (!cs) return candidate;   // not a setup at all: read as it is, and refused
+  const setup = { ...base.setup, ...cs };
+  for (const part of ['settings', 'vocabulary', 'features']) if (isPlain(cs[part]) || isPlain(base.setup[part])) setup[part] = { ...(base.setup[part] ?? {}), ...(isPlain(cs[part]) ? cs[part] : {}) };
+  return { ...candidate, setup, theme: { ...base.theme, ...(isPlain(candidate?.theme) ? candidate.theme : {}) } };
 }

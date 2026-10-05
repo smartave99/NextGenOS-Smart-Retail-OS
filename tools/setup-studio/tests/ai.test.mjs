@@ -90,8 +90,9 @@ test('Claude Code is asked in bare mode with the key only (never a subscription)
     assert.ok(seen.input.includes('<customer_details>') && seen.input.includes('RULES'));
     assert.equal(r.meta.model, 'claude-test');
     assert.equal(r.explanation, 'Local words and wallets.');
-    const out = reconcile(baseline, r.candidate);
+    const out = reconcile(baseline, r.candidate, { merge: true });
     assert.equal(out.ok, true);
+    assert.equal(out.proposal.theme.density, 'touch', 'what the tool did not mention stays as it was');
     assert.equal(out.proposal.setup.settings.receiptFooter, 'Salamat po!');
     assert.deepEqual(out.proposal.setup.vocabulary.customer, ['Suki', 'Sukis']);
     assert.equal(out.proposal.theme.shape, 'pill');
@@ -105,7 +106,7 @@ test('a tool that tries to change who the customer is, or sends nonsense, change
     tool('claude', `process.stdin.resume();process.stdin.on('end',()=>console.log(JSON.stringify({is_error:false,result:JSON.stringify({setup:{schema:1,business:{name:'Hijacked',country:'IN',industry:'library'},settings:{taxRegistered:false,receiptFooter:'<script>alert(1)</script> visit https://evil.example'}},theme:{surface:'plaid'},brand:{name:'Evil',primaryColor:'#ffff00'},explanation:'x'.repeat(5000)})})))`);
     const r = await withPath(dir, () => askForProposal({ tool: 'claude-code', intake, baseline }));
     assert.equal(r.explanation.length, 800);
-    const out = reconcile(baseline, r.candidate).proposal;
+    const out = reconcile(baseline, r.candidate, { merge: true }).proposal;
     assert.equal(out.setup.business.name, 'Luzon Fresh Mart');
     assert.equal(out.setup.business.country, 'PH');
     assert.equal(out.setup.business.industry, 'retail');

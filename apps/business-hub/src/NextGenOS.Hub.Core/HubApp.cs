@@ -1,7 +1,11 @@
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Appointments;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Lending;
+using NextGenOS.Hub.Projects;
+using NextGenOS.Hub.Purchasing;
+using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Restaurant;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
@@ -28,6 +32,10 @@ public sealed class HubApp
         Users = new UserService(db, clock, Audit);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
+        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit);
+        Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
+        Purchasing = new PurchaseService(Documents, Catalog, Parties);
+        Reports = new ReportService(db, Shop, clock, Catalog);
     }
 
     public HubDb Db { get; }
@@ -42,6 +50,10 @@ public sealed class HubApp
     public UserService Users { get; }
     public RestaurantService Restaurant { get; }
     public LibraryService Library { get; }
+    public ProjectService Projects { get; }
+    public AppointmentService Appointments { get; }
+    public PurchaseService Purchasing { get; }
+    public ReportService Reports { get; }
 
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
     public static HubApp Open(string path, IClock? clock = null)

@@ -266,7 +266,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         var now = clock.UtcNow;
         var meta = new Dictionary<string, string>(header.Meta);
         if (header.Type == DocTypes.Order && header.Number is not null) meta["orderNumber"] = header.Number;
-        var number = type == DocTypes.Quote ? header.Number : numbering.Next(c, t, type, now);
+        // A quote and a purchase order keep the number they were given when they were started.
+        var number = type is DocTypes.Quote or DocTypes.Purchase ? header.Number : numbering.Next(c, t, type, now);
 
         // payments
         var payable = header.PayableMinor;
@@ -285,7 +286,13 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         }
 
         DateTimeOffset? due = null;
-        if (header.Direction == "out" && type != DocTypes.Quote && paid < payable)
+        if (header.Direction == "out" && type != DocTypes.Quote && paid < payable && options.OnAccount)
+        {
+            var client = header.PartyId is { } cid ? parties.Get(cid) : null;
+            if (client is null) throw new HubException("no-party", "A bill on account needs a client.");
+            due = now.AddDays(options.TermsDays ?? (client.TermsDays > 0 ? client.TermsDays : (int)context.Rule("paymentTermsDays", context.Rule("creditDays", 30))));
+        }
+        else if (header.Direction == "out" && type != DocTypes.Quote && paid < payable)
         {
             if (!options.OnCredit) throw new HubException("short", $"The payments ({context.Money(paid)}) do not cover the bill ({context.Money(payable)}).");
             var party = header.PartyId is { } pid ? parties.Get(pid) : null;
@@ -305,6 +312,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         HubDb.Exec(c, "UPDATE documents SET paid_minor = $paid WHERE id = $id", t, ("$paid", tendered.Sum(p => p.AmountMinor)), ("$id", documentId));
 
         if (type == DocTypes.Invoice && header.Direction == "out") MoveStock(c, t, header.Id, lines, -1, "sale", options.UserId, now);
+        if (type == DocTypes.Purchase) MoveStock(c, t, header.Id, lines, +1, "purchase", options.UserId, now);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
         return documentId;
     }

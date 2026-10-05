@@ -86,6 +86,9 @@ public sealed class IssueOptions
     public long? UserId { get; set; }
     /// <summary>Allow part or none of the bill to stay unpaid (credit). The customer must have a credit limit.</summary>
     public bool OnCredit { get; set; }
+    /// <summary>Bill on account: due after the customer's terms (or the pack's), with no credit limit check. For work billed to a client on agreed terms (progress bills).</summary>
+    public bool OnAccount { get; set; }
+    public int? TermsDays { get; set; }
 }
 
 public sealed class CheckoutRequest

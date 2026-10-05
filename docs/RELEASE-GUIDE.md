@@ -49,7 +49,7 @@ Tell me, or the person who supports you, **exactly** what you did and saw for an
 
 ## After the first release
 
-- **Rotate the old secrets** (OpenAI key, the Neon database password, Firebase secrets, the SQL Server `sa` password): they are still in the repository's history. See `docs/SECURITY-MODEL.md`, limit 8.
+- **Rotate the old secrets** (OpenAI key, the Neon database password, Firebase secrets, the SQL Server `sa` password): they are still in the repository's history. See `docs/SECURITY-MODEL.md`, "Known limits".
 - **`main` still holds the old MIT licence file** until this branch is merged into it. Merge only when you are ready: from then on the proprietary licence applies to everything. (Copies that someone already received under MIT stay under it.)
 - Fill in the placeholders in `EULA.txt` (legal name and address, governing law) with your lawyer.
 - Have the tax rules of each country you sell in checked by a local tax adviser.

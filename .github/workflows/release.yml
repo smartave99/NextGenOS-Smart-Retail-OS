@@ -182,7 +182,8 @@ jobs:
         run: |
           $zip = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-*-win-x64.zip' | Select-Object -First 1
           $dir = Join-Path $env:RUNNER_TEMP 'hub-zip'
-          Expand-Archive -Path $zip.FullName -DestinationPath $dir
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          tar -xf $zip.FullName -C $dir
           node scripts/smoke-hub.mjs (Join-Path $dir 'NextGenOS.Hub.exe')
           if ($LASTEXITCODE -ne 0) { throw 'The published program did not behave.' }
       - name: Install the setup on this Windows PC, check the service, uninstall, check the shop's data stays
@@ -214,6 +215,7 @@ jobs:
           Start-Process -FilePath $un -ArgumentList '/S' -Wait
           for ($i = 0; $i -lt 60 -and (Test-Path (Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe')); $i++) { Start-Sleep -Seconds 2 }
           if (Test-Path (Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe')) { throw 'The uninstall left the program behind.' }
+          for ($i = 0; $i -lt 30 -and (Get-Service -Name NextGenOSHub -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 2 }
           if (Get-Service -Name NextGenOSHub -ErrorAction SilentlyContinue) { throw 'The uninstall left the service behind.' }
           if (-not (Test-Path 'C:\ProgramData\NextGenOS\Hub\keep-me.txt')) { throw "The uninstall removed the shop's data." }
           Write-Host "Uninstalled; the service is gone and the shop's data stayed."

@@ -75,10 +75,11 @@ Security headers and a strict content policy on every response; no inline script
 2. **No tamper self-check or anti-debugging** is built in yet. The programs do not check their own files for changes or detect a debugger. (A commercial .NET protector can add this to the Windows programs; consider one for the highest-value builds.)
 3. **No per-customer watermark** in the built files yet, so a leaked build cannot yet be traced to the customer it was made for. Licence-bound activation does limit the damage: a leaked build still needs a valid, activated licence.
 4. **Cloned virtual machines.** A cloned VM with identical virtual hardware cannot be told from the original by the PC alone; the seat count, check-in history and contract cover that.
-5. **Not code-signed.** Until a code-signing certificate is added (`WINDOWS_CERT_B64`, `WINDOWS_CERT_PASSWORD` in the release workflow), Windows warns that the publisher is unknown, and a changed file is not flagged by Windows.
-6. **The older Windows POS (`apps/pos-desktop`) is decompiled source** of a program NextGenOS must prove it may resell (see `docs/COMMERCIALIZATION_READINESS.md`). Its installer and libraries do not yet go through the protection and audit above; the Business Hub does.
-7. **Not independently tested.** No penetration test or code review by an outside security firm has been done. Testing shows problems; it never shows there are none.
-8. **Secrets from the early history.** Credentials that were committed before this work (an OpenAI key, a database password, Firebase secrets, a SQL Server `sa` password) are in the repository history even though they are removed from the files. **They must be rotated** (changed at their provider); until then they must be treated as public.
+5. **Antivirus can be wary of hidden names.** Programs whose names are hidden are sometimes flagged by antivirus software as suspicious until they are code-signed and have a reputation. Sign the setup (next point) and report false alarms to the antivirus maker.
+6. **Not code-signed.** Until a code-signing certificate is added (`WINDOWS_CERT_B64`, `WINDOWS_CERT_PASSWORD` in the release workflow), Windows warns that the publisher is unknown, and a changed file is not flagged by Windows.
+7. **The older Windows POS (`apps/pos-desktop`) is decompiled source** of a program NextGenOS must prove it may resell (see `docs/COMMERCIALIZATION_READINESS.md`). Its installer and libraries do not yet go through the protection and audit above; the Business Hub does.
+8. **Not independently tested.** No penetration test or code review by an outside security firm has been done. Testing shows problems; it never shows there are none.
+9. **Secrets from the early history.** Credentials that were committed before this work (an OpenAI key, a database password, Firebase secrets, a SQL Server `sa` password) are in the repository history even though they are removed from the files. **They must be rotated** (changed at their provider); until then they must be treated as public.
 
 ## What a release proves, and what it does not
 

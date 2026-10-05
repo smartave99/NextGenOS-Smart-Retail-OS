@@ -28,7 +28,7 @@ export default function WhatsAppOrderButton({
 
         const phone = whatsappUrl.replace(/\D/g, "");
         const productUrl = `${SITE_URL}/products/${productId}`;
-        const message = `*In-store availability enquiry - {SHOP_NAME}*
+        const message = `*In-store availability enquiry - ${SHOP_NAME}*
 
 *${productName}*
 Price: ₹${productPrice.toLocaleString("en-IN")}

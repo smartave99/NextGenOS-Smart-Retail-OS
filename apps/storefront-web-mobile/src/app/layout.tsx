@@ -128,7 +128,8 @@ async function ConfigLoader({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
-      {config.system.scripts.googleAnalyticsId && (
+      {/* Only a plain measurement id (G-XXXX, UA-…) goes into a script: anything else is ignored. */}
+      {/^[A-Za-z0-9-]{3,30}$/.test(config.system.scripts.googleAnalyticsId ?? "") && (
         <>
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${config.system.scripts.googleAnalyticsId}`}

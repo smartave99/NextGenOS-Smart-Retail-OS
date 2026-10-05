@@ -102,6 +102,12 @@ export async function getSiteConfig(): Promise<SiteConfig> {
 export async function updateSiteConfig(newConfig: SiteConfig): Promise<{ success: boolean; error?: string }> {
     try {
         await requireAdminSession();
+        // Scripts added to every page of the website run with the visitor's trust: only the owner may change them.
+        const current = await getSiteConfig();
+        const scripts = (c: SiteConfig) => JSON.stringify(c.system?.scripts ?? {});
+        if (scripts(current) !== scripts(newConfig)) {
+            await requireAdminSession("system-scripts");
+        }
         const result = await updateBlobJson(BLOB_FILENAME, newConfig);
 
         if (!result.success) {

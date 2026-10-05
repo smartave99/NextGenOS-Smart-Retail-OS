@@ -4,6 +4,7 @@ import { fanOutWrite, getWriteClient } from "@/lib/db-manager";
 import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { requireAdminSession } from "@/lib/auth-server";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { sanitizePageHtml } from "@/lib/sanitize-html";
 
 export interface PageContent {
     title: string;
@@ -11,56 +12,55 @@ export interface PageContent {
     lastUpdated: string;
 }
 
+// Starting texts only. The shop owner replaces them in Admin > Content with legal text from their own adviser: the law of each
+// country differs, and these cannot know yours.
 const DEFAULT_PAGES: Record<string, PageContent> = {
     privacy: {
         title: "Privacy Policy",
         content: `<h2>1. Introduction</h2>
-<p>At {SHOP_NAME}, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our store or use our website.</p>
+<p>At ${SHOP_NAME}, we take your privacy seriously. This Privacy Policy explains how we collect, use and protect your information when you visit our store or use our website.</p>
 
 <h2>2. Information We Collect</h2>
-<p>We may collect information that identifies, relates to, describes, or could reasonably be linked, directly or indirectly, with you or your household:</p>
+<p>We may collect information that identifies or relates to you:</p>
 <ul>
-<li>Identifiers such as your name, alias, postal address, email address, or phone number.</li>
-<li>Commercial information, including records of products purchased or considered.</li>
-<li>Internet or other electronic network activity information.</li>
+<li>Contact details such as your name, address, email address or phone number, when you give them to us.</li>
+<li>Records of products you bought or looked at.</li>
+<li>Technical information about how you use our website.</li>
 </ul>
 
 <h2>3. How We Use Your Information</h2>
 <p>We use the information we collect to:</p>
 <ul>
-<li>Support transactions completed in person at our physical store.</li>
+<li>Complete and support your purchases.</li>
 <li>Improve our products and services.</li>
-<li>Send you promotional materials and updates (with your consent).</li>
-<li>Ensure the security and integrity of our systems.</li>
+<li>Send you offers and updates, only with your consent.</li>
+<li>Keep our systems secure.</li>
 </ul>
 
 <h2>4. Sharing Your Information</h2>
-<p>We do not sell your personal information. We may share limited information with service providers that support our website, analytics, communications, security, and physical-store operations.</p>
+<p>We do not sell your personal information. We may share limited information with service providers that help us run our website, communications, security and stores.</p>
 
-<h2>5. In-Store Purchase Policy</h2>
-<p>Our website is provided for product discovery and store-visit planning. We currently do not accept online, WhatsApp, pickup, reservation, or delivery orders. Product availability shown or discussed online may change, and purchases must be completed in person at our physical store.</p>`,
-        lastUpdated: "February 12, 2026",
+<h2>5. Your Choices</h2>
+<p>You can ask us to show, correct or delete the information we hold about you. Contact us using the details on this website.</p>`,
+        lastUpdated: "",
     },
     terms: {
         title: "Terms of Service",
         content: `<h2>1. Acceptance of Terms</h2>
-<p>By accessing or using the {SHOP_NAME} website and store services, you agree to be bound by these Terms of Service and all applicable laws and regulations.</p>
+<p>By using the ${SHOP_NAME} website and store services, you agree to these Terms of Service and the laws that apply.</p>
 
 <h2>2. Use of Services</h2>
-<p>You agree to use our services only for lawful purposes. You are responsible for maintaining the confidentiality of your account information and for all activities that occur under your account.</p>
+<p>You agree to use our services only for lawful purposes.</p>
 
 <h2>3. Product Information and Pricing</h2>
-<p>We strive to provide accurate product descriptions and pricing. However, we do not warrant that product descriptions or other content are error-free. We reserve the right to correct any errors and to change or update information at any time.</p>
+<p>We work to keep product descriptions and prices accurate, but we do not promise that they are free of errors. We may correct errors and change information at any time.</p>
 
-<h2>4. In-Store Purchases Only</h2>
-<p>The {SHOP_NAME} website is an informational product-discovery service. We currently do not accept online, WhatsApp, pickup, reservation, or delivery orders. Availability and pricing may change before your visit. All purchases must be completed in person at our physical store.</p>
+<h2>4. Limitation of Liability</h2>
+<p>To the extent the law allows, ${SHOP_NAME} is not liable for indirect or consequential damages resulting from your use of, or inability to use, our services.</p>
 
-<h2>5. Limitation of Liability</h2>
-<p>{SHOP_NAME} shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of, or inability to use, our services.</p>
-
-<h2>6. Governing Law</h2>
-<p>These terms are governed by and construed in accordance with the laws of India, and you irrevocably submit to the exclusive jurisdiction of the courts in Patna, Bihar.</p>`,
-        lastUpdated: "February 12, 2026",
+<h2>5. Governing Law</h2>
+<p>These terms are governed by the laws that apply where ${SHOP_NAME} operates.</p>`,
+        lastUpdated: "",
     },
 };
 
@@ -91,7 +91,7 @@ async function _fetchPageContent(pageId: string): Promise<PageContent> {
 
         return {
             title: page.title,
-            content: page.content,
+            content: sanitizePageHtml(page.content),
             lastUpdated: page.lastUpdated,
         };
     } catch (error) {
@@ -121,17 +121,18 @@ export async function updatePageContent(
 ): Promise<{ success: boolean; error?: string }> {
     try {
         await requireAdminSession();
+        const content = sanitizePageHtml(data.content);
         await fanOutWrite(c => c.page.upsert({
             where: { id: pageId },
             update: {
                 title: data.title,
-                content: data.content,
+                content,
                 lastUpdated: data.lastUpdated,
             },
             create: {
                 id: pageId,
                 title: data.title,
-                content: data.content,
+                content,
                 lastUpdated: data.lastUpdated,
             }
         }));

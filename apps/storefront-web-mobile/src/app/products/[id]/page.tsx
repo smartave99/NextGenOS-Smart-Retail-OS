@@ -174,14 +174,29 @@ async function StoreLocationMini({ siteContent }: { siteContent: ProductDetailPa
             <div className="space-y-3 text-sm text-slate-600">
                 <div className="flex items-start gap-3">
                     <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p dangerouslySetInnerHTML={{ __html: content.storeLocationText.replace(/\n|,/g, '<br/>') }} />
+                    <p><TextLines text={content.storeLocationText} splitOnComma /></p>
                 </div>
                 <div className="flex items-start gap-3">
                     <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p dangerouslySetInnerHTML={{ __html: content.storeHoursText.replace(/\n/g, '<br/>') }} />
+                    <p><TextLines text={content.storeHoursText} /></p>
                 </div>
             </div>
         </div>
+    );
+}
+
+/** Lines of plain text with a line break between them: the text is shown as text, never as HTML. */
+function TextLines({ text, splitOnComma = false }: { text: string; splitOnComma?: boolean }) {
+    const lines = text.split(splitOnComma ? /\n|,/ : /\n/).map((line) => line.trim()).filter(Boolean);
+    return (
+        <>
+            {lines.map((line, index) => (
+                <span key={index}>
+                    {index > 0 && <br />}
+                    {line}
+                </span>
+            ))}
+        </>
     );
 }
 

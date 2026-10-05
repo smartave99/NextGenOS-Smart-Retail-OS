@@ -741,7 +741,7 @@ export async function rankProducts(
         tags: p.tags,
     }));
 
-    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at {SHOP_NAME}.
+    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at ${SHOP_NAME}.
 
 Customer query: "${query}"
 
@@ -800,7 +800,7 @@ export async function generateSummary(
     const config = await getAIConfig();
     const persona = config.personaName;
 
-    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at {SHOP_NAME}.
+    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at ${SHOP_NAME}.
 
 Customer asked: "${query}"
 
@@ -1056,7 +1056,7 @@ export async function generateDealExplanation(
     const savings = product.originalPrice ? product.originalPrice - product.price : 0;
     const savingsPercent = product.originalPrice ? Math.round((savings / product.originalPrice) * 100) : 0;
 
-    const prompt = `You are a charismatic sales associate at {SHOP_NAME}.
+    const prompt = `You are a charismatic sales associate at ${SHOP_NAME}.
 Explain why the current deal on "${product.name}" is amazing for the customer.
 
 Product Info:
@@ -1332,7 +1332,7 @@ export async function generateBackInStockMessage(
     productName: string,
     customerName: string
 ): Promise<{ subject: string; body: string; discountCode?: string }> {
-    const prompt = `You are a customer loyalty bot for {SHOP_NAME}.
+    const prompt = `You are a customer loyalty bot for ${SHOP_NAME}.
     Context:
     - Customer: ${customerName}
     - Item Back in Stock: ${productName}

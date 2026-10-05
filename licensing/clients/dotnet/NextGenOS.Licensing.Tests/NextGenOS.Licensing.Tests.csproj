@@ -20,6 +20,7 @@
     <ProjectReference Include="..\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
     <Content Include="..\..\..\testvectors\vectors.json" Link="vectors.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\testvectors\brand-policy.json" Link="brand-policy.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\testvectors\theme-policy.json" Link="theme-policy.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

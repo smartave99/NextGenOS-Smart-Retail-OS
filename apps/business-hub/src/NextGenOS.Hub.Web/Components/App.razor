@@ -1,9 +1,11 @@
 @using Microsoft.AspNetCore.Antiforgery
 @using NextGenOS.Licensing.AspNetCore
 @inject BrandService Brand
+@inject NextGenOS.Hub.Web.Branding.ThemeService Themes
 @inject IAntiforgery Antiforgery
 <!DOCTYPE html>
-<html lang="en">
+@{ var theme = Themes.Current; }
+<html lang="en" data-mode="@theme.Mode" data-surface="@theme.Surface" data-shape="@theme.Shape" data-density="@theme.Density" data-font="@theme.Font" data-scale="@Scale(theme.FontScale)" data-nav="@theme.Nav" data-nav-labels="@theme.NavLabels" data-cart="@theme.Cart" data-depth="@theme.Depth">
 
 <head>
     <meta charset="utf-8" />
@@ -35,6 +37,8 @@
 </html>
 
 @code {
+    private static string Scale(double? value) => (value ?? 1).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
     [CascadingParameter] private HttpContext? Http { get; set; }
 
     private string? RequestToken => Http is null ? null : Antiforgery.GetAndStoreTokens(Http).RequestToken;

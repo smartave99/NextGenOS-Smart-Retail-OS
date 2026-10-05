@@ -6,6 +6,8 @@
 @inject ProductLicence Licence
 @inject BrandService Brand
 @inject NextGenOS.Hub.Web.Branding.LocalBrandStore Looks
+@inject NextGenOS.Hub.Web.Branding.LocalThemeStore LocalTheme
+@inject NextGenOS.Hub.Web.Branding.ThemeService Themes
 
 <PageTitle>Settings</PageTitle>
 <h1>Settings</h1>
@@ -170,6 +172,91 @@ else if (tab == "look")
                 <button type="button" class="btn secondary" id="reset-look" @onclick="ResetLook">Go back to the standard look</button>
             </div>
         }
+    </section>
+    <section class="card" id="layout-card">
+        <h2>Screen and layout</h2>
+        <p class="muted">How the screens are sized and arranged on this PC. A counter with a touch screen works best with big buttons and the menu along the bottom.</p>
+        <div class="stack">
+            <div class="field-row">
+                <div><label for="t-density">Size of buttons and spacing</label>
+                    <select id="t-density" @bind="layout.Density">
+                        <option value="compact">Compact: more on the screen</option>
+                        <option value="comfortable">Comfortable</option>
+                        <option value="touch">Touch screen: big buttons</option>
+                    </select></div>
+                <div><label for="t-scale">Size of the letters</label>
+                    <select id="t-scale" @bind="scaleText">@foreach (var step in Scales) { <option value="@step">@(step)%</option> }</select></div>
+            </div>
+            <div class="field-row">
+                <div><label for="t-nav">Menu</label>
+                    <select id="t-nav" @bind="layout.Nav">
+                        <option value="left">On the left</option>
+                        <option value="top">Along the top</option>
+                        <option value="bottom">Along the bottom</option>
+                    </select></div>
+                <div><label for="t-labels">Menu words</label>
+                    <select id="t-labels" @bind="layout.NavLabels">
+                        <option value="full">Pictures and words</option>
+                        <option value="icons">Pictures only</option>
+                    </select></div>
+            </div>
+            <label for="t-cart">Cart on the sale screen</label>
+            <select id="t-cart" @bind="layout.Cart">
+                <option value="right">On the right</option>
+                <option value="left">On the left</option>
+                <option value="bottom">Below the items</option>
+            </select>
+            @if (Themes.IdentityAllowed)
+            {
+                <h3>Style (your licence allows this)</h3>
+                <div class="field-row">
+                    <div><label for="t-mode">Light or dark</label>
+                        <select id="t-mode" @bind="layout.Mode">
+                            <option value="auto">Follow the PC</option>
+                            <option value="light">Always light</option>
+                            <option value="dark">Always dark</option>
+                        </select></div>
+                    <div><label for="t-surface">Background</label>
+                        <select id="t-surface" @bind="layout.Surface">
+                            <option value="neutral">Neutral</option>
+                            <option value="warm">Warm</option>
+                            <option value="cool">Cool</option>
+                            <option value="paper">Paper</option>
+                        </select></div>
+                </div>
+                <div class="field-row">
+                    <div><label for="t-shape">Corners</label>
+                        <select id="t-shape" @bind="layout.Shape">
+                            <option value="square">Square</option>
+                            <option value="soft">Soft</option>
+                            <option value="rounded">Rounded</option>
+                            <option value="pill">Very round</option>
+                        </select></div>
+                    <div><label for="t-font">Letters</label>
+                        <select id="t-font" @bind="layout.Font">
+                            <option value="system">Your PC's own</option>
+                            <option value="humanist">Friendly</option>
+                            <option value="serif">With serifs</option>
+                            <option value="rounded">Rounded</option>
+                            <option value="mono">Typewriter</option>
+                        </select></div>
+                </div>
+                <label for="t-depth">Shadows</label>
+                <select id="t-depth" @bind="layout.Depth">
+                    <option value="flat">None</option>
+                    <option value="soft">Soft</option>
+                    <option value="lifted">Strong</option>
+                </select>
+            }
+            else
+            {
+                <p class="muted small">Your licence has a fixed style (colours, corners, letters), set by your supplier.</p>
+            }
+        </div>
+        <div class="row">
+            <button type="button" class="btn primary" id="save-theme" @onclick="SaveLayout">Save</button>
+            <button type="button" class="btn secondary" id="reset-theme" @onclick="ResetLayout">Go back to the standard layout</button>
+        </div>
     </section>
 }
 else if (tab == "printers")
@@ -383,6 +470,9 @@ else if (tab == "activity")
 @code {
     private string tab = "shop";
     private NextGenOS.Licensing.LocalBrand look = new();
+    private NextGenOS.Licensing.ThemeSettings layout = new();
+    private string scaleText = "100";
+    private static readonly string[] Scales = { "85", "90", "95", "100", "105", "110", "115", "120", "125", "130", "135" };
     [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
     [SupplyParameterFromQuery(Name = "saved")] public string? Saved { get; set; }
     private ShopSettings s = new();
@@ -411,8 +501,11 @@ else if (tab == "activity")
 
     protected override Task LoadAsync()
     {
-        if (TabName is "look" && !shownTab) { tab = "look"; shownTab = true; if (Saved == "1") Info = "Saved. The new look shows on every screen."; }
+        if (TabName is "look" && !shownTab) { tab = "look"; shownTab = true; if (Saved == "1") Info = "Saved. It shows on every screen."; }
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
+        // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
+        layout = Themes.Current;
+        scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
         rates.Clear();
@@ -467,6 +560,21 @@ else if (tab == "activity")
         var uri = NextGenOS.Hub.Web.Branding.LocalBrandStore.FromBytes(memory.ToArray(), out var problem);
         if (problem is not null) throw new HubException("logo", problem);   // a refused picture never replaces the logo that is there
         look.Logo = uri;
+    });
+
+    private Task SaveLayout() => Run(() =>
+    {
+        layout.FontScale = double.TryParse(scaleText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent) ? percent / 100 : 1;
+        // Without the licence's leave for style, only the choices about the screen are kept: a style chosen later (or a profile's) must not be overridden by a default saved here.
+        if (!Themes.IdentityAllowed) { layout.Mode = layout.Surface = layout.Shape = layout.Font = layout.Depth = null; }
+        LocalTheme.Save(layout, Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private Task ResetLayout() => Run(() =>
+    {
+        LocalTheme.Reset(Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
     });
 
     private Task SaveLook() => Run(() =>

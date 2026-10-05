@@ -9,7 +9,13 @@
     setTheme: function (value) {
       try { if (value === 'light' || value === 'dark') { localStorage.setItem('hub-theme', value); document.documentElement.setAttribute('data-theme', value); } else { localStorage.removeItem('hub-theme'); document.documentElement.removeAttribute('data-theme'); } } catch (e) { /* ignore */ }
     },
-    theme: function () { try { return localStorage.getItem('hub-theme') || ''; } catch (e) { return ''; } },
+    // The look in force now: the person's own choice, else what the business was set up with, else the PC's own light or dark.
+    theme: function () {
+      try { var own = localStorage.getItem('hub-theme'); if (own === 'light' || own === 'dark') return own; } catch (e) { /* storage may be off */ }
+      var set = document.documentElement.getAttribute('data-theme');
+      if (set === 'light' || set === 'dark') return set;
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    },
     print: function () { window.print(); },
     focus: function (id) { var el = document.getElementById(id); if (el) { el.focus(); if (el.select) el.select(); } },
     csrf: token

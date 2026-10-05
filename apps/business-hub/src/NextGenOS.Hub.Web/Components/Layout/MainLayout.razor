@@ -14,12 +14,13 @@
         <ul>
             @foreach (var link in Links())
             {
-                <li><NavLink href="@link.Href" Match="@(link.Href == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><Icon Name="@link.Icon" /><span>@link.Label</span></NavLink></li>
+                <li><NavLink href="@link.Href" title="@link.Label" Match="@(link.Href == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><Icon Name="@link.Icon" /><span>@link.Label</span></NavLink></li>
             }
         </ul>
     </nav>
     <div class="main">
         <header class="top">
+            <span class="top-brand">@Brand.Name@if (Brand.By is { } topBy) { <small>@topBy</small> }</span>
             <span class="shop-name">@Shop.Settings.Name</span>
             <span class="spacer"></span>
             @if (me is not null)

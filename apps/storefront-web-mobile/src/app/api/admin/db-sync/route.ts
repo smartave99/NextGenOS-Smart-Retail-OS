@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedisAccountStatus, forceResyncKey } from "@/app/actions/blob-json";
 import { getDBAccountStatus } from "@/lib/db-manager";
-import { getAdminIdentityFromRequest } from "@/lib/auth-server";
+import { getOwnerIdentityFromRequest } from "@/lib/auth-server";
 
 /**
  * GET /api/admin/db-sync
@@ -9,7 +9,7 @@ import { getAdminIdentityFromRequest } from "@/lib/auth-server";
  */
 export async function GET(request: NextRequest) {
     try {
-        if (!await getAdminIdentityFromRequest(request)) {
+        if (!await getOwnerIdentityFromRequest(request)) {
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
         const [redisStatus, dbStatus] = await Promise.all([
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(req: NextRequest) {
     try {
-        if (!await getAdminIdentityFromRequest(req)) {
+        if (!await getOwnerIdentityFromRequest(req)) {
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
         const body = await req.json();

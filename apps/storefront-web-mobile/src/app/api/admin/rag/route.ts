@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reindexAllProducts, getRAGIndexStatus } from "@/lib/vector-store";
 import { getEmbeddingCacheStats } from "@/lib/embedding-service";
-import { getAdminIdentityFromRequest } from "@/lib/auth-server";
+import { getOwnerIdentityFromRequest } from "@/lib/auth-server";
 import { invalidateCatalogSearchState } from "@/lib/product-indexing";
 
 /**
@@ -25,7 +25,7 @@ import { invalidateCatalogSearchState } from "@/lib/product-indexing";
  */
 export async function GET(request: NextRequest) {
     try {
-        if (!await getAdminIdentityFromRequest(request)) {
+        if (!await getOwnerIdentityFromRequest(request)) {
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
         const [indexStatus, cacheStats] = await Promise.all([
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
     try {
-        if (!await getAdminIdentityFromRequest(request)) {
+        if (!await getOwnerIdentityFromRequest(request)) {
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
         const body = await request.json().catch(() => ({}));

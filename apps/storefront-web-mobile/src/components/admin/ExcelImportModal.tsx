@@ -95,7 +95,7 @@ export default function ExcelImportModal({ isOpen, onClose, onSuccess }: ExcelIm
                                     type="file"
                                     ref={fileInputRef}
                                     className="hidden"
-                                    accept=".xlsx, .xls"
+                                    accept=".xlsx"
                                     onChange={handleFileChange}
                                     aria-describedby="excel-import-help"
                                 />
@@ -110,7 +110,7 @@ export default function ExcelImportModal({ isOpen, onClose, onSuccess }: ExcelIm
                                         <>
                                             <Upload className="mb-2 h-12 w-12 text-gray-400" aria-hidden="true" />
                                             <span className="font-medium text-gray-700">Choose an Excel file</span>
-                                            <span className="mt-1 text-sm text-gray-600">or drag and drop · .xlsx or .xls</span>
+                                            <span className="mt-1 text-sm text-gray-600">or drag and drop · .xlsx</span>
                                         </>
                                     )}
                                 </button>

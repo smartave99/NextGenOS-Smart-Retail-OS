@@ -24,8 +24,6 @@ import {
     XCircle,
     AlertCircle,
     RefreshCw,
-    Eye,
-    EyeOff,
     Zap,
     Shield,
     Bot,
@@ -43,7 +41,6 @@ export default function APIKeyManager() {
     const [saving, setSaving] = useState(false);
     const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
-    const [showKeyValue, setShowKeyValue] = useState<Record<string, boolean>>({});
     const [healthStatus, setHealthStatus] = useState<APIKeyManagerStatus | null>(null);
 
     const [formData, setFormData] = useState<{
@@ -127,10 +124,6 @@ export default function APIKeyManager() {
         }
         await loadData();
         setTestingKeyId(null);
-    };
-
-    const toggleShowKey = (id: string) => {
-        setShowKeyValue(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
     if (authLoading || !user) {
@@ -428,19 +421,7 @@ export default function APIKeyManager() {
                                             </div>
                                             <div className="flex items-center gap-4 text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
-                                                    <code className="font-mono">
-                                                        {showKeyValue[keyItem.id] ? keyItem.key : keyItem.maskedKey}
-                                                    </code>
-                                                    <button
-                                                        onClick={() => toggleShowKey(keyItem.id)}
-                                                        className="p-1 hover:bg-gray-200 rounded"
-                                                    >
-                                                        {showKeyValue[keyItem.id] ? (
-                                                            <EyeOff className="w-3 h-3" />
-                                                        ) : (
-                                                            <Eye className="w-3 h-3" />
-                                                        )}
-                                                    </button>
+                                                    <code className="font-mono">{keyItem.maskedKey}</code>
                                                 </div>
                                                 {health && (
                                                     <span className="flex items-center gap-1 text-xs bg-gray-100 px-2 py-0.5 rounded">

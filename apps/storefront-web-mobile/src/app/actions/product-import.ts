@@ -4,6 +4,7 @@ import { getWriteClient, fanOutWrite } from "@/lib/db-manager";
 import { revalidatePath } from "next/cache";
 import { revalidateTag } from "next/cache";
 import { requireAdminSession } from "@/lib/auth-server";
+import { sheetRowsToObjects } from "@/lib/sheet-rows";
 import { emitWorkflowEvent } from "@/lib/workflow-events";
 import {
     invalidateCatalogSearchState,
@@ -28,12 +29,15 @@ export async function importProductsFromExcel(formData: FormData) {
             return { success: false, error: "Spreadsheet is too large (max 10MB)" };
         }
 
-        const buffer = await file.arrayBuffer();
-        const XLSX = await import('xlsx');
-        const workbook = XLSX.read(buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet) as ProductRow[];
+        const buffer = Buffer.from(await file.arrayBuffer());
+        // An .xlsx file is a zip archive: anything else (an old .xls, a renamed file) is refused before it is read.
+        if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
+            return { success: false, error: "Please upload an Excel .xlsx file (in Excel: File, Save As, Excel Workbook)." };
+        }
+
+        const { readSheet } = await import('read-excel-file/node');
+        const sheetRows = await readSheet(buffer);
+        const rows = sheetRowsToObjects(sheetRows);
 
         if (!rows || rows.length === 0) {
             return { success: false, error: "Excel file is empty" };

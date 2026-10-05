@@ -71,6 +71,12 @@ export async function getAdminIdentityFromRequest(request?: Request): Promise<Ad
     return token ? resolveAdminIdentity(token) : null;
 }
 
+/** The shop owner only (full permissions): for settings of the system itself, such as the AI keys and the databases. Staff are refused. */
+export async function getOwnerIdentityFromRequest(request?: Request): Promise<AdminIdentity | null> {
+    const identity = await getAdminIdentityFromRequest(request);
+    return identity && identity.permissions.includes("*") ? identity : null;
+}
+
 export async function requireAdminSession(permission?: string): Promise<AdminIdentity> {
     const identity = await getAdminIdentityFromRequest();
     if (!identity) throw new Error("UNAUTHORIZED");

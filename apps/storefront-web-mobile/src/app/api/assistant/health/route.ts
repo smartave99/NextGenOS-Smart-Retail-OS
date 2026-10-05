@@ -11,11 +11,11 @@
 import { NextResponse } from "next/server";
 import { getAPIKeyManager } from "@/lib/api-key-manager";
 import { syncAPIKeysToManager } from "@/app/api-key-actions";
-import { getAdminIdentityFromRequest } from "@/lib/auth-server";
+import { getOwnerIdentityFromRequest } from "@/lib/auth-server";
 
 export async function GET(request: Request) {
     try {
-        if (!await getAdminIdentityFromRequest(request)) {
+        if (!await getOwnerIdentityFromRequest(request)) {
             return NextResponse.json({ status: "unauthorized" }, { status: 401 });
         }
         // Sync keys from the database before checking health

@@ -6,13 +6,12 @@
  *   node scripts/make-icons.mjs --logo ../../brand-kits/shop/logo.png --colour "#064e3b"
  *
  * Writes: public/logo.png, public/favicon.ico, src/app/icon.png, src/app/apple-icon.png, assets/*.png, and (with --android)
- * runs the Capacitor asset tool to fill android/app/src/main/res. A logo with a transparent background is placed on a rounded
+ * fills android/app/src/main/res (launcher icons and splash screens). A logo with a transparent background is placed on a rounded
  * square of the brand colour; a logo that already fills its square is used as it is.
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -62,6 +61,32 @@ out('assets/icon.png', await square(1024, { rounded: false }));
 console.log(`Icons made from ${logoPath} on ${colour}.`);
 
 if (process.argv.includes('--android')) {
-  const r = spawnSync('npx', ['capacitor-assets', 'generate', '--android', '--assetPath', 'assets', '--iconBackgroundColor', colour, '--iconBackgroundColorDark', colour, '--splashBackgroundColor', '#f5f5f7', '--splashBackgroundColorDark', '#000000'], { cwd: root, stdio: 'inherit' });
-  if (r.status !== 0) { console.error('The Android icon tool failed.'); process.exit(1); }
+  // The Android icons and splash screens, made here with sharp (no separate tool to install or trust).
+  const res = 'android/app/src/main/res';
+  const dens = { ldpi: 36, mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+  const adaptive = { ldpi: 81, mdpi: 108, hdpi: 162, xhdpi: 216, xxhdpi: 324, xxxhdpi: 432 };
+  const circle = (size) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#fff"/></svg>`);
+  const fg = foreground; // 1024 px, logo inside the safe zone
+  const bg = await sharp({ create: { width: 1024, height: 1024, channels: 4, background: colour } }).png().toBuffer();
+  const flat = await square(1024, { rounded: false });
+  for (const d of Object.keys(dens)) {
+    out(`${res}/mipmap-${d}/ic_launcher.png`, await sharp(flat).resize(dens[d], dens[d]).png().toBuffer());
+    out(`${res}/mipmap-${d}/ic_launcher_round.png`, await sharp(flat).resize(dens[d], dens[d]).composite([{ input: circle(dens[d]), blend: 'dest-in' }]).png().toBuffer());
+    out(`${res}/mipmap-${d}/ic_launcher_foreground.png`, await sharp(fg).resize(adaptive[d], adaptive[d]).png().toBuffer());
+    out(`${res}/mipmap-${d}/ic_launcher_background.png`, await sharp(bg).resize(adaptive[d], adaptive[d]).png().toBuffer());
+  }
+  const portrait = { ldpi: [200, 320], mdpi: [320, 480], hdpi: [480, 800], xhdpi: [720, 1280], xxhdpi: [960, 1600], xxxhdpi: [1280, 1920] };
+  const splash = async (w, h, back) => {
+    const mark = await sharp(splashLogo).resize(Math.round(Math.min(w, h) * 0.34), Math.round(Math.min(w, h) * 0.34)).png().toBuffer();
+    return sharp({ create: { width: w, height: h, channels: 4, background: back } }).composite([{ input: mark, gravity: 'centre' }]).png().toBuffer();
+  };
+  for (const [d, [w, h]] of Object.entries(portrait)) {
+    out(`${res}/drawable-port-${d}/splash.png`, await splash(w, h, '#f5f5f7'));
+    out(`${res}/drawable-port-night-${d}/splash.png`, await splash(w, h, '#000000'));
+    out(`${res}/drawable-land-${d}/splash.png`, await splash(h, w, '#f5f5f7'));
+    out(`${res}/drawable-land-night-${d}/splash.png`, await splash(h, w, '#000000'));
+  }
+  out(`${res}/drawable/splash.png`, await splash(480, 320, '#f5f5f7'));
+  out(`${res}/drawable-night/splash.png`, await splash(480, 320, '#000000'));
+  console.log('Android icons and splash screens written to ' + res + '.');
 }

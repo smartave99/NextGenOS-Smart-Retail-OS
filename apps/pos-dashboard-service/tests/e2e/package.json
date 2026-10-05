@@ -1,0 +1,38 @@
+{
+  "name": "smart-retail-pos-e2e",
+  "private": true,
+  "description": "Browser tests of Smart Retail POS: billing on demo data, the sales dashboard with the AI growth plan, Ask AI, product photos, finding a product with the camera, Google Lens searches with a product's photo, paging through long lists, the change log (what's new), posters, creatives, barcode stickers, the Fix now list, the assistant's memory, actions and their results, the Monday review, online prices, past chats, getting the AI set up, automatic updates, keeping Codex up to date, starting with Windows, the owner's live view, and offering finished products to the owner's website.",
+  "scripts": {
+    "test": "node billing.e2e.js",
+    "test:plan": "node plan.e2e.js",
+    "test:photos": "node photos.e2e.js",
+    "test:camera": "node camera.e2e.js",
+    "test:lens": "node lens.e2e.js",
+    "test:paging": "node paging.e2e.js",
+    "test:whatsnew": "node whatsnew.e2e.js",
+    "test:setup": "node setup.e2e.js",
+    "test:ask": "node ask.e2e.js",
+    "test:posters": "node posters.e2e.js",
+    "test:creatives": "node creatives.e2e.js",
+    "test:barcodes": "node barcodes.e2e.js",
+    "test:fixnow": "node fixnow.e2e.js",
+    "test:memory": "node memory.e2e.js",
+    "test:actions": "node actions.e2e.js",
+    "test:review": "node review.e2e.js",
+    "test:prices": "node prices.e2e.js",
+    "test:history": "node history.e2e.js",
+    "test:jobs": "node jobs.e2e.js",
+    "test:topbar": "node topbar.e2e.js",
+    "test:updates": "node updates.e2e.js",
+    "test:owner": "node owner.e2e.js",
+    "test:owner-app": "node owner-app.e2e.js",
+    "test:owner-review": "node owner-review.e2e.js",
+    "test:live-shop": "node live-shop.e2e.js",
+    "test:codexupdate": "node codexupdate.e2e.js",
+    "test:startup": "node startup.e2e.js",
+    "test:owner-products": "node owner-products.e2e.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

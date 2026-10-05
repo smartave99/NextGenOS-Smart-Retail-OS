@@ -1,0 +1,575 @@
+@page "/barcodes"
+@using SmartRetail.AI.Settings
+@using SmartRetail.Pos.Core.Analytics
+@using SmartRetail.Pos.Core.Labels
+@inject IProductRepository Catalog
+@inject ISalesFactsRepository Facts
+@inject ProductPhotoService Photos
+@inject AiEnvironment Ai
+@inject IOptions<ShopOptions> Shop
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+@inject IJSRuntime Js
+@inject ILogger<Barcodes> Log
+
+<PageTitle>Barcodes · Smart Retail POS</PageTitle>
+
+<div class="barcodes-page">
+    <div class="page-head">
+        <div>
+            <h1>Barcodes</h1>
+            <p class="sub">
+                @if (Book)
+                {
+                    <text>A book to keep at the counter: a photo, the price and a big barcode for each product, so the till can scan it from the page.</text>
+                }
+                else
+                {
+                    <text>Stickers with the code your POS scans, for products that lost theirs or never had one.</text>
+                }
+            </p>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn btn-primary" disabled="@(chosen.Count == 0 || Unprintable > 0)" title="@(Unprintable > 0 ? "First sort out the products marked in red" : null)" @onclick="PrintAsync"><Icon Name="printer" /> Print</button>
+        </div>
+    </div>
+
+    <div class="seg" role="group" aria-label="What to print">
+        <a class="seg-item @(Book ? null : "active")" href="@Link(book: false)">Stickers</a>
+        <a class="seg-item @(Book ? "active" : null)" href="@Link(book: true)">Counter book</a>
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    <div class="grid-2 barcode-setup">
+        <section class="panel">
+            <div class="panel-head"><h2>@(Book ? "Products in the book" : "Stickers to print")</h2></div>
+            <div class="scan-box compact">
+                <Icon Name="search" Class="scan-icon" />
+                <input class="scan-input" type="search" autocomplete="off" placeholder="Find a product: name, code or barcode"
+                       aria-label="Find a product" value="@term" @oninput="OnSearchAsync" />
+                <button type="button" class="scan-camera" title="Find with the camera" aria-label="Find a product with the camera" @onclick="OpenCameraAsync"><Icon Name="camera" /></button>
+            </div>
+
+            <CameraFind @ref="cameraFind" Class="cm-inline" SelectLabel="Add" OnSelect="AddFoundAsync" />
+
+            @if (found.Count > 0)
+            {
+                <ul class="plain-list found-list" aria-label="Products found">
+                    @foreach (var product in found)
+                    {
+                        <li>
+                            <div class="grow">
+                                <div class="item-name">@product.Name</div>
+                                <div class="item-meta">@BatchLine(product.Batches[0])@(product.Batches.Count > 1 ? $" · {product.Batches.Count} prices" : "")</div>
+                            </div>
+                            <span class="till-code" title="The code the till scans">@product.Batches[0].Code</span>
+                            <button type="button" class="btn btn-sm btn-soft" @onclick="() => Add(product)"><Icon Name="plus" /> Add</button>
+                        </li>
+                    }
+                </ul>
+            }
+            else if (term.Trim().Length > 0 && !searching)
+            {
+                <p class="muted note-line">No product matches “@term.Trim()”.</p>
+            }
+
+            @if (Book)
+            {
+                <div class="book-picks">
+                    <button type="button" class="btn btn-sm" disabled="@busy" @onclick="AddBestSellersAsync"><Icon Name="trend" /> Add the best sellers</button>
+                </div>
+            }
+
+            @if (chosen.Count > 0)
+            {
+                <div class="table-wrap chosen-wrap">
+                    <table class="table data-table chosen-list">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Code</th>
+                                @if (!Book)
+                                {
+                                    <th class="num">Stickers</th>
+                                }
+                                <th><span class="visually-hidden">Remove</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var choice in chosen)
+                            {
+                                <tr @key="choice.Key">
+                                    <td>
+                                        <div class="item-name">@choice.Batch.Name</div>
+                                        <div class="item-meta">@BatchLine(choice.Batch)</div>
+                                        @if (Sticker.Fits(choice.Batch.Code, Sheet) is { } problem)
+                                        {
+                                            <div class="item-meta bad-note">@problem</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (choice.Batches.Count > 1)
+                                        {
+                                            <select class="form-select code-select" aria-label="@($"Which price of {choice.Batch.Name}")" @onchange="e => PickBatch(choice, e.Value as string)">
+                                                @foreach (var batch in choice.Batches)
+                                                {
+                                                    <option value="@batch.Code" selected="@(batch.Code == choice.Batch.Code)">@batch.Code · @Formats.Price(batch.Price)</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <span class="till-code">@choice.Batch.Code</span>
+                                        }
+                                    </td>
+                                    @if (!Book)
+                                    {
+                                        <td class="num">
+                                            <input class="form-control count-input" type="number" min="1" max="@Sticker.MaxPerPrint" inputmode="numeric"
+                                                   aria-label="@($"Stickers for {choice.Batch.Name}")" value="@choice.Count" @onchange="e => SetCount(choice, e.Value as string)" />
+                                        </td>
+                                    }
+                                    <td class="num"><button type="button" class="icon-btn" title="Remove" aria-label="@($"Remove {choice.Batch.Name}")" @onclick="() => Remove(choice)"><Icon Name="close" /></button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="muted note-line">@(Book ? "Add the products that most often come without a sticker, or the best sellers." : "Find a product and add it. Choose how many stickers it needs, e.g. 9 when 1 of 10 pieces still has one.")</p>
+            }
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><h2>@(Book ? "The book" : "Paper")</h2></div>
+            @if (!Book)
+            {
+                <label class="field-label" for="paper">Sticker paper</label>
+                <select id="paper" class="form-select" @onchange="OnPaperAsync">
+                    @foreach (var sheet in LabelSheet.All)
+                    {
+                        <option value="@sheet.Id" selected="@(sheet.Id == paper.Id)">@sheet.Name</option>
+                    }
+                </select>
+                @if (!paper.IsRoll)
+                {
+                    <label class="field-label" for="start-at">Start at sticker</label>
+                    <div class="start-at">
+                        <input id="start-at" class="form-control count-input" type="number" min="1" max="@paper.PerPage" value="@startAt" @onchange="OnStartAt" />
+                        <span class="muted">of @paper.PerPage, for a sheet already partly used</span>
+                    </div>
+                }
+                <label class="switch"><input type="checkbox" checked="@settings.ShowPrice" @onchange="e => SaveAsync(s => s.ShowPrice = e.Value is true)" /> Show the price</label>
+                <label class="switch"><input type="checkbox" checked="@settings.ShowMrp" @onchange="e => SaveAsync(s => s.ShowMrp = e.Value is true)" /> Show the MRP when it is higher</label>
+                <label class="switch"><input type="checkbox" checked="@settings.ShowShopName" @onchange="e => SaveAsync(s => s.ShowShopName = e.Value is true)" /> Show the shop’s name</label>
+                <p class="muted note-line">
+                    @Summary()&#32;
+                    @if (paper.IsRoll)
+                    {
+                        <span>Set the label printer’s paper to @paper.Name.Split(", ").Last() in its printer settings.</span>
+                    }
+                    else
+                    {
+                        <span>In the print window choose A4, margins <b>None</b> and scale <b>100%</b>.</span>
+                    }
+                </p>
+            }
+            else
+            {
+                <p class="muted">@Summary()&#32;In the print window choose A4, margins <b>None</b> and scale <b>100%</b>. Laminated, a page lasts for months at the counter.</p>
+            }
+            <p class="muted note-line">The codes are the ones your POS bills by, read from it just now, so the till finds each product as if its own sticker was scanned.</p>
+        </section>
+    </div>
+
+    @if (chosen.Count > 0)
+    {
+        @if (Book)
+        {
+            <LabelPages TItem="BookEntry" Sheet="LabelSheet.CounterBook" Pages="bookPages" Class="book-pages">
+                <Cell Context="entry">
+                    <div class="book-card">
+                        <div class="bc-photo">
+                            @if (entry.Photo is { } photo)
+                            {
+                                <img src="@photo" alt="" />
+                            }
+                            else
+                            {
+                                <Icon Name="products" />
+                            }
+                        </div>
+                        <div class="bc-text">
+                            <div class="bc-name">@entry.Sticker.Name</div>
+                            <div class="bc-price">
+                                <b>@Formats.Price(entry.Sticker.Price)</b>
+                                @if (entry.Sticker.ShowsMrp)
+                                {
+                                    <span>MRP @Formats.Price(entry.Sticker.Mrp)</span>
+                                }
+                            </div>
+                        </div>
+                        <Barcode Code="@entry.Sticker.Code" Class="bc-bars" />
+                        <div class="bc-code">@entry.Sticker.Code</div>
+                    </div>
+                </Cell>
+            </LabelPages>
+        }
+        else
+        {
+            <LabelPages TItem="Sticker" Sheet="paper" Pages="stickerPages" Class="@(paper.IsRoll ? "roll-pages" : "sheet-pages")">
+                <Cell Context="sticker">
+                    <div class="sticker @StickerSize">
+                        <StickerView Sticker="sticker" Shop="@(settings.ShowShopName ? Shop.Value.Name : null)" ShowPrice="settings.ShowPrice" ShowMrp="settings.ShowMrp" />
+                    </div>
+                </Cell>
+            </LabelPages>
+        }
+    }
+</div>
+
+@code {
+    private const int SearchLimit = 12;
+
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+
+    /// <summary>Products to start with, e.g. from the Products page: "12" or "12,15".</summary>
+    [SupplyParameterFromQuery(Name = "products")] public string? ProductIds { get; set; }
+
+    [SupplyParameterFromQuery(Name = "count")] public int? Count { get; set; }
+
+    private readonly List<Choice> chosen = new();
+    private List<Found> found = new();
+    private StickerSettings settings = new();
+    private LabelSheet paper = LabelSheet.Default;
+    private IReadOnlyList<IReadOnlyList<Sticker?>> stickerPages = Array.Empty<IReadOnlyList<Sticker?>>();
+    private IReadOnlyList<IReadOnlyList<BookEntry?>> bookPages = Array.Empty<IReadOnlyList<BookEntry?>>();
+    private IReadOnlyDictionary<int, SmartRetail.AI.Products.ProductPhotoInfo> photos = new Dictionary<int, SmartRetail.AI.Products.ProductPhotoInfo>();
+    private string term = "";
+    private string? prefilled;
+    private int startAt = 1;
+    private int searchVersion;
+    private int nextKey;
+    private bool searching;
+    private bool busy;
+    private string? error;
+
+    private bool Book => View == "book";
+
+    /// <summary>What the barcodes print on: the chosen sticker paper, or the counter book's cards.</summary>
+    private LabelSheet Sheet => Book ? LabelSheet.CounterBook : paper;
+
+    /// <summary>Chosen products whose code would not scan on <see cref="Sheet"/>; printing waits for them.</summary>
+    private int Unprintable => chosen.Count(c => Sticker.Fits(c.Batch.Code, Sheet) is not null);
+
+    /// <summary>Taller stickers get bigger writing: one line of name on small ones, more room on big ones.</summary>
+    private string? StickerSize => paper.LabelHeightMm switch
+    {
+        < 24 => "small",
+        >= 30 => "large",
+        _ => null,
+    };
+
+    private sealed class Choice
+    {
+        public int Key { get; init; }
+        public required IReadOnlyList<StockBatch> Batches { get; init; }
+        public required StockBatch Batch { get; set; }
+        public int Count { get; set; } = 1;
+    }
+
+    private sealed record Found(int Id, string Name, IReadOnlyList<StockBatch> Batches);
+
+    private sealed record BookEntry(Sticker Sticker, string? Photo);
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            settings = Ai.LoadSettings().Stickers;
+            paper = LabelSheet.Find(settings.Paper);
+            photos = Photos.All();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the sticker settings failed.");
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Products asked for in the address (from the Products page or the side panel), added once.
+        if (ProductIds == prefilled)
+        {
+            Rebuild();
+            return;
+        }
+
+        prefilled = ProductIds;
+        var ids = (ProductIds ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(id => int.TryParse(id, out var value) ? value : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(100)
+            .ToList();
+        // Switching between stickers and the book keeps the list: only products not on it yet are added.
+        ids.RemoveAll(id => chosen.Any(c => c.Batch.ProductId == id));
+        if (ids.Count > 0)
+        {
+            await AddProductsAsync(ids, Math.Clamp(Count ?? 1, 1, Sticker.MaxPerPrint));
+        }
+
+        Rebuild();
+    }
+
+    private async Task OnSearchAsync(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString() ?? "";
+        var mine = ++searchVersion;
+        if (term.Trim().Length == 0)
+        {
+            found = new();
+            return;
+        }
+
+        searching = true;
+        try
+        {
+            await Task.Delay(200);
+            if (mine != searchVersion)
+            {
+                return;
+            }
+
+            var products = await Catalog.SearchAsync(term.Trim(), SearchLimit);
+            var batches = await Catalog.GetBatchesAsync(products.Select(p => p.Id).ToList());
+            if (mine != searchVersion)
+            {
+                return;
+            }
+
+            found = products
+                .Select(p => new Found(p.Id, p.Name, batches.Where(b => b.ProductId == p.Id).ToList()))
+                .Where(p => p.Batches.Count > 0)
+                .ToList();
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Finding products for barcodes failed.");
+            error = "Could not search the products: " + ex.Message;
+        }
+        finally
+        {
+            if (mine == searchVersion)
+            {
+                searching = false;
+            }
+        }
+    }
+
+    private void Add(Found product)
+    {
+        AddChoice(product.Batches, 1);
+        term = "";
+        found = new();
+        Rebuild();
+    }
+
+    private CameraFind? cameraFind;
+
+    private Task OpenCameraAsync() => cameraFind?.OpenAsync() ?? Task.CompletedTask;
+
+    /// <summary>The product the person chose from what the camera found joins the list.</summary>
+    private async Task AddFoundAsync(FoundProduct product)
+    {
+        if (product.Codes.Count == 0)
+        {
+            error = $"{product.Name} has no code in the POS’s stock, so there is no barcode to print for it.";
+            return;
+        }
+
+        await AddProductsAsync(new[] { product.ProductId }, 1);
+        Rebuild();
+    }
+
+    private async Task AddBestSellersAsync()
+    {
+        busy = true;
+        try
+        {
+            var today = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+            var report = await Facts.LoadReportAsync(DateRange.Ending(today, 30));
+            await AddProductsAsync(report.TopProducts.Select(p => p.ProductId).ToList(), 1);
+            Rebuild();
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Adding the best sellers failed.");
+            error = "Could not read the best sellers: " + ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task AddProductsAsync(IReadOnlyList<int> ids, int count)
+    {
+        try
+        {
+            var batches = await Catalog.GetBatchesAsync(ids);
+            foreach (var id in ids)
+            {
+                var own = batches.Where(b => b.ProductId == id).ToList();
+                if (own.Count > 0)
+                {
+                    AddChoice(own, count);
+                }
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Reading product codes for barcodes failed.");
+            error = "Could not read the products’ codes: " + ex.Message;
+        }
+    }
+
+    private void AddChoice(IReadOnlyList<StockBatch> batches, int count)
+    {
+        // A product already on the list gets more stickers rather than a second line.
+        var existing = chosen.FirstOrDefault(c => c.Batch.ProductId == batches[0].ProductId);
+        if (existing is not null)
+        {
+            existing.Count = Math.Min(Sticker.MaxPerPrint, existing.Count + (Book ? 0 : count));
+            return;
+        }
+
+        // The batch in stock first: it is the one on the shelf.
+        var batch = batches.FirstOrDefault(b => b.Qty > 0) ?? batches[0];
+        chosen.Add(new Choice { Key = ++nextKey, Batches = batches, Batch = batch, Count = count });
+    }
+
+    private void PickBatch(Choice choice, string? code)
+    {
+        if (choice.Batches.FirstOrDefault(b => b.Code == code) is { } batch)
+        {
+            choice.Batch = batch;
+            Rebuild();
+        }
+    }
+
+    private void SetCount(Choice choice, string? value)
+    {
+        if (int.TryParse(value, out var count))
+        {
+            choice.Count = Math.Clamp(count, 1, Sticker.MaxPerPrint);
+            Rebuild();
+        }
+    }
+
+    private void Remove(Choice choice)
+    {
+        chosen.Remove(choice);
+        Rebuild();
+    }
+
+    private async Task OnPaperAsync(ChangeEventArgs e)
+    {
+        paper = LabelSheet.Find(e.Value as string);
+        startAt = Math.Clamp(startAt, 1, paper.PerPage);
+        await SaveAsync(s => s.Paper = paper.Id);
+    }
+
+    private void OnStartAt(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value as string, out var value))
+        {
+            startAt = Math.Clamp(value, 1, paper.PerPage);
+            Rebuild();
+        }
+    }
+
+    private Task SaveAsync(Action<StickerSettings> change)
+    {
+        change(settings);
+        try
+        {
+            var store = new SettingsStore(Ai.SettingsFile);
+            var all = store.Load();
+            change(all.Stickers);
+            store.Save(all);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Saving the sticker settings failed.");
+        }
+
+        Rebuild();
+        return Task.CompletedTask;
+    }
+
+    private void Rebuild()
+    {
+        var stickers = chosen.Select(c => (Sticker.For(c.Batch), Book ? 1 : c.Count)).ToList();
+        stickerPages = paper.Pages(Sticker.Repeat(stickers), startAt);
+        bookPages = LabelSheet.CounterBook.Pages(chosen.Select(c => new BookEntry(Sticker.For(c.Batch), PhotoOf(c.Batch.ProductId))));
+    }
+
+    private string? PhotoOf(int productId) =>
+        photos.GetValueOrDefault(productId)?.Thumbnail is { } file ? ProductPhotoService.Url(productId, file) : null;
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("srpos.print");
+
+    private string Summary()
+    {
+        if (Book)
+        {
+            var pages = bookPages.Count;
+            return chosen.Count == 0 ? "" : $"{chosen.Count} products on {pages} {(pages == 1 ? "page" : "pages")}.";
+        }
+
+        var count = stickerPages.Sum(p => p.Count(s => s is not null));
+        var sheets = stickerPages.Count;
+        var what = paper.IsRoll ? (sheets == 1 ? "label" : "labels") : (sheets == 1 ? "sheet" : "sheets");
+        return count == 0 ? "" : paper.IsRoll ? $"{count} stickers." : $"{count} {(count == 1 ? "sticker" : "stickers")} on {sheets} {what}.";
+    }
+
+    private static string BatchLine(StockBatch batch)
+    {
+        var parts = new List<string> { Formats.Price(batch.Price) };
+        if (batch.Mrp > batch.Price)
+        {
+            parts.Add("MRP " + Formats.Price(batch.Mrp));
+        }
+
+        parts.Add(batch.Qty > 0 ? Money.FormatQty(batch.Qty) + " in stock" : "none in stock");
+        return string.Join(" · ", parts);
+    }
+
+    private string Link(bool book)
+    {
+        var ids = chosen.Count == 0 ? null : string.Join(",", chosen.Select(c => c.Batch.ProductId));
+        var query = new List<string>();
+        if (book)
+        {
+            query.Add("view=book");
+        }
+
+        if (ids is not null)
+        {
+            query.Add("products=" + ids);
+        }
+
+        return "barcodes" + (query.Count == 0 ? "" : "?" + string.Join("&", query));
+    }
+}

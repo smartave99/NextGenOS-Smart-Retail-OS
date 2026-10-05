@@ -1,0 +1,512 @@
+Namespace BillPoint
+	' Token: 0x020004CB RID: 1227
+		Public Partial Class frmHoldrecord
+		Inherits Global.System.Windows.Forms.Form
+
+		' Token: 0x0600F909 RID: 63753 RVA: 0x009520A0 File Offset: 0x009502A0
+		<Global.System.Diagnostics.DebuggerNonUserCode()>
+		Protected Overrides Sub Dispose(disposing As Boolean)
+			Try
+				Dim flag As Boolean = disposing AndAlso Me.components IsNot Nothing
+				If flag Then
+					Me.components.Dispose()
+				End If
+			Finally
+				MyBase.Dispose(disposing)
+			End Try
+		End Sub
+
+		' Token: 0x0600F90A RID: 63754 RVA: 0x009520F0 File Offset: 0x009502F0
+		<Global.System.Diagnostics.DebuggerStepThrough()>
+		Private Sub InitializeComponent()
+			Dim dataGridViewCellStyle As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle2 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle3 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle4 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle5 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim componentResourceManager As Global.System.ComponentModel.ComponentResourceManager = New Global.System.ComponentModel.ComponentResourceManager(GetType(Global.BillPoint.frmHoldrecord))
+			Dim dataGridViewCellStyle6 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle7 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle8 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle9 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle10 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle11 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle12 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle13 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle14 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle15 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle16 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle17 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle18 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle19 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle20 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle21 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle22 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle23 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Me.Panel1 = New Global.System.Windows.Forms.Panel()
+			Me.Label4 = New Global.System.Windows.Forms.Label()
+			Me.DataGridView1 = New Global.System.Windows.Forms.DataGridView()
+			Me.lblUser = New Global.System.Windows.Forms.Label()
+			Me.Panel2 = New Global.System.Windows.Forms.Panel()
+			Me.Button2 = New Global.System.Windows.Forms.Button()
+			Me.ComboBox1 = New Global.System.Windows.Forms.ComboBox()
+			Me.Button1 = New Global.System.Windows.Forms.Button()
+			Me.Label3 = New Global.System.Windows.Forms.Label()
+			Me.btnunhold = New Global.System.Windows.Forms.Button()
+			Me.btnhold = New Global.System.Windows.Forms.Button()
+			Me.Label2 = New Global.System.Windows.Forms.Label()
+			Me.txtHold = New Global.System.Windows.Forms.TextBox()
+			Me.Label1 = New Global.System.Windows.Forms.Label()
+			Me.Column1 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column2 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column3 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column14 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column4 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column5 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column6 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column11 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column16 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column17 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column12 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column13 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column15 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column18 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column19 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column20 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column21 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column22 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column23 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column24 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column25 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column26 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column7 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column8 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column9 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column10 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column27 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column28 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column29 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column30 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column31 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column32 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column33 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column34 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column35 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column36 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column37 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column38 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column39 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column40 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Panel1.SuspendLayout()
+			CType(Me.DataGridView1, Global.System.ComponentModel.ISupportInitialize).BeginInit()
+			Me.Panel2.SuspendLayout()
+			MyBase.SuspendLayout()
+			Me.Panel1.BackColor = Global.System.Drawing.Color.White
+			Me.Panel1.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel1.Controls.Add(Me.Label4)
+			Me.Panel1.Controls.Add(Me.DataGridView1)
+			Me.Panel1.Controls.Add(Me.lblUser)
+			Me.Panel1.Controls.Add(Me.Panel2)
+			Me.Panel1.Controls.Add(Me.Label2)
+			Me.Panel1.Controls.Add(Me.txtHold)
+			Me.Panel1.Controls.Add(Me.Label1)
+			Me.Panel1.Location = New Global.System.Drawing.Point(7, 7)
+			Me.Panel1.Name = "Panel1"
+			Me.Panel1.Size = New Global.System.Drawing.Size(695, 273)
+			Me.Panel1.TabIndex = 0
+			Me.Label4.AutoSize = True
+			Me.Label4.Location = New Global.System.Drawing.Point(645, 6)
+			Me.Label4.Name = "Label4"
+			Me.Label4.Size = New Global.System.Drawing.Size(39, 13)
+			Me.Label4.TabIndex = 1679
+			Me.Label4.Text = "Label4"
+			Me.Label4.Visible = False
+			Me.DataGridView1.AllowUserToAddRows = False
+			Me.DataGridView1.AllowUserToDeleteRows = False
+			dataGridViewCellStyle.BackColor = Global.System.Drawing.Color.FloralWhite
+			Me.DataGridView1.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle
+			Me.DataGridView1.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Bottom Or Global.System.Windows.Forms.AnchorStyles.Left Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.DataGridView1.BackgroundColor = Global.System.Drawing.Color.White
+			Me.DataGridView1.ColumnHeadersBorderStyle = Global.System.Windows.Forms.DataGridViewHeaderBorderStyle.[Single]
+			dataGridViewCellStyle2.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter
+			dataGridViewCellStyle2.BackColor = Global.System.Drawing.Color.DarkViolet
+			dataGridViewCellStyle2.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle2.ForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle2.SelectionBackColor = Global.System.Drawing.Color.LightSteelBlue
+			dataGridViewCellStyle2.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle2.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[True]
+			Me.DataGridView1.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2
+			Me.DataGridView1.ColumnHeadersHeight = 30
+			Me.DataGridView1.ColumnHeadersHeightSizeMode = Global.System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+			Me.DataGridView1.Columns.AddRange(New Global.System.Windows.Forms.DataGridViewColumn() { Me.Column1, Me.Column2, Me.Column3, Me.Column14, Me.Column4, Me.Column5, Me.Column6, Me.Column11, Me.Column16, Me.Column17, Me.Column12, Me.Column13, Me.Column15, Me.Column18, Me.Column19, Me.Column20, Me.Column21, Me.Column22, Me.Column23, Me.Column24, Me.Column25, Me.Column26, Me.Column7, Me.Column8, Me.Column9, Me.Column10, Me.Column27, Me.Column28, Me.Column29, Me.Column30, Me.Column31, Me.Column32, Me.Column33, Me.Column34, Me.Column35, Me.Column36, Me.Column37, Me.Column38, Me.Column39, Me.Column40 })
+			Me.DataGridView1.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			dataGridViewCellStyle3.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft
+			dataGridViewCellStyle3.BackColor = Global.System.Drawing.SystemColors.Window
+			dataGridViewCellStyle3.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle3.ForeColor = Global.System.Drawing.SystemColors.ControlText
+			dataGridViewCellStyle3.SelectionBackColor = Global.System.Drawing.SystemColors.Highlight
+			dataGridViewCellStyle3.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle3.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[False]
+			Me.DataGridView1.DefaultCellStyle = dataGridViewCellStyle3
+			Me.DataGridView1.EnableHeadersVisualStyles = False
+			Me.DataGridView1.GridColor = Global.System.Drawing.Color.White
+			Me.DataGridView1.Location = New Global.System.Drawing.Point(4, 33)
+			Me.DataGridView1.MultiSelect = False
+			Me.DataGridView1.Name = "DataGridView1"
+			Me.DataGridView1.[ReadOnly] = True
+			Me.DataGridView1.RowHeadersBorderStyle = Global.System.Windows.Forms.DataGridViewHeaderBorderStyle.[Single]
+			dataGridViewCellStyle4.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft
+			dataGridViewCellStyle4.BackColor = Global.System.Drawing.Color.DarkViolet
+			dataGridViewCellStyle4.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle4.ForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle4.SelectionBackColor = Global.System.Drawing.Color.OrangeRed
+			dataGridViewCellStyle4.SelectionForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle4.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[True]
+			Me.DataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle4
+			Me.DataGridView1.RowHeadersWidth = 25
+			Me.DataGridView1.RowHeadersWidthSizeMode = Global.System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.DisableResizing
+			dataGridViewCellStyle5.BackColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle5.Font = New Global.System.Drawing.Font("Tahoma", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle5.SelectionBackColor = Global.System.Drawing.Color.DarkSlateGray
+			dataGridViewCellStyle5.SelectionForeColor = Global.System.Drawing.Color.White
+			Me.DataGridView1.RowsDefaultCellStyle = dataGridViewCellStyle5
+			Me.DataGridView1.RowTemplate.Height = 25
+			Me.DataGridView1.RowTemplate.Resizable = Global.System.Windows.Forms.DataGridViewTriState.[False]
+			Me.DataGridView1.SelectionMode = Global.System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+			Me.DataGridView1.Size = New Global.System.Drawing.Size(588, 222)
+			Me.DataGridView1.TabIndex = 1678
+			Me.DataGridView1.TabStop = False
+			Me.lblUser.AutoSize = True
+			Me.lblUser.BackColor = Global.System.Drawing.Color.Transparent
+			Me.lblUser.Location = New Global.System.Drawing.Point(523, 11)
+			Me.lblUser.Name = "lblUser"
+			Me.lblUser.Size = New Global.System.Drawing.Size(39, 13)
+			Me.lblUser.TabIndex = 414
+			Me.lblUser.Text = "lblUser"
+			Me.lblUser.Visible = False
+			Me.Panel2.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel2.Controls.Add(Me.Button2)
+			Me.Panel2.Controls.Add(Me.ComboBox1)
+			Me.Panel2.Controls.Add(Me.Button1)
+			Me.Panel2.Controls.Add(Me.Label3)
+			Me.Panel2.Controls.Add(Me.btnunhold)
+			Me.Panel2.Controls.Add(Me.btnhold)
+			Me.Panel2.Location = New Global.System.Drawing.Point(596, 33)
+			Me.Panel2.Name = "Panel2"
+			Me.Panel2.Size = New Global.System.Drawing.Size(92, 222)
+			Me.Panel2.TabIndex = 413
+			Me.Button2.BackColor = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.Button2.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Button2.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.Button2.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.Button2.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Button2.ForeColor = Global.System.Drawing.Color.White
+			Me.Button2.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Button2.Location = New Global.System.Drawing.Point(1, 124)
+			Me.Button2.Name = "Button2"
+			Me.Button2.Size = New Global.System.Drawing.Size(88, 33)
+			Me.Button2.TabIndex = 1681
+			Me.Button2.TabStop = False
+			Me.Button2.Text = "All PC Record"
+			Me.Button2.UseVisualStyleBackColor = False
+			Me.ComboBox1.AutoCompleteMode = Global.System.Windows.Forms.AutoCompleteMode.SuggestAppend
+			Me.ComboBox1.AutoCompleteSource = Global.System.Windows.Forms.AutoCompleteSource.ListItems
+			Me.ComboBox1.FormattingEnabled = True
+			Me.ComboBox1.Location = New Global.System.Drawing.Point(1, 197)
+			Me.ComboBox1.Name = "ComboBox1"
+			Me.ComboBox1.Size = New Global.System.Drawing.Size(88, 21)
+			Me.ComboBox1.TabIndex = 1680
+			Me.Button1.BackColor = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.Button1.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Button1.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.Button1.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.Button1.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Button1.ForeColor = Global.System.Drawing.Color.White
+			Me.Button1.Image = CType(componentResourceManager.GetObject("Button1.Image"), Global.System.Drawing.Image)
+			Me.Button1.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Button1.Location = New Global.System.Drawing.Point(1, 83)
+			Me.Button1.Name = "Button1"
+			Me.Button1.Size = New Global.System.Drawing.Size(88, 33)
+			Me.Button1.TabIndex = 1679
+			Me.Button1.TabStop = False
+			Me.Button1.Text = "Reset"
+			Me.Button1.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.Button1.UseVisualStyleBackColor = False
+			Me.Label3.Location = New Global.System.Drawing.Point(0, 167)
+			Me.Label3.Name = "Label3"
+			Me.Label3.Size = New Global.System.Drawing.Size(87, 28)
+			Me.Label3.TabIndex = 1678
+			Me.Label3.Text = "Search By Hold No. :"
+			Me.btnunhold.BackColor = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.btnunhold.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.btnunhold.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.btnunhold.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.btnunhold.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.btnunhold.ForeColor = Global.System.Drawing.Color.White
+			Me.btnunhold.Image = CType(componentResourceManager.GetObject("btnunhold.Image"), Global.System.Drawing.Image)
+			Me.btnunhold.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.btnunhold.Location = New Global.System.Drawing.Point(1, 43)
+			Me.btnunhold.Name = "btnunhold"
+			Me.btnunhold.Size = New Global.System.Drawing.Size(88, 33)
+			Me.btnunhold.TabIndex = 1676
+			Me.btnunhold.TabStop = False
+			Me.btnunhold.Text = "Delete"
+			Me.btnunhold.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.btnunhold.UseVisualStyleBackColor = False
+			Me.btnhold.BackColor = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.btnhold.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.btnhold.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.btnhold.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.btnhold.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.btnhold.ForeColor = Global.System.Drawing.Color.White
+			Me.btnhold.Image = CType(componentResourceManager.GetObject("btnhold.Image"), Global.System.Drawing.Image)
+			Me.btnhold.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.btnhold.Location = New Global.System.Drawing.Point(1, 3)
+			Me.btnhold.Name = "btnhold"
+			Me.btnhold.Size = New Global.System.Drawing.Size(88, 33)
+			Me.btnhold.TabIndex = 1675
+			Me.btnhold.TabStop = False
+			Me.btnhold.Text = "Delete All"
+			Me.btnhold.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.btnhold.UseVisualStyleBackColor = False
+			Me.Label2.AutoSize = True
+			Me.Label2.ForeColor = Global.System.Drawing.Color.Crimson
+			Me.Label2.Location = New Global.System.Drawing.Point(1, 257)
+			Me.Label2.Name = "Label2"
+			Me.Label2.Size = New Global.System.Drawing.Size(221, 13)
+			Me.Label2.TabIndex = 412
+			Me.Label2.Text = "( PS :- Double click on rows to retrieve data. )"
+			Me.txtHold.Location = New Global.System.Drawing.Point(600, 6)
+			Me.txtHold.Name = "txtHold"
+			Me.txtHold.[ReadOnly] = True
+			Me.txtHold.Size = New Global.System.Drawing.Size(11, 20)
+			Me.txtHold.TabIndex = 1677
+			Me.txtHold.TabStop = False
+			Me.txtHold.Visible = False
+			Me.Label1.BackColor = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.Label1.Dock = Global.System.Windows.Forms.DockStyle.Top
+			Me.Label1.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 14.25F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Label1.ForeColor = Global.System.Drawing.Color.White
+			Me.Label1.Location = New Global.System.Drawing.Point(0, 0)
+			Me.Label1.Name = "Label1"
+			Me.Label1.Size = New Global.System.Drawing.Size(693, 30)
+			Me.Label1.TabIndex = 410
+			Me.Label1.Text = "Hold Record"
+			Me.Label1.TextAlign = Global.System.Drawing.ContentAlignment.MiddleCenter
+			Me.Column1.HeaderText = "Invoice ID"
+			Me.Column1.Name = "Column1"
+			Me.Column1.[ReadOnly] = True
+			Me.Column1.Visible = False
+			Me.Column2.HeaderText = "Hold No"
+			Me.Column2.Name = "Column2"
+			Me.Column2.[ReadOnly] = True
+			dataGridViewCellStyle6.Format = "dd/MM/yyyy"
+			Me.Column3.DefaultCellStyle = dataGridViewCellStyle6
+			Me.Column3.HeaderText = "Hold Date"
+			Me.Column3.Name = "Column3"
+			Me.Column3.[ReadOnly] = True
+			Me.Column14.HeaderText = "Tax Type"
+			Me.Column14.Name = "Column14"
+			Me.Column14.[ReadOnly] = True
+			Me.Column4.HeaderText = "CID"
+			Me.Column4.Name = "Column4"
+			Me.Column4.[ReadOnly] = True
+			Me.Column4.Visible = False
+			Me.Column5.HeaderText = "Customer ID"
+			Me.Column5.Name = "Column5"
+			Me.Column5.[ReadOnly] = True
+			Me.Column5.Visible = False
+			Me.Column5.Width = 112
+			Me.Column6.HeaderText = "Customer Name"
+			Me.Column6.Name = "Column6"
+			Me.Column6.[ReadOnly] = True
+			Me.Column6.Width = 150
+			Me.Column11.HeaderText = "Contact No."
+			Me.Column11.Name = "Column11"
+			Me.Column11.[ReadOnly] = True
+			Me.Column11.Width = 120
+			Me.Column16.HeaderText = "State"
+			Me.Column16.Name = "Column16"
+			Me.Column16.[ReadOnly] = True
+			Me.Column16.Visible = False
+			Me.Column16.Width = 120
+			Me.Column17.HeaderText = "GSTIN"
+			Me.Column17.Name = "Column17"
+			Me.Column17.[ReadOnly] = True
+			Me.Column17.Visible = False
+			Me.Column12.HeaderText = "SM_ID"
+			Me.Column12.Name = "Column12"
+			Me.Column12.[ReadOnly] = True
+			Me.Column12.Visible = False
+			Me.Column13.HeaderText = "Salesman ID"
+			Me.Column13.Name = "Column13"
+			Me.Column13.[ReadOnly] = True
+			Me.Column13.Visible = False
+			Me.Column15.HeaderText = "Salesman"
+			Me.Column15.Name = "Column15"
+			Me.Column15.[ReadOnly] = True
+			dataGridViewCellStyle7.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column18.DefaultCellStyle = dataGridViewCellStyle7
+			Me.Column18.HeaderText = "Sub Total"
+			Me.Column18.Name = "Column18"
+			Me.Column18.[ReadOnly] = True
+			Me.Column18.Visible = False
+			dataGridViewCellStyle8.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column19.DefaultCellStyle = dataGridViewCellStyle8
+			Me.Column19.HeaderText = "CGST"
+			Me.Column19.Name = "Column19"
+			Me.Column19.[ReadOnly] = True
+			Me.Column19.Visible = False
+			dataGridViewCellStyle9.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column20.DefaultCellStyle = dataGridViewCellStyle9
+			Me.Column20.HeaderText = "SGST/UTGST"
+			Me.Column20.Name = "Column20"
+			Me.Column20.[ReadOnly] = True
+			Me.Column20.Visible = False
+			dataGridViewCellStyle10.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column21.DefaultCellStyle = dataGridViewCellStyle10
+			Me.Column21.HeaderText = "IGST"
+			Me.Column21.Name = "Column21"
+			Me.Column21.[ReadOnly] = True
+			Me.Column21.Visible = False
+			dataGridViewCellStyle11.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column22.DefaultCellStyle = dataGridViewCellStyle11
+			Me.Column22.HeaderText = "CESS"
+			Me.Column22.Name = "Column22"
+			Me.Column22.[ReadOnly] = True
+			Me.Column22.Visible = False
+			dataGridViewCellStyle12.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column23.DefaultCellStyle = dataGridViewCellStyle12
+			Me.Column23.HeaderText = "Bill Sundry Charges"
+			Me.Column23.Name = "Column23"
+			Me.Column23.[ReadOnly] = True
+			Me.Column23.Visible = False
+			dataGridViewCellStyle13.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column24.DefaultCellStyle = dataGridViewCellStyle13
+			Me.Column24.HeaderText = "Total Bill Discount"
+			Me.Column24.Name = "Column24"
+			Me.Column24.[ReadOnly] = True
+			Me.Column24.Visible = False
+			dataGridViewCellStyle14.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column25.DefaultCellStyle = dataGridViewCellStyle14
+			Me.Column25.HeaderText = "Total"
+			Me.Column25.Name = "Column25"
+			Me.Column25.[ReadOnly] = True
+			Me.Column25.Visible = False
+			dataGridViewCellStyle15.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column26.DefaultCellStyle = dataGridViewCellStyle15
+			Me.Column26.HeaderText = "Round Off"
+			Me.Column26.Name = "Column26"
+			Me.Column26.[ReadOnly] = True
+			Me.Column26.Visible = False
+			dataGridViewCellStyle16.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column7.DefaultCellStyle = dataGridViewCellStyle16
+			Me.Column7.HeaderText = "Grand Total"
+			Me.Column7.Name = "Column7"
+			Me.Column7.[ReadOnly] = True
+			dataGridViewCellStyle17.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column8.DefaultCellStyle = dataGridViewCellStyle17
+			Me.Column8.HeaderText = "Total Payment"
+			Me.Column8.Name = "Column8"
+			Me.Column8.[ReadOnly] = True
+			Me.Column8.Visible = False
+			dataGridViewCellStyle18.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column9.DefaultCellStyle = dataGridViewCellStyle18
+			Me.Column9.HeaderText = "Payment Due"
+			Me.Column9.Name = "Column9"
+			Me.Column9.[ReadOnly] = True
+			Me.Column9.Visible = False
+			Me.Column10.HeaderText = "Remarks"
+			Me.Column10.Name = "Column10"
+			Me.Column10.[ReadOnly] = True
+			Me.Column10.Visible = False
+			Me.Column27.HeaderText = "Narration"
+			Me.Column27.Name = "Column27"
+			Me.Column27.[ReadOnly] = True
+			Me.Column27.Visible = False
+			Me.Column28.HeaderText = "E-Way No"
+			Me.Column28.Name = "Column28"
+			Me.Column28.[ReadOnly] = True
+			Me.Column28.Visible = False
+			Me.Column29.HeaderText = "Till ID"
+			Me.Column29.Name = "Column29"
+			Me.Column29.[ReadOnly] = True
+			Me.Column29.Width = 150
+			Me.Column30.HeaderText = "Operator"
+			Me.Column30.Name = "Column30"
+			Me.Column30.[ReadOnly] = True
+			Me.Column31.HeaderText = "Bill Sundy Type"
+			Me.Column31.Name = "Column31"
+			Me.Column31.[ReadOnly] = True
+			Me.Column31.Visible = False
+			Me.Column32.HeaderText = "Offer Discount"
+			Me.Column32.Name = "Column32"
+			Me.Column32.[ReadOnly] = True
+			Me.Column32.Visible = False
+			Me.Column33.HeaderText = "Loyalty Discount"
+			Me.Column33.Name = "Column33"
+			Me.Column33.[ReadOnly] = True
+			Me.Column33.Visible = False
+			Me.Column34.HeaderText = "Manual Bill Discount"
+			Me.Column34.Name = "Column34"
+			Me.Column34.[ReadOnly] = True
+			Me.Column34.Visible = False
+			Me.Column35.HeaderText = "Customer Type"
+			Me.Column35.Name = "Column35"
+			Me.Column35.[ReadOnly] = True
+			Me.Column35.Visible = False
+			dataGridViewCellStyle19.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle19.Format = "N2"
+			Me.Column36.DefaultCellStyle = dataGridViewCellStyle19
+			Me.Column36.HeaderText = "Tender"
+			Me.Column36.Name = "Column36"
+			Me.Column36.[ReadOnly] = True
+			dataGridViewCellStyle20.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle20.Format = "N2"
+			Me.Column37.DefaultCellStyle = dataGridViewCellStyle20
+			Me.Column37.HeaderText = "Refund"
+			Me.Column37.Name = "Column37"
+			Me.Column37.[ReadOnly] = True
+			dataGridViewCellStyle21.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle21.Format = "N2"
+			Me.Column38.DefaultCellStyle = dataGridViewCellStyle21
+			Me.Column38.HeaderText = "Bill Cash"
+			Me.Column38.Name = "Column38"
+			Me.Column38.[ReadOnly] = True
+			dataGridViewCellStyle22.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle22.Format = "N2"
+			Me.Column39.DefaultCellStyle = dataGridViewCellStyle22
+			Me.Column39.HeaderText = "Coupon Discount"
+			Me.Column39.Name = "Column39"
+			Me.Column39.[ReadOnly] = True
+			Me.Column39.Visible = False
+			dataGridViewCellStyle23.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle23.Format = "N2"
+			Me.Column40.DefaultCellStyle = dataGridViewCellStyle23
+			Me.Column40.HeaderText = "Gift Discount"
+			Me.Column40.Name = "Column40"
+			Me.Column40.[ReadOnly] = True
+			Me.Column40.Visible = False
+			MyBase.AutoScaleDimensions = New Global.System.Drawing.SizeF(6F, 13F)
+			MyBase.AutoScaleMode = Global.System.Windows.Forms.AutoScaleMode.Font
+			Me.BackColor = Global.System.Drawing.Color.FromArgb(255, 192, 128)
+			MyBase.ClientSize = New Global.System.Drawing.Size(709, 286)
+			MyBase.Controls.Add(Me.Panel1)
+			MyBase.FormBorderStyle = Global.System.Windows.Forms.FormBorderStyle.FixedSingle
+			MyBase.KeyPreview = True
+			MyBase.MaximizeBox = False
+			MyBase.Name = "frmHoldrecord"
+			MyBase.ShowIcon = False
+			MyBase.ShowInTaskbar = False
+			MyBase.StartPosition = Global.System.Windows.Forms.FormStartPosition.CenterParent
+			Me.Panel1.ResumeLayout(False)
+			Me.Panel1.PerformLayout()
+			CType(Me.DataGridView1, Global.System.ComponentModel.ISupportInitialize).EndInit()
+			Me.Panel2.ResumeLayout(False)
+			MyBase.ResumeLayout(False)
+		End Sub
+
+		' Token: 0x04005F4C RID: 24396
+		Private components As Global.System.ComponentModel.IContainer
+	End Class
+End Namespace

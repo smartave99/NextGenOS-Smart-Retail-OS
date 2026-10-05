@@ -1,0 +1,126 @@
+@* Settings: offering the finished products to the owner's website. The listing, the photos and the POS price wait in the owner's own
+   Supabase project, and nothing is published until the owner approves each product on the website. *@
+@implements IDisposable
+@inject WebsiteService Website
+
+<div class="website-setting" id="website-products" data-runs="@status.Runs">
+    <h4>Offer finished products to your website</h4>
+    <p>
+        When a product's photos and listing are finished, this PC can offer it to your website: its listing, its photos and its price from the POS go to your
+        Supabase project and wait there. Nothing appears on your website until you approve each product, on your website (Live shop, then <em>From the shop</em>).
+        Every product also gets a category of your website, chosen from its list.
+    </p>
+    <div class="website-switch">
+        <OnOff Label="Offer finished products to my website" Value="Website.Enabled" Changed="SetAsync" />
+        @if (Website.Enabled)
+        {
+            <button type="button" class="btn btn-soft btn-sm" disabled="@(busy || status.Working)" @onclick="LookAsync"><Icon Name="refresh" /> Look now</button>
+        }
+    </div>
+    @if (Website.Enabled)
+    {
+        @if (status.Problem is { } problem)
+        {
+            <p class="owner-state problem"><Icon Name="alert" /><span>@problem</span></p>
+        }
+        else if (status.Working || busy)
+        {
+            <p class="owner-state"><span class="spinner"></span><span>Looking at your website's list…</span></p>
+        }
+        else if (status.LastRunAt is { } looked)
+        {
+            <p class="owner-state"><span class="live-dot" aria-hidden="true"></span><span>@Summary() Looked at @Formats.Time(looked.LocalDateTime).</span></p>
+        }
+
+        @if (status.ListFull)
+        {
+            <p class="owner-state"><Icon Name="info" /><span>The list on your website is full. Decide on some products there, and more are offered.</span></p>
+        }
+
+        @if (status.ReadyToOffer > 0)
+        {
+            <p class="small muted website-line">@Count(status.ReadyToOffer, "finished product") will be offered next.</p>
+        }
+
+        @if (status.NeedsCategory > 0)
+        {
+            <p class="small muted website-line">@Count(status.NeedsCategory, "finished product") @(status.NeedsCategory == 1 ? "needs" : "need") a category of your website: choose it on the product's page, under Listings, Your website.</p>
+        }
+
+        @if (status.Categories == 0)
+        {
+            <p class="small muted website-line">Your website's categories have not reached this PC yet. Open <em>From the shop</em> in your website's admin once: they come here by themselves.</p>
+        }
+        else
+        {
+            <p class="small muted website-line">@Count(status.Categories, "category", "categories") of your website @(status.Categories == 1 ? "is" : "are") known here.</p>
+        }
+    }
+</div>
+
+@code {
+    private WebsiteStatus status = new();
+    private bool busy;
+
+    protected override void OnInitialized()
+    {
+        status = Website.Status;
+        Website.Changed += OnChanged;
+    }
+
+    private void SetAsync(bool on)
+    {
+        Website.SetSendProducts(on);
+        status = Website.Status;
+    }
+
+    private async Task LookAsync()
+    {
+        busy = true;
+        try
+        {
+            await Website.RunNowAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    /// <summary>E.g. "2 waiting for your approval · 5 approved."</summary>
+    private string Summary()
+    {
+        var parts = new List<string>();
+        if (status.Sending > 0)
+        {
+            parts.Add($"{status.Sending} being sent");
+        }
+
+        if (status.Waiting > 0)
+        {
+            parts.Add($"{status.Waiting} waiting for your approval");
+        }
+
+        if (status.Published > 0)
+        {
+            parts.Add($"{status.Published} approved");
+        }
+
+        if (status.Declined > 0)
+        {
+            parts.Add($"{status.Declined} declined");
+        }
+
+        return parts.Count == 0 ? "Nothing has been offered yet." : string.Join(" · ", parts) + ".";
+    }
+
+    private static string Count(int count, string one, string? many = null) => count == 1 ? $"1 {one}" : $"{count} {many ?? one + "s"}";
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        status = Website.Status;
+        StateHasChanged();
+    });
+
+    public void Dispose() => Website.Changed -= OnChanged;
+}

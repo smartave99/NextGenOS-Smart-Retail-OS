@@ -1,0 +1,433 @@
+@page "/review"
+@using SmartRetail.Pos.Core.Actions
+@using SmartRetail.Pos.Core.Analytics
+@using SmartRetail.Pos.Core.Review
+@implements IDisposable
+@inject ReviewService Reviews
+@inject ActionService Actions
+@inject ILogger<MondayReview> Log
+
+<PageTitle>Monday review · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Monday review</h1>
+        <p class="sub">Five minutes once a week: how last week went, what the stock rules suggest, and how your earlier decisions turned out. The rules only suggest; you decide. Nothing here changes the POS.</p>
+    </div>
+    @if (data is not null)
+    {
+        <div class="actions">
+            @if (data.Reviewed is { } reviewedAt)
+            {
+                <span class="pill good"><Icon Name="check" /> Reviewed @Formats.DateAndTime(reviewedAt)</span>
+            }
+            else
+            {
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="MarkReviewedAsync"><Icon Name="check" /> Mark the week as reviewed</button>
+            }
+        </div>
+    }
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (data is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Reading the POS…</p>
+    }
+}
+else
+{
+    var thisWeek = data.ThisWeek;
+    var weekBefore = data.WeekBefore;
+    <h2 class="review-week">Last week, @ReviewWeeks.Name(data.Week)</h2>
+    <div class="kpis">
+        <Kpi Label="Sales" Value="@Formats.Rupees(thisWeek.Sales)" Hint="@Versus(Formats.Growth(thisWeek.Sales, weekBefore.Sales), Formats.Rupees(weekBefore.Sales))"
+             HintTone="@Formats.ChangeTone(Formats.Growth(thisWeek.Sales, weekBefore.Sales))" />
+        <Kpi Label="Bills" Value="@Formats.Count(thisWeek.Bills)" Hint="@Versus(Formats.Growth(thisWeek.Bills, weekBefore.Bills), Formats.Count(weekBefore.Bills))"
+             HintTone="@Formats.ChangeTone(Formats.Growth(thisWeek.Bills, weekBefore.Bills))" />
+        <Kpi Label="Average bill" Value="@Formats.Rupees(thisWeek.AverageBill)" Hint="@Versus(Formats.Growth(thisWeek.AverageBill, weekBefore.AverageBill), Formats.Rupees(weekBefore.AverageBill))"
+             HintTone="@Formats.ChangeTone(Formats.Growth(thisWeek.AverageBill, weekBefore.AverageBill))" />
+        <Kpi Label="Profit before GST" Value="@(thisWeek.ProfitMargin is null ? "–" : Formats.Rupees(thisWeek.Profit))" Hint="@ProfitHint(thisWeek)" />
+    </div>
+    <p class="muted small review-year">@YearBefore()</p>
+
+    <section class="panel" aria-labelledby="actions-head">
+        <div class="panel-head">
+            <h2 id="actions-head"><Icon Name="flag" /> What the shop is trying</h2>
+            <a class="more" href="actions">All actions <Icon Name="chevron" /></a>
+        </div>
+        @if (actions.Count == 0)
+        {
+            <p class="muted">Nothing noted. Note an offer, an ad or a new display on the Actions page, and the figures show later whether it worked.</p>
+        }
+        else
+        {
+            <ul class="memory-list">
+                @foreach (var (action, result) in actions)
+                {
+                    <li class="memory-item" @key="action.Id">
+                        <div class="m-text">
+                            <strong>@action.Title</strong>
+                            @if (result.Test is { } test)
+                            {
+                                <span class="pill @test.Verdict.Tone()">@test.Verdict.Name()</span>
+                            }
+                            else
+                            {
+                                <span class="pill @result.Verdict.Tone()">@result.Verdict.Name()</span>
+                            }
+                        </div>
+                        <div class="m-meta">@action.Kind.Name() · @Dates(action)</div>
+                        <div class="m-text">@result.Summary</div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    @if (tests.Count > 0)
+    {
+        <section class="panel" aria-labelledby="tests-head">
+            <div class="panel-head">
+                <h2 id="tests-head"><Icon Name="products" /> New products to decide</h2>
+                <span class="muted small">Their review day came</span>
+            </div>
+            <ul class="memory-list">
+                @foreach (var (action, test) in tests)
+                {
+                    <li class="memory-item review-test" @key="action.Id">
+                        <div class="m-text"><strong>@action.Title</strong> <span class="pill @test.Verdict.Tone()">@test.Verdict.Name()</span></div>
+                        <div class="m-text">@test.Summary</div>
+                        <TestDecisionForm Tested="action" Result="test" OnDecided="LoadAsync" />
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    <div class="grid-2 review-alerts">
+        <section class="panel" aria-labelledby="out-head">
+            <div class="panel-head">
+                <h2 id="out-head"><Icon Name="stock" /> Running out</h2>
+                <span class="muted small">Regular sellers with under a week of stock</span>
+            </div>
+            @AlertList(AlertKind.StockOut)
+        </section>
+        <section class="panel" aria-labelledby="dead-head">
+            <div class="panel-head">
+                <h2 id="dead-head"><Icon Name="products" /> Not selling</h2>
+                <span class="muted small">In stock, not sold in 8 weeks</span>
+            </div>
+            @AlertList(AlertKind.DeadStock)
+        </section>
+    </div>
+
+    <section class="panel" aria-labelledby="decisions-head">
+        <div class="panel-head">
+            <h2 id="decisions-head"><Icon Name="check" /> Your decisions</h2>
+            @if (data.Decisions.Count > 0)
+            {
+                <span class="muted small">Checked two weeks later, four for stock that was not selling</span>
+            }
+        </div>
+        @if (Tally() is { } tally)
+        {
+            <p class="review-tally">@tally</p>
+        }
+        @if (data.Decisions.Count == 0)
+        {
+            <p class="muted">No decisions yet. Each one is checked later from the POS’s figures, so you can see whether following the rules helps the shop.</p>
+        }
+        else
+        {
+            <ul class="memory-list">
+                @foreach (var decision in data.Decisions.Take(showAll ? data.Decisions.Count : DecisionsShown))
+                {
+                    <li class="memory-item" @key="decision.Id">
+                        <div class="m-text"><strong>@decision.Name</strong> <span class="pill @(decision.Kind == AlertKind.StockOut ? "warn" : "blue")">@KindName(decision.Kind)</span></div>
+                        <div class="m-meta">@Formats.Date(decision.Decided) · the rule said: @decision.Recommendation</div>
+                        <div class="m-text">@ChoiceText(decision)</div>
+                        <div class="m-meta">
+                            @if (decision.Outcome is { } outcome)
+                            {
+                                <span class="@(decision.WentWell switch { true => "trend-up", false => "trend-down", _ => "" })">@outcome</span>
+                            }
+                            else
+                            {
+                                @($"Checked on {Formats.Date(decision.ReviewOn)}.")
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+            @if (!showAll && data.Decisions.Count > DecisionsShown)
+            {
+                <button type="button" class="btn btn-sm btn-link" @onclick="() => showAll = true">Show all @data.Decisions.Count</button>
+            }
+        }
+    </section>
+}
+
+@code {
+    private const int DecisionsShown = 20;
+
+    /// <summary>The shop's actions shown at most: those going on, or that ran during the week.</summary>
+    private const int ActionsShown = 5;
+
+    private readonly CancellationTokenSource stopping = new();
+    private ReviewData? data;
+    private IReadOnlyList<(ShopAction Action, ActionResult Result)> actions = Array.Empty<(ShopAction, ActionResult)>();
+    private IReadOnlyList<(ShopAction Action, TestResult Test)> tests = Array.Empty<(ShopAction, TestResult)>();
+    private string? error;
+    private bool busy;
+    private bool showAll;
+
+    /// <summary>The alert whose note is being written, and the choice it is for.</summary>
+    private (AlertKind Kind, int ProductId, DecisionChoice Choice)? noting;
+    private string note = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Reviews.Changed += OnChanged;
+        Actions.Changed += OnChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            data = await Reviews.LoadAsync(stopping.Token);
+            tests = await TestsAsync();
+            actions = await ActionsAsync(data.Week, tests.Select(t => t.Action.Id).ToHashSet());
+            error = null;
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading the Monday review failed.");
+            error = "Could not read the POS: " + ex.Message;
+        }
+    }
+
+    /// <summary>The new products whose review day came, each with how its test went, waiting for the owner's decision.</summary>
+    private async Task<IReadOnlyList<(ShopAction, TestResult)>> TestsAsync()
+    {
+        var due = new List<(ShopAction, TestResult)>();
+        foreach (var action in Actions.TestsToDecide())
+        {
+            try
+            {
+                if ((await Actions.MeasureAsync(action, stopping.Token)).Test is { } test)
+                {
+                    due.Add((action, test));
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.LogWarning(ex, "Judging a new product's test for the Monday review failed.");
+            }
+        }
+
+        return due;
+    }
+
+    /// <summary>The actions going on, or that ran during the week, newest first, with what the figures say; the new
+    /// products waiting for a decision are left to their own list.</summary>
+    private async Task<IReadOnlyList<(ShopAction, ActionResult)>> ActionsAsync(DateRange week, IReadOnlySet<string> deciding)
+    {
+        var today = Reviews.Today;
+        var shown = new List<(ShopAction, ActionResult)>();
+        foreach (var action in Actions.Load().Actions
+                     .Where(a => !a.Cancelled && !deciding.Contains(a.Id) && a.Start <= today && (a.End is not { } end || end >= week.From))
+                     .OrderByDescending(a => a.Start)
+                     .Take(ActionsShown))
+        {
+            try
+            {
+                shown.Add((action, await Actions.MeasureAsync(action, stopping.Token)));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.LogWarning(ex, "Measuring an action for the Monday review failed.");
+                shown.Add((action, new ActionResult { Verdict = ActionVerdict.NothingToCompare, Summary = "Could not read the figures: " + ex.Message }));
+            }
+        }
+
+        return shown;
+    }
+
+    private static string Dates(ShopAction action) =>
+        action.End is { } end ? ActionMeasure.Dates(new DateRange(action.Start, end)) : "from " + Formats.Date(action.Start);
+
+    private RenderFragment AlertList(AlertKind kind) => __builder =>
+    {
+        var alerts = data!.Alerts.Where(a => a.Kind == kind).ToList();
+        if (alerts.Count == 0)
+        {
+            <p class="muted">@(kind == AlertKind.StockOut ? "Nothing is running out." : "Nothing in stock has gone 8 weeks unsold.")</p>
+        }
+        else
+        {
+            <ul class="memory-list">
+                @foreach (var alert in alerts)
+                {
+                    <li class="memory-item review-alert" @key="(alert.Kind, alert.ProductId)">
+                        <div class="m-text"><strong>@alert.Name</strong></div>
+                        <div class="m-meta">@alert.Figures</div>
+                        <div class="m-text">@alert.Recommendation</div>
+                        @if (noting is { } open && open.Kind == alert.Kind && open.ProductId == alert.ProductId)
+                        {
+                            var id = $"note-{alert.Kind}-{alert.ProductId}";
+                            <form class="review-note" @onsubmit="() => DecideAsync(alert, open.Choice, note)">
+                                <label class="field-label" for="@id">@(open.Choice == DecisionChoice.Changed ? "What will you do instead?" : "Why not now? (you can leave it empty)")@if (open.Choice == DecisionChoice.Changed) {<text> </text><Required />}</label>
+                                <input id="@id" class="form-control" maxlength="@AlertDecision.MaxNote" aria-required="@(open.Choice == DecisionChoice.Changed ? "true" : null)" @bind="note" />
+                                <div class="f-actions">
+                                    <button type="submit" class="btn btn-sm btn-primary" disabled="@busy">Save</button>
+                                    <button type="button" class="btn btn-sm btn-link" @onclick="() => noting = null">Cancel</button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="f-actions">
+                                <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => DecideAsync(alert, DecisionChoice.Accepted, null)">Do it</button>
+                                <button type="button" class="btn btn-sm btn-soft" disabled="@busy" @onclick="() => StartNote(alert, DecisionChoice.Changed)">Something else</button>
+                                <button type="button" class="btn btn-sm btn-link" disabled="@busy" @onclick="() => StartNote(alert, DecisionChoice.Rejected)">Not now</button>
+                                @if (alert.Kind == AlertKind.DeadStock)
+                                {
+                                    <a class="btn btn-sm btn-link" href="posters?kind=clearance">Make a clearance poster</a>
+                                }
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    };
+
+    private void StartNote(ShopAlert alert, DecisionChoice choice)
+    {
+        noting = (alert.Kind, alert.ProductId, choice);
+        note = "";
+        error = null;
+    }
+
+    private async Task DecideAsync(ShopAlert alert, DecisionChoice choice, string? words)
+    {
+        busy = true;
+        try
+        {
+            if (Reviews.Decide(alert, choice, words) is { } problem)
+            {
+                error = problem;
+                return;
+            }
+
+            noting = null;
+            note = "";
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task MarkReviewedAsync()
+    {
+        busy = true;
+        try
+        {
+            Reviews.MarkReviewed(data!.Week);
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private string YearBefore()
+    {
+        if (data!.YearBefore is not { } year)
+        {
+            return "The POS has no bills from the same week a year before, so the week is compared with the week before only.";
+        }
+
+        var growth = Formats.Growth(data.ThisWeek.Sales, year.Sales);
+        return $"The same week a year before ({ReviewWeeks.Name(ReviewWeeks.YearBefore(data.Week))}): {Formats.Rupees(year.Sales)} from {Formats.Count(year.Bills)} bills"
+            + (growth is null ? "." : $", so last week was {Formats.Change(growth)}.");
+    }
+
+    /// <summary>How the checked decisions went, when the owner followed the rule and when not; null before any was checked.</summary>
+    private string? Tally()
+    {
+        var tally = AlertDecisions.Tally(data!.Decisions);
+        if (tally.Judged == 0)
+        {
+            return null;
+        }
+
+        var parts = new List<string>();
+        if (tally.FollowedJudged > 0)
+        {
+            parts.Add($"when you followed the rule, {tally.FollowedWell} of {tally.FollowedJudged} went well");
+        }
+
+        if (tally.OtherJudged > 0)
+        {
+            parts.Add($"when you did something else or waited, {tally.OtherWell} of {tally.OtherJudged} went well");
+        }
+
+        return "Checked so far: " + string.Join("; ", parts) + ". Going well means still in stock on its review day, or stock that sold again by then; a product running out that was checked late is not counted.";
+    }
+
+    private static string Versus(decimal? change, string before) =>
+        change is null ? $"{before} the week before" : $"{Formats.Change(change)} vs {before}";
+
+    private static string ProfitHint(SalesTotals totals) => totals.ProfitMargin is { } margin
+        ? $"{Formats.Share(margin)} margin"
+        : "No purchase prices recorded";
+
+    private static string KindName(AlertKind kind) => kind == AlertKind.StockOut ? "Running out" : "Not selling";
+
+    private static string ChoiceText(AlertDecision decision) => decision.Choice switch
+    {
+        DecisionChoice.Accepted => "You: did it." + (decision.Note.Length > 0 ? " " + decision.Note : ""),
+        DecisionChoice.Changed => "You: something else. " + decision.Note,
+        _ => "You: not now." + (decision.Note.Length > 0 ? " " + decision.Note : ""),
+    };
+
+    private void OnChanged() => _ = InvokeAsync(async () =>
+    {
+        if (!busy)
+        {
+            await LoadAsync();
+            StateHasChanged();
+        }
+    });
+
+    public void Dispose()
+    {
+        Reviews.Changed -= OnChanged;
+        Actions.Changed -= OnChanged;
+        stopping.Cancel();
+    }
+}

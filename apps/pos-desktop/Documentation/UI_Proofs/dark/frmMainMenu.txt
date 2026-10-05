@@ -1,0 +1,150 @@
+/frmMainMenu | frmMainMenu | {X=10,Y=26,Width=1040,Height=759} | True | Smart Retail OS
+/frmMainMenu/RetailHomeShell | TableLayoutPanel | {X=0,Y=0,Width=1024,Height=720} | True | 
+/frmMainMenu/RetailHomeShell/MenuStrip2 | MenuStrip | {X=0,Y=0,Width=1024,Height=44} | True | MenuStrip2
+/frmMainMenu/RetailHomeShell/RetailWorkspace | TabControl | {X=3,Y=47,Width=1018,Height=638} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace/ | TabPage | {X=4,Y=48,Width=1010,Height=586} | True | Home
+/frmMainMenu/RetailHomeShell/RetailWorkspace// | Panel | {X=8,Y=8,Width=994,Height=570} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace/// | TableLayoutPanel | {X=24,Y=24,Width=946,Height=520} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//// | TableLayoutPanel | {X=24,Y=24,Width=898,Height=144} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace///// | TableLayoutPanel | {X=0,Y=0,Width=670,Height=132} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace////// | Label | {X=0,Y=0,Width=670,Height=40} | True | Ready for your next sale.
+/frmMainMenu/RetailHomeShell/RetailWorkspace////// | Label | {X=0,Y=48,Width=670,Height=24} | True | Your everyday store tasks, in one place.
+/frmMainMenu/RetailHomeShell/RetailWorkspace////// | TableLayoutPanel | {X=0,Y=80,Width=670,Height=44} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace/////// | Button | {X=0,Y=0,Width=280,Height=44} | True | Start a sale
+/frmMainMenu/RetailHomeShell/RetailWorkspace/////RetailWelcomeArtwork | RetailArtwork | {X=670,Y=0,Width=228,Height=144} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//// | Label | {X=24,Y=176,Width=74,Height=32} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//// | TableLayoutPanel | {X=24,Y=176,Width=898,Height=44} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace///// | Label | {X=0,Y=0,Width=628,Height=44} | True | Everyday tasks
+/frmMainMenu/RetailHomeShell/RetailWorkspace/////RetailAppearance | Button | {X=628,Y=0,Width=270,Height=44} | True | Use light appearance
+/frmMainMenu/RetailHomeShell/RetailWorkspace//// | TableLayoutPanel | {X=24,Y=228,Width=898,Height=68} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace///// | TableLayoutPanel | {X=0,Y=0,Width=898,Height=68} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace////// | Label | {X=0,Y=0,Width=898,Height=24} | True | Search products, invoices, stock, reports, or settings
+/frmMainMenu/RetailHomeShell/RetailWorkspace////// | FieldFrame | {X=0,Y=24,Width=898,Height=44} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace///////RetailTaskSearch | TextBox | {X=16,Y=11,Width=866,Height=22} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults | FlowLayoutPanel | {X=24,Y=304,Width=898,Height=184} | True | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults/RetailTask_ProductsToolStripMenuItem1 | Button | {X=8,Y=8,Width=277,Height=76} | True | Manage products
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults/RetailTask_CustomerToolStripMenuItem1 | Button | {X=301,Y=8,Width=277,Height=76} | True | Manage customers
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults/RetailTask_SalesToolStripMenuItem2 | Button | {X=594,Y=8,Width=277,Height=76} | True | Find invoices
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults/RetailTask_StockStatusToolStripMenuItem | Button | {X=8,Y=100,Width=277,Height=76} | True | Review stock
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults/RetailTask_PurchaseEntryToolStripMenuItem | Button | {X=301,Y=100,Width=277,Height=76} | True | Record a purchase
+/frmMainMenu/RetailHomeShell/RetailWorkspace////RetailTaskResults/RetailTask_ToolStripMenuItem19 | Button | {X=594,Y=100,Width=277,Height=76} | True | View sales dashboard
+/frmMainMenu/RetailHomeShell/RetailWorkspace//// | Label | {X=24,Y=496,Width=881,Height=32} | False | 6 matching tasks shown. Use the menu to browse all tasks.
+/frmMainMenu/RetailHomeShell/RetailWorkspace/ | TabPage | {X=4,Y=48,Width=192,Height=48} | False | All tools
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6 | Panel | {X=-1,Y=90,Width=1245,Height=541} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/GelButton7 | GelButton | {X=364,Y=260,Width=208,Height=28} | False | Product Smart
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/GelButton6 | GelButton | {X=290,Y=341,Width=208,Height=28} | False | Check Connection(SMS)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/btnImportPro | GelButton | {X=438,Y=117,Width=134,Height=28} | False | Import Product
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button25 | Button | {X=1085,Y=102,Width=150,Height=150} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/GelButton4 | GelButton | {X=290,Y=436,Width=208,Height=28} | False | State
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/GelBtnSerialWiseReport | GelButton | {X=290,Y=510,Width=146,Height=28} | False | SerialWiseReport
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/btnSupport_Dashboard | Button | {X=442,Y=507,Width=317,Height=28} | False | Customer Support - Dashboard
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button24 | Button | {X=871,Y=505,Width=132,Height=28} | False | Product GST Update
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/btnLeadGenerate | Button | {X=766,Y=507,Width=99,Height=28} | False | Lead
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/GelButton5 | GelButton | {X=1006,Y=505,Width=229,Height=28} | False | GSTR-1 Report by HSN Code
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button23 | Button | {X=6,Y=511,Width=168,Height=28} | False | Admin Dashbord
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button22 | Button | {X=180,Y=511,Width=104,Height=28} | False | Post
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button20 | Button | {X=84,Y=3,Width=190,Height=56} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button21 | Button | {X=678,Y=512,Width=178,Height=28} | False | E-Mail Dashbord
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button18 | Button | {X=595,Y=102,Width=202,Height=56} | False | MenuHeader Update
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button19 | Button | {X=803,Y=102,Width=144,Height=56} | False | Menu Update
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1 | Panel | {X=661,Y=233,Width=537,Height=280} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/GelButton1 | GelButton | {X=280,Y=41,Width=179,Height=43} | False | test
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/PictureBox3 | PictureBox | {X=428,Y=159,Width=102,Height=96} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/lblCName | Label | {X=261,Y=25,Width=75,Height=20} | False | lblCName
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/PictureBox2 | PictureBox | {X=377,Y=112,Width=153,Height=143} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel7 | TableLayoutPanel | {X=327,Y=201,Width=44,Height=20} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel7/Label23 | Label | {X=19,Y=0,Width=2,Height=20} | False | Today's Total Purchases Return
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel7/Label24 | Label | {X=27,Y=0,Width=2,Height=20} | False | Today's Total Payments
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel7/Label25 | Label | {X=3,Y=0,Width=2,Height=20} | False | Today's Total Expenses
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel7/Label26 | Label | {X=11,Y=0,Width=2,Height=20} | False | Today's Total Sales Return
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel7/Label34 | Label | {X=35,Y=0,Width=6,Height=20} | False | Today's Total Service Advance
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel8 | TableLayoutPanel | {X=327,Y=222,Width=44,Height=28} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel8/Label27 | Label | {X=27,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel8/Label28 | Label | {X=19,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel8/Label29 | Label | {X=11,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel8/Label30 | Label | {X=3,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel8/Label33 | Label | {X=35,Y=0,Width=6,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7 | Panel | {X=67,Y=25,Width=172,Height=458} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/Button17 | GelButton | {X=2,Y=382,Width=166,Height=47} | False | Expense (F8)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/GelButton3 | GelButton | {X=37,Y=37,Width=166,Height=47} | False | Product  (F7)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/LblEngine | Label | {X=0,Y=421,Width=172,Height=37} | False | WhatsApp : Not Ready
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/Button13 | GelButton | {X=2,Y=332,Width=166,Height=47} | False | Supplier Pay (F4)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/btnSaleReturn | GelButton | {X=2,Y=134,Width=166,Height=47} | False | Sale Return
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/Button12 | GelButton | {X=2,Y=282,Width=166,Height=47} | False | Customer Pay (F3)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel7/btnPurchaseReturn | GelButton | {X=2,Y=233,Width=166,Height=47} | False | Purchase Return
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel6 | TableLayoutPanel | {X=327,Y=150,Width=44,Height=20} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel6/Label22 | Label | {X=19,Y=0,Width=2,Height=20} | False | Today's Total Purchases
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel6/Label16 | Label | {X=27,Y=0,Width=2,Height=20} | False | Today's Total Receipts
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel6/Label14 | Label | {X=3,Y=0,Width=2,Height=20} | False | Today's Total Income
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel6/Label12 | Label | {X=11,Y=0,Width=2,Height=20} | False | Today's Total Sales
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel6/Label31 | Label | {X=35,Y=0,Width=6,Height=20} | False | Today's Total Services Bill
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel1 | TableLayoutPanel | {X=327,Y=171,Width=44,Height=28} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel1/Label21 | Label | {X=27,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel1/Label15 | Label | {X=19,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel1/Label13 | Label | {X=11,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel1/Label11 | Label | {X=3,Y=0,Width=2,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TableLayoutPanel1/Label32 | Label | {X=35,Y=0,Width=6,Height=28} | False | 0.00
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Label2 | Label | {X=111,Y=112,Width=251,Height=20} | False | Label2
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel4 | Panel | {X=0,Y=256,Width=533,Height=20} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel4/lblScroll | Label | {X=521,Y=2,Width=16,Height=16} | False | ..
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3 | Panel | {X=4,Y=115,Width=320,Height=138} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/Label48 | Label | {X=6,Y=118,Width=53,Height=17} | False | Label48
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/Label47 | Label | {X=6,Y=100,Width=53,Height=17} | False | Label47
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/btnNotification | GelButton | {X=-58,Y=42,Width=162,Height=37} | False | Notifications(0)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/Label46 | Label | {X=6,Y=64,Width=53,Height=17} | False | Label46
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/Label45 | Label | {X=6,Y=82,Width=53,Height=17} | False | Label45
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/Label44 | Label | {X=6,Y=44,Width=53,Height=17} | False | Label44
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel3/Label43 | Label | {X=6,Y=4,Width=311,Height=44} | False | Label43
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TextBox3 | TextBox | {X=293,Y=121,Width=31,Height=11} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Label1 | Label | {X=290,Y=361,Width=51,Height=20} | False | Label1
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Label5 | Label | {X=109,Y=203,Width=15,Height=20} | False | *
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/txtDB | TextBox | {X=293,Y=140,Width=31,Height=11} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Label49 | Label | {X=290,Y=347,Width=45,Height=14} | False | Label49
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Chart1 | Chart | {X=332,Y=411,Width=36,Height=28} | False | Chart1
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TextBox2 | TextBox | {X=348,Y=389,Width=10,Height=27} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TextBox1 | TextBox | {X=329,Y=383,Width=10,Height=27} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2 | Panel | {X=67,Y=106,Width=652,Height=74} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel9 | TableLayoutPanel | {X=70,Y=3,Width=530,Height=66} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel9/Label51 | Label | {X=3,Y=0,Width=524,Height=66} | False | ...
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/PictureBox1 | PictureBox | {X=3,Y=3,Width=62,Height=62} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2 | TableLayoutPanel | {X=131,Y=10,Width=441,Height=55} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button9 | Button | {X=3,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button8 | Button | {X=47,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button2 | Button | {X=91,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button1 | Button | {X=355,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button3 | Button | {X=311,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button4 | Button | {X=267,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button5 | Button | {X=223,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button6 | Button | {X=179,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel2/TableLayoutPanel2/Button7 | Button | {X=135,Y=3,Width=38,Height=49} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/DTP2 | DateTimePicker | {X=226,Y=398,Width=87,Height=22} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/DTP1 | DateTimePicker | {X=226,Y=372,Width=87,Height=22} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/TextBox7 | TextBox | {X=268,Y=727,Width=23,Height=27} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/DateTimePicker1 | DateTimePicker | {X=281,Y=421,Width=44,Height=27} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/Panel5 | Panel | {X=293,Y=345,Width=42,Height=62} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/LblSenderId | Label | {X=218,Y=388,Width=142,Height=23} | False | Phone: Unavailable
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Panel1/cmbChartType | ComboBox | {X=360,Y=363,Width=13,Height=21} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button16 | Button | {X=276,Y=3,Width=190,Height=56} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button11 | Button | {X=853,Y=3,Width=190,Height=56} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button10 | Button | {X=469,Y=3,Width=190,Height=56} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Label130 | Label | {X=350,Y=547,Width=51,Height=20} | False | Label1
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/GelButton2 | Button | {X=661,Y=3,Width=190,Height=56} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/LblEngine1 | Label | {X=24,Y=555,Width=59,Height=20} | False | Label19
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button15 | Button | {X=957,Y=260,Width=309,Height=41} | False | Supplier (F6)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/btnAT0 | Button | {X=1045,Y=3,Width=190,Height=56} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/Button14 | Button | {X=884,Y=322,Width=211,Height=41} | False | Customer (F5)
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5 | TableLayoutPanel | {X=574,Y=185,Width=456,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label6 | Label | {X=183,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label52 | Label | {X=273,Y=0,Width=39,Height=38} | False |              Help Videos
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label10 | Label | {X=228,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label17 | Label | {X=318,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label7 | Label | {X=363,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label3 | Label | {X=408,Y=0,Width=45,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label4 | Label | {X=138,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label8 | Label | {X=93,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label9 | Label | {X=48,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//Panel6/TableLayoutPanel5/Label18 | Label | {X=3,Y=0,Width=39,Height=38} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//flpItemsCategory | FlowLayoutPanel | {X=0,Y=1,Width=1245,Height=90} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//flpItems_BV | FlowLayoutPanel | {X=2,Y=157,Width=1225,Height=31} | False | 
+/frmMainMenu/RetailHomeShell/RetailWorkspace//flpItems_BV/FlowLayoutPanel1 | FlowLayoutPanel | {X=3,Y=3,Width=569,Height=0} | False | 
+/frmMainMenu/RetailHomeShell/StatusStrip1 | StatusStrip | {X=0,Y=688,Width=1024,Height=32} | True | StatusStrip1

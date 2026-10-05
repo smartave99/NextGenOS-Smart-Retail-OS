@@ -1,0 +1,231 @@
+@page "/storage"
+@using SmartRetail.AI.Storage
+@inject StorageService Storage
+@inject ProductPhotoService Photos
+@inject PosterArtworkWorker Artwork
+@inject MemoryService Memory
+@inject ActionService Actions
+@inject ChatHistoryService Chats
+@inject SmartRetail.AI.Memory.MemoryReviewer Reviewer
+@inject CameraSearchService CameraSearch
+@inject CreativeService Creatives
+@inject ReviewService Reviews
+@inject PlaybookService Playbooks
+@inject PriceCheckService PriceChecks
+@inject ILogger<DataStorage> Log
+
+<PageTitle>Storage · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Storage</h1>
+        <p class="sub">Where product photos, growth plans and posters are kept. Choose a drive with enough free space. The POS database is never used for these.</p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Data folder</h2>
+            @if (Storage.IsDefault)
+            {
+                <span class="pill">Default</span>
+            }
+        </div>
+        <p class="path big-path" id="current-folder">@current</p>
+        <div class="plan-actions">
+            @if (StorageService.CanOpenFolders)
+            {
+                <button class="btn btn-outline-secondary btn-sm" @onclick="Open">Open folder</button>
+            }
+            else
+            {
+                <span class="muted small">Open it in File Explorer on the shop PC.</span>
+            }
+        </div>
+        @if (use is not null)
+        {
+            <div class="stat-list folder-stats">
+                <div class="stat"><div class="stat-value">@use.Products</div><div class="stat-label">products with photos</div></div>
+                <div class="stat"><div class="stat-value">@DataFolderMover.Describe(use.PhotoBytes)</div><div class="stat-label">@use.PhotoFiles photo files</div></div>
+                <div class="stat"><div class="stat-value">@use.PlanFiles</div><div class="stat-label">growth plans</div></div>
+                <div class="stat"><div class="stat-value">@use.Posters</div><div class="stat-label">posters</div></div>
+                <div class="stat"><div class="stat-value">@DataFolderMover.Describe(use.FreeBytes)</div><div class="stat-label">free on this drive</div></div>
+            </div>
+        }
+        <p class="small muted">Inside it: <strong>@DataFolders.ProductsFolderName</strong>, with a folder per product such as “1006 Sunflower Oil 1 L”, <strong>@DataFolders.PlansFolderName</strong>, <strong>@DataFolders.PostersFolderName</strong>, <strong>@DataFolders.ChecksFolderName</strong> (Fix now notes) and <strong>@DataFolders.MemoryFolderName</strong> (what the assistant remembers, the actions and past chats), <strong>@DataFolders.CreativesFolderName</strong> and <strong>@DataFolders.PriceChecksFolderName</strong> (the online prices found and the pages you confirmed). The side panel's settings and saved keys stay in <span class="path">@Storage.SettingsFolder</span> for this Windows user.</p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><h2>Drives on this PC</h2></div>
+        @if (drives.Count == 0)
+        {
+            <p class="muted">No drives could be read.</p>
+        }
+        <ul class="drive-list">
+            @foreach (var drive in drives)
+            {
+                var low = drive.FreeBytes < 5L * 1024 * 1024 * 1024;
+                <li>
+                    <div class="drive-top">
+                        <strong class="path">@drive.Root</strong>
+                        @if (drive.Label.Length > 0)
+                        {
+                            <span class="muted">@drive.Label</span>
+                        }
+                        @if (drive.Removable)
+                        {
+                            <span class="pill warn" title="Keep it plugged in, or photos will be missing">removable</span>
+                        }
+                        <span class="drive-free @(low ? "trend-down" : null)">@DataFolderMover.Describe(drive.FreeBytes) free of @DataFolderMover.Describe(drive.TotalBytes)</span>
+                    </div>
+                    <div class="share-track"><div class="share-fill @(low ? "warn" : null)" style="width: @((drive.UsedShare * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div></div>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => Choose(drive)" disabled="@busy">Use this drive</button>
+                </li>
+            }
+        </ul>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Keep the data somewhere else</h2></div>
+    <div class="plan-form">
+        <RequiredNote />
+        <label class="form-label" for="data-folder">Folder <Required /></label>
+        <input id="data-folder" class="form-control" autocomplete="off" spellcheck="false" placeholder="@Example" aria-required="true"
+               value="@target" @oninput="@(e => { target = e.Value?.ToString() ?? ""; check = null; })" />
+    </div>
+    <div class="plan-actions">
+        <button class="btn btn-outline-secondary" @onclick="CheckFolder" disabled="@(busy || target.Trim().Length == 0)">Check</button>
+        <button class="btn btn-primary" @onclick="ChangeAsync" disabled="@(busy || check is not { Ok: true, IsCurrent: false } || WorkInProgress is not null)">
+            @(check?.HasData == true ? "Use this folder" : "Move my data here")
+        </button>
+        @if (busy)
+        {
+            <span class="muted small" role="status">@progress</span>
+        }
+    </div>
+    @if (check is not null)
+    {
+        <p class="small check-result @(check.Ok ? "trend-up" : "trend-down")">@Explain(check)</p>
+    }
+    @if (WorkInProgress is { } work)
+    {
+        <p class="small muted">@work The folder can be changed when it is done.</p>
+    }
+    @if (message is not null)
+    {
+        <p class="small @(messageIsProblem ? "trend-down" : "trend-up")" role="status">@message</p>
+    }
+    <p class="small muted">Everything is copied first and every copy is checked. Only then does the dashboard switch to the new folder and delete the old copies, so nothing is lost if something goes wrong on the way.</p>
+</section>
+
+@code {
+    private string current = "";
+    private DataFolderUse? use;
+    private IReadOnlyList<DriveChoice> drives = Array.Empty<DriveChoice>();
+    private string target = "";
+    private DataFolderCheck? check;
+    private bool busy;
+    private string? progress;
+    private string? message;
+    private bool messageIsProblem;
+
+    private static string Example => OperatingSystem.IsWindows() ? @"D:\Smart Retail POS AI" : "/data/Smart Retail POS AI";
+
+    protected override void OnInitialized() => Refresh();
+
+    private void Refresh()
+    {
+        current = Storage.DataFolder;
+        try
+        {
+            use = Storage.Use();
+            drives = Storage.Drives();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the data folder failed.");
+            Show("Could not read the data folder: " + ex.Message, problem: true);
+        }
+    }
+
+    private void Choose(DriveChoice drive)
+    {
+        target = DataFolders.SuggestedOn(drive.Root);
+        CheckFolder();
+    }
+
+    private void CheckFolder()
+    {
+        message = null;
+        check = Storage.Check(target);
+    }
+
+    /// <summary>What is writing to the data folder now, or null.</summary>
+    private string? WorkInProgress => !Photos.Maker.IsIdle
+        ? (Photos.Maker.IsPaused ? "Photos are waiting for Codex's usage limit to lift (they can be stopped on their page)." : "Photos are being made (they can be stopped on their page).")
+        : !Artwork.IsIdle ? "A poster's artwork is being made."
+        : Reviewer.Busy || Memory.IsWriting || Actions.IsWriting || Chats.IsWriting ? "The assistant is saving what it learned from a chat."
+        : CameraSearch.IsWriting ? "Camera search is learning the products' photos."
+        : !Creatives.IsIdle ? (Creatives.IsWaitingForLimit ? "A creative's picture is waiting for Codex's usage limit to lift." : "A creative's picture is being made.")
+        : Reviews.IsWriting ? "A decision from the Monday review is being saved."
+        : Playbooks.IsWriting ? "A playbook is being saved."
+        : PriceChecks.Checking is not null || PriceChecks.IsWriting ? "A product's prices are being looked up online."
+        : null;
+
+    private async Task ChangeAsync()
+    {
+        busy = true;
+        message = null;
+        progress = "Moving the data…";
+        try
+        {
+            var done = await Storage.ChangeAsync(target, () => WorkInProgress, new Progress<string>(text =>
+            {
+                progress = text;
+                _ = InvokeAsync(StateHasChanged);
+            }));
+            Show(done, problem: false);
+            check = null;
+            target = "";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing the data folder failed.");
+            Show("The data folder was not changed: " + ex.Message, problem: true);
+        }
+        finally
+        {
+            busy = false;
+            Refresh();
+        }
+    }
+
+    private void Open()
+    {
+        try
+        {
+            Storage.Open(current);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or PlatformNotSupportedException)
+        {
+            Show("Could not open the folder: " + ex.Message, problem: true);
+        }
+    }
+
+    private static string Explain(DataFolderCheck check) => check switch
+    {
+        { Ok: false } => check.Problem!,
+        { IsCurrent: true } => "This is the folder in use.",
+        { HasData: true } => "This folder already holds Smart Retail POS AI data. It will be used as it is, and the data in the current folder stays where it is.",
+        _ => $"Can be used: {DataFolderMover.Describe(check.FreeBytes)} free there. "
+            + (check.NeededBytes > 0 ? $"{DataFolderMover.Describe(check.NeededBytes)} of photos and plans will be moved." : "There is nothing to move yet."),
+    };
+
+    private void Show(string text, bool problem)
+    {
+        message = text;
+        messageIsProblem = problem;
+    }
+}

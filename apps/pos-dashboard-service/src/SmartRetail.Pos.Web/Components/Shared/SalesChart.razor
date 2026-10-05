@@ -1,0 +1,111 @@
+@* Bars with an optional line, drawn as SVG: no chart library, so it works with no internet.
+   Class names start with "c-" so page styles such as the dashboard's .bar never reach the SVG. *@
+@using System.Globalization
+
+<svg class="chart" viewBox="0 0 @Width @Height" role="img" aria-label="@AriaLabel" preserveAspectRatio="xMidYMid meet">
+    @foreach (var tick in Ticks)
+    {
+        var y = Y(tick);
+        @* Inside <g>: a bare <text> in a code block would be read as Razor's own text tag. *@
+        <g>
+            <line class="c-grid" x1="@F(Left)" x2="@F(Width - Right)" y1="@F(y)" y2="@F(y)" />
+            <text class="c-axis" x="@F(Left - 8)" y="@F(y + 4)" text-anchor="end">@Formats.Compact(tick)</text>
+        </g>
+    }
+
+    @for (var i = 0; i < Bars.Count; i++)
+    {
+        var bar = Bars[i];
+        var top = Y(bar.Value);
+        <g>
+            <title>@bar.Tooltip</title>
+            <rect class="c-hit" x="@F(Slot * i + Left)" y="@F(Top)" width="@F(Slot)" height="@F(PlotBottom - Top)" />
+            @if (PlotBottom - top >= 0.5)
+            {
+                <path class="@(bar.Highlight ? "c-bar hi" : "c-bar")" d="@Column(Slot * i + Left + (Slot - BarWidth) / 2, top)" />
+            }
+        </g>
+        if (i % LabelEvery == 0 || (i == Bars.Count - 1 && Bars.Count <= 14))
+        {
+            <g><text class="c-axis" x="@F(Slot * i + Left + Slot / 2)" y="@F(Height - 8)" text-anchor="middle">@bar.Label</text></g>
+        }
+    }
+
+    @if (Line is { Count: > 1 } line && line.Count == Bars.Count)
+    {
+        <polyline class="c-line" points="@Points(line)" />
+    }
+</svg>
+
+@if (LineLabel is not null && Line is { Count: > 1 })
+{
+    <div class="chart-legend"><span class="key bar-key"></span>@BarLabel <span class="key line-key"></span>@LineLabel</div>
+}
+
+@code {
+    private const double Left = 64;
+    private const double Right = 10;
+    private const double Top = 12;
+    private const double Bottom = 30;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ChartBar> Bars { get; set; } = Array.Empty<ChartBar>();
+    [Parameter] public IReadOnlyList<decimal>? Line { get; set; }
+    [Parameter] public string BarLabel { get; set; } = "Sales";
+    [Parameter] public string? LineLabel { get; set; }
+    [Parameter] public double Height { get; set; } = 260;
+
+    /// <summary>Drawing width. Match it roughly to the space on screen so labels keep a readable size.</summary>
+    [Parameter] public double Width { get; set; } = 1000;
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = "";
+
+    /// <summary>Thin columns with air between them: at most 24 units wide.</summary>
+    private const double MaxBarWidth = 24;
+
+    private double PlotBottom => Height - Bottom;
+    private double BarWidth => Math.Max(1, Math.Min(Slot - Gap, MaxBarWidth));
+    private double Slot => Bars.Count == 0 ? 0 : (Width - Left - Right) / Bars.Count;
+    private double Gap => Math.Min(Slot * 0.3, 14);
+    private int LabelEvery => Math.Max(1, (int)Math.Ceiling(Bars.Count / 12.0));
+
+    private decimal Max => Math.Max(1m, Math.Max(Bars.Count == 0 ? 0 : Bars.Max(b => b.Value), Line is { Count: > 0 } l ? l.Max() : 0));
+    private decimal Step => NiceStep(Max / 4m);
+    private decimal AxisTop => Math.Ceiling(Max / Step) * Step;
+
+    private IEnumerable<decimal> Ticks
+    {
+        get
+        {
+            for (var tick = 0m; tick <= AxisTop; tick += Step)
+            {
+                yield return tick;
+            }
+        }
+    }
+
+    private double Y(decimal value) => PlotBottom - (double)(Math.Max(0, value) / AxisTop) * (PlotBottom - Top);
+
+    private string Points(IReadOnlyList<decimal> values) =>
+        string.Join(" ", values.Select((v, i) => F(Slot * i + Left + Slot / 2) + "," + F(Y(v))));
+
+    /// <summary>A column rising from the baseline, square at the bottom and round at the top.</summary>
+    private string Column(double x, double top)
+    {
+        var r = Math.Min(4, Math.Min(BarWidth / 2, (PlotBottom - top) / 2));
+        return $"M{F(x)} {F(PlotBottom)}V{F(top + r)}Q{F(x)} {F(top)} {F(x + r)} {F(top)}H{F(x + BarWidth - r)}Q{F(x + BarWidth)} {F(top)} {F(x + BarWidth)} {F(top + r)}V{F(PlotBottom)}Z";
+    }
+
+    private static string F(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static decimal NiceStep(decimal raw)
+    {
+        if (raw <= 0)
+        {
+            return 1m;
+        }
+
+        var power = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)raw)));
+        var fraction = raw / power;
+        var nice = fraction <= 1m ? 1m : fraction <= 2m ? 2m : fraction <= 2.5m ? 2.5m : fraction <= 5m ? 5m : 10m;
+        return nice * power;
+    }
+}

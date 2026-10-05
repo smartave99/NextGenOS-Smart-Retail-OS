@@ -1,0 +1,224 @@
+@using SmartRetail.Pos.Core.Analytics
+@using SmartRetail.Pos.Core.Prices
+@inject TimeProvider Clock
+@inject ProductPhotoService Photos
+
+@* One product whose online prices are followed: what Codex found, which pages the owner confirmed, and the shop's price against them. *@
+@{
+    var now = Clock.GetLocalNow().DateTime;
+    var confirmed = Watched.Links.Where(l => l.Status == LinkStatus.Confirmed).ToList();
+    var waiting = Watched.Links.Where(l => l.Status == LinkStatus.New).OrderByDescending(l => l.LooksSame).ThenBy(l => l.Price).ToList();
+    var rejected = Watched.Links.Where(l => l.Status == LinkStatus.Rejected).ToList();
+    var own = Facts?.Price ?? 0m;
+    var floor = Product is null ? null : PriceCompare.Floor(Product.CostPrice, Product.GstRatePercent);
+    var comparison = PriceCompare.Compare(own, floor, confirmed.Select(l => new OnlinePrice(l.Shop, l.Price, l.Seen)).ToList(), now);
+}
+<section class="panel price-card" aria-label="@Watched.Name" data-product="@Watched.ProductId">
+    <div class="panel-head">
+        <h2>@(Product?.Name ?? Watched.Name)</h2>
+        <div class="f-actions">
+            <LensLink ProductId="Watched.ProductId" Available="@(GoogleLens.BestPhoto(Photos.Info(Watched.ProductId)) is not null)" Class="btn btn-sm btn-soft"
+                      Title="Search Google Lens with this product's photo: it finds the same product and where it is sold, more exactly than its name, and uses none of the AI's limit." />
+            <button type="button" class="btn btn-sm btn-primary" disabled="@(Busy || Locked)" title="@(Locked ? WaitText : null)" @onclick="() => OnCheck.InvokeAsync(false)"><Icon Name="search" /> @(Watched.Checked is null ? "Look online" : "Look again")</button>
+            @if (confirmed.Count > 0)
+            {
+                <button type="button" class="btn btn-sm" disabled="@(Busy || Locked)" title="@(Locked ? WaitText : "Read the confirmed pages again, without looking for more")" @onclick="() => OnCheck.InvokeAsync(true)"><Icon Name="refresh" /> Update confirmed prices</button>
+            }
+            <button type="button" class="btn btn-sm btn-link danger-link" disabled="@Busy" @onclick="() => OnForget.InvokeAsync()">Stop following</button>
+        </div>
+    </div>
+
+    @if (Product is null)
+    {
+        <p class="small muted">This product is not in the POS any more.</p>
+    }
+    else
+    {
+        <p class="small muted price-own">
+            Your price <strong>@Money.FormatCompact(own)</strong> with GST
+            @if (Facts is { Mrp: > 0 } withMrp)
+            {
+                <text> · MRP @Money.FormatCompact(withMrp.Mrp)</text>
+            }
+            @if (floor is { } lowestSafe)
+            {
+                <text> · lowest safe price @Money.FormatCompact(lowestSafe) (purchase price plus GST)</text>
+            }
+        </p>
+    }
+
+    @if (Busy)
+    {
+        <p class="small" role="status"><span class="spinner"></span> Codex is looking for prices on the web. This can take a few minutes; you can leave this page meanwhile.</p>
+    }
+    else if (Locked)
+    {
+        <p class="small muted" role="status">@WaitText</p>
+    }
+
+    @if (Problem is not null)
+    {
+        <p class="small trend-down" role="alert">@Problem</p>
+    }
+
+    @if (confirmed.Count > 0 || Watched.Checked is not null)
+    {
+        <p class="price-verdict small @VerdictClass(comparison.Verdict)">
+            @if (comparison.Verdict != PriceVerdict.NoData)
+            {
+                <span class="pill @VerdictPill(comparison.Verdict)">@VerdictName(comparison.Verdict)</span>
+            }
+            @comparison.Text
+        </p>
+    }
+
+    @if (Watched.Checked is { } checkedOn)
+    {
+        <p class="small muted">Last looked @checkedOn.ToString("d MMM, h:mm tt", India)@(Watched.Note.Length > 0 ? " · " + Watched.Note : ".")</p>
+    }
+    else if (!Busy)
+    {
+        <p class="small muted">Not looked yet. “Look online” has Codex search @SmartRetail.AI.Prices.PriceShops.Names for this product.</p>
+    }
+
+    @if (confirmed.Count > 0)
+    {
+        <h3 class="price-head">Confirmed: exactly this product</h3>
+        @Table(confirmed, now, own, isConfirmed: true)
+    }
+
+    @if (waiting.Count > 0)
+    {
+        <h3 class="price-head">Found: is it exactly this product, in this pack?</h3>
+        <p class="small muted">Open a page to check it. Only pages you confirm are compared with your price.</p>
+        @Table(waiting, now, own, isConfirmed: false)
+    }
+
+    @if (rejected.Count > 0)
+    {
+        <details class="price-rejected">
+            <summary class="small">Not this product (@rejected.Count)</summary>
+            <ul class="memory-list">
+                @foreach (var link in rejected)
+                {
+                    <li class="memory-item">
+                        <div class="m-text">@(link.Title.Length > 0 ? link.Title : link.Url) <span class="pill">@link.Shop</span></div>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => OnStatus.InvokeAsync((link.Url, LinkStatus.New))">Undo</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </details>
+    }
+</section>
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    [Parameter, EditorRequired] public WatchedProduct Watched { get; set; } = default!;
+
+    /// <summary>The product as the POS has it; null when it is not there any more.</summary>
+    [Parameter] public ProductFacts? Product { get; set; }
+
+    /// <summary>The price the customer pays and the stock's MRP, from the POS.</summary>
+    [Parameter] public SmartRetail.Pos.Web.Services.ListingFacts? Facts { get; set; }
+
+    /// <summary>A check is running for this product.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>A check is running for another product: one is looked up at a time, each uses some of Codex's limit.</summary>
+    [Parameter] public bool Locked { get; set; }
+
+    private const string WaitText = "Another product is being looked up now. This one can be looked up when that is done.";
+
+    [Parameter] public string? Problem { get; set; }
+
+    /// <summary>Look (false) or only read the confirmed pages again (true).</summary>
+    [Parameter] public EventCallback<bool> OnCheck { get; set; }
+
+    [Parameter] public EventCallback<(string Url, LinkStatus Status)> OnStatus { get; set; }
+
+    [Parameter] public EventCallback OnForget { get; set; }
+
+    private RenderFragment Table(IReadOnlyList<PriceLink> links, DateTime now, decimal own, bool isConfirmed) => __builder =>
+    {
+        <div class="table-wrap">
+            <table class="data-table price-table">
+                <thead>
+                    <tr><th>Shop</th><th>Page</th><th class="num">Price</th><th>Against yours</th><th>Seen</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var link in links)
+                    {
+                        var difference = own > 0 ? link.Price - own : (decimal?)null;
+                        <tr data-shop="@link.Shop">
+                            <td>@link.Shop</td>
+                            <td>
+                                <a href="@link.Url" target="_blank" rel="noopener noreferrer" title="Open this page in the browser">@(link.Title.Length > 0 ? link.Title : "Open the page") <Icon Name="external" /></a>
+                                <div class="small muted">
+                                    @if (link.Pack.Length > 0)
+                                    {
+                                        <span>@link.Pack</span>
+                                    }
+                                    @if (!isConfirmed && !link.LooksSame)
+                                    {
+                                        <span class="pill warn">Maybe another pack</span>
+                                    }
+                                    @if (!link.InStock)
+                                    {
+                                        <span class="pill">Out of stock</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="num">
+                                <strong>@Money.FormatCompact(link.Price)</strong>
+                                @if (link.History.Count > 1)
+                                {
+                                    var before = link.History[^2];
+                                    <div class="small muted">was @Money.FormatCompact(before.Price), @before.Seen.ToString("d MMM", India)</div>
+                                }
+                            </td>
+                            <td class="small">
+                                @if (difference is { } d)
+                                {
+                                    @(d == 0 ? "the same" : Money.FormatCompact(Math.Abs(d)) + (d < 0 ? " below yours" : " above yours"))
+                                }
+                            </td>
+                            <td class="small">
+                                @link.Seen.ToString("d MMM", India)
+                                @if (PriceCompare.IsOld(link.Seen, now))
+                                {
+                                    <span class="pill warn">Old</span>
+                                }
+                            </td>
+                            <td class="row-actions">
+                                @if (!isConfirmed)
+                                {
+                                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => OnStatus.InvokeAsync((link.Url, LinkStatus.Confirmed))">Same product</button>
+                                }
+                                <button type="button" class="btn btn-sm btn-link" @onclick="() => OnStatus.InvokeAsync((link.Url, LinkStatus.Rejected))">Not this</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
+
+    private static string VerdictName(PriceVerdict verdict) => verdict switch
+    {
+        PriceVerdict.Dearer => "Dearer than online",
+        PriceVerdict.Cheaper => "Cheaper than online",
+        _ => "About the same",
+    };
+
+    private static string VerdictPill(PriceVerdict verdict) => verdict switch
+    {
+        PriceVerdict.Dearer => "warn",
+        PriceVerdict.Cheaper => "good",
+        _ => "",
+    };
+
+    private static string? VerdictClass(PriceVerdict verdict) => verdict == PriceVerdict.NoData ? "muted" : null;
+}

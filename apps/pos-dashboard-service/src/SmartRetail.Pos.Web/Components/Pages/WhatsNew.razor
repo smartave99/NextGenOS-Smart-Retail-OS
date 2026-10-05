@@ -1,0 +1,130 @@
+@page "/whats-new"
+@using SmartRetail.Pos.Core.Updates
+@inject WhatsNewService News
+@inject UpdateStatusService Updates
+
+<PageTitle>What's new · Smart Retail POS</PageTitle>
+
+@* The change log: what changed in each update (CHANGELOG.md, built into the app), newest first. The updates since the owner last
+   looked are marked New; opening this page counts this version as seen, so the dot in the sidebar and the banner on Today go. *@
+<div class="page-head">
+    <div>
+        <h1>What's new</h1>
+        <p class="sub">What changed in each update: new things, things that work better, and fixes. The newest update is first.</p>
+    </div>
+    <div class="actions">
+        <span class="pill good">You have version @News.CurrentVersion</span>
+    </div>
+</div>
+
+@if (Updates.Ready is { } available)
+{
+    <section class="panel setup-banner-card" id="update-ready">
+        <div class="suggestion">
+            <div class="tile blue"><Icon Name="download" /></div>
+            <div>
+                <h3>Version @available is ready to install</h3>
+                @if (Updates.Status.Notes.Length > 0)
+                {
+                    <p><strong>What is new:</strong> @Updates.Status.Notes</p>
+                }
+                <p class="small muted">Its full list is here once it is installed.</p>
+            </div>
+            <a class="btn btn-primary btn-sm" href="settings#updates">Install it</a>
+        </div>
+    </section>
+}
+
+@if (News.Releases.Count == 0)
+{
+    <section class="panel"><p class="muted">The change log is not part of this copy of the app.</p></section>
+}
+else
+{
+    @foreach (var release in News.Releases.Take(open))
+    {
+        @Release(release)
+    }
+
+    @if (News.Releases.Count > open)
+    {
+        <details class="panel earlier-versions">
+            <summary>Earlier versions <span class="muted">(@(News.Releases.Count - open))</span></summary>
+            @foreach (var release in News.Releases.Skip(open))
+            {
+                @Release(release)
+            }
+        </details>
+    }
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    /// <summary>The updates shown open: the newest few, and every one the owner has not seen.</summary>
+    private const int Newest = 5;
+
+    private HashSet<string> unseen = new();
+    private int open = Newest;
+
+    protected override void OnInitialized()
+    {
+        unseen = News.UnseenReleases.Select(release => release.Version).ToHashSet();
+        open = Math.Max(Newest, unseen.Count);
+    }
+
+    // After the first draw, so the New marks show once; then this version counts as seen.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            News.MarkSeen();
+        }
+    }
+
+    private RenderFragment Release(ChangeRelease release) =>
+        @<section class="panel change-release @(release.Version == News.CurrentVersion ? "current" : null)" id="@($"v{release.Version}")" aria-label="@($"Version {release.Version}")">
+            <div class="panel-head">
+                <h2>Version @release.Version</h2>
+                <div class="change-meta">
+                    @if (release.Version == News.CurrentVersion)
+                    {
+                        <span class="pill good">You have this</span>
+                    }
+                    @if (unseen.Contains(release.Version))
+                    {
+                        <span class="pill brand">New</span>
+                    }
+                    @if (release.Date is { } day)
+                    {
+                        <span class="muted small">@day.ToString("d MMMM yyyy", India)</span>
+                    }
+                </div>
+            </div>
+            @if (release.Summary.Length > 0)
+            {
+                <p class="change-summary">@release.Summary</p>
+            }
+            @if (release.Includes.Length > 0)
+            {
+                <p class="small muted">Includes @release.Includes, which @(release.Includes.Contains(',') ? "were" : "was") not released on @(release.Includes.Contains(',') ? "their" : "its") own.</p>
+            }
+            @foreach (var section in release.Sections)
+            {
+                <div class="change-kind"><span class="pill @Tone(section.Kind)">@section.Kind</span></div>
+                <ul class="change-list">
+                    @foreach (var item in section.Items)
+                    {
+                        <li><MarkdownView Text="@item" /></li>
+                    }
+                </ul>
+            }
+        </section>;
+
+    private static string Tone(ChangeKind kind) => kind switch
+    {
+        ChangeKind.New => "brand",
+        ChangeKind.Improved => "good",
+        _ => "warn",
+    };
+}

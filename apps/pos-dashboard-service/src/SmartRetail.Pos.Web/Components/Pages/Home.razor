@@ -1,0 +1,467 @@
+@page "/"
+@using SmartRetail.Pos.Core.Analytics
+@implements IDisposable
+@inject ISalesFactsRepository Facts
+@inject IInvoiceRepository Invoices
+@inject IStockRepository Stock
+@inject ProductPhotoService Photos
+@inject AiSetupService Setup
+@inject FixNowService Checks
+@inject ReviewService Reviews
+@inject ActionService Actions
+@inject WhatsNewService News
+@inject TimeProvider Clock
+@inject ILogger<Home> Log
+
+<PageTitle>Today · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow today-eyebrow">
+            <span>@Formats.LongDate(Today) · FY @FinancialYear.ShortLabel(Today)</span>
+            @if (data is not null)
+            {
+                <span class="live-state @(liveProblem ? "problem" : null)">
+                    @if (liveProblem)
+                    {
+                        <span>Could not check for new bills; trying again</span>
+                    }
+                    else
+                    {
+                        <span class="live-dot" aria-hidden="true"></span>
+                        <span>Live · updated @(updatedAt is { } at ? Formats.Time(at) : "…")</span>
+                    }
+                </span>
+            }
+        </div>
+        <h1>@Greeting</h1>
+        <p class="lead">Here’s how the shop is doing today.</p>
+    </div>
+    <div class="actions">
+        <button class="btn" @onclick="LoadAsync" disabled="@loading"><Icon Name="refresh" /> Refresh</button>
+        <a class="btn btn-primary" href="ask"><Icon Name="spark" /> Ask AI</a>
+    </div>
+</div>
+
+@if (Setup.State.Stage is AiSetupStage.NotInstalled or AiSetupStage.NotSignedIn or AiSetupStage.Failed)
+{
+    <a class="setup-banner" href="welcome">
+        <Icon Name="spark" />
+        <span><strong>Finish setting up the AI.</strong> @(Setup.State.Stage == AiSetupStage.NotInstalled ? "Install Codex" : "Sign in with ChatGPT") in one click, and the AI can answer questions, plan sales and make product photos.</span>
+        <span class="setup-banner-go">Get started ›</span>
+    </a>
+}
+
+@if (News.HasUnseen && News.Current is { } now)
+{
+    @* After an update: what changed, once. Opening What's new, or Got it, counts the version as seen. *@
+    <div class="news-banner" role="status">
+        <Icon Name="news" />
+        <span><strong>Smart Retail POS @News.CurrentVersion.</strong> @(now.Summary.Length > 0 ? now.Summary : "See what changed in this update.")</span>
+        <a class="setup-banner-go" href="whats-new">What's new ›</a>
+        <button type="button" class="btn btn-sm btn-link" @onclick="News.MarkSeen">Got it</button>
+    </div>
+}
+
+@if (Checks.Last is { FixNow: > 0 } found)
+{
+    <a class="fix-banner" href="fix-now">
+        <Icon Name="alert" />
+        <span><strong>@(found.FixNow == 1 ? "1 thing to fix now" : $"{found.FixNow} things to fix now").</strong> @FixNowSummary(found)</span>
+        <span class="setup-banner-go">See them ›</span>
+    </a>
+}
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (data is null)
+{
+    <p class="muted"><span class="spinner"></span> Loading today’s figures…</p>
+}
+else
+{
+    var figures = data.Figures;
+    <section class="panel hero">
+        <div>
+            <div class="hero-label">Sales today@(figures.LastBillAt is { } lastBill ? $" · last bill at {Formats.Time(lastBill)}" : "")</div>
+            <div class="hero-figure"><span class="rupee">₹</span>@Formats.Rupees(figures.Sales).TrimStart('₹')</div>
+            @if (figures.ChangeVsLastWeek is { } change)
+            {
+                <div class="delta @Formats.ChangeTone(change)">@Formats.Change(change) <span class="vs">vs last @Today.DayOfWeek@(figures.ComparedAt is { } at ? " by " + Formats.Time(at) : "")</span></div>
+            }
+            else if (figures.ComparedAt is { } at)
+            {
+                <div class="delta"><span class="vs">Last @Today.DayOfWeek had no sales by @Formats.Time(at)</span></div>
+            }
+            else
+            {
+                <div class="delta"><span class="vs">Nothing to compare with last @Today.DayOfWeek</span></div>
+            }
+            <div class="facts">
+                <div><strong>@figures.Bills</strong><span>@(figures.Bills == 1 ? "bill" : "bills")</span></div>
+                <div><strong>@(figures.Bills == 0 ? "–" : Formats.Rupees(figures.AverageBill))</strong><span>average bill</span></div>
+                <div><strong>@Formats.Rupees(data.CreditToday)</strong><span>on credit</span></div>
+            </div>
+        </div>
+        <div>
+            <div class="chart-head">
+                <div class="t">Last 7 days <span class="muted">· @Formats.Rupees(figures.WeekSales)</span></div>
+                @if (figures.WeekChange is { } weekChange)
+                {
+                    <div class="chart-note @Formats.ChangeTone(weekChange)">@Formats.Change(weekChange) vs the week before</div>
+                }
+            </div>
+            @if (figures.WeekSales > 0)
+            {
+                <WeekBars Days="figures.Week" />
+            }
+            else
+            {
+                <div class="empty">
+                    <Icon Name="chart" Size="34" />
+                    <p>No bills in the last 7 days.</p>
+                    @if (data.LastBill is { } last)
+                    {
+                        <p class="small">The latest bill in the POS is from @Formats.Date(last). <a href="sales">See those sales</a></p>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (figures.Hours.Count > 0)
+    {
+        <section class="panel today-hours">
+            <div class="panel-head">
+                <h2>Today by the hour</h2>
+                <div class="chart-legend">
+                    <span><i class="swatch now" aria-hidden="true"></i>Today</span>
+                    <span><i class="swatch ghost" aria-hidden="true"></i>Last @Today.DayOfWeek</span>
+                </div>
+            </div>
+            <HourBars Hours="figures.Hours" NowHour="@(figures.LastBillAt is null ? -1 : Clock.GetLocalNow().Hour)" LastWeek="@Today.DayOfWeek.ToString()" />
+        </section>
+    }
+
+    <div class="row-2">
+        <section class="panel suggestions-card">
+            <div class="panel-head">
+                <h2><Icon Name="spark" /> For you</h2>
+                <a class="more" href="plan">See the growth plan <Icon Name="chevron" /></a>
+            </div>
+            @if (data.Suggestions.Count == 0)
+            {
+                <p class="muted" style="padding: 4px 8px 12px">Nothing needs your attention right now.</p>
+            }
+            @foreach (var tip in data.Suggestions)
+            {
+                <div class="suggestion">
+                    <div class="tile @tip.Tone"><Icon Name="@tip.Icon" /></div>
+                    <div>
+                        <h3>@tip.Title</h3>
+                        <p>@tip.Text</p>
+                    </div>
+                    <a class="btn btn-soft btn-sm" href="@tip.Link">@tip.Action</a>
+                </div>
+            }
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Running low</h2>
+                <a class="more" href="stock">See all <Icon Name="chevron" /></a>
+            </div>
+            @if (data.LowStock.Count == 0)
+            {
+                <p class="muted">Every product is above its reorder level.</p>
+            }
+            else
+            {
+                <ul class="row-list">
+                    @foreach (var item in data.LowStock)
+                    {
+                        <li>
+                            <div>
+                                <div class="name">@item.Name</div>
+                                <div class="sub">Reorder at @Money.FormatQty(item.MinStock)</div>
+                            </div>
+                            <span class="pill @(item.InHand <= 0 ? "bad" : item.InHand * 2 <= item.MinStock ? "bad" : "warn")">@(item.InHand <= 0 ? "Out of stock" : Money.FormatQty(item.InHand) + " left")</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    /// <summary>How often the page asks the POS whether today's bills have changed, and how often it reloads
+    /// everything anyway (stock, suggestions).</summary>
+    private static readonly TimeSpan CheckEvery = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ReloadEvery = TimeSpan.FromMinutes(5);
+
+    private TodayData? data;
+    private string? error;
+    private bool loading;
+    private bool liveProblem;
+    private DateTime? updatedAt;
+    private DateTimeOffset loadedAt;
+
+    /// <summary>Today's bills as the POS gave them when the figures on screen were read: a bill added, changed or
+    /// deleted, or a payment on a bill given on credit, changes them.</summary>
+    private SalesSummary? loadedFrom;
+    private readonly CancellationTokenSource stopping = new();
+
+    /// <summary>Busiest hours are only named when this many bills have a time.</summary>
+    private const int MinimumTimedBills = 30;
+
+    private sealed record Suggestion(string Icon, string Tone, string Title, string Text, string Action, string Link);
+
+    private sealed record TodayData(
+        TodayFigures Figures,
+        decimal CreditToday,
+        DateOnly? LastBill,
+        IReadOnlyList<StockLevel> LowStock,
+        IReadOnlyList<Suggestion> Suggestions);
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    private string Greeting => Clock.GetLocalNow().Hour switch
+    {
+        < 12 => "Good morning",
+        < 17 => "Good afternoon",
+        _ => "Good evening",
+    };
+
+    protected override void OnInitialized()
+    {
+        Setup.Changed += OnSetupChanged;
+        Checks.Changed += OnSetupChanged;
+        News.Changed += OnSetupChanged;
+        _ = Checks.CheckAsync();
+        _ = Setup.RefreshIfStaleAsync();
+    }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ = WatchAsync(stopping.Token);
+        }
+    }
+
+    private Task LoadAsync() => LoadAsync(quiet: false);
+
+    /// <param name="quiet">A live update: on failure the figures on screen stay, marked as not updated.</param>
+    private async Task LoadAsync(bool quiet)
+    {
+        if (!quiet)
+        {
+            error = null;
+        }
+
+        loading = true;
+        try
+        {
+            var now = Clock.GetLocalNow();
+            var today = DateOnly.FromDateTime(now.DateTime);
+            var range = DateRange.Ending(today, TodayFigures.DaysNeeded);
+            // Read first: a bill saved while the rest loads then shows as a change at the next look.
+            var from = await Invoices.GetSalesForDayAsync(today, stopping.Token);
+            var facts = await Facts.GetFactsAsync(range, stopping.Token);
+            var products = await Facts.GetProductsAsync(stopping.Token);
+            var report = SalesAnalysis.Analyse(facts, new SalesFacts { Range = range.Previous }, products);
+            var times = await Facts.GetBillTimesAsync(new DateRange(today.AddDays(-7), today), stopping.Token);
+            var figures = TodayFigures.From(now.DateTime, report.Daily, times.Where(t => t.Day == today || t.Day == today.AddDays(-7)).ToList());
+            var lastBill = figures.WeekSales > 0 ? null : (await Facts.GetBillSpanAsync(stopping.Token))?.Last;
+            data = new TodayData(
+                figures,
+                facts.Days.Where(d => d.Day == today).Sum(d => d.Outstanding),
+                lastBill,
+                await Stock.GetLowStockAsync(5, stopping.Token),
+                Suggestions(report, figures));
+            error = null;
+            liveProblem = false;
+            loadedAt = now;
+            loadedFrom = from;
+            updatedAt = now.DateTime;
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading the Today screen failed.");
+            if (quiet && data is not null)
+            {
+                liveProblem = true;
+            }
+            else
+            {
+                error = ex.Message;
+            }
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    /// <summary>Keeps the figures live: a quick look at today's bills every few seconds, and a reload when a bill
+    /// was added, changed, deleted or paid, the day has turned, or a few minutes have passed.</summary>
+    private async Task WatchAsync(CancellationToken stop)
+    {
+        using var timer = new PeriodicTimer(CheckEvery);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop))
+            {
+                if (loading)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var seen = await Invoices.GetSalesForDayAsync(Today, stop);
+                    if (seen != loadedFrom || Clock.GetLocalNow() - loadedAt >= ReloadEvery)
+                    {
+                        await InvokeAsync(() => LoadAsync(quiet: true));
+                    }
+                    else
+                    {
+                        liveProblem = false;
+                        updatedAt = Clock.GetLocalNow().DateTime;
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Log.LogWarning(ex, "Could not check the POS for new bills.");
+                    liveProblem = true;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <summary>What deserves a look today, most urgent first.</summary>
+    private List<Suggestion> Suggestions(SalesReport report, TodayFigures figures)
+    {
+        var tips = new List<Suggestion>();
+        if (report.ReorderNow.FirstOrDefault() is { } reorder)
+        {
+            var when = reorder.DaysOfStock switch
+            {
+                < 1m => "today",
+                < 2m => "tomorrow",
+                _ => $"in about {Formats.Days(reorder.DaysOfStock)} days",
+            };
+            tips.Add(new("stock", "orange", $"{reorder.Name} may run out {when}",
+                $"{Money.FormatQty(reorder.StockInHand)} left, and it sells about {Formats.Days(reorder.QtyPerDay)} a day. Reorder soon.",
+                "Low stock", "stock"));
+        }
+
+        var week = SmartRetail.Pos.Core.Review.ReviewWeeks.LastWeek(Today);
+        if (report.Daily.Any(d => week.Contains(d.Day) && d.Bills > 0) && !LastWeekReviewed())
+        {
+            tips.Add(new("calendar", "blue", "Your Monday review is ready",
+                $"How last week ({SmartRetail.Pos.Core.Review.ReviewWeeks.Name(week)}) went, what is running out or not selling, and how your decisions turned out. About five minutes.",
+                "Review the week", "review"));
+        }
+
+        if (TestsToDecide() is { Count: > 0 } due)
+        {
+            tips.Add(new("products", "green",
+                due.Count == 1 ? $"{due[0].Title}: its test is done" : $"{due.Count} new products' tests are done",
+                "See how many sold against what you hoped, and decide: reorder, buy more, hold, bundle, mark down or stop.",
+                "Decide", "actions"));
+        }
+
+        var photos = Photos.All();
+        var withoutPhotos = report.TopProducts.Count(p => photos.GetValueOrDefault(p.ProductId)?.Thumbnail is null);
+        if (withoutPhotos > 0)
+        {
+            tips.Add(new("camera", "purple",
+                withoutPhotos == 1 ? "A best seller has no photos yet" : $"{withoutPhotos} best sellers have no photos yet",
+                "Take a phone photo of each; the AI makes five shop-ready photos.", "Make photos", "photos"));
+        }
+
+        if (report.SlowMoverCount > 0)
+        {
+            tips.Add(new("poster", "pink",
+                report.SlowMoverCount == 1 ? "A slow product could clear with a poster" : $"{report.SlowMoverCount} slow products could clear with a poster",
+                $"Not sold in 4 weeks, with {Formats.Rupees(report.MoneyInSlowStock)} tied up in stock. Offers on the poster stay above cost.",
+                "Make a poster", "posters?kind=clearance"));
+        }
+
+        if (report.BusiestHours is { } hours && report.TimedBills >= MinimumTimedBills)
+        {
+            tips.Add(new("clock", "blue", $"{Formats.Hours(hours.From, hours.To)} is your busiest time",
+                $"{Formats.Share(hours.Share)} of sales in the last 4 weeks came in these hours. Keep the counter staffed and best sellers in reach.",
+                "See sales", "sales"));
+        }
+
+        if (figures.Busiest is { } busiest)
+        {
+            tips.Add(new("trend", "green", $"{busiest.Day} is your busiest day",
+                $"About {Formats.Share(busiest.Lift)} more sales than on other days. Stock up the day before.", "See sales", "sales"));
+        }
+
+        return tips;
+    }
+
+    /// <summary>The new products whose test waits for the owner's decision; none when the actions cannot be read.</summary>
+    private IReadOnlyList<SmartRetail.Pos.Core.Actions.ShopAction> TestsToDecide()
+    {
+        try
+        {
+            return Actions.TestsToDecide();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Could not read the new products' tests.");
+            return Array.Empty<SmartRetail.Pos.Core.Actions.ShopAction>();
+        }
+    }
+
+    /// <summary>Whether last week's review is done; a decisions file that cannot be read hides the reminder.</summary>
+    private bool LastWeekReviewed()
+    {
+        try
+        {
+            return Reviews.LastWeekReviewed();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Could not read the Monday review's decisions.");
+            return true;
+        }
+    }
+
+    private void OnSetupChanged() => _ = InvokeAsync(StateHasChanged);
+
+    /// <summary>The first two things to fix, e.g. "Selling below cost: Glucose Biscuits 200 g."</summary>
+    private static string FixNowSummary(FixNowResult found)
+    {
+        var first = found.Open.Where(f => f.Level == SmartRetail.Pos.Core.Checks.FindingLevel.FixNow).Take(2)
+            .Select(f => SmartRetail.Pos.Core.Checks.FindingKinds.Heading(f.Kind) + ": " + f.Title);
+        return string.Join("; ", first) + (found.FixNow > 2 ? "; and more." : ".");
+    }
+
+    public void Dispose()
+    {
+        // Cancelled but not disposed: a refresh still finishing may read its token.
+        stopping.Cancel();
+        Setup.Changed -= OnSetupChanged;
+        Checks.Changed -= OnSetupChanged;
+        News.Changed -= OnSetupChanged;
+    }
+}

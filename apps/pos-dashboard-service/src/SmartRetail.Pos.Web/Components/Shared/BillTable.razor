@@ -1,0 +1,78 @@
+@inject NavigationManager Nav
+
+@if (Bills.Count == 0)
+{
+    <p class="muted">@Empty</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="table data-table bill-list">
+            <thead>
+                <tr>
+                    <th>Bill no.</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Customer</th>
+                    <th class="num">Total</th>
+                    <th class="num">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var bill in Bills)
+                {
+                    var isNew = NewIds?.Contains(bill.Id) == true;
+                    <tr @key="bill.Id" class="@(isNew ? "is-new" : null)" @onclick="() => Open(bill)">
+                        <td class="mono">
+                            <a href="@Link(bill)" @onclick:stopPropagation="true">@bill.Number</a>
+                            @if (isNew)
+                            {
+                                <span class="pill blue">New</span>
+                            }
+                        </td>
+                        <td>@Formats.BillDate(bill.Date)</td>
+                        <td class="bill-time">
+                            @if (bill.Time is { } time)
+                            {
+                                @Formats.Time(time)
+                            }
+                            else if (bill.EnteredLater && bill.SavedAt is { } saved)
+                            {
+                                <span class="muted" title="Typed into the POS on @Formats.DateAndTime(saved), so the time it was sold is not known">entered later</span>
+                            }
+                            else
+                            {
+                                <span class="muted">–</span>
+                            }
+                        </td>
+                        <td>@PersonalData.MaskNumbers(bill.CustomerName)</td>
+                        <td class="num">@Money.Format(bill.GrandTotal)</td>
+                        <td class="num">
+                            @if (bill.Balance > 0)
+                            {
+                                <span class="pill warn">@Money.Format(bill.Balance) due</span>
+                            }
+                            else
+                            {
+                                <span class="pill good">Paid</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<InvoiceSummary> Bills { get; set; } = Array.Empty<InvoiceSummary>();
+
+    /// <summary>Bills that came in while the page was open, shown as new.</summary>
+    [Parameter] public IReadOnlySet<long>? NewIds { get; set; }
+
+    [Parameter] public string Empty { get; set; } = "No bills yet.";
+
+    private static string Link(InvoiceSummary bill) => "bills/" + bill.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private void Open(InvoiceSummary bill) => Nav.NavigateTo(Link(bill));
+}

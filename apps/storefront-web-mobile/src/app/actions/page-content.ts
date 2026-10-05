@@ -1,0 +1,151 @@
+"use server";
+
+import { fanOutWrite, getWriteClient } from "@/lib/db-manager";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
+import { requireAdminSession } from "@/lib/auth-server";
+
+export interface PageContent {
+    title: string;
+    content: string;
+    lastUpdated: string;
+}
+
+const DEFAULT_PAGES: Record<string, PageContent> = {
+    privacy: {
+        title: "Privacy Policy",
+        content: `<h2>1. Introduction</h2>
+<p>At Smart Avenue, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our store or use our website.</p>
+
+<h2>2. Information We Collect</h2>
+<p>We may collect information that identifies, relates to, describes, or could reasonably be linked, directly or indirectly, with you or your household:</p>
+<ul>
+<li>Identifiers such as your name, alias, postal address, email address, or phone number.</li>
+<li>Commercial information, including records of products purchased or considered.</li>
+<li>Internet or other electronic network activity information.</li>
+</ul>
+
+<h2>3. How We Use Your Information</h2>
+<p>We use the information we collect to:</p>
+<ul>
+<li>Support transactions completed in person at our physical store.</li>
+<li>Improve our products and services.</li>
+<li>Send you promotional materials and updates (with your consent).</li>
+<li>Ensure the security and integrity of our systems.</li>
+</ul>
+
+<h2>4. Sharing Your Information</h2>
+<p>We do not sell your personal information. We may share limited information with service providers that support our website, analytics, communications, security, and physical-store operations.</p>
+
+<h2>5. In-Store Purchase Policy</h2>
+<p>Our website is provided for product discovery and store-visit planning. We currently do not accept online, WhatsApp, pickup, reservation, or delivery orders. Product availability shown or discussed online may change, and purchases must be completed in person at our physical store.</p>`,
+        lastUpdated: "February 12, 2026",
+    },
+    terms: {
+        title: "Terms of Service",
+        content: `<h2>1. Acceptance of Terms</h2>
+<p>By accessing or using the Smart Avenue website and store services, you agree to be bound by these Terms of Service and all applicable laws and regulations.</p>
+
+<h2>2. Use of Services</h2>
+<p>You agree to use our services only for lawful purposes. You are responsible for maintaining the confidentiality of your account information and for all activities that occur under your account.</p>
+
+<h2>3. Product Information and Pricing</h2>
+<p>We strive to provide accurate product descriptions and pricing. However, we do not warrant that product descriptions or other content are error-free. We reserve the right to correct any errors and to change or update information at any time.</p>
+
+<h2>4. In-Store Purchases Only</h2>
+<p>The Smart Avenue website is an informational product-discovery service. We currently do not accept online, WhatsApp, pickup, reservation, or delivery orders. Availability and pricing may change before your visit. All purchases must be completed in person at our physical store.</p>
+
+<h2>5. Limitation of Liability</h2>
+<p>Smart Avenue shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of, or inability to use, our services.</p>
+
+<h2>6. Governing Law</h2>
+<p>These terms are governed by and construed in accordance with the laws of India, and you irrevocably submit to the exclusive jurisdiction of the courts in Patna, Bihar.</p>`,
+        lastUpdated: "February 12, 2026",
+    },
+};
+
+/**
+ * Internal fetcher for page content.
+ */
+async function _fetchPageContent(pageId: string): Promise<PageContent> {
+    try {
+        const page = await getWriteClient().page.findUnique({
+            where: { id: pageId }
+        });
+
+        if (!page) {
+            const defaultContent = DEFAULT_PAGES[pageId];
+            if (defaultContent) {
+                await fanOutWrite(c => c.page.create({
+                    data: {
+                        id: pageId,
+                        title: defaultContent.title,
+                        content: defaultContent.content,
+                        lastUpdated: defaultContent.lastUpdated,
+                    }
+                }));
+                return defaultContent;
+            }
+            return { title: "", content: "", lastUpdated: "" };
+        }
+
+        return {
+            title: page.title,
+            content: page.content,
+            lastUpdated: page.lastUpdated,
+        };
+    } catch (error) {
+        console.error(`Error fetching page content for ${pageId}:`, error);
+        return DEFAULT_PAGES[pageId] || { title: "", content: "", lastUpdated: "" };
+    }
+}
+
+/**
+ * Fetches page content with caching.
+ */
+export async function getPageContent(pageId: string): Promise<PageContent> {
+    const cachedFetch = unstable_cache(
+        () => _fetchPageContent(pageId),
+        [`page-content-${pageId}`],
+        { revalidate: 300, tags: ["pages", `page-${pageId}`] }
+    );
+    return cachedFetch();
+}
+
+/**
+ * Updates page content in Firestore.
+ */
+export async function updatePageContent(
+    pageId: string,
+    data: PageContent
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await requireAdminSession();
+        await fanOutWrite(c => c.page.upsert({
+            where: { id: pageId },
+            update: {
+                title: data.title,
+                content: data.content,
+                lastUpdated: data.lastUpdated,
+            },
+            create: {
+                id: pageId,
+                title: data.title,
+                content: data.content,
+                lastUpdated: data.lastUpdated,
+            }
+        }));
+
+        revalidatePath(`/${pageId}`);
+        revalidatePath(`/admin/content/${pageId}`);
+        revalidateTag("pages");
+        revalidateTag(`page-${pageId}`);
+
+        return { success: true };
+    } catch (error) {
+        console.error(`Error updating page content for ${pageId}:`, error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update page content",
+        };
+    }
+}

@@ -1,0 +1,40 @@
+@using System.Globalization
+@using SmartRetail.Pos.Core.Labels
+@typeparam TItem where TItem : class
+
+@* Pages of stickers or cards, placed in millimetres. On screen each page scales to its column; in print it is
+   exactly the paper's size (the page's own @page rule), so the stickers land on the sticker paper's shapes. *@
+<style>
+    @@page labels { size: @Mm(Sheet.PageWidthMm) @Mm(Sheet.PageHeightMm); margin: 0; }
+</style>
+<div class="label-pages @Class" style="--page-w: @Mm(Sheet.PageWidthMm); --page-h: @Mm(Sheet.PageHeightMm)">
+    @for (var p = 0; p < Pages.Count; p++)
+    {
+        var page = Pages[p];
+        <div class="label-page" style="aspect-ratio: @Num(Sheet.PageWidthMm) / @Num(Sheet.PageHeightMm); --mm: calc(100cqw / @Num(Sheet.PageWidthMm))" aria-label="@($"Page {p + 1} of {Pages.Count}")">
+            @for (var i = 0; i < page.Count; i++)
+            {
+                var (x, y) = Sheet.Position(i);
+                var item = page[i];
+                <div class="label-cell @(item is null ? "empty" : null)"
+                     style="left: @Pct(x, Sheet.PageWidthMm); top: @Pct(y, Sheet.PageHeightMm); width: @Pct(Sheet.LabelWidthMm, Sheet.PageWidthMm); height: @Pct(Sheet.LabelHeightMm, Sheet.PageHeightMm)">
+                    @if (item is not null)
+                    {
+                        @Cell(item)
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public LabelSheet Sheet { get; set; } = LabelSheet.Default;
+    [Parameter, EditorRequired] public IReadOnlyList<IReadOnlyList<TItem?>> Pages { get; set; } = Array.Empty<IReadOnlyList<TItem?>>();
+    [Parameter, EditorRequired] public RenderFragment<TItem> Cell { get; set; } = default!;
+    [Parameter] public string? Class { get; set; }
+
+    private static string Num(decimal value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string Mm(decimal value) => Num(value) + "mm";
+    private static string Pct(decimal part, decimal whole) => (part / whole * 100m).ToString("0.####", CultureInfo.InvariantCulture) + "%";
+}

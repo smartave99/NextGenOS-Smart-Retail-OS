@@ -1,0 +1,246 @@
+@page "/welcome"
+@layout PanelLayout
+@implements IDisposable
+@using SmartRetail.AI.Storage
+@inject AiSetupService Setup
+@inject DataSourceInfo Source
+@inject PosConnectionReport Connection
+@inject StorageService Storage
+@inject IOptions<ShopOptions> Shop
+@inject IJSRuntime Js
+
+<PageTitle>Get started · Smart Retail POS</PageTitle>
+
+<div class="setup">
+    <aside class="setup-rail">
+        <a class="brand" href="">
+            <AppMark Size="44" />
+            <div>
+                <div class="brand-name">Smart Retail POS</div>
+                <div class="brand-by">Get started</div>
+            </div>
+        </a>
+
+        <ol class="rail-steps">
+            <li class="rail-step @(Source.IsDemo ? "now" : "done")">
+                <span class="mark">@if (Source.IsDemo) { <text>1</text> } else { <Icon Name="check" /> }</span>
+                <div>
+                    <b>Your shop’s data</b>
+                    <small>@(Source.IsDemo ? "Not found yet: showing the demo shop" : "Found on this PC · only read")</small>
+                </div>
+            </li>
+            <li class="rail-step @(AiReady ? "done" : Source.IsDemo ? null : "now")">
+                <span class="mark">@if (AiReady) { <Icon Name="check" /> } else { <text>2</text> }</span>
+                <div>
+                    <b>The AI</b>
+                    <small>@AiStepNote</small>
+                </div>
+            </li>
+            <li class="rail-step done">
+                <span class="mark"><Icon Name="check" /></span>
+                <div>
+                    <b>Photos and plans</b>
+                    <small><a href="storage">@(freeText is null ? "Kept on this PC" : $"{freeText} free where they are kept")</a></small>
+                </div>
+            </li>
+        </ol>
+
+        <div class="rail-foot"><Icon Name="lock" /><span>Nothing here changes your POS.<br />You can come back to this any time.</span></div>
+    </aside>
+
+    <main class="setup-main">
+        <div class="inner">
+            @if (AiReady && !Source.IsDemo)
+            {
+                <div class="kicker">All done</div>
+                <h1>You’re all set</h1>
+                <p class="lead">Your shop’s data is connected and the AI is ready. Ask it anything, see today’s sales, or make product photos.</p>
+            }
+            else if (Source.IsDemo && AiReady)
+            {
+                <div class="kicker">Step 1 of 3</div>
+                <h1>Connect your shop’s data</h1>
+                <p class="lead">The POS database was not found on this PC, so the demo shop is shown for now.</p>
+            }
+            else
+            {
+                <div class="kicker">Step 2 of 3</div>
+                <h1>Connect the AI</h1>
+                <p class="lead">It answers questions about the shop, writes the plan to grow sales and makes product photos.</p>
+            }
+
+            <section class="panel setup-card @(AiReady ? "done" : null)" id="ai-step">
+                @switch (state.Stage)
+                {
+                    case AiSetupStage.Unknown:
+                    case AiSetupStage.Checking:
+                        <p class="muted"><span class="spinner" aria-hidden="true"></span> Checking the AI tool on this PC…</p>
+                        break;
+
+                    case AiSetupStage.NotInstalled:
+                        <p>@state.Detail</p>
+                        @if (Setup.CanInstall)
+                        {
+                            <p class="small muted">It is free to install. It comes straight from OpenAI and needs an internet connection for a minute or two.</p>
+                            <p><button class="btn btn-primary btn-lg" @onclick="Setup.InstallAsync"><Icon Name="spark" /> Install the AI tool</button></p>
+                        }
+                        break;
+
+                    case AiSetupStage.Installing:
+                        <p><span class="spinner" aria-hidden="true"></span> <strong>Installing Codex…</strong> This takes a minute or two.</p>
+                        <p class="small muted setup-log">@(state.LastLine ?? state.Detail)</p>
+                        <p><button class="btn btn-sm" @onclick="Setup.Cancel">Stop</button></p>
+                        break;
+
+                    case AiSetupStage.NotSignedIn:
+                        <p>Codex is installed. Sign in once with your ChatGPT account, the same one you use on chatgpt.com.</p>
+                        <p><button class="btn btn-primary btn-lg" @onclick="Setup.SignInAsync"><Icon Name="user" /> Sign in with ChatGPT</button></p>
+                        <ApiKeySignIn />
+                        break;
+
+                    case AiSetupStage.SigningIn when state.Code is { } signIn:
+                        <div class="code-step">
+                            <span class="n">1</span>
+                            <div>
+                                <div class="t">Open the sign-in page<small>On this PC or on your phone: @signIn.Url</small></div>
+                                <a class="btn btn-primary" href="@signIn.Url" target="_blank" rel="noopener">Open the sign-in page <Icon Name="external" /></a>
+                            </div>
+                        </div>
+                        <div class="code-step">
+                            <span class="n">2</span>
+                            <div>
+                                <div class="t">Sign in to ChatGPT there, and type this code</div>
+                                <div class="one-time-code" id="one-time-code" data-code="@signIn.Code" aria-label="@signIn.Code">
+                                    @foreach (var character in signIn.Code)
+                                    {
+                                        if (character == '-')
+                                        {
+                                            <span class="dash" aria-hidden="true"></span>
+                                        }
+                                        else
+                                        {
+                                            <span class="ch" aria-hidden="true">@character</span>
+                                        }
+                                    }
+                                    <button class="btn btn-soft" @onclick="() => CopyAsync(signIn.Code)"><Icon Name="copy" /> @(copied ? "Copied" : "Copy the code")</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="wait"><span class="spinner" aria-hidden="true"></span> Waiting for you to sign in. This page moves on by itself; the code works for 15 minutes.</div>
+                        <p style="margin-top: 12px"><button class="btn btn-sm" @onclick="Setup.Cancel">Cancel</button></p>
+                        break;
+
+                    case AiSetupStage.SigningIn:
+                        <p class="muted"><span class="spinner" aria-hidden="true"></span> @state.Detail</p>
+                        break;
+
+                    case AiSetupStage.Ready:
+                        <p><span class="pill good"><Icon Name="check" /> Signed in</span> @state.Detail</p>
+                        <p class="small muted">The AI answers questions, writes the growth plan and makes product photos with this account.</p>
+                        <button class="link-button small" @onclick="Setup.SignInAsync">Sign in with another account</button>
+                        break;
+
+                    case AiSetupStage.Failed:
+                        <p class="trend-down">@state.Detail</p>
+                        <p><button class="btn btn-primary" @onclick="Setup.RefreshAsync">Try again</button></p>
+                        break;
+                }
+            </section>
+
+            @if (Source.IsDemo)
+            {
+                <section class="panel setup-card">
+                    <p><strong>The shop’s data.</strong> Make sure SQL Server is running on this PC, then open the AI side panel once: it finds the POS database by itself and remembers it. Then close and open this app again.</p>
+                    @if (Connection.Steps.Count > 0)
+                    {
+                        <details class="small">
+                            <summary>What was checked</summary>
+                            <ul>
+                                @foreach (var step in Connection.Steps)
+                                {
+                                    <li>@step</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </section>
+            }
+            else
+            {
+                <p class="small muted">Connected to the POS database of <strong>@Shop.Value.Name</strong>@(Connection.Description.Length > 0 ? $": {Connection.Description}" : ""). It is only ever read, never changed.</p>
+            }
+
+            <div class="setup-next">
+                <a class="btn btn-primary btn-lg" href="">@(AiReady ? "Open the app" : "Go to the app")</a>
+                @if (!AiReady)
+                {
+                    <span class="small muted">You can finish the AI step later from <strong>Get started</strong> in the menu.</span>
+                }
+            </div>
+        </div>
+    </main>
+</div>
+
+@code {
+    private AiSetupState state = new(AiSetupStage.Unknown, "");
+    private string? freeText;
+    private bool copied;
+
+    private bool AiReady => state.Stage == AiSetupStage.Ready;
+
+    private string AiStepNote => state.Stage switch
+    {
+        AiSetupStage.Ready => "Signed in",
+        AiSetupStage.Installing => "Installing…",
+        AiSetupStage.NotInstalled => "Install the AI tool",
+        AiSetupStage.SigningIn => "Signing in…",
+        AiSetupStage.Failed => "Needs another try",
+        AiSetupStage.NotSignedIn => "Sign in with ChatGPT",
+        _ => "Checking…",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Setup.Changed += OnSetupChanged;
+        state = Setup.State;
+        var free = DataFolderMover.FreeBytes(Storage.DataFolder);
+        freeText = free >= 0 ? DataFolderMover.Describe(free) : null;
+        if (!state.Busy)
+        {
+            await Setup.RefreshAsync();
+            // Installing needs nothing from the owner, so it starts by itself.
+            if (Setup.State.Stage == AiSetupStage.NotInstalled && Setup.CanInstall)
+            {
+                _ = Setup.InstallAsync();
+            }
+        }
+
+        state = Setup.State;
+    }
+
+    private void OnSetupChanged() => _ = InvokeAsync(() =>
+    {
+        state = Setup.State;
+        if (state.Code is null)
+        {
+            copied = false;
+        }
+
+        StateHasChanged();
+    });
+
+    private async Task CopyAsync(string code)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", code);
+            copied = true;
+        }
+        catch (JSException)
+        {
+            // Copying is a convenience; the code is on the screen.
+        }
+    }
+
+    public void Dispose() => Setup.Changed -= OnSetupChanged;
+}

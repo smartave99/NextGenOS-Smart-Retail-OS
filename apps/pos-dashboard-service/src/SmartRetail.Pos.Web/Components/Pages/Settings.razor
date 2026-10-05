@@ -1,0 +1,252 @@
+@page "/settings"
+@implements IDisposable
+@using System.Reflection
+@using SmartRetail.AI.Providers
+@using SmartRetail.AI.Settings
+@inject AiSetupService Setup
+@inject AiEnvironment Ai
+@inject DataSourceInfo Source
+@inject PosConnectionReport Connection
+@inject StorageService Storage
+@inject IOptions<ShopOptions> Shop
+@inject IJSRuntime Js
+
+<PageTitle>Settings · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Settings</h1>
+        <p class="lead">How the app looks, the AI it uses, and where your shop’s data comes from.</p>
+    </div>
+</div>
+
+<div class="settings-list">
+    <div class="setting-group">Appearance</div>
+    <section class="panel">
+        <div class="setting">
+            <div>
+                <h3>Light or dark</h3>
+                <p>Automatic follows Windows. Your choice is kept on this PC.</p>
+            </div>
+            <div class="seg seg-inline" role="radiogroup" aria-label="Light or dark">
+                @foreach (var (key, label) in Themes)
+                {
+                    <button type="button" class="seg-item @(theme == key ? "on" : null)" role="radio" aria-checked="@(theme == key ? "true" : "false")" @onclick="() => SetThemeAsync(key)">@label</button>
+                }
+            </div>
+        </div>
+    </section>
+
+    <div class="setting-group">The AI</div>
+    <section class="panel">
+        <div class="setting">
+            <div>
+                <h3>@(Setup.State.Stage switch { AiSetupStage.Ready => "Codex is ready", AiSetupStage.Checking or AiSetupStage.Unknown => "Checking Codex…", _ => "Codex is not ready yet" })</h3>
+                <p>@(Setup.State.Detail.Length > 0 ? Setup.State.Detail : "Checking…")</p>
+            </div>
+            <div class="setting-actions">
+                <button type="button" class="btn btn-soft" disabled="@Setup.State.Busy" @onclick="Setup.RefreshAsync" title="Ask Codex again whether it is installed and signed in"><Icon Name="refresh" /> Check again</button>
+                <a class="btn @(Setup.State.Stage == AiSetupStage.Ready ? "" : "btn-primary")" href="welcome">@(Setup.State.Stage == AiSetupStage.Ready ? "Sign-in" : "Get started")</a>
+            </div>
+        </div>
+        <div class="setting">
+            <div>
+                <h3>Which AI answers</h3>
+                <p>@aiChoice</p>
+            </div>
+            <button type="button" class="btn host-only" @onclick="OpenAdvancedAsync">Change</button>
+        </div>
+        <div class="setting">
+            <div>
+                <h3>Privacy</h3>
+                <p>@privacy</p>
+            </div>
+            <button type="button" class="btn host-only" @onclick="OpenAdvancedAsync">Change</button>
+        </div>
+    </section>
+
+    <div class="setting-group" id="ai-jobs">AI for each job</div>
+    <section class="panel">
+        @foreach (var job in AiJobs.All)
+        {
+            <div class="setting">
+                <div>
+                    <h3>@AiJobs.Name(job)</h3>
+                    <p>@AiJobs.Why(job) Recommended: @AiJobs.EffortName(AiJobs.RecommendedEffort(job)).ToLowerInvariant() thinking, with Codex's default model.</p>
+                </div>
+                <AiChoice Job="job" />
+            </div>
+        }
+        <div class="setting">
+            <div>
+                <h3>Codex use</h3>
+                <p>How much of your ChatGPT plan's Codex limits is used, as Codex says. More thinking uses more.</p>
+            </div>
+            <CodexUsageMeter Explain="true" />
+        </div>
+    </section>
+
+    <div class="setting-group">Posters</div>
+    <section class="panel">
+        <div class="setting">
+            <div>
+                <h3>Biggest offer</h3>
+                <p>The most an offer on a poster may take off. Offers never go below the purchase price plus GST, whatever this is.</p>
+            </div>
+            <select class="form-select setting-select" aria-label="Biggest offer on posters" @onchange="SetMaxOffer">
+                @foreach (var choice in PosterSettings.MaxOfferChoices)
+                {
+                    <option value="@choice" selected="@(choice == maxOffer)">@choice% off</option>
+                }
+            </select>
+        </div>
+    </section>
+
+    <div class="setting-group" id="camera-search">Camera search</div>
+    <section class="panel">
+        <CameraSearchSetting />
+    </section>
+
+    <div class="setting-group">Your shop</div>
+    <section class="panel">
+        <div class="setting">
+            <div>
+                <h3>@Shop.Value.Name</h3>
+                <p>@(Source.IsDemo ? "Demo shop with sample data: the POS database was not found on this PC." : Connection.Description.Length > 0 ? Connection.Description + ". Only read, never changed." : Source.Name)</p>
+            </div>
+            <span class="pill @(Source.IsDemo ? "warn" : "good")"><Icon Name="database" /> @(Source.IsDemo ? "Demo data" : "Live · read-only")</span>
+        </div>
+        <div class="setting">
+            <div>
+                <h3>Photos, plans and posters</h3>
+                <p class="path">@Storage.DataFolder</p>
+            </div>
+            <a class="btn" href="storage">Storage</a>
+        </div>
+    </section>
+
+    <div class="setting-group" id="owner-view">Owner's live view</div>
+    <section class="panel">
+        <OwnerViewSetting />
+    </section>
+
+    <div class="setting-group host-only">Side panel</div>
+    <section class="panel host-only">
+        <div class="setting">
+            <div>
+                <h3>The panel beside the POS</h3>
+                <p>@(shortcut.Length > 0 ? $"{shortcut} shows or hides it from any program. " : "")Its side, width and shortcut are in the advanced settings.</p>
+            </div>
+            <button type="button" class="btn" @onclick="OpenAdvancedAsync">Advanced settings</button>
+        </div>
+        <div class="setting" id="start-with-windows">
+            <div>
+                <h3>Start with Windows</h3>
+                <p>@StartWithWindowsText</p>
+            </div>
+            <OnOff Label="Start with Windows" Value="startWithWindows" Changed="SetStartWithWindowsAsync" />
+        </div>
+    </section>
+
+    <div class="setting-group" id="updates">Updates</div>
+    <section class="panel">
+        <UpdatesSetting />
+        <CodexUpdatesSetting />
+    </section>
+
+    <div class="setting-group">About</div>
+    <section class="panel">
+        <div class="setting">
+            <div>
+                <h3>Smart Retail POS @Version</h3>
+                <p>by NextGen OS. The AI only reads the POS database; nothing here changes the POS.</p>
+                <p>Free, open source software under the MIT License. The licence, and the licences of the software inside it, are in the app's folder: <code>LICENSE.txt</code> and <code>THIRD-PARTY-NOTICES.md</code>.</p>
+            </div>
+            <AppMark Size="36" />
+        </div>
+    </section>
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Themes = { ("auto", "Automatic"), ("light", "Light"), ("dark", "Dark") };
+
+    private string theme = "auto";
+    private string aiChoice = "";
+    private string privacy = "";
+    private int maxOffer = PosterSettings.DefaultMaxOfferPercent;
+    private string shortcut = "";
+    private bool startWithWindows;
+    private bool switchedOffInWindows;
+
+    private string StartWithWindowsText =>
+        startWithWindows ? "On. Smart Retail POS starts by itself when you sign in to Windows, and waits as the AI tab beside the POS."
+        : switchedOffInWindows ? "Off. Windows has Smart Retail POS switched off in its list of start-up apps (Settings → Apps → Startup). Turn this on to switch it on there again."
+        : "Off. Open Smart Retail POS from the Start menu when you need it.";
+
+    private static string Version =>
+        typeof(Settings).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "";
+
+    protected override void OnInitialized()
+    {
+        Setup.Changed += OnSetupChanged;
+        _ = Setup.RefreshIfStaleAsync();
+
+        var settings = Ai.LoadSettings();
+        var router = Ai.CreateRouter();
+        var first = router.PlanOrder(ProviderIds.Auto).FirstOrDefault();
+        aiChoice = first is null
+            ? "No AI tool is set up."
+            : first.DisplayName + " first" + (settings.FallbackToOtherProviders ? ", then any other that is ready." : ".");
+        privacy = (settings.Privacy.MaskContactDetails ? "Phone numbers, e-mail and addresses are hidden from the AI." : "Contact details are shared with the AI.")
+            + (settings.Privacy.AllowAiWrittenQueries ? " The AI may write its own read-only queries." : " Only the built-in reports run.");
+        shortcut = settings.Panel.Shortcut ?? "";
+        // The setup ticks "Start with Windows" and writes the sign-in entry; the settings file may not say so yet. Windows' own list of
+        // start-up apps (Task Manager) may have it switched off, and then it does not start although the entry is there.
+        switchedOffInWindows = WindowsStartup.SwitchedOffInWindows();
+        startWithWindows = StartupChoice.Effective(settings.Panel.StartWithWindows, WindowsStartup.EntryExists(), switchedOffInWindows);
+        maxOffer = settings.Posters.CheckedMaxOfferPercent;
+    }
+
+    private void SetMaxOffer(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value as string, out var percent) || !PosterSettings.MaxOfferChoices.Contains(percent))
+        {
+            return;
+        }
+
+        var store = new SettingsStore(Ai.SettingsFile);
+        var settings = store.Load();
+        settings.Posters.MaxOfferPercent = percent;
+        store.Save(settings);
+        maxOffer = percent;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            theme = await Js.InvokeAsync<string>("srpos.theme");
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetThemeAsync(string key)
+    {
+        theme = key;
+        await Js.InvokeVoidAsync("srpos.setTheme", key);
+    }
+
+    private async Task OpenAdvancedAsync() => await Js.InvokeAsync<bool>("srpos.send", "settings", "");
+
+    /// <summary>Only the Windows app can change the sign-in entry: it is asked, and saves the choice.</summary>
+    private async Task SetStartWithWindowsAsync(bool on)
+    {
+        startWithWindows = on;
+        switchedOffInWindows = false;
+        await Js.InvokeAsync<bool>("srpos.send", "startup", on ? "on" : "off");
+    }
+
+    private void OnSetupChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Setup.Changed -= OnSetupChanged;
+}

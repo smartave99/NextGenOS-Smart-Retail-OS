@@ -1,0 +1,165 @@
+@* Settings: camera search. A photo always finds a product by its barcode; finding it by its look is turned on here,
+   which downloads a model (DINOv2-small, about 88 MB, to start with) once. A better model that an update of the app brings is
+   offered here and chosen by the owner: it is downloaded while the one working goes on, then the photos are learned again.
+   Everything happens on this PC: photos are never kept or sent. *@
+@using SmartRetail.Pos.Vision
+@implements IDisposable
+@inject CameraSearchService Search
+@inject ILogger<CameraSearchSetting> Log
+
+<div class="setting camera-search-setting">
+    <div>
+        <h3>Find products by their look</h3>
+        <p>@Describe()</p>
+        @if (status.Model == LookModelState.Downloading)
+        {
+            <div class="progress-track" role="progressbar" aria-label="Downloading the model" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent"><i style="width: @(Percent)%"></i></div>
+        }
+        @if (status.Problem is { } problem)
+        {
+            <p class="owner-state problem" role="alert"><Icon Name="alert" /><span>@problem</span></p>
+        }
+        @if (message is not null)
+        {
+            <p class="plan-error small trend-down" role="alert">@message</p>
+        }
+    </div>
+    <div class="setting-actions">
+        @if (on)
+        {
+            @if (status.Model == LookModelState.Problem || status.Problem is not null)
+            {
+                <button type="button" class="btn btn-primary" @onclick="TurnOn">Try again</button>
+            }
+            <button type="button" class="btn" @onclick="TurnOff">@(status.Model == LookModelState.Downloading ? "Cancel" : "Turn off")</button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-primary" @onclick="TurnOn">Turn on</button>
+            @if (downloaded)
+            {
+                <button type="button" class="btn btn-soft" title="Frees about 88 MB; turning on again downloads it again" @onclick="DeleteModel">Delete the model</button>
+            }
+        }
+    </div>
+</div>
+@if (Search.Models.Count > 1)
+{
+    <div class="setting camera-model-setting">
+        <div>
+            <h3>Model</h3>
+            <p>@(on ? "Using" : "Will use") <strong>@Name(Search.Model)</strong> (@Size(Search.Model)). @Search.Model.Note</p>
+            @if (Search.Better is { } better)
+            {
+                <p class="owner-state camera-better"><Icon Name="spark" /><span>A better model is available: <strong>@Name(better)</strong> (@Size(better)). @better.Note</span></p>
+            }
+            @if (status.SwitchingTo is { } switchingTo)
+            {
+                <div class="progress-track" role="progressbar" aria-label="@($"Downloading {switchingTo}")" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent"><i style="width: @(Percent)%"></i></div>
+                <p class="small muted">Downloading <strong>@switchingTo</strong>: @Percent%. The model working now goes on finding products meanwhile.</p>
+            }
+            else
+            {
+                <p class="small muted">
+                    Another model is downloaded once and your products' photos are learned again with it, in the background, on this PC. Until that
+                    is done a photo finds by look the products learned so far; barcodes always work. The old model is deleted once the new one works.
+                </p>
+            }
+            <div class="camera-model-pick">
+                <label class="visually-hidden" for="camera-model">Model</label>
+                <select id="camera-model" class="form-select" @bind="pick" disabled="@(status.SwitchingTo is not null)">
+                    @foreach (var model in Search.Models)
+                    {
+                        <option value="@model.Id">@Name(model) · @Size(model)@(model.Id == Search.Model.Id ? " · in use" : "")</option>
+                    }
+                </select>
+                <button type="button" class="btn btn-primary" disabled="@(pick == Search.Model.Id || status.SwitchingTo is not null)" @onclick="UseModel">Use this model</button>
+            </div>
+        </div>
+    </div>
+}
+<div class="setting">
+    <div>
+        <h3>Barcodes</h3>
+        <p>A photo of a barcode finds its product at once, on this PC: makers' EAN and UPC codes, and the shop's own stickers.</p>
+    </div>
+    <span class="pill good"><Icon Name="check" /> Always on</span>
+</div>
+
+@code {
+    private CameraSearchStatus status = new(LookModelState.Off, 0, null, 0, 0, false);
+    private bool on;
+    private bool downloaded;
+    private string? message;
+    private string pick = "";
+
+    private int Percent => (int)Math.Round(status.Progress * 100);
+
+    protected override void OnInitialized()
+    {
+        Read();
+        Search.Changed += OnChanged;
+    }
+
+    private void Read()
+    {
+        status = Search.Status;
+        on = Search.FindByLookIsOn;
+        downloaded = Search.ModelIsDownloaded;
+        if (pick.Length == 0 || Search.Models.All(m => m.Id != pick) || status.SwitchingTo is null && pick == Search.Model.Id)
+        {
+            pick = Search.Model.Id;
+        }
+    }
+
+    private string Describe() => status.Model switch
+    {
+        LookModelState.Downloading => $"Downloading {Name(Search.Model)}: {Percent}% of {Size(Search.Model)}. You can go on working meanwhile.",
+        LookModelState.Checking => "Checking the downloaded model…",
+        LookModelState.Loading => "Starting the model…",
+        LookModelState.Ready => $"On. {status.Learned} of {status.WithPhotos} products with photos learned{(status.Learning ? ", learning more now" : "")}. "
+            + "A product without photos is found by its barcode only.",
+        LookModelState.Problem => "Not working: see below.",
+        _ when on => "Starting…",
+        _ => $"Off. When on, a photo of a product finds it by its look, not only its barcode: the app downloads {Name(Search.Model)} "
+            + $"(about {Size(Search.Model)}, once, from Hugging Face) and learns each product's phone and white-background photos. "
+            + "Photos are looked at on this PC only, and never kept or sent.",
+    };
+
+    private static string Name(VisionModel model) => model.Name.Length > 0 ? model.Name : model.Id;
+
+    /// <summary>"88 MB", or "12 KB" for a very small stand-in.</summary>
+    private static string Size(VisionModel model) => model.Size >= 1_000_000 ? $"{model.Size / 1_000_000} MB" : $"{Math.Max(1, model.Size / 1_000)} KB";
+
+    private void UseModel() => Act(() => Search.Switch(pick));
+
+    private void TurnOn() => Act(Search.TurnOn);
+
+    private void TurnOff() => Act(Search.TurnOff);
+
+    private void DeleteModel() => Act(Search.DeleteModel);
+
+    private void Act(Action action)
+    {
+        message = null;
+        try
+        {
+            action();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing camera search failed.");
+            message = ex.Message;
+        }
+
+        Read();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Read();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Search.Changed -= OnChanged;
+}

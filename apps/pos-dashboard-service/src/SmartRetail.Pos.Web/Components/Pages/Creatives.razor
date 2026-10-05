@@ -1,0 +1,254 @@
+@page "/creatives"
+@implements IDisposable
+@using System.Globalization
+@using SmartRetail.Pos.Core.Creatives
+@inject CreativeService Service
+@inject IProductRepository Catalog
+@inject ISalesFactsRepository Facts
+@inject NavigationManager Nav
+@inject ILogger<Creatives> Log
+
+<PageTitle>Creatives · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Creatives</h1>
+        <p class="lead">Ads for social media and the shop, designed by AI around your products. Every price on them is your POS's, added by the app.</p>
+    </div>
+    <div class="actions ai-jobs">
+        <span class="muted small">Designs</span> <AiChoice Job="SmartRetail.AI.Settings.AiJob.Creative" />
+    </div>
+</div>
+
+<div class="creatives-page">
+    <section class="panel form-card creative-new" aria-labelledby="new-creative">
+        <h2 id="new-creative">New creative</h2>
+        <div class="field-label" id="format-label">Format</div>
+        <div class="seg" role="radiogroup" aria-labelledby="format-label">
+            @foreach (var choice in CreativeFormat.All)
+            {
+                <button type="button" role="radio" aria-checked="@(choice == format ? "true" : "false")"
+                        class="seg-item @(choice == format ? "on" : null)" @onclick="() => format = choice">@choice.Name</button>
+            }
+        </div>
+        <p class="kind-help">For @format.Use · @format.Size</p>
+
+        <div class="field-label" id="products-label">Products to show <span class="muted">(up to @CreativeBrief.MaxProducts, or none)</span></div>
+        @if (picked.Count > 0)
+        {
+            <ul class="plain-list picked-products" aria-labelledby="products-label">
+                @foreach (var product in picked)
+                {
+                    <li>
+                        <span class="grow item-name">@product.Name</span>
+                        <button type="button" class="icon-btn" aria-label="@($"Take {product.Name} off")" @onclick="() => picked.Remove(product)"><Icon Name="close" /></button>
+                    </li>
+                }
+            </ul>
+        }
+        @if (picked.Count < CreativeBrief.MaxProducts)
+        {
+            <div class="scan-box compact">
+                <Icon Name="search" Class="scan-icon" />
+                <input class="scan-input" type="search" autocomplete="off" placeholder="Find a product: name, code or barcode"
+                       aria-label="Find a product for the creative" value="@term" @oninput="SearchAsync" />
+            </div>
+            @if (found.Count > 0)
+            {
+                <ul class="plain-list found-list" aria-label="Products found">
+                    @foreach (var product in found)
+                    {
+                        <li>
+                            <div class="grow">
+                                <div class="item-name">@product.Name</div>
+                                <div class="item-meta">@product.Code · @Formats.Price(product.SellingPrice)</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-soft" @onclick="() => Pick(product.Id, product.Name)"><Icon Name="plus" /> Add</button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary btn-lg" disabled="@busy" @onclick="Create"><Icon Name="spark" /> Start the creative</button>
+        </div>
+        @if (problem is not null)
+        {
+            <p class="alert alert-danger" role="alert">@problem</p>
+        }
+        <div class="note">
+            <Icon Name="info" />
+            <span>Next you write the words and choose the look. Codex then designs the whole picture with its image tool, in a few minutes; you can change it with a few words, as often as you like.</span>
+        </div>
+    </section>
+
+    @if (projects.Count == 0)
+    {
+        <section class="panel empty-creatives">
+            <div class="empty">
+                <Icon Name="spark" Size="40" />
+                <h2>No creatives yet</h2>
+                <p>A creative is a picture for Instagram, WhatsApp, Facebook, your website or a printed poster, designed around your products.</p>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section aria-label="Your creatives">
+            <div class="creative-grid">
+                @foreach (var project in projects)
+                {
+                    var shown = project.Shown;
+                    @* The picture shown was made in its own brief's format, which the brief may have changed from since. *@
+                    var projectFormat = CreativeFormat.Find((shown?.Brief ?? project.Brief).Format);
+                    <a class="creative-card" href="@($"creatives/{project.Id}")">
+                        <span class="cc-picture" style="aspect-ratio: @projectFormat.Width / @projectFormat.Height">
+                            @if (shown is not null)
+                            {
+                                <img src="@($"creative-files/{project.Id}/picture/{shown.Number}")" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <Icon Name="spark" />
+                            }
+                        </span>
+                        <span class="cc-title">@project.Title</span>
+                        <span class="cc-meta">@projectFormat.Name · @Describe(project)</span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private const int SearchLimit = 8;
+
+    /// <summary>A product to start with, e.g. from its photo page.</summary>
+    [SupplyParameterFromQuery(Name = "product")] public int? ProductId { get; set; }
+
+    private readonly List<(int Id, string Name)> picked = new();
+    private IReadOnlyList<CreativeProject> projects = Array.Empty<CreativeProject>();
+    private IReadOnlyList<Product> found = Array.Empty<Product>();
+    private CreativeFormat format = CreativeFormat.Square;
+    private string term = "";
+    private string? problem;
+    private bool busy;
+    private int searchVersion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Service.Changed += OnChanged;
+        Load();
+        if (ProductId is { } id && id > 0)
+        {
+            try
+            {
+                if ((await Facts.GetProductsAsync()).FirstOrDefault(p => p.Id == id) is { } product)
+                {
+                    Pick(product.Id, product.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(ex, "Reading product {Id} for a creative failed.", id);
+            }
+        }
+    }
+
+    private void Load()
+    {
+        try
+        {
+            projects = Service.Store.Recent();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the creatives failed.");
+            problem = "The creatives could not be read: " + ex.Message;
+        }
+    }
+
+    private async Task SearchAsync(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString() ?? "";
+        var mine = ++searchVersion;
+        if (term.Trim().Length == 0)
+        {
+            found = Array.Empty<Product>();
+            return;
+        }
+
+        await Task.Delay(200);
+        if (mine != searchVersion)
+        {
+            return;
+        }
+
+        try
+        {
+            var products = await Catalog.SearchAsync(term.Trim(), SearchLimit);
+            if (mine == searchVersion)
+            {
+                found = products.Where(p => picked.All(c => c.Id != p.Id)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Finding products for a creative failed.");
+            problem = "Could not search the products: " + ex.Message;
+        }
+    }
+
+    private void Pick(int id, string name)
+    {
+        if (picked.Count < CreativeBrief.MaxProducts && picked.All(p => p.Id != id))
+        {
+            picked.Add((id, name));
+        }
+
+        term = "";
+        found = Array.Empty<Product>();
+    }
+
+    private void Create()
+    {
+        busy = true;
+        problem = null;
+        try
+        {
+            var project = Service.Create(format, picked.Select(p => p.Id).ToList(), picked.Count > 0 ? picked[0].Name : null);
+            Nav.NavigateTo($"creatives/{project.Id}");
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Starting a creative failed.");
+            problem = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private string Describe(CreativeProject project)
+    {
+        if (project.IsMaking)
+        {
+            return "being made…";
+        }
+
+        var made = project.Generations.Count(g => g.HasImage);
+        var when = project.Updated.ToString("d MMM, h:mm tt", CultureInfo.InvariantCulture);
+        return made == 0 ? $"no picture yet · {when}" : $"{made} {(made == 1 ? "picture" : "pictures")} · {when}";
+    }
+
+    private void OnChanged(string id) => _ = InvokeAsync(() =>
+    {
+        Load();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Service.Changed -= OnChanged;
+}

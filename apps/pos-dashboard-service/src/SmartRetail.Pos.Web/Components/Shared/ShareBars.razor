@@ -1,0 +1,28 @@
+@* Horizontal bars for shares: categories, payment modes. *@
+@using System.Globalization
+
+<ul class="share-bars">
+    @foreach (var row in Rows)
+    {
+        <li>
+            <div class="share-top">
+                <span class="share-label">@row.Label</span>
+                <span class="share-value">@row.Value</span>
+            </div>
+            <div class="share-track" aria-hidden="true">
+                <div class="share-fill @row.Tone" style="width: @Width(row.Share)%"></div>
+            </div>
+            @if (row.Note is not null)
+            {
+                <div class="share-note">@row.Note</div>
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ShareRow> Rows { get; set; } = Array.Empty<ShareRow>();
+
+    private static string Width(decimal share) =>
+        (share <= 0 ? 0m : Math.Max(1m, Math.Min(100m, share * 100m))).ToString("0.#", CultureInfo.InvariantCulture);
+}

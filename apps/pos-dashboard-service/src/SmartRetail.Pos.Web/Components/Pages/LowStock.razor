@@ -1,0 +1,76 @@
+@page "/stock"
+@inject IStockRepository Stock
+@inject ILogger<LowStock> Log
+
+<PageTitle>Low stock · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Low stock</h1>
+        <p class="sub">Products below their reorder level, biggest shortfall first.</p>
+    </div>
+</div>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (items is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (items.Count == 0)
+{
+    <section class="panel"><p class="muted">Every product is above its reorder level.</p></section>
+}
+else
+{
+    <section class="panel">
+        <div class="table-wrap">
+            <table class="table data-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Product</th>
+                        <th class="num">In stock</th>
+                        <th class="num">Reorder level</th>
+                        <th class="num">Short by</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td class="mono">@item.Code</td>
+                            <td class="item-name">@item.Name</td>
+                            <td class="num"><span class="pill @(item.InHand <= 0 ? "bad" : "warn")">@Money.FormatQty(item.InHand)</span></td>
+                            <td class="num">@Money.FormatQty(item.MinStock)</td>
+                            <td class="num"><strong>@Money.FormatQty(item.Shortfall)</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<StockLevel>? items;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            items = await Stock.GetLowStockAsync(200);
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading low stock failed.");
+            error = ex.Message;
+        }
+    }
+}

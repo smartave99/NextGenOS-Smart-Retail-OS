@@ -1,0 +1,102 @@
+@* An A4 poster as it prints. Every size inside is relative to the sheet's width, so the same poster shows as a
+   preview, as a thumbnail and on paper. The words, photos and prices are the app's; the artwork only sits behind. *@
+@using System.Globalization
+@using SmartRetail.Pos.Core.Posters
+
+<div class="sheet-frame @Class">
+    <article class="sheet kind-@Poster.Kind.Slug() @Layout @(Poster.Artwork is null ? null : "has-art")"
+             style="@(Poster.Artwork is null ? null : $"background-image: url('{PosterStore.ArtworkUrl(Poster)}')")"
+             aria-label="@Poster.Words.Headline poster">
+        <div class="sheet-top">
+            @if (!string.IsNullOrWhiteSpace(Poster.ShopName))
+            {
+                <div class="sheet-shop">@Poster.ShopName</div>
+            }
+            <h2 class="sheet-headline" style="@HeadlineStyle">@Poster.Words.Headline</h2>
+            @if (Poster.Words.HindiLine.Length > 0)
+            {
+                <p class="sheet-hindi @(Poster.Words.HindiLine.Length > 26 ? "long" : null)" lang="hi">@Poster.Words.HindiLine</p>
+            }
+            @if (Poster.Words.Subline.Length > 0)
+            {
+                <p class="sheet-sub">@Poster.Words.Subline</p>
+            }
+            @if (Poster.UpToPercentOff is { } upTo)
+            {
+                <div class="sheet-badge" aria-label="Up to @upTo% off">
+                    <small>@(Poster.Items.Count(i => i.HasOffer) > 1 ? "UP TO" : "SAVE")</small>
+                    <b>@upTo.ToString("0")%</b>
+                    <small>OFF</small>
+                </div>
+            }
+        </div>
+
+        <div class="sheet-items">
+            @foreach (var item in Poster.Items)
+            {
+                <div class="sheet-item">
+                    <div class="sheet-photo">
+                        @if (item.Photo is { } photo)
+                        {
+                            <img src="@ProductPhotoService.Url(item.ProductId, photo)" alt="" loading="eager" />
+                        }
+                        else
+                        {
+                            <span class="sheet-initial" aria-hidden="true">@Initial(item.Name)</span>
+                        }
+                    </div>
+                    <div class="sheet-text">
+                        <div class="sheet-name">@item.Name</div>
+                        <div class="sheet-prices">
+                            @if (item.HasOffer)
+                            {
+                                <s>@Money.FormatCompact(item.Price)</s>
+                                <b class="offer">@Money.FormatCompact(item.OfferPrice!.Value)</b>
+                            }
+                            else
+                            {
+                                <b>@Money.FormatCompact(item.Price)</b>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <footer class="sheet-foot">
+            <span>@Poster.ValidityText</span>
+            <span>Prices include GST</span>
+        </footer>
+    </article>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Poster Poster { get; set; } = new();
+
+    /// <summary>"print-me" on the one sheet the Print button prints.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private string Layout => Poster.Items.Count switch
+    {
+        <= 1 => "n1",
+        2 => "n2",
+        <= 4 => "n4",
+        _ => "n6",
+    };
+
+    /// <summary>As big as the headline can be: its longest word fits one line, and all of it fits two lines,
+    /// beside the offer badge when there is one. Heavy capitals are about 0.7 of their size wide.</summary>
+    private string HeadlineStyle
+    {
+        get
+        {
+            var headline = Poster.Words.Headline;
+            var longest = Math.Max(1, headline.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(word => word.Length).DefaultIfEmpty(1).Max());
+            var width = Poster.UpToPercentOff is null ? 86.0 : 63.0;
+            var size = Math.Min(12.0, Math.Min(width / (0.7 * longest), 2 * width / (0.7 * Math.Max(1, headline.Length))));
+            return "font-size: " + Math.Max(5.0, Math.Floor(size * 10) / 10).ToString("0.0", CultureInfo.InvariantCulture) + "cqw";
+        }
+    }
+
+    private static string Initial(string name) => name.Trim() is { Length: > 0 } text ? text[..1].ToUpperInvariant() : "?";
+}

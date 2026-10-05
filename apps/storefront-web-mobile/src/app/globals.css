@@ -1,0 +1,290 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-outfit);
+  --font-serif: var(--font-outfit);
+  /* Using Sans for Serif variable to override any legacy serif usage */
+
+  --color-canvas: var(--sa-canvas);
+  --color-surface: var(--sa-surface);
+  --color-label: var(--sa-label);
+  --color-label-muted: var(--sa-label-muted);
+  --color-brand-blue: var(--sa-accent);
+  --color-brand-lime: var(--sa-success);
+  --color-brand-green: var(--sa-success);
+  --color-brand-gold: var(--sa-warning);
+  --color-brand-sand: var(--sa-canvas);
+  --color-brand-dark: var(--sa-night);
+  --color-brand-light: var(--sa-surface);
+  --color-brand-gray: var(--sa-label-muted);
+  --color-success: var(--sa-success);
+  --color-warning: var(--sa-warning);
+  --color-danger: var(--sa-danger);
+  --color-ai: var(--sa-ai);
+}
+
+:root {
+  color-scheme: light;
+  --sa-canvas: #f4f7fb;
+  --sa-surface: #ffffff;
+  --sa-surface-soft: #eaf0f7;
+  --sa-label: #0f172a;
+  --sa-label-muted: #475569;
+  --sa-border: #cbd5e1;
+  --sa-accent: #1d4ed8;
+  --sa-accent-hover: #1e40af;
+  --sa-success: #047857;
+  --sa-warning: #92400e;
+  --sa-danger: #b91c1c;
+  --sa-ai: #6d28d9;
+  --sa-night: #071225;
+  --sa-focus: #2563eb;
+  --sa-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.08);
+  --sa-shadow-2: 0 4px 8px rgba(15, 23, 42, 0.05), 0 20px 48px rgba(15, 23, 42, 0.14);
+
+  --primary: var(--sa-night);
+  --secondary: var(--sa-accent);
+  --accent: var(--sa-success);
+  --background: var(--sa-canvas);
+  --foreground: var(--sa-label);
+
+  --brand-blue: var(--sa-accent);
+  --brand-lime: var(--sa-success);
+  --brand-green: var(--sa-success);
+  --brand-gold: var(--sa-warning);
+  --brand-dark: var(--sa-night);
+  --brand-sand: var(--sa-canvas);
+
+  /* Font Variables matching layout.tsx */
+  --font-sans: var(--font-outfit);
+  --font-serif: var(--font-outfit);
+}
+
+/* Modern Glassmorphism (Frosted) */
+.glass-panel {
+  @apply bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl;
+}
+
+.glass-header {
+  @apply bg-white/90 backdrop-blur-2xl border-b border-gray-200/50 shadow-sm supports-[backdrop-filter]:bg-white/80;
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-dark via-slate-600 to-brand-lime;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background: var(--background);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  min-width: 320px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  color: #ffffff;
+  background: var(--sa-accent);
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid var(--sa-focus);
+  outline-offset: 3px;
+}
+
+:where(button, [role="button"], a) {
+  touch-action: manipulation;
+}
+
+.sa-card {
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  box-shadow: var(--sa-shadow-1);
+}
+
+.sa-card-link {
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sa-card-link:active,
+.sa-press:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sa-card-link:hover {
+    transform: translateY(-4px);
+    border-color: #93c5fd;
+    box-shadow: var(--sa-shadow-2);
+  }
+
+  .sa-card-link:hover .sa-card-image {
+    transform: scale(1.04);
+  }
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+  /* Modern Sans for Headings */
+  letter-spacing: -0.025em;
+  /* Tight tracking for premium feel */
+}
+
+/* Mobile Optimization: Prevent iOS input zoom */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Hide scrollbar utility */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}
+
+/* Shimmer skeleton loading effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 25%,
+    #e2e8f0 50%,
+    #f1f5f9 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.sa-card-image {
+  transition: transform 300ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* CSS-based slide transitions (replace simple framer-motion) */
+.slide-enter {
+  transform: translateX(100%);
+  opacity: 0;
+}
+.slide-enter-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+              opacity 0.3s ease;
+}
+.slide-exit-active {
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+              opacity 0.3s ease;
+}
+
+/* Fade transition utility */
+.fade-enter {
+  opacity: 0;
+}
+.fade-enter-active {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Mobile menu overlay transition */
+.overlay-enter {
+  opacity: 0;
+}
+.overlay-enter-active {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Skeleton card placeholder */
+.skeleton-card {
+  @apply rounded-2xl overflow-hidden border border-slate-100;
+}
+.skeleton-card .skeleton-image {
+  @apply aspect-[4/3];
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.skeleton-card .skeleton-line {
+  @apply h-4 rounded;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.skeleton-card .skeleton-line-sm {
+  @apply h-3 rounded w-2/3;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* CSS transition keyframes for mobile menu (replaces framer-motion) */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel,
+  .glass-header {
+    background: var(--sa-surface) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :where(button, input, select, textarea, a) {
+    border-color: currentColor;
+  }
+
+  .text-slate-400,
+  .text-slate-500 {
+    color: var(--sa-label-muted) !important;
+  }
+}

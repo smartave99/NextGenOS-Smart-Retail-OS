@@ -1,0 +1,87 @@
+@implements IDisposable
+@using SmartRetail.AI.Products
+@using SmartRetail.AI.Providers
+@inject ProductPhotoService Photos
+
+@* Which photo of which product is being made now, what comes next for it, and which products wait: the AI makes the photos one at
+   a time in the background, so this says where the work stands. It redraws by itself as each photo is done. *@
+@if (!queue.IsEmpty)
+{
+    <section class="panel photo-queue @(queue.PausedUntil is null ? null : "paused")" aria-label="What is being made" role="status">
+        <div class="panel-head">
+            <h2>
+                @if (queue.PausedUntil is null)
+                {
+                    <span class="spinner"></span>
+                }
+                else
+                {
+                    <Icon Name="clock" />
+                }
+                @(queue.PausedUntil is null ? "Making photos" : "Photos paused")
+            </h2>
+            <span class="muted small">@queue.PhotosLeft @(queue.PhotosLeft == 1 ? "photo" : "photos") left</span>
+        </div>
+        @if (queue.PausedUntil is { } resumes)
+        {
+            <p class="pq-paused">
+                Codex's usage limit was reached. The photos carry on by themselves at <strong>@UsageLimitPause.Describe(resumes, DateTimeOffset.Now)</strong>, from where they stopped.
+                <button type="button" class="link-button" title="Try again at once, e.g. after getting more usage" @onclick="Photos.TryNow">Try now</button>
+            </p>
+        }
+        @if (queue.Now is { } now)
+        {
+            <p class="pq-now">
+                <strong><a href="@($"photos/{now.ProductId}")">@queue.NowName</a></strong>:
+                @(now.IsListing ? "writing the listings for Amazon and your website" : $"photo {now.Kind.Number()} of {PhotoKinds.All.Count}, {now.Kind.Title()}")
+                <span class="muted">· started @now.Started.ToString("h:mm tt", India)</span>
+            </p>
+            @if (queue.NextKinds.Count > 0 || queue.ListingNext)
+            {
+                <p class="small pq-next"><span class="muted">Next for it:</span> @Next(queue)</p>
+            }
+        }
+        @if (queue.Waiting.Count > 0)
+        {
+            <p class="small muted pq-wait-head">@(queue.PausedUntil is not null ? "Waiting to carry on:" : queue.Now is null ? "Waiting for its turn:" : "Waiting after it:")</p>
+            <ol class="pq-waiting">
+                @foreach (var waiting in queue.Waiting.Take(Shown))
+                {
+                    <li>
+                        <a href="@($"photos/{waiting.ProductId}")">@waiting.Name</a>
+                        <span class="muted">· @(waiting.Photos == 0 ? "the listings" : waiting.Photos == 1 ? "1 photo" : $"{waiting.Photos} photos")</span>
+                    </li>
+                }
+            </ol>
+            @if (queue.Waiting.Count > Shown)
+            {
+                <p class="small muted">and @(queue.Waiting.Count - Shown) more @(queue.Waiting.Count - Shown == 1 ? "product" : "products")</p>
+            }
+        }
+    </section>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    private const int Shown = 5;
+
+    private PhotoQueue queue = PhotoQueue.Empty;
+
+    protected override void OnInitialized()
+    {
+        queue = Photos.Queue();
+        Photos.Changed += OnChanged;
+    }
+
+    private static string Next(PhotoQueue queue) =>
+        string.Join(", then ", queue.NextKinds.Select(kind => kind.Title()).Concat(queue.ListingNext ? new[] { "the listings" } : Array.Empty<string>()));
+
+    private void OnChanged(int productId) => _ = InvokeAsync(() =>
+    {
+        queue = Photos.Queue();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Photos.Changed -= OnChanged;
+}

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="SqlServer\pos_schema_subset.sql" LogicalName="pos_schema_subset.sql" />
+  </ItemGroup>
+
+  <!-- Two tiny stand-ins for DINOv2 (Vision/make_tiny_models.py): its input and outputs, a few hundred bytes. -->
+  <ItemGroup>
+    <None Include="Vision\*.onnx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SmartRetail.Pos.Core\SmartRetail.Pos.Core.csproj" />
+    <ProjectReference Include="..\..\src\SmartRetail.Pos.Data\SmartRetail.Pos.Data.csproj" />
+    <!-- For the chat's query runner, which is tested against SQL Server. -->
+    <ProjectReference Include="..\..\src\SmartRetail.Pos.Web\SmartRetail.Pos.Web.csproj" />
+  </ItemGroup>
+
+</Project>

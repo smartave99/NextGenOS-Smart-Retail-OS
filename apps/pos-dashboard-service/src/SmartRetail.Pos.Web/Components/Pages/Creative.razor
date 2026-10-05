@@ -1,0 +1,932 @@
+@page "/creatives/{Id}"
+@implements IAsyncDisposable
+@using System.Globalization
+@using SmartRetail.AI.Creatives
+@using SmartRetail.Pos.Core.Creatives
+@inject CreativeService Service
+@inject IProductRepository Catalog
+@inject NavigationManager Nav
+@inject IJSRuntime Js
+@inject ILogger<Creative> Log
+
+<PageTitle>@(project?.Title ?? "Creative") · Creatives · Smart Retail POS</PageTitle>
+
+@if (project is null)
+{
+    <p class="muted">@(loaded ? "This creative is not in the data folder." : "Loading…")</p>
+}
+else
+{
+    var format = CreativeFormat.Find(brief.Format);
+    var selected = Selected;
+    <div class="page-head">
+        <div class="grow-head">
+            <div class="eyebrow"><a href="creatives">Creatives</a> <Icon Name="chevron" /></div>
+            <input class="title-input" value="@title" maxlength="80" aria-label="The creative's name" @onchange="RenameAsync" />
+            <p class="lead">@format.Name · @format.Size · @Pictures()</p>
+        </div>
+        <div class="actions">
+            <AiChoice Job="SmartRetail.AI.Settings.AiJob.Creative" />
+            <button type="button" class="btn @(confirmDelete ? "btn-danger" : "btn-soft")" disabled="@Making" @onclick="Delete">
+                <Icon Name="trash" /> @(confirmDelete ? "Press again to delete it" : "Delete")
+            </button>
+        </div>
+    </div>
+
+    @if (codex is { IsReady: false })
+    {
+        <section class="panel setup-banner-card">
+            <div class="suggestion">
+                <div class="tile orange"><Icon Name="spark" /></div>
+                <div>
+                    <h3>The AI tool is not ready yet</h3>
+                    <p>Only Codex can make pictures. Install it and sign in once on the Get started page; it takes a minute.</p>
+                </div>
+                <a class="btn btn-primary btn-sm" href="welcome">Get started</a>
+            </div>
+        </section>
+    }
+
+    @if (message is not null)
+    {
+        <p class="plan-error small @(messageIsProblem ? "trend-down" : "trend-up")" role="status">@message</p>
+    }
+
+    <div class="creative-page">
+        <div class="creative-brief">
+            <section class="panel form-card" aria-labelledby="brief-head">
+                <h2 id="brief-head">The brief</h2>
+                <p class="brief-lead">Nothing here is compulsory: the AI fills in whatever you leave empty. For a good first picture, choose the format, add the products to show and write a headline. The rest is under <strong>More choices</strong>.</p>
+
+                <div class="brief-step"><span class="step-no" aria-hidden="true">1</span> What is it for?</div>
+                <div class="field-label" id="format-label">Format</div>
+                <div class="seg" role="radiogroup" aria-labelledby="format-label">
+                    @foreach (var choice in CreativeFormat.All)
+                    {
+                        <button type="button" role="radio" aria-checked="@(choice == format ? "true" : "false")"
+                                class="seg-item @(choice == format ? "on" : null)" @onclick="() => SaveAsync(b => b with { Format = choice.Id })">@choice.Name</button>
+                    }
+                </div>
+                <p class="kind-help">For @format.Use.</p>
+
+                <div class="brief-step"><span class="step-no" aria-hidden="true">2</span> What should it show? <span class="muted">Optional</span></div>
+                <div class="field-label" id="products-label">Products <span class="muted">(up to @CreativeBrief.MaxProducts)</span></div>
+                @if (products.Count > 0)
+                {
+                    <ul class="picks" aria-labelledby="products-label">
+                        @foreach (var product in products)
+                        {
+                            var item = brief.Products.FirstOrDefault(i => i.ProductId == product.ProductId);
+                            <li class="pick">
+                                <span class="thumb">
+                                    @if (product.Photo is { } photo)
+                                    {
+                                        <img src="@photo" alt="" />
+                                    }
+                                    else
+                                    {
+                                        <Icon Name="products" />
+                                    }
+                                </span>
+                                <div>
+                                    <div class="item-name">@product.Name</div>
+                                    @if (!product.InPos)
+                                    {
+                                        <div class="why"><span class="text-danger">No longer in the POS. Take it off the creative.</span></div>
+                                    }
+                                    else
+                                    {
+                                        <div class="why" title="@(product.HasPhoto ? null : "Without a photo the AI draws the product from its name, so it may not look like yours. Add photos on the Product photos page.")">@Formats.Price(product.Price)@(product.HasPhoto ? "" : " · no photo yet")</div>
+                                    }
+                                </div>
+                                <div class="pick-offer">
+                                    @if (!product.InPos)
+                                    {
+                                    }
+                                    else if (product.OfferChoices.Count > 0)
+                                    {
+                                        <select class="form-select" aria-label="@($"Offer on {product.Name}")" @onchange="e => SetOfferAsync(product.ProductId, e.Value as string)">
+                                            <option value="" selected="@(item?.Offer is null)">No offer</option>
+                                            @foreach (var offer in product.OfferChoices)
+                                            {
+                                                <option value="@offer.ToString(CultureInfo.InvariantCulture)" selected="@(item?.Offer == offer)">
+                                                    @Formats.Price(offer) (@SmartRetail.Pos.Core.Posters.PosterPricing.PercentOff(product.Price, offer)% off)
+                                                </option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <span class="price-only small muted" title="No offer is allowed: its purchase price is missing, or too close to its price">No offer allowed</span>
+                                    }
+                                </div>
+                                <button type="button" class="icon-btn" aria-label="@($"Take {product.Name} off")" @onclick="() => RemoveProductAsync(product.ProductId)"><Icon Name="close" /></button>
+                            </li>
+                        }
+                    </ul>
+                }
+                @if (brief.Products.Count < CreativeBrief.MaxProducts)
+                {
+                    <div class="scan-box compact">
+                        <Icon Name="search" Class="scan-icon" />
+                        <input class="scan-input" type="search" autocomplete="off" placeholder="Add a product: name, code or barcode"
+                               aria-label="Add a product to the creative" value="@term" @oninput="SearchAsync" />
+                    </div>
+                    @if (found.Count > 0)
+                    {
+                        <ul class="plain-list found-list" aria-label="Products found">
+                            @foreach (var product in found)
+                            {
+                                <li>
+                                    <div class="grow">
+                                        <div class="item-name">@product.Name</div>
+                                        <div class="item-meta">@product.Code · @Formats.Price(product.SellingPrice)</div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-soft" @onclick="() => AddProductAsync(product.Id)"><Icon Name="plus" /> Add</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                }
+                <label class="switch"><input type="checkbox" checked="@brief.ShowPrices" @onchange="@(e => SaveAsync(b => b with { ShowPrices = e.Value is true }))" /> Put the prices on it</label>
+
+                <div class="brief-step"><span class="step-no" aria-hidden="true">3</span> What should it say? <span class="muted">Optional</span></div>
+                <p class="small muted words-help">The AI draws these words as you write them. No numbers, ₹ or %: the app adds each price itself. English is drawn best; check other languages closely.</p>
+                @(WordInput("headline", "Headline", brief.Headline, CreativeWords.MaxHeadline, "e.g. Diwali Dhamaka", v => b => b with { Headline = v }))
+                @(WordInput("subtitle", "Line under it", brief.Subtitle, CreativeWords.MaxLine, "e.g. Fresh stock for the festival", v => b => b with { Subtitle = v }))
+
+                <details class="brief-more" open="@moreOpen">
+                    <summary>More choices <span class="muted">All optional</span></summary>
+                    <div class="field-label" id="style-label">Style</div>
+                    <div class="seg" role="radiogroup" aria-labelledby="style-label">
+                        @foreach (var choice in CreativeStyle.All)
+                        {
+                            var style = CreativeStyle.Find(brief.Style);
+                            <button type="button" role="radio" aria-checked="@(choice == style ? "true" : "false")"
+                                    class="seg-item @(choice == style ? "on" : null)" @onclick="() => SaveAsync(b => b with { Style = choice.Id })">@choice.Name</button>
+                        }
+                    </div>
+
+                    @(WordInput("cta", "What to do", brief.CallToAction, CreativeWords.MaxLine, "e.g. Visit us today", v => b => b with { CallToAction = v }))
+                    @(WordInput("small-print", "Small print", brief.SmallPrint, CreativeWords.MaxLine, "e.g. While stocks last", v => b => b with { SmallPrint = v }))
+                    <label class="field-label" for="background">Background</label>
+                    <textarea id="background" class="form-control" rows="2" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. a warm evening glow with diyas"
+                              @onchange="@(e => SaveAsync(b => b with { Background = Text(e) }))">@brief.Background</textarea>
+                    <label class="field-label" for="instructions">More for the AI</label>
+                    <textarea id="instructions" class="form-control" rows="2" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. put the products side by side on a wooden table"
+                              @onchange="@(e => SaveAsync(b => b with { Instructions = Text(e) }))">@brief.Instructions</textarea>
+
+                    <div class="field-label" id="refs-label">Pictures to take the look from <span class="muted">(up to @CreativeBrief.MaxReferences)</span></div>
+                    <div class="creative-refs" aria-labelledby="refs-label">
+                        @foreach (var reference in brief.References)
+                        {
+                            <div class="camera-shot">
+                                <img src="@($"creative-files/{Id}/asset/{reference}")" alt="A picture to take the look from" />
+                                <button type="button" aria-label="Remove this picture" @onclick="() => RemoveReferenceAsync(reference)">×</button>
+                            </div>
+                        }
+                        @if (brief.References.Count < CreativeBrief.MaxReferences)
+                        {
+                            <label class="btn btn-sm btn-soft upload-button">
+                                <Icon Name="upload" /> Add a picture
+                                <InputFile OnChange="AddReferenceAsync" accept="image/jpeg,image/png,image/webp" class="visually-hidden" />
+                            </label>
+                        }
+                    </div>
+
+                </details>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary btn-lg" disabled="@(Making || codex is { IsReady: false })" @onclick="MakeAsync"><Icon Name="spark" /> @(project.Generations.Count == 0 ? "Make it" : "Make a new one")</button>
+                    @if (Making)
+                    {
+                        <button type="button" class="btn btn-soft" @onclick="Stop"><Icon Name="stop" /> Stop</button>
+                    }
+                </div>
+                @if (Making)
+                {
+                    <p class="muted small" role="status"><span class="spinner"></span> @status</p>
+                }
+            </section>
+
+            <section class="panel form-card brand-card">
+                <details open="@brandOpen">
+                    <summary><h2>Your shop's brand</h2><span class="muted small">Used on every creative</span></summary>
+                    <label class="field-label" for="shop-name">Shop's name</label>
+                    <input id="shop-name" class="form-control" maxlength="@CreativeWords.MaxLine" aria-describedby="shop-name-help" @bind="brandName" />
+                    <p class="small muted" id="shop-name-help">Drawn on the picture exactly as you write it. A number in it is fine (Avenue 99); a ₹ or % is not.</p>
+                    @if (CreativeWords.NameProblem("The shop's name", brandName, CreativeWords.MaxLine) is { } nameProblem)
+                    {
+                        <div class="item-meta bad-note">@nameProblem</div>
+                    }
+                    <div class="field-label">Colours</div>
+                    <div class="brand-colours">
+                        <input type="color" aria-label="The shop's main colour (price tags use it)" @bind="colour1" />
+                        <input type="color" aria-label="The shop's second colour" @bind="colour2" />
+                        <span class="small muted">The first colours the price tags.</span>
+                    </div>
+                    <label class="field-label" for="brand-notes">About the brand, for the AI</label>
+                    <textarea id="brand-notes" class="form-control" rows="2" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. friendly, family-run, since the nineties" @bind="brandNotes"></textarea>
+                    <div class="field-label">Logo</div>
+                    <div class="brand-logo">
+                        @if (brand.Logo is { } logo)
+                        {
+                            <img src="@($"creative-files/brand/{logo}")" alt="The shop's logo" />
+                            <button type="button" class="btn btn-sm" @onclick="RemoveLogo">Remove</button>
+                        }
+                        <label class="btn btn-sm btn-soft upload-button">
+                            <Icon Name="upload" /> @(brand.Logo is null ? "Add the logo" : "Change it")
+                            <InputFile OnChange="SetLogoAsync" accept="image/jpeg,image/png,image/webp" class="visually-hidden" />
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-soft" @onclick="SaveBrand"><Icon Name="check" /> Save the brand</button>
+                    </div>
+                </details>
+            </section>
+        </div>
+
+        <div class="creative-work">
+            <section class="panel creative-stage" aria-label="The picture" @ref="stage">
+                @if (selected is { HasImage: true })
+                {
+                    var selectedFormat = CreativeFormat.Find(selected.Brief.Format);
+                    var places = TagPlaces(selected, selectedFormat);
+                    <div class="creative-frame" @ref="frame"
+                         style="@($"aspect-ratio: {selectedFormat.Width} / {selectedFormat.Height}; width: min(100%, calc(70vh * {selectedFormat.Width} / {selectedFormat.Height}))")">
+                        <img src="@($"creative-files/{Id}/picture/{selected.Number}")" alt="@($"Picture {selected.Number}")" />
+                        @for (var i = 0; i < tags.Tags.Count && i < places.Count; i++)
+                        {
+                            var tag = tags.Tags[i];
+                            var place = places[i];
+                            var (background, words) = TagLayout.Colours(brand.Colours.FirstOrDefault());
+                            <div class="ctag @(Formats.Price(tag.Pays).Length > 6 ? "long" : null)" data-index="@i" tabindex="0" role="button"
+                                 aria-label="@($"Price tag for {tag.Name}: {Formats.Price(tag.Pays)}. Drag it, or use the arrow keys, to move it.")"
+                                 style="@($"left: {Percent(place.X)}%; top: {Percent(place.Y)}%; background: {background}; color: {words}")">
+                                <span class="ctag-name">@tag.Name</span>
+                                <span class="ctag-price">@Formats.Price(tag.Pays)</span>
+                                @if (tag.Offer is not null)
+                                {
+                                    <span class="ctag-was"><s>@Formats.Price(tag.Price)</s> · <b>@tag.PercentOff.ToString("0", CultureInfo.InvariantCulture)% off</b></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <p class="small muted made-line">
+                        Picture @selected.Number@(selected.Parent is { } parent ? $", a change of picture {parent}: “{selected.Change}”" : ", from the brief")
+                        · made by @(string.IsNullOrEmpty(selected.By) ? "Codex" : selected.By)@(selected.Seconds > 0 ? $" in {Duration(selected.Seconds)}" : "").
+                        @if (!string.IsNullOrEmpty(selected.Notes))
+                        {
+                            <span> The AI says: @selected.Notes</span>
+                        }
+                    </p>
+                    @if (tags.Tags.Count > 0)
+                    {
+                        <p class="small muted">The prices are your POS's today, added by the app. Drag a price tag to where it looks best.</p>
+                    }
+                    @if (tags.Problems.Count > 0)
+                    {
+                        <div class="price-changes" role="alert">
+                            <h3>Sort these out before exporting</h3>
+                            <ul>
+                                @foreach (var tagProblem in tags.Problems)
+                                {
+                                    <li>@tagProblem</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <div class="creative-actions">
+                        @if (project.Chosen == selected.Number)
+                        {
+                            <span class="pill good"><Icon Name="check" /> The one you chose</span>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-soft" @onclick="() => Choose(selected.Number)"><Icon Name="check" /> Use this one</button>
+                        }
+                        <label class="switch confirm"><input type="checkbox" checked="@wordsChecked" @onchange="e => wordsChecked = e.Value is true" /> I checked the words and the prices</label>
+                        <button type="button" class="btn btn-primary" disabled="@(!wordsChecked || tags.Problems.Count > 0 || exporting)" @onclick="() => ExportAsync(selected)"><Icon Name="download" /> Export PNG</button>
+                    </div>
+
+                    <label class="field-label" for="creative-change">What to change in this picture <Required /></label>
+                    <div class="change-row">
+                        <input id="creative-change" class="form-control" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. make the background deep blue"
+                               aria-required="true" @bind="change" @bind:event="oninput" @onkeydown="ChangeKeyAsync" disabled="@Making" />
+                        <button type="button" class="btn btn-soft" disabled="@(Making || change.Trim().Length == 0 || codex is { IsReady: false })" @onclick="() => ChangeAsync(selected.Number)"><Icon Name="edit" /> Change it</button>
+                    </div>
+
+                    <details class="prompt-details">
+                        <summary>What the AI was asked</summary>
+                        <pre class="prompt-text">@PromptOf(selected.Number)</pre>
+                    </details>
+                }
+                else if (selected is { IsMaking: true })
+                {
+                    <div class="creative-wait" role="status">
+                        <span class="spinner"></span>
+                        <p>@status</p>
+                        <p class="small muted">Codex designs the whole picture; it usually takes one to five minutes. You can leave this page meanwhile.</p>
+                        @if (Service.IsWaitingForLimit)
+                        {
+                            <button type="button" class="btn btn-primary" title="Try again at once, e.g. after getting more usage" @onclick="Service.TryNow"><Icon Name="refresh" /> Try now</button>
+                        }
+                        <button type="button" class="btn btn-soft" @onclick="Stop"><Icon Name="stop" /> Stop</button>
+                    </div>
+                }
+                else if (selected is { Problem: { } problem })
+                {
+                    <div class="creative-wait">
+                        <p class="trend-down" role="alert"><Icon Name="alert" /> @problem</p>
+                        <button type="button" class="btn btn-primary" disabled="@(Making || codex is { IsReady: false })" @onclick="MakeAsync"><Icon Name="refresh" /> Make it again</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="creative-wait">
+                        <Icon Name="spark" Size="40" />
+                        <h2>Write the brief, then press Make it</h2>
+                        <p class="muted">Codex's image tool designs the whole picture around your products and words, in the format and style you chose. The app then adds the prices from your POS.</p>
+                    </div>
+                }
+            </section>
+
+            @if (project.Generations.Count > 0)
+            {
+                <section class="panel creative-history" aria-labelledby="history-head">
+                    <h2 id="history-head">Pictures</h2>
+                    <div class="history-strip">
+                        @foreach (var generation in project.Generations.OrderBy(g => g.Number))
+                        {
+                            <button type="button" class="hist-item @(generation.Number == selected?.Number ? "on" : null)" aria-pressed="@(generation.Number == selected?.Number ? "true" : "false")"
+                                    title="@(generation.Parent is { } from ? $"A change of picture {from}: {generation.Change}" : "From the brief")" @onclick="() => Select(generation.Number)">
+                                <span class="hist-thumb">
+                                    @if (generation.HasImage)
+                                    {
+                                        <img src="@($"creative-files/{Id}/picture/{generation.Number}")" alt="" loading="lazy" />
+                                    }
+                                    else if (generation.IsMaking)
+                                    {
+                                        <span class="spinner"></span>
+                                    }
+                                    else
+                                    {
+                                        <Icon Name="alert" />
+                                    }
+                                </span>
+                                <span class="hist-label">@generation.Number@(project.Chosen == generation.Number ? " · chosen" : "")</span>
+                            </button>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private const int SearchLimit = 8;
+
+    [Parameter] public string Id { get; set; } = "";
+
+    private CreativeProject? project;
+    private CreativeBrief brief = new();
+    private string title = "";
+    private int? selectedNumber;
+    private IReadOnlyList<CreativeProductInfo> products = Array.Empty<CreativeProductInfo>();
+    private CreativeTags tags = new(Array.Empty<PriceTag>(), Array.Empty<string>());
+    private CreativeBrand brand = new();
+    private string brandName = "";
+    private string colour1 = "#D7263D";
+    private string colour2 = "#1D3557";
+    private string brandNotes = "";
+    private bool brandOpen;
+
+    /// <summary>"More choices" is shown open when the creative opens with something set in it, and is never closed from here while it is edited, so clearing the last field does not fold the section away under the cursor.</summary>
+    private bool moreOpen;
+    private SmartRetail.AI.Providers.ProviderStatus? codex;
+    private IReadOnlyList<Product> found = Array.Empty<Product>();
+    private string term = "";
+    private string change = "";
+    private string? status;
+    private string? message;
+    private (int Number, string Text)? prompt;
+    private bool messageIsProblem;
+    private bool wordsChecked;
+    private bool exporting;
+    private bool confirmDelete;
+    private bool loaded;
+    private int searchVersion;
+    private string? loadedId;
+    private ElementReference frame;
+    private ElementReference stage;
+    private DotNetObjectReference<Creative>? self;
+    private readonly CancellationTokenSource stopping = new();
+
+    private bool Making => project?.IsMaking == true || status is not null;
+
+    private CreativeGeneration? Selected =>
+        project is null ? null
+        : (selectedNumber is { } number ? project.Generation(number) : null) ?? project.Shown ?? project.Generations.OrderByDescending(g => g.Number).FirstOrDefault();
+
+    protected override void OnInitialized() => Service.Changed += OnChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedId == Id)
+        {
+            return;
+        }
+
+        loadedId = Id;
+        selectedNumber = null;
+        moreOpen = false;
+        await LoadAsync();
+        _ = CheckCodexAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        project = Service.Store.Load(Id);
+        loaded = true;
+        if (project is null)
+        {
+            return;
+        }
+
+        brief = project.Brief;
+        moreOpen |= MoreIsUsed;
+        title = project.Title;
+        status = Service.Status(Id);
+        brand = Service.Brand;
+        brandName = brand.ShopName;
+        colour1 = brand.Colours.ElementAtOrDefault(0) ?? "#D7263D";
+        colour2 = brand.Colours.ElementAtOrDefault(1) ?? "#1D3557";
+        brandNotes = brand.Notes;
+        brandOpen = (brand.Colours.Count == 0 && brand.Logo is null && string.IsNullOrEmpty(brand.Notes))
+            || CreativeWords.NameProblem("The shop's name", brandName, CreativeWords.MaxLine) is not null;
+        await LoadProductsAsync();
+        await LoadTagsAsync();
+    }
+
+    private async Task CheckCodexAsync()
+    {
+        try
+        {
+            codex = await Service.CheckCodexAsync(stopping.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            codex = SmartRetail.AI.Providers.ProviderStatus.NotReady(ex.Message);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        try
+        {
+            products = await Service.ProductsAsync(brief.Products.Select(p => p.ProductId).ToList(), stopping.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Reading a creative's products failed.");
+            Show("Could not read the products: " + ex.Message, problem: true);
+        }
+    }
+
+    /// <summary>The selected picture's price tags: its products, with the offers chosen now, priced by the POS now.</summary>
+    private async Task LoadTagsAsync()
+    {
+        if (Selected is not { HasImage: true } generation)
+        {
+            tags = new CreativeTags(Array.Empty<PriceTag>(), Array.Empty<string>());
+            return;
+        }
+
+        var items = generation.Brief.Products.Select(p => brief.Products.FirstOrDefault(c => c.ProductId == p.ProductId) ?? p).ToList();
+        try
+        {
+            tags = await Service.TagsAsync(generation.Brief with { Products = items, ShowPrices = brief.ShowPrices && generation.Brief.ShowPrices }, stopping.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Pricing a creative failed.");
+            tags = new CreativeTags(Array.Empty<PriceTag>(), new[] { "The prices could not be read from the POS: " + ex.Message });
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Selected is { HasImage: true } && frame.Context is not null)
+        {
+            self ??= DotNetObjectReference.Create(this);
+            try
+            {
+                await Js.InvokeVoidAsync("srposCreative.tags", frame, self);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page is gone.
+            }
+        }
+    }
+
+    /// <summary>Where each price tag sits: as placed on the picture, else along its bottom.</summary>
+    private IReadOnlyList<TagPlace> TagPlaces(CreativeGeneration generation, CreativeFormat format)
+    {
+        var defaults = TagLayout.Place(tags.Tags.Count, Array.Empty<(double, double, double, double)>(), format);
+        return defaults.Select((place, i) => i < generation.Tags.Count ? generation.Tags[i] : place).ToList();
+    }
+
+    [JSInvokable]
+    public Task TagMoved(int index, double x, double y) => InvokeAsync(() =>
+    {
+        if (Selected is not { } generation)
+        {
+            return;
+        }
+
+        try
+        {
+            project = Service.MoveTag(Id, generation.Number, index, x, y);
+        }
+        catch (CreativeException ex)
+        {
+            Show(ex.Message, problem: true);
+        }
+
+        StateHasChanged();
+    });
+
+    private async Task SaveAsync(Func<CreativeBrief, CreativeBrief> edit)
+    {
+        var before = brief;
+        brief = edit(brief);
+        try
+        {
+            project = Service.SaveBrief(Id, title, brief);
+            brief = project.Brief;
+            message = null;
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            brief = before;
+            Show(ex.Message, problem: true);
+        }
+
+        if (!brief.Products.Select(p => p.ProductId).SequenceEqual(before.Products.Select(p => p.ProductId)))
+        {
+            await LoadProductsAsync();
+        }
+
+        await LoadTagsAsync();
+    }
+
+    private Task RenameAsync(ChangeEventArgs e)
+    {
+        title = (e.Value as string ?? "").Trim();
+        return SaveAsync(b => b);
+    }
+
+    private static string Text(ChangeEventArgs e) => e.Value as string ?? "";
+
+    /// <summary>Something under "More choices" is set.</summary>
+    private bool MoreIsUsed => CreativeStyle.Find(brief.Style) != CreativeStyle.Clean || !string.IsNullOrEmpty(brief.CallToAction) || !string.IsNullOrEmpty(brief.SmallPrint)
+        || !string.IsNullOrEmpty(brief.Background) || !string.IsNullOrEmpty(brief.Instructions) || brief.References.Count > 0;
+
+    private RenderFragment WordInput(string id, string label, string value, int max, string placeholder, Func<string, Func<CreativeBrief, CreativeBrief>> edit) =>
+        @<div class="word-field">
+            <label class="field-label" for="@id">@label</label>
+            <input id="@id" class="form-control" maxlength="@max" placeholder="@placeholder" value="@value"
+                   @onchange="@(e => SaveAsync(edit(Text(e))))" />
+            @if (CreativeWords.Problem(label, value, max) is { } wordProblem)
+            {
+                <div class="item-meta bad-note">@wordProblem</div>
+            }
+        </div>;
+
+    private Task SetOfferAsync(int productId, string? value)
+    {
+        decimal? offer = decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) ? amount : null;
+        return SaveAsync(b => b with { Products = b.Products.Select(p => p.ProductId == productId ? p with { Offer = offer } : p).ToList() });
+    }
+
+    private async Task SearchAsync(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString() ?? "";
+        var mine = ++searchVersion;
+        if (term.Trim().Length == 0)
+        {
+            found = Array.Empty<Product>();
+            return;
+        }
+
+        await Task.Delay(200);
+        if (mine != searchVersion)
+        {
+            return;
+        }
+
+        try
+        {
+            var results = await Catalog.SearchAsync(term.Trim(), SearchLimit, stopping.Token);
+            if (mine == searchVersion)
+            {
+                found = results.Where(p => brief.Products.All(c => c.ProductId != p.Id)).ToList();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Finding products for a creative failed.");
+            Show("Could not search the products: " + ex.Message, problem: true);
+        }
+    }
+
+    private Task AddProductAsync(int productId)
+    {
+        term = "";
+        found = Array.Empty<Product>();
+        return SaveAsync(b => b with { Products = b.Products.Append(new CreativeItem(productId)).ToList() });
+    }
+
+    private Task RemoveProductAsync(int productId) =>
+        SaveAsync(b => b with { Products = b.Products.Where(p => p.ProductId != productId).ToList() });
+
+    private async Task AddReferenceAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            await using var picture = e.File.OpenReadStream(15L * 1024 * 1024, stopping.Token);
+            var name = await Service.AddReferenceAsync(Id, picture, stopping.Token);
+            await SaveAsync(b => b with { References = b.References.Append(name).ToList() });
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Show(ex.Message, problem: true);
+        }
+    }
+
+    private async Task RemoveReferenceAsync(string name)
+    {
+        await SaveAsync(b => b with { References = b.References.Where(r => r != name).ToList() });
+        try
+        {
+            Service.Store.RemoveAsset(Id, name);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Deleting a creative's picture failed.");
+        }
+    }
+
+    private void SaveBrand()
+    {
+        try
+        {
+            Service.SaveBrand(brand with { ShopName = brandName, Colours = new[] { colour1, colour2 }, Notes = brandNotes });
+            brand = Service.Brand;
+            Show("The brand is saved. New pictures use it; the price tags use its first colour.", problem: false);
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            Show(ex.Message, problem: true);
+        }
+    }
+
+    private async Task SetLogoAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            await using var picture = e.File.OpenReadStream(15L * 1024 * 1024, stopping.Token);
+            await Service.SaveLogoAsync(picture, stopping.Token);
+            brand = Service.Brand;
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Show(ex.Message, problem: true);
+        }
+    }
+
+    private void RemoveLogo()
+    {
+        try
+        {
+            Service.RemoveLogo();
+            brand = Service.Brand;
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            Show(ex.Message, problem: true);
+        }
+    }
+
+    private async Task MakeAsync()
+    {
+        message = null;
+        try
+        {
+            project = Service.Make(Id);
+            selectedNumber = project.Generations.Max(g => g.Number);
+            status = Service.Status(Id);
+            wordsChecked = false;
+            await ShowStageAsync();
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            Show(ex.Message, problem: true);
+        }
+
+        await LoadTagsAsync();
+    }
+
+    private async Task ChangeAsync(int from)
+    {
+        message = null;
+        try
+        {
+            project = Service.Change(Id, from, change);
+            selectedNumber = project.Generations.Max(g => g.Number);
+            status = Service.Status(Id);
+            change = "";
+            wordsChecked = false;
+            await ShowStageAsync();
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            Show(ex.Message, problem: true);
+        }
+
+        await LoadTagsAsync();
+    }
+
+    private async Task ChangeKeyAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && Selected is { HasImage: true } generation && change.Trim().Length > 0 && !Making)
+        {
+            await ChangeAsync(generation.Number);
+        }
+    }
+
+    private void Stop() => Service.Stop(Id);
+
+    private async Task ShowStageAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srposCreative.show", stage);
+        }
+        catch (JSException ex)
+        {
+            Log.LogDebug(ex, "Scrolling to the picture failed.");
+        }
+    }
+
+    private void Choose(int number)
+    {
+        try
+        {
+            project = Service.Choose(Id, number);
+        }
+        catch (CreativeException ex)
+        {
+            Show(ex.Message, problem: true);
+        }
+    }
+
+    private async Task Select(int number)
+    {
+        selectedNumber = number;
+        wordsChecked = false;
+        await LoadTagsAsync();
+    }
+
+    /// <summary>The prompt a picture was made from, read once for the picture shown.</summary>
+    private string PromptOf(int number)
+    {
+        if (prompt is not { } kept || kept.Number != number)
+        {
+            prompt = (number, Service.Store.Prompt(Id, number) ?? "Not kept for this picture.");
+        }
+
+        return prompt.Value.Text;
+    }
+
+    private async Task ExportAsync(CreativeGeneration generation)
+    {
+        exporting = true;
+        message = null;
+        try
+        {
+            await LoadTagsAsync();
+            if (tags.Problems.Count > 0)
+            {
+                return;
+            }
+
+            var format = CreativeFormat.Find(generation.Brief.Format);
+            var places = TagPlaces(generation, format);
+            var (background, words) = TagLayout.Colours(brand.Colours.FirstOrDefault());
+            var spec = new
+            {
+                width = format.Width,
+                height = format.Height,
+                picture = Nav.ToAbsoluteUri($"creative-files/{Id}/picture/{generation.Number}").ToString(),
+                tags = tags.Tags.Select((tag, i) => new
+                {
+                    x = places[i].X,
+                    y = places[i].Y,
+                    name = tag.Name,
+                    pays = Formats.Price(tag.Pays),
+                    was = tag.Offer is null ? null : Formats.Price(tag.Price),
+                    off = tag.Offer is null ? null : tag.PercentOff.ToString("0", CultureInfo.InvariantCulture) + "% off",
+                    @long = Formats.Price(tag.Pays).Length > 6,
+                    background,
+                    words,
+                }).ToList(),
+            };
+            await using var png = await Js.InvokeAsync<IJSStreamReference>("srposCreative.render", stopping.Token, spec);
+            await using var stream = await png.OpenReadStreamAsync(40L * 1024 * 1024, stopping.Token);
+            var name = await Service.SaveExportAsync(Id, generation.Number, stream, stopping.Token);
+            await Js.InvokeVoidAsync("srposCreative.download", $"creative-files/{Id}/export/{name}", name);
+            Show($"Exported as {name}, {format.Size}, with today's prices. A copy is kept with the creative.", problem: false);
+        }
+        catch (Exception ex) when (ex is CreativeException or JSException or IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Exporting a creative failed.");
+            Show(ex is JSException ? "The picture could not be exported: " + ex.Message : ex.Message, problem: true);
+        }
+        finally
+        {
+            exporting = false;
+        }
+    }
+
+    private void Delete()
+    {
+        if (!confirmDelete)
+        {
+            confirmDelete = true;
+            return;
+        }
+
+        try
+        {
+            Service.Delete(Id);
+            Nav.NavigateTo("creatives");
+        }
+        catch (Exception ex) when (ex is CreativeException or IOException or UnauthorizedAccessException)
+        {
+            confirmDelete = false;
+            Show(ex.Message, problem: true);
+        }
+    }
+
+    private void OnChanged(string id)
+    {
+        if (id != Id)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            var wasMaking = Making;
+            project = Service.Store.Load(Id);
+            status = Service.Status(Id);
+            if (project is not null && wasMaking && !Making)
+            {
+                await LoadTagsAsync();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private void Show(string text, bool problem)
+    {
+        message = text;
+        messageIsProblem = problem;
+    }
+
+    private string Pictures()
+    {
+        var made = project!.Generations.Count(g => g.HasImage);
+        return made == 0 ? "no picture yet" : made == 1 ? "1 picture" : $"{made} pictures";
+    }
+
+    private static string Percent(double share) => (share * 100).ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string Duration(double seconds) =>
+        seconds < 90 ? $"{seconds:0} s" : $"{Math.Floor(seconds / 60):0} min {seconds % 60:0} s";
+
+    public async ValueTask DisposeAsync()
+    {
+        Service.Changed -= OnChanged;
+        await stopping.CancelAsync();
+        stopping.Dispose();
+        self?.Dispose();
+    }
+}

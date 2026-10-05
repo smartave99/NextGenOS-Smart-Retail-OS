@@ -1,0 +1,20 @@
+<div class="kpi @Tone">
+    <div class="kpi-label">@Label</div>
+    <div class="kpi-value">@Value</div>
+    @if (Hint is not null)
+    {
+        <div class="kpi-hint @HintTone">@Hint</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Hint { get; set; }
+
+    /// <summary>Optional colour: "good", "warn" or "bad".</summary>
+    [Parameter] public string? Tone { get; set; }
+
+    /// <summary>Optional colour for the hint: "trend-up" or "trend-down".</summary>
+    [Parameter] public string? HintTone { get; set; }
+}

@@ -1,0 +1,46 @@
+@* A code block in an answer: its language, a Copy button, and the code, which scrolls sideways inside the column
+   rather than widening the page. *@
+@implements IDisposable
+@inject IJSRuntime Js
+
+<div class="md-code">
+    <div class="md-code-head">
+        <span class="md-code-lang">@(Language ?? "Code")</span>
+        <button type="button" class="md-code-copy" title="Copy the code" @onclick="CopyAsync">
+            <Icon Name="@(copied ? "check" : "copy")" /><span>@(copied ? "Copied" : "Copy")</span>
+        </button>
+    </div>
+    <pre tabindex="0"><code>@Code</code></pre>
+</div>
+
+@code {
+    private readonly CancellationTokenSource gone = new();
+    private bool copied;
+
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The language the AI named, e.g. "sql"; null when it named none.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", Code);
+            copied = true;
+            StateHasChanged();
+            await Task.Delay(2000, gone.Token);
+            copied = false;
+        }
+        catch (Exception ex) when (ex is JSException or TaskCanceledException or JSDisconnectedException)
+        {
+            copied = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        gone.Cancel();
+        gone.Dispose();
+    }
+}

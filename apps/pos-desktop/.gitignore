@@ -1,0 +1,32 @@
+# Build outputs
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+!Drivers/**
+
+# Visual Studio temporary files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Original Binaries, Database backups & Tools
+Original_Binaries/
+Database/
+Tools/
+Old Software Lossed/
+*.bak
+
+# Abandoned initial C# decompile attempt
+Source/SmartAvenue99_POS/
+
+# OS and editor files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Scratch and temporary scripts
+scratch/

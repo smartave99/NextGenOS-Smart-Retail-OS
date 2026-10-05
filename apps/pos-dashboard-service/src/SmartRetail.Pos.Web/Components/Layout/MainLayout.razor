@@ -1,0 +1,65 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject PosConnectionReport Connection
+@inject CameraSearchLauncher Camera
+@inject NavigationManager Nav
+
+<WindowBar />
+
+<div class="app">
+    <aside class="sidebar">
+        <NavMenu />
+    </aside>
+
+    <div class="main">
+        <main class="content">
+            @if (Connection.Automatic && !Connection.Found)
+            {
+                <div class="notice-bar" role="status">
+                    <div><strong>The POS database was not found on this PC</strong>, so you are looking at the demo shop.</div>
+                    <div class="small">Make sure SQL Server is running, or open the AI side panel once (it finds and remembers the database), then restart this app.</div>
+                    @if (Connection.Steps.Count > 0)
+                    {
+                        <details class="small">
+                            <summary>What was checked</summary>
+                            <ul>
+                                @foreach (var step in Connection.Steps)
+                                {
+                                    <li>@step</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </div>
+            }
+            @Body
+        </main>
+    </div>
+</div>
+
+@* The camera button in the search boxes of the top bar and the sidebar opens this, on every page. What it found shows as
+   a card over the page; "Show" opens the Products page on that product. *@
+<CameraFind @ref="cameraFind" Class="panel global-camera" SelectLabel="Show" OnSelect="ShowFound" />
+
+<div id="blazor-error-ui" data-nosnippet>
+    Something went wrong on this screen.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private CameraFind? cameraFind;
+
+    protected override void OnInitialized() => Camera.Requested += OnRequested;
+
+    private void OnRequested() => _ = InvokeAsync(() => cameraFind?.OpenAsync() ?? Task.CompletedTask);
+
+    /// <summary>The Products page, on the product chosen: its code (else its name) finds it, and it comes first, marked.</summary>
+    private void ShowFound(FoundProduct product)
+    {
+        var term = product.Code.Length > 0 ? product.Code : product.Name;
+        Nav.NavigateTo($"products?q={Uri.EscapeDataString(term)}&picked={product.ProductId}");
+    }
+
+    public void Dispose() => Camera.Requested -= OnRequested;
+}

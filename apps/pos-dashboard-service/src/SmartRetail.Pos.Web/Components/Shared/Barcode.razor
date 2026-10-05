@@ -1,0 +1,19 @@
+@using SmartRetail.Pos.Core.Labels
+
+@* A Code 128 barcode that scales to its box; bars stay sharp at any size and in print. *@
+@if (Code128.CanEncode(Code))
+{
+    var (path, width) = Code128.SvgPath(Code);
+    <svg class="barcode @Class" viewBox="0 0 @width 1" preserveAspectRatio="none" role="img" aria-label="@("Barcode " + Code)">
+        <path d="@path" />
+    </svg>
+}
+else
+{
+    <span class="barcode-missing @Class" title="Only letters, digits and simple signs can be printed as a barcode">No barcode</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Code { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+}

@@ -1,0 +1,134 @@
+@page "/ask/past/{Id}"
+@using SmartRetail.AI.Assistant
+@using SmartRetail.AI.Memory
+@inject ChatHistoryService Chats
+@inject Conversation Chat
+@inject NavigationManager Nav
+@inject ILogger<PastChat> Log
+
+<PageTitle>Past chat · Smart Retail POS</PageTitle>
+
+@if (chat is null)
+{
+    <div class="page-head">
+        <div>
+            <h1>Past chat</h1>
+            <p class="sub">That chat is not here any more.</p>
+        </div>
+        <div class="actions"><a class="btn btn-soft" href="ask/past">Past chats</a></div>
+    </div>
+}
+else
+{
+    <div class="page-head">
+        <div>
+            <h1>@chat.Title</h1>
+            <p class="sub">@Formats.DateAndTime(chat.Started). The figures are as they were then; ask again for today's.</p>
+        </div>
+        <div class="actions">
+            <a class="btn btn-soft" href="ask/past">Past chats</a>
+            @if (deleting)
+            {
+                <button type="button" class="btn btn-danger" @onclick="Delete">Delete this chat</button>
+                <button type="button" class="btn btn-link" @onclick="() => deleting = false">Keep it</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-link danger-link" @onclick="() => deleting = true">Delete</button>
+            }
+        </div>
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+
+    <div class="ask-again">
+        <span class="muted small">Ask again:</span>
+        <div class="chips">
+            @foreach (var question in chat.Questions.Distinct())
+            {
+                <button type="button" class="chip" title="Ask it in the chat now" @onclick="() => AskAgain(question)">@question</button>
+            }
+        </div>
+    </div>
+
+    <div class="thread past-thread">
+        @foreach (var message in chat.Messages)
+        {
+            if (message.Role == ChatRole.Owner)
+            {
+                <UserMessage Text="@message.Text" />
+                continue;
+            }
+
+            <article class="msg-ai @(message.IsProblem ? "problem" : null)">
+                @if (message.IsProblem)
+                {
+                    <p class="answer-problem"><Icon Name="alert" /><span>@message.Text</span></p>
+                }
+                else
+                {
+                    <MarkdownView Text="@message.Text" />
+                }
+                @if (message.Table is { } table)
+                {
+                    <p class="msg-meta">@table. Its rows are not kept: ask again to see them.</p>
+                }
+                @if (message.Source is { } source)
+                {
+                    <p class="msg-meta">@source</p>
+                }
+            </article>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private SavedChat? chat;
+    private bool deleting;
+    private string? error;
+
+    protected override void OnParametersSet()
+    {
+        try
+        {
+            chat = Chats.History.Get(Id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading a past chat failed.");
+            chat = null;
+        }
+    }
+
+    /// <summary>Asks it in the chat now, as a new question, and goes there.</summary>
+    private void AskAgain(string question)
+    {
+        if (Chat.Busy)
+        {
+            error = "A question is being answered in Ask AI. Try again when it is done.";
+            return;
+        }
+
+        Chat.Ask(question);
+        Nav.NavigateTo("ask");
+    }
+
+    private void Delete()
+    {
+        try
+        {
+            Chats.Delete(Id);
+            Nav.NavigateTo("ask/past");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Deleting a past chat failed.");
+            error = "Deleting it failed: " + ex.Message;
+        }
+    }
+}

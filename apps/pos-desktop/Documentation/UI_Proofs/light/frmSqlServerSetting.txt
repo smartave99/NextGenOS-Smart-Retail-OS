@@ -1,0 +1,42 @@
+/frmSqlServerSetting | frmSqlServerSetting | {X=331,Y=218,Width=576,Height=759} | True | Connect your store · Smart Retail OS
+/frmSqlServerSetting/RetailConnection | Panel | {X=0,Y=0,Width=560,Height=720} | True | 
+/frmSqlServerSetting/RetailConnection/ | TableLayoutPanel | {X=24,Y=24,Width=512,Height=648} | True | 
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=24,Width=464,Height=80} | True | 
+/frmSqlServerSetting/RetailConnection///RetailBrandArtwork | RetailArtwork | {X=0,Y=0,Width=76,Height=80} | True | 
+/frmSqlServerSetting/RetailConnection/// | TableLayoutPanel | {X=76,Y=0,Width=388,Height=80} | True | 
+/frmSqlServerSetting/RetailConnection//// | Label | {X=8,Y=0,Width=380,Height=40} | True | Connect your store
+/frmSqlServerSetting/RetailConnection//// | Label | {X=8,Y=48,Width=380,Height=32} | True | Smart Retail OS
+/frmSqlServerSetting/RetailConnection// | Label | {X=24,Y=112,Width=464,Height=68} | True | Enter the database details provided by your administrator.
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=188,Width=464,Height=68} | True | 
+/frmSqlServerSetting/RetailConnection/// | TableLayoutPanel | {X=0,Y=0,Width=464,Height=68} | True | 
+/frmSqlServerSetting/RetailConnection//// | Label | {X=0,Y=0,Width=464,Height=24} | True | SQL Server
+/frmSqlServerSetting/RetailConnection//// | FieldFrame | {X=0,Y=24,Width=464,Height=44} | True | 
+/frmSqlServerSetting/RetailConnection/////cmbServerName | ComboBox | {X=16,Y=8,Width=432,Height=29} | True | 
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=264,Width=464,Height=68} | True | 
+/frmSqlServerSetting/RetailConnection/// | TableLayoutPanel | {X=0,Y=0,Width=464,Height=68} | True | 
+/frmSqlServerSetting/RetailConnection//// | Label | {X=0,Y=0,Width=464,Height=24} | True | Database username
+/frmSqlServerSetting/RetailConnection//// | FieldFrame | {X=0,Y=24,Width=464,Height=44} | True | 
+/frmSqlServerSetting/RetailConnection/////txtUserName | TextBox | {X=16,Y=11,Width=432,Height=22} | True | 
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=340,Width=464,Height=68} | True | 
+/frmSqlServerSetting/RetailConnection/// | TableLayoutPanel | {X=0,Y=0,Width=464,Height=68} | True | 
+/frmSqlServerSetting/RetailConnection//// | Label | {X=0,Y=0,Width=464,Height=24} | True | Database password
+/frmSqlServerSetting/RetailConnection//// | FieldFrame | {X=0,Y=24,Width=464,Height=44} | True | 
+/frmSqlServerSetting/RetailConnection/////txtPassword | TextBox | {X=16,Y=11,Width=432,Height=22} | True | 
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=416,Width=464,Height=44} | True | 
+/frmSqlServerSetting/RetailConnection///btnTestConnection | Button | {X=0,Y=0,Width=464,Height=44} | True | Test connection
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=468,Width=464,Height=44} | True | 
+/frmSqlServerSetting/RetailConnection///btnCreateDemoDataDB | Button | {X=0,Y=0,Width=464,Height=44} | True | Save connection
+/frmSqlServerSetting/RetailConnection// | TableLayoutPanel | {X=24,Y=520,Width=464,Height=44} | True | 
+/frmSqlServerSetting/RetailConnection///Button1 | Button | {X=0,Y=0,Width=224,Height=44} | True | Reset fields
+/frmSqlServerSetting/RetailConnection///btnClose | Button | {X=232,Y=0,Width=232,Height=44} | True | Close
+/frmSqlServerSetting/RetailConnection//LinkLabel1 | LinkLabel | {X=24,Y=572,Width=464,Height=44} | True | Find SQL Servers on this computer
+/frmSqlServerSetting/Panel1 | Panel | {X=7,Y=7,Width=604,Height=300} | False | 
+/frmSqlServerSetting/Panel1/GroupBox1 | GroupBox | {X=5,Y=47,Width=592,Height=247} | False | SQL Server Configuration
+/frmSqlServerSetting/Panel1/GroupBox1/PictureBox2 | PictureBox | {X=513,Y=49,Width=39,Height=37} | False | 
+/frmSqlServerSetting/Panel1/GroupBox1/PictureBox1 | PictureBox | {X=2,Y=153,Width=101,Height=89} | False | 
+/frmSqlServerSetting/Panel1/GroupBox1/Label3 | Label | {X=5,Y=76,Width=183,Height=21} | False | SQL Server User Name :
+/frmSqlServerSetting/Panel1/GroupBox1/Label2 | Label | {X=5,Y=128,Width=157,Height=21} | False | SQL User Password :
+/frmSqlServerSetting/Panel1/GroupBox1/Label5 | Label | {X=5,Y=24,Width=146,Height=21} | False | SQL Server Name :
+/frmSqlServerSetting/Panel1/Panel2 | Panel | {X=5,Y=5,Width=592,Height=33} | False | 
+/frmSqlServerSetting/Panel1/Panel2/Label1 | Label | {X=205,Y=4,Width=187,Height=24} | False | SQL Server Setting
+/frmSqlServerSetting/Panel1/Panel2/lblSet | Label | {X=80,Y=15,Width=23,Height=13} | False | Set

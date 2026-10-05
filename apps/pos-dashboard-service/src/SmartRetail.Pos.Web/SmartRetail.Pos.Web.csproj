@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartRetail.Pos.Core\SmartRetail.Pos.Core.csproj" />
+    <ProjectReference Include="..\SmartRetail.Pos.Data\SmartRetail.Pos.Data.csproj" />
+    <!-- The AI providers of the side panel (Codex CLI first), for the plan to grow sales. -->
+    <ProjectReference Include="..\..\..\SmartRetailAI\src\SmartRetail.AI.Core\SmartRetail.AI.Core.csproj" />
+    <ProjectReference Include="..\SmartRetail.Pos.Vision\SmartRetail.Pos.Vision.csproj" />
+  </ItemGroup>
+
+  <!-- The owner view's Supabase script, which Settings opens (Services/OwnerViewScript.cs). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\cloud\supabase-owner-view.sql" LogicalName="supabase-owner-view.sql" />
+  </ItemGroup>
+  <!-- The change log (CHANGELOG.md at the repository's root), which What's new shows: built in, so it is always the log of this
+       very version (Services/WhatsNewService.cs). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\CHANGELOG.md" LogicalName="CHANGELOG.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartRetail.Pos.Tests" />
+  </ItemGroup>
+
+  <!-- Native libraries' debug symbols (SkiaSharp's is about 100 MB) and import libraries are not needed to run: keep
+       them out of the package. -->
+  <Target Name="LeaveOutNativeExtras" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'libSkiaSharp.pdb' Or '%(Extension)' == '.lib'" />
+    </ItemGroup>
+  </Target>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+</Project>

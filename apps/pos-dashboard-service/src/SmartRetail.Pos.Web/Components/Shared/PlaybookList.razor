@@ -1,0 +1,198 @@
+@using SmartRetail.AI.Memory
+@implements IDisposable
+@inject PlaybookService Playbooks
+@inject ILogger<PlaybookList> Log
+
+@* The shop's playbooks on the Memory page: those the AI wrote, waiting for the owner's Save, and the saved ones. *@
+<section class="panel memory-playbooks" id="playbooks" aria-labelledby="playbooks-head">
+    <div class="panel-head">
+        <h2 id="playbooks-head"><Icon Name="flag" /> Playbooks</h2>
+        @if (book.Waiting.Count > 0)
+        {
+            <span class="pill warn">@(book.Waiting.Count == 1 ? "1 waits for your Save" : $"{book.Waiting.Count} wait for your Save")</span>
+        }
+    </div>
+    <p class="muted small part-hint">The shop’s own ways of doing things, one for each kind of action, written by the AI from what the shop tried and what came of it (on the Actions page). Saved ones go into every chat and growth plan with the memory. What each gave before comes from the POS’s figures, never from the AI.</p>
+
+    @if (error is not null)
+    {
+        <p class="small trend-down" role="alert">@error</p>
+    }
+
+    @if (book.Waiting.Count == 0 && book.Saved.Count == 0)
+    {
+        <p class="muted memory-empty">None yet. When an action on the Actions page has a result, “Write a playbook” has the AI write one from it.</p>
+    }
+    else
+    {
+        <ul class="memory-list">
+            @foreach (var playbook in book.Waiting)
+            {
+                <li class="memory-item playbook waiting" @key="playbook.Id">@Show(playbook, waiting: true)</li>
+            }
+            @foreach (var playbook in book.Saved.OrderBy(p => p.Title, StringComparer.OrdinalIgnoreCase))
+            {
+                <li class="memory-item playbook" @key="playbook.Id">@Show(playbook, waiting: false)</li>
+            }
+        </ul>
+    }
+
+    @if (book.SetAside.Count > 0)
+    {
+        <div class="playbook-aside" role="group" aria-label="Playbooks set aside">
+            <div class="panel-head">
+                <h3>Set aside <span class="count">@book.SetAside.Count</span></h3>
+                <span class="pill warn">Not used</span>
+            </div>
+            <p class="muted small part-hint">These were in the playbooks file but break the rules, for example after the file was edited by hand, so the AI never sees them.</p>
+            <ul class="memory-list">
+                @foreach (var entry in book.SetAside)
+                {
+                    <li class="memory-item" @key="entry.Key">
+                        <div class="m-text">@entry.Title</div>
+                        <div class="m-meta">@entry.Why</div>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Do(() => { Playbooks.DeleteSetAside(entry.Key); return null; })">Remove</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</section>
+
+@code {
+    private PlaybookBook book = new();
+    private string? editing;
+    private string title = "";
+    private string when = "";
+    private string steps = "";
+    private string? deleting;
+    private string? error;
+
+    protected override void OnInitialized()
+    {
+        Playbooks.Changed += OnChanged;
+        Reload();
+    }
+
+    private void Reload()
+    {
+        try
+        {
+            book = Playbooks.Load();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the playbooks failed.");
+            error = "Could not read the playbooks: " + ex.Message;
+        }
+    }
+
+    private RenderFragment Show(Playbook playbook, bool waiting) => __builder =>
+    {
+        if (editing == playbook.Id)
+        {
+            var id = "pb-" + playbook.Id;
+            <form class="playbook-edit" @onsubmit="() => SaveEdit(playbook, waiting)">
+                <RequiredNote />
+                <label class="field-label" for="@(id + "-title")">Name <Required /></label>
+                <input id="@(id + "-title")" class="form-control" maxlength="@Playbook.MaxTitle" aria-required="true" @bind="title" />
+                <label class="field-label" for="@(id + "-when")">When to use it</label>
+                <input id="@(id + "-when")" class="form-control" maxlength="@Playbook.MaxWhen" @bind="when" />
+                <label class="field-label" for="@(id + "-steps")">Steps, one a line (at most @Playbook.MaxSteps) <Required /></label>
+                <textarea id="@(id + "-steps")" class="form-control" rows="6" aria-required="true" @bind="steps"></textarea>
+                <div class="f-actions">
+                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => editing = null">Cancel</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="m-text"><strong>@playbook.Title</strong> <span class="pill">@playbook.Kind</span>@if (waiting) {<span class="pill warn">New, waiting</span>}</div>
+            @if (playbook.WhenToUse.Length > 0)
+            {
+                <div class="m-meta">When: @playbook.WhenToUse</div>
+            }
+            <ol class="playbook-steps">
+                @foreach (var step in playbook.Steps)
+                {
+                    <li>@step</li>
+                }
+            </ol>
+            @if (playbook.Results.Count > 0)
+            {
+                <div class="m-meta">What it gave before:</div>
+                <ul class="playbook-results">
+                    @foreach (var result in playbook.Results)
+                    {
+                        <li>@result</li>
+                    }
+                </ul>
+            }
+            <div class="m-meta">@(waiting ? "Written" : "Saved") on @Formats.Date(playbook.Updated)</div>
+            <div class="f-actions">
+                @if (waiting)
+                {
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => Do(() => Playbooks.Save(playbook.Id))">Save</button>
+                    <button type="button" class="btn btn-sm" @onclick="() => StartEdit(playbook)"><Icon Name="edit" /> Edit</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => Do(() => { Playbooks.Discard(playbook.Id); return null; })">Don’t save</button>
+                }
+                else if (deleting == playbook.Id)
+                {
+                    <span class="small">Delete this playbook?</span>
+                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => Do(() => { deleting = null; Playbooks.Delete(playbook.Id); return null; })">Delete</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => deleting = null">Keep it</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => StartEdit(playbook)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => deleting = playbook.Id">Delete</button>
+                }
+            </div>
+        }
+    };
+
+    private void StartEdit(Playbook playbook)
+    {
+        editing = playbook.Id;
+        title = playbook.Title;
+        when = playbook.WhenToUse;
+        steps = string.Join("\n", playbook.Steps);
+        error = null;
+    }
+
+    private void SaveEdit(Playbook playbook, bool waiting)
+    {
+        var lines = steps.Split('\n');
+        Do(() => waiting ? Playbooks.Save(playbook.Id, title, when, lines) : Playbooks.Update(playbook.Id, title, when, lines));
+        if (error is null)
+        {
+            editing = null;
+        }
+    }
+
+    private void Do(Func<string?> change)
+    {
+        try
+        {
+            error = change();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing a playbook failed.");
+            error = ex.Message;
+        }
+
+        Reload();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Reload();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Playbooks.Changed -= OnChanged;
+}

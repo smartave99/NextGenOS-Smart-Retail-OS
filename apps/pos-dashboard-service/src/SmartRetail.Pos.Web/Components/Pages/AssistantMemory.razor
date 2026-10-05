@@ -1,0 +1,421 @@
+@page "/memory"
+@using SmartRetail.AI.Memory
+@using SmartRetail.AI.Settings
+@implements IDisposable
+@inject MemoryService Memory
+@inject ChatHistoryService Chats
+@inject ILogger<AssistantMemory> Log
+
+<PageTitle>Memory · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Memory</h1>
+        <p class="sub">What the assistant remembers about the shop and about you. It is used in every chat and growth plan. In Ask AI, say “Remember that…” or “Forget…”, or change it here. It is kept in the data folder, never in the POS.</p>
+    </div>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (book.Pending.Count > 0)
+{
+    <section class="panel memory-waiting" aria-label="Learned from your chats">
+        <div class="panel-head">
+            <h2>Learned from your chats <span class="count">@book.Pending.Count</span></h2>
+            <span class="pill warn">Waiting for your Save</span>
+        </div>
+        <ul class="memory-list">
+            @foreach (var change in book.Pending)
+            {
+                <li class="memory-item" @key="change.Id">
+                    @if (editing == change.Id)
+                    {
+                        <input class="form-control" maxlength="@MemoryRules.EntryLimit" aria-label="What to remember" @bind="editText" @bind:event="oninput" />
+                    }
+                    else
+                    {
+                        <div class="m-text">@Describe(change)</div>
+                    }
+                    <div class="m-meta">@PartName(change.Part)@(string.IsNullOrWhiteSpace(change.Why) ? "" : " · " + change.Why)</div>
+                    <div class="f-actions">
+                        @if (editing == change.Id)
+                        {
+                            <button type="button" class="btn btn-sm btn-primary" @onclick="() => Approve(change, editText)">Save</button>
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => editing = null">Cancel</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-primary" @onclick="() => Approve(change, null)">Save</button>
+                            @if (change.Op != MemoryOp.Remove)
+                            {
+                                <button type="button" class="btn btn-sm" @onclick="() => StartEdit(change.Id, change.NewText)"><Icon Name="edit" /> Edit</button>
+                            }
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => Reject(change)">Don’t save</button>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@if (book.SetAside.Count > 0)
+{
+    <section class="panel memory-waiting" aria-label="Set aside">
+        <div class="panel-head">
+            <h2>Set aside <span class="count">@book.SetAside.Count</span></h2>
+            <span class="pill warn">Not used</span>
+        </div>
+        <p class="muted small part-hint">These were in the memory file but break memory's rules, for example after the file was copied or edited by hand, so the AI never sees them.</p>
+        <ul class="memory-list">
+            @foreach (var entry in book.SetAside)
+            {
+                <li class="memory-item">
+                    <div class="m-text">@entry.Text</div>
+                    <div class="m-meta">@PartName(entry.Part) · @entry.Reason</div>
+                    <div class="f-actions">
+                        <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => RemoveSetAside(entry)">Remove</button>
+                    </div>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+<div class="memory-parts">
+    @foreach (var part in Parts)
+    {
+        var entries = book.Entries(part);
+        var used = MemoryRules.Used(book, part);
+        var limit = MemoryRules.Limit(part);
+        var nearlyFull = used * 5 > limit * 4;
+        <section class="panel memory-part" aria-label="@PartTitle(part)">
+            <div class="panel-head">
+                <h2>@PartTitle(part)</h2>
+                <span class="muted small">@(entries.Count == 1 ? "1 thing" : $"{entries.Count} things")</span>
+            </div>
+            <p class="muted small part-hint">@PartHint(part)</p>
+            <div class="share-track" role="meter" aria-label="Room used" aria-valuemin="0" aria-valuemax="@limit" aria-valuenow="@used">
+                <div class="share-fill @(nearlyFull ? "warn" : null)" style="width: @(Math.Min(100, used * 100 / limit))%"></div>
+            </div>
+            <div class="share-note">@used.ToString("N0") of @limit.ToString("N0") characters used@(nearlyFull ? ": merge or remove some to make room" : "")</div>
+
+            @if (entries.Count == 0)
+            {
+                <p class="muted memory-empty">Nothing yet.</p>
+            }
+            else
+            {
+                <ul class="memory-list">
+                    @foreach (var entry in entries)
+                    {
+                        var key = Key(part, entry.Text);
+                        <li class="memory-item" @key="key">
+                            @if (editing == key)
+                            {
+                                <input class="form-control" maxlength="@MemoryRules.EntryLimit" aria-label="Change what it remembers" @bind="editText" @bind:event="oninput" />
+                                <div class="f-actions">
+                                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => Replace(part, entry.Text, editText)">Save</button>
+                                    <button type="button" class="btn btn-sm btn-link" @onclick="() => editing = null">Cancel</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="m-text">@entry.Text</div>
+                                <div class="m-meta">@SourceName(entry.Source) · @Formats.Date(entry.Added)</div>
+                                <div class="f-actions">
+                                    <button type="button" class="btn btn-sm btn-link" @onclick="() => StartEdit(key, entry.Text)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Remove(part, entry.Text)">Remove</button>
+                                </div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
+            <form class="memory-add" @onsubmit="() => Add(part)">
+                <input class="form-control" maxlength="@MemoryRules.EntryLimit" placeholder="@AddHint(part)" aria-label="@("Add to " + PartTitle(part))"
+                       value="@adding.GetValueOrDefault(part)" @oninput="e => adding[part] = e.Value as string ?? string.Empty" />
+                <button type="submit" class="btn btn-soft" disabled="@string.IsNullOrWhiteSpace(adding.GetValueOrDefault(part))"><Icon Name="plus" /> Add</button>
+            </form>
+        </section>
+    }
+</div>
+
+<PlaybookList />
+
+<section class="panel memory-settings" aria-label="Learning">
+    <div class="panel-head"><h2>Learning</h2></div>
+    <div class="setting">
+        <div>
+            <h3>Learn from chats</h3>
+            <p>After a chat, the AI suggests what is worth keeping, such as how you like answers and what worked for the shop. It thinks briefly, to keep the cost low.</p>
+        </div>
+        <div class="setting-actions">
+            <AiChoice Job="AiJob.MemoryReview" />
+            <OnOff Label="Learn from chats" Value="settings.LearnFromChats" Changed="on => SaveSettings(s => s.LearnFromChats = on)" />
+        </div>
+    </div>
+    <div class="setting">
+        <div>
+            <h3>Ask before saving</h3>
+            <p>What it learns waits above for your Save. When off, it is saved at once, and can be undone below.</p>
+        </div>
+        <OnOff Label="Ask before saving" Value="settings.AskBeforeSaving" Changed="on => SaveSettings(s => s.AskBeforeSaving = on)" />
+    </div>
+    <div class="setting">
+        <div>
+            <h3>Keep past chats</h3>
+            <p>Each chat is kept for six months, saved again after every answer, words only, to find in <a href="ask/past">Past chats</a> and ask again. @PastChatsNote</p>
+        </div>
+        <div class="setting-actions">
+            <OnOff Label="Keep past chats" Value="settings.KeepChats" Changed="on => SaveSettings(s => s.KeepChats = on)" />
+            @if (deletingChats)
+            {
+                <button type="button" class="btn btn-sm btn-danger" @onclick="DeleteChats">Delete them all</button>
+                <button type="button" class="btn btn-sm btn-link" @onclick="() => deletingChats = false">Keep them</button>
+            }
+            else if (pastChats > 0)
+            {
+                <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => deletingChats = true">Delete all past chats</button>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="panel memory-journey" aria-label="What changed">
+    <div class="panel-head"><h2>What changed</h2></div>
+    @if (book.Journey.Count == 0)
+    {
+        <p class="muted memory-empty">Nothing yet. Every change is listed here, and can be undone.</p>
+    }
+    else
+    {
+        <ul class="memory-list">
+            @foreach (var change in showAllJourney ? book.Journey : book.Journey.Take(JourneyShown))
+            {
+                <li class="memory-item" @key="change.Id">
+                    <div class="m-text"><strong>@Verb(change)</strong> @Describe(change)</div>
+                    <div class="m-meta">@PartName(change.Part) · @SourceName(change.Source) · @Formats.DateAndTime(change.At)</div>
+                    @if (change.Status == MemoryChangeStatus.Saved)
+                    {
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => Undo(change)"><Icon Name="undo" /> Undo</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+        @if (!showAllJourney && book.Journey.Count > JourneyShown)
+        {
+            <button type="button" class="link-button show-all" @onclick="() => showAllJourney = true">Show all @book.Journey.Count</button>
+        }
+    }
+</section>
+
+@code {
+    private const int JourneyShown = 10;
+
+    private static readonly MemoryPart[] Parts = { MemoryPart.Shop, MemoryPart.Owner };
+
+    private readonly Dictionary<MemoryPart, string> adding = new();
+    private MemoryBook book = new();
+    private MemorySettings settings = new();
+    private string? editing;
+    private string editText = "";
+    private string? error;
+    private bool showAllJourney;
+    private bool deletingChats;
+    private int pastChats;
+
+    private string PastChatsNote => pastChats switch
+    {
+        0 => "None are kept now.",
+        1 => "1 is kept now.",
+        _ => $"{pastChats} are kept now.",
+    };
+
+    protected override void OnInitialized()
+    {
+        Memory.Changed += OnChanged;
+        Reload();
+        try
+        {
+            settings = Memory.Settings;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the memory settings failed.");
+        }
+    }
+
+    private void Reload()
+    {
+        book = Memory.Load();
+        try
+        {
+            pastChats = Chats.History.Latest(10000).Count;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Counting the past chats failed.");
+        }
+    }
+
+    private void DeleteChats()
+    {
+        deletingChats = false;
+        try
+        {
+            Chats.DeleteAll();
+            error = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Deleting the past chats failed.");
+            error = "Deleting the past chats failed: " + ex.Message;
+        }
+
+        Reload();
+    }
+
+    private static string PartTitle(MemoryPart part) => part == MemoryPart.Shop ? "About the shop" : "About you";
+
+    private static string PartName(MemoryPart part) => part == MemoryPart.Shop ? "The shop" : "You";
+
+    private static string PartHint(MemoryPart part) => part == MemoryPart.Shop
+        ? "What sells when, what the shop tried and how it went, decisions taken."
+        : "How you like answers, your language, budget and goals.";
+
+    private static string AddHint(MemoryPart part) => part == MemoryPart.Shop
+        ? "e.g. Sweets sell three times more in Diwali week"
+        : "e.g. Answer in Hinglish, short, with rupee figures";
+
+    private static string Key(MemoryPart part, string text) => part + "|" + text;
+
+    private static string SourceName(string? source) => source switch
+    {
+        "Owner" => "Added by you",
+        "Owner, in chat" => "You said it in a chat",
+        "Chat" => "Learned from a chat",
+        "Undo" => "Undone",
+        "Actions" => "A lesson from Actions",
+        null or "" => "Added",
+        _ => source,
+    };
+
+    private static string Describe(MemoryChange change) => change.Op switch
+    {
+        MemoryOp.Add => change.NewText,
+        MemoryOp.Replace => $"“{change.Before ?? change.OldText}” → “{change.NewText}”",
+        _ => $"“{change.Before ?? change.OldText}”",
+    };
+
+    private static string Verb(MemoryChange change)
+    {
+        var done = change.Op switch
+        {
+            MemoryOp.Add => "Added",
+            MemoryOp.Replace => "Changed",
+            _ => "Removed",
+        };
+        return change.Status switch
+        {
+            MemoryChangeStatus.Rejected => "Not saved:",
+            MemoryChangeStatus.Undone => done + ", then undone:",
+            _ => done + ":",
+        };
+    }
+
+    private void StartEdit(string key, string text)
+    {
+        editing = key;
+        editText = text;
+        error = null;
+    }
+
+    private void Approve(MemoryChange change, string? edited) => Do(() => Memory.Approve(change.Id, edited), "Saving that failed");
+
+    private void Reject(MemoryChange change) => Do(() =>
+    {
+        Memory.Reject(change.Id);
+        return null;
+    }, "Turning that down failed");
+
+    private void Add(MemoryPart part)
+    {
+        var text = adding.GetValueOrDefault(part);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        if (Do(() => Memory.Change(new MemoryChange { Op = MemoryOp.Add, Part = part, NewText = text, Source = "Owner" }), "Adding that failed"))
+        {
+            adding[part] = "";
+        }
+    }
+
+    private void Replace(MemoryPart part, string old, string text) =>
+        Do(() => Memory.Change(new MemoryChange { Op = MemoryOp.Replace, Part = part, OldText = old, NewText = text, Source = "Owner" }), "Changing that failed");
+
+    private void Remove(MemoryPart part, string text) =>
+        Do(() => Memory.Change(new MemoryChange { Op = MemoryOp.Remove, Part = part, OldText = text, Source = "Owner" }), "Removing that failed");
+
+    private void Undo(MemoryChange change) => Do(() => Memory.Undo(change.Id), "Undoing that failed");
+
+    private void RemoveSetAside(SetAsideEntry entry) => Do(() =>
+    {
+        Memory.RemoveSetAside(entry.Part, entry.Text);
+        return null;
+    }, "Removing that failed");
+
+    /// <summary>Runs a change: true when it was saved, else the reason is shown.</summary>
+    private bool Do(Func<string?> change, string failed)
+    {
+        try
+        {
+            var problem = change();
+            error = problem;
+            if (problem is null)
+            {
+                editing = null;
+            }
+
+            Reload();
+            return problem is null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "{Failed}.", failed);
+            error = failed + ": " + ex.Message;
+            return false;
+        }
+    }
+
+    private void SaveSettings(Action<MemorySettings> change)
+    {
+        try
+        {
+            change(settings);
+            Memory.SaveSettings(change);
+            error = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Saving the memory settings failed.");
+            error = "Saving the setting failed: " + ex.Message;
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Reload();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Memory.Changed -= OnChanged;
+}

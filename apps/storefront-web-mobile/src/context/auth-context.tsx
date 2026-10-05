@@ -1,0 +1,185 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+    User,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    reauthenticateWithCredential,
+    updatePassword as firebaseUpdatePassword,
+    EmailAuthProvider
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { getStaffData } from "@/app/actions";
+
+interface AuthContextType {
+    user: User | null;
+    role: string | null;
+    permissions: string[];
+    loading: boolean;
+    login: (email: string, password: string) => Promise<void>;
+    logout: () => Promise<void>;
+    changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+    user: null,
+    role: null,
+    permissions: [],
+    loading: true,
+    login: async () => { },
+    logout: async () => { },
+    changePassword: async () => ({ success: false }),
+});
+
+// Persist minimal auth state to localStorage for faster initial render
+// Persist minimal auth state to localStorage for faster initial render
+const AUTH_STORAGE_KEY = "smart_avenue_auth";
+
+function setPersistedAuth(isLoggedIn: boolean) {
+    if (typeof window === "undefined") return;
+    try {
+        if (isLoggedIn) {
+            localStorage.setItem(AUTH_STORAGE_KEY, "true");
+        } else {
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+    } catch {
+        // Ignore localStorage errors
+    }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+    // Initialize with persisted state for instant UI
+    const [user, setUser] = useState<User | null>(null);
+    const [role, setRole] = useState<string | null>(null);
+    const [permissions, setPermissions] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [initializing, setInitializing] = useState(true);
+    const [, setPersistedAuthState] = useState(false); // Renamed to avoid conflict with function
+
+    useEffect(() => {
+        // Check local storage for persisted auth state to avoid flash of login screen
+        const storedAuth = localStorage.getItem("isAuthenticated");
+        if (storedAuth === "true") {
+            setPersistedAuthState(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!auth || typeof auth.onAuthStateChanged !== "function") {
+            setUser(null);
+            setRole(null);
+            setPermissions([]);
+            setLoading(false);
+            setInitializing(false);
+            return;
+        }
+
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setUser(user);
+            setPersistedAuth(!!user);
+            setPersistedAuthState(!!user);
+
+            if (user && user.email) {
+                void (async () => {
+                    try {
+                        const idToken = await user.getIdToken();
+                        const response = await fetch("/api/auth/session", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ idToken }),
+                        });
+                        if (!response.ok) throw new Error("Server session was rejected");
+
+                        const data = await getStaffData(user.email!);
+                        if (data) {
+                            setRole(data.role);
+                            setPermissions(data.permissions);
+                        } else {
+                            setRole("Staff");
+                            setPermissions([]);
+                        }
+                    } catch (error) {
+                        console.error("Unable to establish secure admin session", error);
+                        setRole("Staff");
+                        setPermissions([]);
+                    } finally {
+                        setLoading(false);
+                        setInitializing(false);
+                    }
+                })();
+            } else {
+                void fetch("/api/auth/session", { method: "DELETE" }).catch(() => undefined);
+                setRole(null);
+                setPermissions([]);
+                setLoading(false);
+                setInitializing(false);
+            }
+        });
+
+        // Force stop loading after 10 seconds to prevent infinite load
+        const timeout = setTimeout(() => {
+            setLoading((prev) => {
+                if (prev) {
+                    console.warn("Auth state change timeout - forcing loading to false");
+                    return false;
+                }
+                return prev;
+            });
+        }, 10000);
+
+        return () => {
+            unsubscribe();
+            clearTimeout(timeout);
+        };
+    }, []);
+
+    const login = async (email: string, password: string) => {
+        if (!auth) throw new Error("Authentication is not configured.");
+        await signInWithEmailAndPassword(auth, email, password);
+    };
+
+    const logout = async () => {
+        setPersistedAuth(false);
+        if (!auth) return;
+        await fetch("/api/auth/session", { method: "DELETE" }).catch(() => undefined);
+        await signOut(auth);
+    };
+
+    const changePassword = async (currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+        if (!auth || !user || !user.email) {
+            return { success: false, error: "No user logged in" };
+        }
+        try {
+            const credential = EmailAuthProvider.credential(user.email, currentPassword);
+            await reauthenticateWithCredential(user, credential);
+            await firebaseUpdatePassword(user, newPassword);
+            return { success: true };
+        } catch (err: unknown) {
+            const error = err as { code?: string; message?: string };
+            if (error?.code === "auth/wrong-password" || error?.code === "auth/invalid-credential") {
+                return { success: false, error: "Current password is incorrect" };
+            }
+            if (error?.code === "auth/weak-password") {
+                return { success: false, error: "New password is too weak. Use at least 6 characters." };
+            }
+            return { success: false, error: error?.message || "Failed to change password" };
+        }
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, role, permissions, loading: loading || initializing, login, logout, changePassword }}>
+            {!initializing && children}
+        </AuthContext.Provider>
+    );
+}
+
+export function useAuth() {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+}

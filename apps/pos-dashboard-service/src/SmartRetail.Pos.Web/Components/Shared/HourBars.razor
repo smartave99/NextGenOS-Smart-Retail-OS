@@ -1,0 +1,98 @@
+@* Today by the hour: today's sales as columns, the same day last week as pale columns behind them, so the owner
+   sees how today is going and what the rest of the day usually brings. *@
+@using System.Globalization
+@using SmartRetail.Pos.Core.Analytics
+
+<svg class="chart hour-bars" viewBox="0 0 @Width @Height" role="img" aria-label="@AriaLabel">
+    @foreach (var tick in Ticks)
+    {
+        <g>
+            <line class="c-grid" x1="@F(Left)" x2="@F(Width)" y1="@F(Y(tick))" y2="@F(Y(tick))" />
+            <text class="c-axis" x="@F(Left - 10)" y="@F(Y(tick) + 4)" text-anchor="end">@(tick == 0 ? "0" : Formats.Compact(tick))</text>
+        </g>
+    }
+
+    @for (var i = 0; i < Hours.Count; i++)
+    {
+        var hour = Hours[i];
+        var now = hour.Hour == NowHour;
+        var centre = Left + Slot * i + Slot / 2;
+        <g>
+            <title>@Formats.Hours(hour.Hour, hour.Hour + 1): @Formats.Rupees(hour.Sales) from @hour.Bills @(hour.Bills == 1 ? "bill" : "bills") today; @Formats.Rupees(hour.LastWeekSales) last @LastWeek</title>
+            <rect class="c-hit" x="@F(Left + Slot * i)" y="@F(Top)" width="@F(Slot)" height="@F(Base - Top)" />
+            @if (hour.LastWeekSales > 0)
+            {
+                <path class="c-bar ghost" d="@Column(centre - BarWidth / 2, Y(hour.LastWeekSales), BarWidth)" />
+            }
+            @if (hour.Sales > 0)
+            {
+                <path class="@(now ? "c-bar hi" : "c-bar")" d="@Column(centre - InnerWidth / 2, Y(hour.Sales), InnerWidth)" />
+            }
+            @if (now || i % LabelEvery == 0)
+            {
+                <g><text class="@(now ? "c-axis now" : "c-axis")" x="@F(centre)" y="@F(Height - 6)" text-anchor="middle">@(now ? "Now" : Formats.Hour(hour.Hour))</text></g>
+            }
+        </g>
+    }
+</svg>
+
+@code {
+    private const double Width = 960;
+    private const double Height = 190;
+    private const double Left = 44;
+    private const double Top = 16;
+    private const double Bottom = 26;
+    private const double Radius = 4;
+
+    [Parameter, EditorRequired] public IReadOnlyList<TodayHour> Hours { get; set; } = Array.Empty<TodayHour>();
+
+    /// <summary>The hour it is now, drawn in the accent colour; -1 for none.</summary>
+    [Parameter] public int NowHour { get; set; } = -1;
+
+    /// <summary>The weekday last week's columns are from, e.g. "Saturday".</summary>
+    [Parameter] public string LastWeek { get; set; } = "week";
+
+    [Parameter] public string AriaLabel { get; set; } = "Sales in each hour today, with the same day last week";
+
+    private double Base => Height - Bottom;
+    private double Slot => Hours.Count == 0 ? 0 : (Width - Left) / Hours.Count;
+    private double BarWidth => Math.Min(34, Slot * 0.7);
+    private double InnerWidth => BarWidth * 0.6;
+
+    // A label on every hour while they fit, else on every second or third.
+    private int LabelEvery => Slot >= 56 ? 1 : Slot >= 30 ? 2 : 3;
+
+    private decimal Highest => Hours.Count == 0 ? 0m : Hours.Max(h => Math.Max(h.Sales, h.LastWeekSales));
+    private decimal Step => NiceStep(Math.Max(1m, Highest) / 3m);
+    private decimal AxisTop => Math.Ceiling(Math.Max(1m, Highest) / Step) * Step;
+
+    private IEnumerable<decimal> Ticks
+    {
+        get
+        {
+            for (var tick = 0m; tick <= AxisTop; tick += Step)
+            {
+                yield return tick;
+            }
+        }
+    }
+
+    private double Y(decimal value) => Base - (double)(Math.Max(0, value) / AxisTop) * (Base - Top);
+
+    /// <summary>A column rising from the baseline, square at the bottom and round at the top.</summary>
+    private string Column(double x, double top, double width)
+    {
+        var r = Math.Min(Radius, Math.Min(width / 2, (Base - top) / 2));
+        return $"M{F(x)} {F(Base)}V{F(top + r)}Q{F(x)} {F(top)} {F(x + r)} {F(top)}H{F(x + width - r)}Q{F(x + width)} {F(top)} {F(x + width)} {F(top + r)}V{F(Base)}Z";
+    }
+
+    private static string F(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static decimal NiceStep(decimal raw)
+    {
+        var power = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)raw)));
+        var fraction = raw / power;
+        var nice = fraction <= 1m ? 1m : fraction <= 2m ? 2m : fraction <= 2.5m ? 2.5m : fraction <= 5m ? 5m : 10m;
+        return nice * power;
+    }
+}

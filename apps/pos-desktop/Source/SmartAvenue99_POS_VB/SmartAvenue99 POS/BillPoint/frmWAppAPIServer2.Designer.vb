@@ -1,0 +1,456 @@
+Namespace BillPoint
+	' Token: 0x02000216 RID: 534
+		Public Partial Class frmWAppAPIServer2
+		Inherits Global.System.Windows.Forms.Form
+
+		' Token: 0x060099E7 RID: 39399 RVA: 0x006E50BC File Offset: 0x006E32BC
+		<Global.System.Diagnostics.DebuggerNonUserCode()>
+		Protected Overrides Sub Dispose(disposing As Boolean)
+			Try
+				Dim flag As Boolean = disposing AndAlso Me.components IsNot Nothing
+				If flag Then
+					Me.components.Dispose()
+				End If
+			Finally
+				MyBase.Dispose(disposing)
+			End Try
+		End Sub
+
+		' Token: 0x060099E8 RID: 39400 RVA: 0x006E510C File Offset: 0x006E330C
+		<Global.System.Diagnostics.DebuggerStepThrough()>
+		Private Sub InitializeComponent()
+			Me.components = New Global.System.ComponentModel.Container()
+			Dim dataGridViewCellStyle As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle2 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle3 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle4 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle5 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle6 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle7 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim componentResourceManager As Global.System.ComponentModel.ComponentResourceManager = New Global.System.ComponentModel.ComponentResourceManager(GetType(Global.BillPoint.frmWAppAPIServer2))
+			Me.Timer1 = New Global.System.Windows.Forms.Timer(Me.components)
+			Me.Label1 = New Global.System.Windows.Forms.Label()
+			Me.Panel2 = New Global.System.Windows.Forms.Panel()
+			Me.Column3 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column2 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column1 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.dgw = New Global.System.Windows.Forms.DataGridView()
+			Me.LinkLabel1 = New Global.System.Windows.Forms.LinkLabel()
+			Me.TextBox1 = New Global.System.Windows.Forms.TextBox()
+			Me.ComboBox1 = New Global.System.Windows.Forms.ComboBox()
+			Me.TextBox2 = New Global.System.Windows.Forms.TextBox()
+			Me.Label2 = New Global.System.Windows.Forms.Label()
+			Me.Label3 = New Global.System.Windows.Forms.Label()
+			Me.ErrorProvider1 = New Global.System.Windows.Forms.ErrorProvider(Me.components)
+			Me.Button2 = New Global.CButtonLib.CButton()
+			Me.Button3 = New Global.CButtonLib.CButton()
+			Me.Button4 = New Global.CButtonLib.CButton()
+			Me.Button5 = New Global.CButtonLib.CButton()
+			Me.pBoxAuthQR = New Global.System.Windows.Forms.PictureBox()
+			Me.chkBoxHeadLess = New Global.System.Windows.Forms.CheckBox()
+			Me.btnTerminate = New Global.System.Windows.Forms.Button()
+			Me.btnInitialize = New Global.System.Windows.Forms.Button()
+			Me.btnLogout = New Global.System.Windows.Forms.Button()
+			Me.Panel7 = New Global.System.Windows.Forms.Panel()
+			Me.LblSenderId = New Global.System.Windows.Forms.Label()
+			Me.lblWhatsAppState = New Global.System.Windows.Forms.Label()
+			Me.Panel8 = New Global.System.Windows.Forms.Panel()
+			Me.Panel1 = New Global.System.Windows.Forms.Panel()
+			Me.Panel5 = New Global.System.Windows.Forms.Panel()
+			Me.Panel4 = New Global.System.Windows.Forms.Panel()
+			Me.Panel6 = New Global.System.Windows.Forms.Panel()
+			Me.Panel3 = New Global.System.Windows.Forms.Panel()
+			Me.Panel2.SuspendLayout()
+			CType(Me.dgw, Global.System.ComponentModel.ISupportInitialize).BeginInit()
+			CType(Me.ErrorProvider1, Global.System.ComponentModel.ISupportInitialize).BeginInit()
+			CType(Me.pBoxAuthQR, Global.System.ComponentModel.ISupportInitialize).BeginInit()
+			Me.Panel7.SuspendLayout()
+			Me.Panel8.SuspendLayout()
+			Me.Panel1.SuspendLayout()
+			Me.Panel5.SuspendLayout()
+			Me.Panel4.SuspendLayout()
+			Me.Panel6.SuspendLayout()
+			Me.Panel3.SuspendLayout()
+			MyBase.SuspendLayout()
+			Me.Timer1.Enabled = True
+			Me.Timer1.Interval = 1000
+			Me.Label1.BackColor = Global.System.Drawing.Color.RoyalBlue
+			Me.Label1.Dock = Global.System.Windows.Forms.DockStyle.Top
+			Me.Label1.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 14.25F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Label1.ForeColor = Global.System.Drawing.Color.White
+			Me.Label1.Location = New Global.System.Drawing.Point(0, 0)
+			Me.Label1.Name = "Label1"
+			Me.Label1.Size = New Global.System.Drawing.Size(729, 32)
+			Me.Label1.TabIndex = 0
+			Me.Label1.Text = "WhatsApp Configuration"
+			Me.Label1.TextAlign = Global.System.Drawing.ContentAlignment.TopCenter
+			Me.Panel2.BackColor = Global.System.Drawing.Color.DarkSlateGray
+			Me.Panel2.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Panel2.Controls.Add(Me.Label1)
+			Me.Panel2.Dock = Global.System.Windows.Forms.DockStyle.Top
+			Me.Panel2.Location = New Global.System.Drawing.Point(0, 0)
+			Me.Panel2.Name = "Panel2"
+			Me.Panel2.Size = New Global.System.Drawing.Size(729, 30)
+			Me.Panel2.TabIndex = 0
+			dataGridViewCellStyle.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter
+			Me.Column3.DefaultCellStyle = dataGridViewCellStyle
+			Me.Column3.HeaderText = "WhatsApp API Status"
+			Me.Column3.Name = "Column3"
+			Me.Column3.[ReadOnly] = True
+			dataGridViewCellStyle2.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter
+			Me.Column2.DefaultCellStyle = dataGridViewCellStyle2
+			Me.Column2.HeaderText = "Country Code of WhatsApp"
+			Me.Column2.Name = "Column2"
+			Me.Column2.[ReadOnly] = True
+			Me.Column1.HeaderText = "ID"
+			Me.Column1.Name = "Column1"
+			Me.Column1.[ReadOnly] = True
+			Me.Column1.Visible = False
+			Me.dgw.AllowUserToAddRows = False
+			Me.dgw.AllowUserToDeleteRows = False
+			dataGridViewCellStyle3.BackColor = Global.System.Drawing.Color.FloralWhite
+			Me.dgw.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle3
+			Me.dgw.AutoSizeColumnsMode = Global.System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill
+			Me.dgw.AutoSizeRowsMode = Global.System.Windows.Forms.DataGridViewAutoSizeRowsMode.AllCells
+			Me.dgw.BackgroundColor = Global.System.Drawing.Color.White
+			Me.dgw.CellBorderStyle = Global.System.Windows.Forms.DataGridViewCellBorderStyle.Raised
+			Me.dgw.ColumnHeadersBorderStyle = Global.System.Windows.Forms.DataGridViewHeaderBorderStyle.[Single]
+			dataGridViewCellStyle4.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter
+			dataGridViewCellStyle4.BackColor = Global.System.Drawing.Color.DarkViolet
+			dataGridViewCellStyle4.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle4.ForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle4.SelectionBackColor = Global.System.Drawing.Color.LightSteelBlue
+			dataGridViewCellStyle4.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle4.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[True]
+			Me.dgw.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle4
+			Me.dgw.ColumnHeadersHeight = 24
+			Me.dgw.Columns.AddRange(New Global.System.Windows.Forms.DataGridViewColumn() { Me.Column1, Me.Column2, Me.Column3 })
+			Me.dgw.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			dataGridViewCellStyle5.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft
+			dataGridViewCellStyle5.BackColor = Global.System.Drawing.SystemColors.Window
+			dataGridViewCellStyle5.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle5.ForeColor = Global.System.Drawing.SystemColors.ControlText
+			dataGridViewCellStyle5.SelectionBackColor = Global.System.Drawing.SystemColors.Highlight
+			dataGridViewCellStyle5.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle5.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[False]
+			Me.dgw.DefaultCellStyle = dataGridViewCellStyle5
+			Me.dgw.EnableHeadersVisualStyles = False
+			Me.dgw.GridColor = Global.System.Drawing.Color.White
+			Me.dgw.Location = New Global.System.Drawing.Point(5, 158)
+			Me.dgw.MultiSelect = False
+			Me.dgw.Name = "dgw"
+			Me.dgw.[ReadOnly] = True
+			Me.dgw.RowHeadersBorderStyle = Global.System.Windows.Forms.DataGridViewHeaderBorderStyle.[Single]
+			dataGridViewCellStyle6.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft
+			dataGridViewCellStyle6.BackColor = Global.System.Drawing.Color.FromArgb(192, 0, 0)
+			dataGridViewCellStyle6.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle6.ForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle6.SelectionBackColor = Global.System.Drawing.Color.OrangeRed
+			dataGridViewCellStyle6.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle6.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[True]
+			Me.dgw.RowHeadersDefaultCellStyle = dataGridViewCellStyle6
+			Me.dgw.RowHeadersWidth = 25
+			Me.dgw.RowHeadersWidthSizeMode = Global.System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.DisableResizing
+			dataGridViewCellStyle7.BackColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle7.Font = New Global.System.Drawing.Font("Tahoma", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle7.SelectionBackColor = Global.System.Drawing.Color.DeepPink
+			dataGridViewCellStyle7.SelectionForeColor = Global.System.Drawing.Color.White
+			Me.dgw.RowsDefaultCellStyle = dataGridViewCellStyle7
+			Me.dgw.RowTemplate.Height = 18
+			Me.dgw.RowTemplate.Resizable = Global.System.Windows.Forms.DataGridViewTriState.[False]
+			Me.dgw.ScrollBars = Global.System.Windows.Forms.ScrollBars.Vertical
+			Me.dgw.SelectionMode = Global.System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+			Me.dgw.Size = New Global.System.Drawing.Size(385, 56)
+			Me.dgw.TabIndex = 40
+			Me.dgw.TabStop = False
+			Me.LinkLabel1.AutoSize = True
+			Me.LinkLabel1.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.LinkLabel1.Location = New Global.System.Drawing.Point(4, 98)
+			Me.LinkLabel1.Name = "LinkLabel1"
+			Me.LinkLabel1.Size = New Global.System.Drawing.Size(145, 15)
+			Me.LinkLabel1.TabIndex = 405
+			Me.LinkLabel1.TabStop = True
+			Me.LinkLabel1.Text = "Download Chrome Driver"
+			Me.LinkLabel1.Visible = False
+			Me.TextBox1.BackColor = Global.System.Drawing.Color.FromArgb(255, 255, 192)
+			Me.TextBox1.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 9F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.TextBox1.Location = New Global.System.Drawing.Point(195, 28)
+			Me.TextBox1.Name = "TextBox1"
+			Me.TextBox1.ScrollBars = Global.System.Windows.Forms.ScrollBars.Both
+			Me.TextBox1.Size = New Global.System.Drawing.Size(94, 21)
+			Me.TextBox1.TabIndex = 0
+			Me.TextBox1.TextAlign = Global.System.Windows.Forms.HorizontalAlignment.Center
+			Me.ComboBox1.BackColor = Global.System.Drawing.Color.FromArgb(255, 255, 192)
+			Me.ComboBox1.DropDownStyle = Global.System.Windows.Forms.ComboBoxStyle.DropDownList
+			Me.ComboBox1.FormattingEnabled = True
+			Me.ComboBox1.Items.AddRange(New Object() { "Enabled", "Disabled" })
+			Me.ComboBox1.Location = New Global.System.Drawing.Point(195, 61)
+			Me.ComboBox1.Name = "ComboBox1"
+			Me.ComboBox1.Size = New Global.System.Drawing.Size(94, 23)
+			Me.ComboBox1.TabIndex = 2
+			Me.TextBox2.Location = New Global.System.Drawing.Point(272, 1)
+			Me.TextBox2.Name = "TextBox2"
+			Me.TextBox2.Size = New Global.System.Drawing.Size(13, 21)
+			Me.TextBox2.TabIndex = 5
+			Me.TextBox2.TabStop = False
+			Me.TextBox2.Visible = False
+			Me.Label2.AutoSize = True
+			Me.Label2.Location = New Global.System.Drawing.Point(4, 61)
+			Me.Label2.Name = "Label2"
+			Me.Label2.Size = New Global.System.Drawing.Size(126, 15)
+			Me.Label2.TabIndex = 4
+			Me.Label2.Text = "WhatsApp API Status :"
+			Me.Label3.AutoSize = True
+			Me.Label3.Location = New Global.System.Drawing.Point(4, 28)
+			Me.Label3.Name = "Label3"
+			Me.Label3.Size = New Global.System.Drawing.Size(179, 15)
+			Me.Label3.TabIndex = 0
+			Me.Label3.Text = "Country Code of WhatsApp No. :"
+			Me.ErrorProvider1.ContainerControl = Me
+			Me.Button2.BackColor = Global.System.Drawing.Color.Transparent
+			Me.Button2.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Button2.Corners.All = 5
+			Me.Button2.Corners.LowerLeft = 5
+			Me.Button2.Corners.LowerRight = 5
+			Me.Button2.Corners.UpperLeft = 5
+			Me.Button2.Corners.UpperRight = 5
+			Me.Button2.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.Button2.DesignerSelected = False
+			Me.Button2.Enabled = False
+			Me.Button2.Font = New Global.System.Drawing.Font("Arial", 9.75F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Button2.Image = CType(componentResourceManager.GetObject("Button2.Image"), Global.System.Drawing.Image)
+			Me.Button2.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Button2.ImageIndex = 0
+			Me.Button2.ImageSize = New Global.System.Drawing.Size(26, 26)
+			Me.Button2.Location = New Global.System.Drawing.Point(6, 134)
+			Me.Button2.Name = "Button2"
+			Me.Button2.Size = New Global.System.Drawing.Size(91, 35)
+			Me.Button2.TabIndex = 3
+			Me.Button2.Text = "&Delete"
+			Me.Button2.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.Button3.BackColor = Global.System.Drawing.Color.Transparent
+			Me.Button3.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Button3.Corners.All = 5
+			Me.Button3.Corners.LowerLeft = 5
+			Me.Button3.Corners.LowerRight = 5
+			Me.Button3.Corners.UpperLeft = 5
+			Me.Button3.Corners.UpperRight = 5
+			Me.Button3.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.Button3.DesignerSelected = False
+			Me.Button3.Enabled = False
+			Me.Button3.Font = New Global.System.Drawing.Font("Arial", 9.75F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Button3.Image = CType(componentResourceManager.GetObject("Button3.Image"), Global.System.Drawing.Image)
+			Me.Button3.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Button3.ImageIndex = 0
+			Me.Button3.ImageSize = New Global.System.Drawing.Size(26, 26)
+			Me.Button3.Location = New Global.System.Drawing.Point(6, 92)
+			Me.Button3.Name = "Button3"
+			Me.Button3.Size = New Global.System.Drawing.Size(91, 35)
+			Me.Button3.TabIndex = 2
+			Me.Button3.Text = "&Update"
+			Me.Button3.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.Button4.BackColor = Global.System.Drawing.Color.Transparent
+			Me.Button4.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Button4.Corners.All = 5
+			Me.Button4.Corners.LowerLeft = 5
+			Me.Button4.Corners.LowerRight = 5
+			Me.Button4.Corners.UpperLeft = 5
+			Me.Button4.Corners.UpperRight = 5
+			Me.Button4.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.Button4.DesignerSelected = False
+			Me.Button4.Font = New Global.System.Drawing.Font("Arial", 9.75F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Button4.Image = Global.BillPoint.My.Resources.Resources.Save_32x32
+			Me.Button4.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Button4.ImageIndex = 0
+			Me.Button4.ImageSize = New Global.System.Drawing.Size(26, 26)
+			Me.Button4.Location = New Global.System.Drawing.Point(6, 50)
+			Me.Button4.Name = "Button4"
+			Me.Button4.Size = New Global.System.Drawing.Size(91, 35)
+			Me.Button4.TabIndex = 1
+			Me.Button4.Text = "&Save"
+			Me.Button4.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.Button5.BackColor = Global.System.Drawing.Color.Transparent
+			Me.Button5.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.Button5.Corners.All = 5
+			Me.Button5.Corners.LowerLeft = 5
+			Me.Button5.Corners.LowerRight = 5
+			Me.Button5.Corners.UpperLeft = 5
+			Me.Button5.Corners.UpperRight = 5
+			Me.Button5.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.Button5.DesignerSelected = False
+			Me.Button5.Font = New Global.System.Drawing.Font("Arial", 9.75F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Button5.Image = CType(componentResourceManager.GetObject("Button5.Image"), Global.System.Drawing.Image)
+			Me.Button5.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Button5.ImageIndex = 0
+			Me.Button5.ImageSize = New Global.System.Drawing.Size(26, 26)
+			Me.Button5.Location = New Global.System.Drawing.Point(6, 8)
+			Me.Button5.Name = "Button5"
+			Me.Button5.Size = New Global.System.Drawing.Size(91, 35)
+			Me.Button5.TabIndex = 0
+			Me.Button5.Text = "&New"
+			Me.Button5.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.pBoxAuthQR.BackColor = Global.System.Drawing.Color.White
+			Me.pBoxAuthQR.Dock = Global.System.Windows.Forms.DockStyle.Fill
+			Me.pBoxAuthQR.Location = New Global.System.Drawing.Point(0, 0)
+			Me.pBoxAuthQR.Name = "pBoxAuthQR"
+			Me.pBoxAuthQR.Size = New Global.System.Drawing.Size(187, 181)
+			Me.pBoxAuthQR.SizeMode = Global.System.Windows.Forms.PictureBoxSizeMode.Zoom
+			Me.pBoxAuthQR.TabIndex = 7
+			Me.pBoxAuthQR.TabStop = False
+			Me.chkBoxHeadLess.AutoSize = True
+			Me.chkBoxHeadLess.Checked = True
+			Me.chkBoxHeadLess.CheckState = Global.System.Windows.Forms.CheckState.Checked
+			Me.chkBoxHeadLess.Location = New Global.System.Drawing.Point(461, 223)
+			Me.chkBoxHeadLess.Name = "chkBoxHeadLess"
+			Me.chkBoxHeadLess.Size = New Global.System.Drawing.Size(70, 17)
+			Me.chkBoxHeadLess.TabIndex = 52
+			Me.chkBoxHeadLess.Text = "Headless"
+			Me.chkBoxHeadLess.UseVisualStyleBackColor = True
+			Me.chkBoxHeadLess.Visible = False
+			Me.btnTerminate.BackgroundImage = Global.BillPoint.My.Resources.Resources.UpdateOrange
+			Me.btnTerminate.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.btnTerminate.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.btnTerminate.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.btnTerminate.ForeColor = Global.System.Drawing.Color.White
+			Me.btnTerminate.Location = New Global.System.Drawing.Point(597, 219)
+			Me.btnTerminate.Name = "btnTerminate"
+			Me.btnTerminate.Size = New Global.System.Drawing.Size(62, 26)
+			Me.btnTerminate.TabIndex = 51
+			Me.btnTerminate.TabStop = False
+			Me.btnTerminate.Text = "Terminate"
+			Me.btnTerminate.UseVisualStyleBackColor = True
+			Me.btnInitialize.BackgroundImage = Global.BillPoint.My.Resources.Resources.NewGreen
+			Me.btnInitialize.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.btnInitialize.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.btnInitialize.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.btnInitialize.ForeColor = Global.System.Drawing.Color.White
+			Me.btnInitialize.Location = New Global.System.Drawing.Point(535, 219)
+			Me.btnInitialize.Name = "btnInitialize"
+			Me.btnInitialize.Size = New Global.System.Drawing.Size(59, 26)
+			Me.btnInitialize.TabIndex = 50
+			Me.btnInitialize.TabStop = False
+			Me.btnInitialize.Text = "Initialize"
+			Me.btnInitialize.UseVisualStyleBackColor = True
+			Me.btnLogout.BackgroundImage = Global.BillPoint.My.Resources.Resources.NewRed
+			Me.btnLogout.BackgroundImageLayout = Global.System.Windows.Forms.ImageLayout.Stretch
+			Me.btnLogout.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.btnLogout.Enabled = False
+			Me.btnLogout.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.btnLogout.ForeColor = Global.System.Drawing.Color.White
+			Me.btnLogout.Location = New Global.System.Drawing.Point(663, 219)
+			Me.btnLogout.Name = "btnLogout"
+			Me.btnLogout.Size = New Global.System.Drawing.Size(59, 26)
+			Me.btnLogout.TabIndex = 8
+			Me.btnLogout.TabStop = False
+			Me.btnLogout.Text = "Logout"
+			Me.btnLogout.UseVisualStyleBackColor = True
+			Me.Panel7.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Bottom Or Global.System.Windows.Forms.AnchorStyles.Left
+			Me.Panel7.Controls.Add(Me.pBoxAuthQR)
+			Me.Panel7.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Panel7.Location = New Global.System.Drawing.Point(535, 35)
+			Me.Panel7.Name = "Panel7"
+			Me.Panel7.Size = New Global.System.Drawing.Size(187, 181)
+			Me.Panel7.TabIndex = 49
+			Me.LblSenderId.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.LblSenderId.ForeColor = Global.System.Drawing.Color.Chocolate
+			Me.LblSenderId.Location = New Global.System.Drawing.Point(248, 3)
+			Me.LblSenderId.Margin = New Global.System.Windows.Forms.Padding(3)
+			Me.LblSenderId.Name = "LblSenderId"
+			Me.LblSenderId.Size = New Global.System.Drawing.Size(211, 23)
+			Me.LblSenderId.TabIndex = 0
+			Me.LblSenderId.Text = "Sender Id: Unavailable"
+			Me.LblSenderId.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.lblWhatsAppState.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 8.25F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.lblWhatsAppState.ForeColor = Global.System.Drawing.Color.Blue
+			Me.lblWhatsAppState.Location = New Global.System.Drawing.Point(3, 2)
+			Me.lblWhatsAppState.Margin = New Global.System.Windows.Forms.Padding(3)
+			Me.lblWhatsAppState.Name = "lblWhatsAppState"
+			Me.lblWhatsAppState.Size = New Global.System.Drawing.Size(235, 25)
+			Me.lblWhatsAppState.TabIndex = 0
+			Me.lblWhatsAppState.Text = "Engine : Not Ready"
+			Me.lblWhatsAppState.TextAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.Panel8.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.Panel8.Controls.Add(Me.LblSenderId)
+			Me.Panel8.Controls.Add(Me.lblWhatsAppState)
+			Me.Panel8.Location = New Global.System.Drawing.Point(7, 216)
+			Me.Panel8.Name = "Panel8"
+			Me.Panel8.Size = New Global.System.Drawing.Size(462, 30)
+			Me.Panel8.TabIndex = 53
+			Me.Panel1.BackColor = Global.System.Drawing.Color.White
+			Me.Panel1.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel1.Controls.Add(Me.Panel8)
+			Me.Panel1.Controls.Add(Me.chkBoxHeadLess)
+			Me.Panel1.Controls.Add(Me.btnTerminate)
+			Me.Panel1.Controls.Add(Me.btnInitialize)
+			Me.Panel1.Controls.Add(Me.btnLogout)
+			Me.Panel1.Controls.Add(Me.Panel7)
+			Me.Panel1.Controls.Add(Me.Panel5)
+			Me.Panel1.Controls.Add(Me.Panel4)
+			Me.Panel1.Controls.Add(Me.dgw)
+			Me.Panel1.Controls.Add(Me.Panel2)
+			Me.Panel1.Location = New Global.System.Drawing.Point(0, 0)
+			Me.Panel1.Name = "Panel1"
+			Me.Panel1.Size = New Global.System.Drawing.Size(731, 252)
+			Me.Panel1.TabIndex = 3
+			Me.Panel5.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel5.Controls.Add(Me.Button2)
+			Me.Panel5.Controls.Add(Me.Button3)
+			Me.Panel5.Controls.Add(Me.Button4)
+			Me.Panel5.Controls.Add(Me.Button5)
+			Me.Panel5.Location = New Global.System.Drawing.Point(408, 35)
+			Me.Panel5.Name = "Panel5"
+			Me.Panel5.Size = New Global.System.Drawing.Size(105, 179)
+			Me.Panel5.TabIndex = 48
+			Me.Panel4.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel4.Controls.Add(Me.LinkLabel1)
+			Me.Panel4.Controls.Add(Me.TextBox1)
+			Me.Panel4.Controls.Add(Me.ComboBox1)
+			Me.Panel4.Controls.Add(Me.TextBox2)
+			Me.Panel4.Controls.Add(Me.Label2)
+			Me.Panel4.Controls.Add(Me.Label3)
+			Me.Panel4.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 9F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Panel4.Location = New Global.System.Drawing.Point(5, 35)
+			Me.Panel4.Name = "Panel4"
+			Me.Panel4.Size = New Global.System.Drawing.Size(385, 121)
+			Me.Panel4.TabIndex = 0
+			Me.Panel6.BackColor = Global.System.Drawing.Color.White
+			Me.Panel6.Controls.Add(Me.Panel1)
+			Me.Panel6.Location = New Global.System.Drawing.Point(3, 3)
+			Me.Panel6.Name = "Panel6"
+			Me.Panel6.Size = New Global.System.Drawing.Size(731, 252)
+			Me.Panel6.TabIndex = 0
+			Me.Panel3.BackColor = Global.System.Drawing.Color.White
+			Me.Panel3.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel3.Controls.Add(Me.Panel6)
+			Me.Panel3.Location = New Global.System.Drawing.Point(4, 1)
+			Me.Panel3.Name = "Panel3"
+			Me.Panel3.Size = New Global.System.Drawing.Size(739, 260)
+			Me.Panel3.TabIndex = 6
+			MyBase.AutoScaleDimensions = New Global.System.Drawing.SizeF(6F, 13F)
+			MyBase.AutoScaleMode = Global.System.Windows.Forms.AutoScaleMode.Font
+			MyBase.ClientSize = New Global.System.Drawing.Size(747, 266)
+			MyBase.Controls.Add(Me.Panel3)
+			MyBase.MaximizeBox = False
+			MyBase.MinimizeBox = False
+			MyBase.Name = "frmWAppAPIServer2"
+			Me.Text = "frmWAppAPIServer2"
+			Me.Panel2.ResumeLayout(False)
+			CType(Me.dgw, Global.System.ComponentModel.ISupportInitialize).EndInit()
+			CType(Me.ErrorProvider1, Global.System.ComponentModel.ISupportInitialize).EndInit()
+			CType(Me.pBoxAuthQR, Global.System.ComponentModel.ISupportInitialize).EndInit()
+			Me.Panel7.ResumeLayout(False)
+			Me.Panel8.ResumeLayout(False)
+			Me.Panel1.ResumeLayout(False)
+			Me.Panel1.PerformLayout()
+			Me.Panel5.ResumeLayout(False)
+			Me.Panel4.ResumeLayout(False)
+			Me.Panel4.PerformLayout()
+			Me.Panel6.ResumeLayout(False)
+			Me.Panel3.ResumeLayout(False)
+			MyBase.ResumeLayout(False)
+		End Sub
+
+		' Token: 0x04004424 RID: 17444
+		Private components As Global.System.ComponentModel.IContainer
+	End Class
+End Namespace

@@ -1,0 +1,207 @@
+@* The app window's own top bar, in place of the empty Windows title bar. It shows only inside the Smart Retail AI app,
+   once the app hands its title bar to the page (html[data-frame="app"]); in a browser it is hidden. The bar drags the
+   window (CSS app-region), and its window buttons work from app.js, so they work even when the page has lost the
+   dashboard. Full: search, the shop's data, the AI and the bell for what needs the owner; otherwise (Get started) just
+   the name and the window buttons. *@
+@implements IDisposable
+@inject DataSourceInfo Source
+@inject AiSetupService Setup
+@inject FixNowService Checks
+@inject MemoryService Memory
+@inject ActionService Actions
+@inject UpdateStatusService Updates
+@inject CodexUpdateService Codex
+@inject CodexAccountService Account
+@inject CameraSearchLauncher Camera
+@inject NavigationManager Nav
+@inject IJSRuntime Js
+
+<header class="window-bar">
+    <a class="wb-brand" href=""><AppMark Size="18" /><span>Smart Retail POS</span></a>
+    @if (Full)
+    {
+        <form class="wb-search" role="search" @onsubmit="Search">
+            <Icon Name="search" Size="15" />
+            <input id="top-search" type="search" placeholder="Search products" aria-label="Search" autocomplete="off" @bind="query" />
+            <button type="button" class="scan-camera" title="Search with the camera" aria-label="Search products with the camera" @onclick="Camera.Request"><Icon Name="camera" Size="15" /></button>
+            <kbd>Ctrl K</kbd>
+        </form>
+        <div class="wb-status">
+            <a class="wb-chip" href="settings" title="@Source.Name">
+                <span class="dot @(Source.IsDemo ? "demo" : null)"></span><span class="wb-label">@(Source.IsDemo ? "Demo data" : "Live · read-only")</span>
+            </a>
+            <a class="wb-chip" href="@(Setup.State.Stage == AiSetupStage.Ready ? "settings#ai-jobs" : "welcome")" title="@AiTitle">
+                <Icon Name="spark" Size="13" /><span class="wb-label">@AiText</span>
+                @if (FiveHours is { } used)
+                {
+                    <span class="wb-meter @(used >= 90 ? "bad" : used >= 75 ? "warn" : null)"><i style="width: @used%"></i></span><span class="wb-used">@used%</span>
+                }
+            </a>
+            <div class="wb-bell">
+                <button type="button" class="wb-bell-button @(open ? "open" : null)" aria-expanded="@(open ? "true" : "false")"
+                        aria-label="@(Count == 0 ? "Nothing needs you" : $"{Count} need you")" title="What needs you" @onclick="() => open = !open">
+                    <Icon Name="bell" Size="17" />
+                    @if (Count > 0)
+                    {
+                        <span class="wb-badge">@Count</span>
+                    }
+                </button>
+                @if (open)
+                {
+                    <div class="wb-backdrop" @onclick="() => open = false"></div>
+                    <div class="wb-pop" role="dialog" aria-label="What needs you">
+                        <div class="wb-pop-head"><strong>Needs you</strong>@if (Count > 0) {<span class="muted">@Count</span>}</div>
+                        @if (Count == 0)
+                        {
+                            <p class="wb-pop-empty">Nothing needs you right now.</p>
+                        }
+                        @if (Updates.Ready is { } available)
+                        {
+                            <a class="wb-pop-row" href="settings#updates" @onclick="() => open = false">
+                                <span class="wb-tile blue"><Icon Name="download" Size="15" /></span>
+                                <span><strong>Version @available is ready to install</strong><small>The app closes, updates and opens again by itself.</small></span>
+                            </a>
+                        }
+                        @if (Codex.NeedsYou is { } codexNeed)
+                        {
+                            <a class="wb-pop-row" href="settings#updates" @onclick="() => open = false">
+                                <span class="wb-tile blue"><Icon Name="download" Size="15" /></span>
+                                <span><strong>@codexNeed.Title</strong><small>@codexNeed.Detail</small></span>
+                            </a>
+                        }
+                        @if (fixNow > 0)
+                        {
+                            <a class="wb-pop-row" href="fix-now" @onclick="() => open = false">
+                                <span class="wb-tile bad"><Icon Name="alert" Size="15" /></span>
+                                <span><strong>@Plural(fixNow, "mistake", "mistakes") to fix now</strong><small>Prices or bills in the POS that lose money.</small></span>
+                            </a>
+                        }
+                        @if (waiting > 0)
+                        {
+                            <a class="wb-pop-row" href="memory" @onclick="() => open = false">
+                                <span class="wb-tile purple"><Icon Name="memory" Size="15" /></span>
+                                <span><strong>@Plural(waiting, "thing", "things") learned from your chats</strong><small>@(waiting == 1 ? "It waits" : "They wait") for your Save.</small></span>
+                            </a>
+                        }
+                        @if (heard > 0)
+                        {
+                            <a class="wb-pop-row" href="actions" @onclick="() => open = false">
+                                <span class="wb-tile green"><Icon Name="flag" Size="15" /></span>
+                                <span><strong>@Plural(heard, "action", "actions") heard in your chats</strong><small>Track @(heard == 1 ? "it" : "them") to see what @(heard == 1 ? "it does" : "they do") to sales.</small></span>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="wb-fill"></div>
+    }
+    <div class="wb-buttons">
+        <button type="button" data-window="minimize" aria-label="Minimise" title="Minimise"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6.5h10" /></svg></button>
+        <button type="button" data-window="maximize" aria-label="Maximise or restore" title="Maximise or restore">
+            <svg class="wb-max" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="1.2" /></svg>
+            <svg class="wb-restore" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="3.5" width="7" height="7" rx="1.2" /><path d="M3.5 3.5V2.7A1.2 1.2 0 0 1 4.7 1.5h4.6a1.2 1.2 0 0 1 1.2 1.2v4.6a1.2 1.2 0 0 1-1.2 1.2h-.8" /></svg>
+        </button>
+        <button type="button" class="wb-close" data-window="close" aria-label="Close" title="Close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" /></svg></button>
+    </div>
+</header>
+
+@code {
+    [Parameter] public bool Full { get; set; } = true;
+
+    private string query = "";
+    private bool open;
+    private int fixNow;
+    private int waiting;
+    private int heard;
+
+    private int Count => fixNow + waiting + heard + (Updates.Ready is null ? 0 : 1) + (Codex.NeedsYou is null ? 0 : 1);
+
+    private string AiText => Setup.State.Stage switch
+    {
+        AiSetupStage.Ready => "AI ready",
+        AiSetupStage.Unknown or AiSetupStage.Checking => "AI",
+        _ => "Set up AI",
+    };
+
+    /// <summary>How much of Codex's 5-hour limit is used, when Codex says.</summary>
+    private int? FiveHours => Account.LastUsage.Usage?.Primary is { } window
+        ? (int)Math.Round(Math.Clamp(window.UsedPercent, 0, 100), MidpointRounding.AwayFromZero)
+        : null;
+
+    private string AiTitle => Setup.State.Stage == AiSetupStage.Ready
+        ? "The AI is ready." + (FiveHours is { } used ? $" {used}% of Codex's 5-hour limit is used." : "") + " Each job's model and thinking level: Settings."
+        : "The AI is not ready yet: Get started sets it up.";
+
+    protected override void OnInitialized()
+    {
+        if (!Full)
+        {
+            return;
+        }
+
+        Setup.Changed += OnChanged;
+        Checks.Changed += OnChanged;
+        Memory.Changed += OnChanged;
+        Actions.Changed += OnChanged;
+        Account.UsageChanged += OnChanged;
+        Updates.Changed += OnChanged;
+        Codex.Changed += OnChanged;
+        Recount();
+    }
+
+    private void Recount()
+    {
+        fixNow = Checks.Last?.FixNow ?? 0;
+        waiting = Memory.Load().Pending.Count;
+        heard = Actions.Load().Suggested.Count;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("srpos.frameReady");
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page was closed.
+            }
+        }
+    }
+
+    private void Search()
+    {
+        var term = query.Trim();
+        Nav.NavigateTo(term.Length == 0 ? "products" : "products?q=" + Uri.EscapeDataString(term));
+    }
+
+    private static string Plural(int count, string one, string many) => count == 1 ? "1 " + one : count + " " + many;
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Recount();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        if (!Full)
+        {
+            return;
+        }
+
+        Setup.Changed -= OnChanged;
+        Checks.Changed -= OnChanged;
+        Memory.Changed -= OnChanged;
+        Actions.Changed -= OnChanged;
+        Account.UsageChanged -= OnChanged;
+        Updates.Changed -= OnChanged;
+        Codex.Changed -= OnChanged;
+    }
+}

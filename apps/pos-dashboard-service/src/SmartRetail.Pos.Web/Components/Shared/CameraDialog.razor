@@ -1,0 +1,277 @@
+@* The camera, in the app's own look: a live preview, "Take photo", then "Retake", "Use photo" or "Cancel"; "Switch
+   camera" when there is more than one. With Max above 1 it takes several photos: "Keep photo" puts each in a strip
+   (with a way to remove it) and the preview carries on, until "Done". It starts only when the dialog opens after a
+   click, and every track stops when it closes (srposCamera). Photos stay in the page until the caller takes them
+   with the ids it is given. *@
+@implements IAsyncDisposable
+@inject IJSRuntime Js
+
+<div class="camera-backdrop" @onclick="CancelAsync"></div>
+<div class="camera-dialog" role="dialog" aria-modal="true" aria-label="@Title" @onkeydown="OnKey" tabindex="-1" @ref="dialog">
+    <div class="camera-head">
+        <h2>@Title</h2>
+        <button type="button" class="icon-btn" aria-label="Close the camera" @onclick="CancelAsync"><Icon Name="close" /></button>
+    </div>
+    <div class="camera-view">
+        <video @ref="video" class="@(still is null ? null : "hidden")" autoplay playsinline muted></video>
+        @if (still is not null)
+        {
+            <img src="@still.Url" alt="The photo just taken" />
+        }
+        @if (starting && problem is null)
+        {
+            <span class="camera-wait"><span class="spinner"></span> Starting the camera…</span>
+        }
+        @if (problem is not null)
+        {
+            <p class="camera-problem" role="alert"><Icon Name="alert" /><span>@problem</span></p>
+        }
+    </div>
+    @if (Hint is not null && problem is null)
+    {
+        <p class="camera-hint">@(Multiple && taken.Count >= Max ? $"That is {Max} photos: press Done." : Hint)</p>
+    }
+    @if (taken.Count > 0)
+    {
+        <div class="camera-taken" aria-label="Photos kept">
+            @for (var i = 0; i < taken.Count; i++)
+            {
+                var shot = taken[i];
+                var number = i + 1;
+                <div class="camera-shot">
+                    <img src="@shot.Url" alt="@($"Photo {number}")" />
+                    <button type="button" aria-label="@($"Remove photo {number}")" @onclick="() => RemoveAsync(shot)">×</button>
+                </div>
+            }
+        </div>
+    }
+    <div class="camera-actions">
+        @if (problem is not null)
+        {
+            <button type="button" class="btn btn-soft" @onclick="StartAsync"><Icon Name="refresh" /> Try again</button>
+        }
+        else if (still is null)
+        {
+            @if (cameras > 1)
+            {
+                <button type="button" class="btn btn-soft" @onclick="NextAsync"><Icon Name="refresh" /> Switch camera</button>
+            }
+            <button type="button" class="btn @(taken.Count > 0 ? "btn-soft" : "btn-primary")" disabled="@(!ready || busy || (Multiple && taken.Count >= Max))" @onclick="CaptureAsync"><Icon Name="camera" /> Take photo</button>
+            @if (taken.Count > 0)
+            {
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="DoneAsync"><Icon Name="check" /> Done (@taken.Count)</button>
+            }
+        }
+        else
+        {
+            <button type="button" class="btn btn-soft" disabled="@busy" @onclick="RetakeAsync">Retake</button>
+            @if (Multiple)
+            {
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="Keep"><Icon Name="check" /> Keep photo</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="UseAsync"><Icon Name="check" /> @UseLabel</button>
+            }
+        }
+        <button type="button" class="btn" @onclick="CancelAsync">Cancel</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference video;
+    private ElementReference dialog;
+    private readonly List<Still> taken = new();
+    private Still? still;
+    private string? problem;
+    private bool starting = true;
+    private bool ready;
+    private bool busy;
+    private bool closed;
+    private int cameras;
+
+    [Parameter] public string Title { get; set; } = "Take a photo";
+
+    /// <summary>A line under the preview, e.g. "Hold one product in front of the camera".</summary>
+    [Parameter] public string? Hint { get; set; }
+
+    [Parameter] public string UseLabel { get; set; } = "Use photo";
+
+    /// <summary>Called with the photo's id (srposCamera.take or giveToChat) when "Use photo" is pressed.</summary>
+    [Parameter] public EventCallback<string> OnUse { get; set; }
+
+    /// <summary>How many photos may be taken; above 1, "Done" gives them all to <see cref="OnDone"/>.</summary>
+    [Parameter] public int Max { get; set; } = 1;
+
+    /// <summary>Called with the kept photos' ids, in the order they were taken, when "Done" is pressed.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<string>> OnDone { get; set; }
+
+    private bool Multiple => Max > 1;
+
+    /// <summary>Called when the dialog is closed without a photo.</summary>
+    [Parameter, EditorRequired] public EventCallback OnClose { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Js.InvokeVoidAsync("srpos.focus", dialog);
+            await StartAsync();
+        }
+    }
+
+    private async Task StartAsync()
+    {
+        problem = null;
+        starting = true;
+        ready = false;
+        StateHasChanged();
+        var started = await Js.InvokeAsync<Started>("srposCamera.start", video, null);
+        starting = false;
+        ready = started.Ok;
+        cameras = started.Cameras;
+        problem = started.Ok ? null : started.Problem;
+
+        // Called after the first render too, where Blazor does not draw again by itself.
+        StateHasChanged();
+    }
+
+    private async Task NextAsync()
+    {
+        var started = await Js.InvokeAsync<Started>("srposCamera.next", video);
+        cameras = started.Cameras;
+        problem = started.Ok ? null : started.Problem;
+    }
+
+    private async Task CaptureAsync()
+    {
+        busy = true;
+        try
+        {
+            still = await Js.InvokeAsync<Still?>("srposCamera.capture", video);
+            if (still is null)
+            {
+                problem = "The camera gave no picture. Try again.";
+            }
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RetakeAsync()
+    {
+        if (still is { } shot)
+        {
+            await Js.InvokeVoidAsync("srposCamera.discard", shot.Id);
+        }
+
+        still = null;
+    }
+
+    /// <summary>Keeps the photo just taken and carries on with the preview for the next.</summary>
+    private void Keep()
+    {
+        if (still is { } shot && taken.Count < Max)
+        {
+            taken.Add(shot);
+            still = null;
+        }
+    }
+
+    private async Task RemoveAsync(Still shot)
+    {
+        taken.Remove(shot);
+        await Js.InvokeVoidAsync("srposCamera.discard", shot.Id);
+    }
+
+    private async Task DoneAsync()
+    {
+        if (taken.Count == 0)
+        {
+            return;
+        }
+
+        busy = true;
+        await StopAsync();
+        var ids = taken.Select(t => t.Id).ToList();
+        taken.Clear();
+        closed = true;
+        await OnDone.InvokeAsync(ids);
+    }
+
+    private async Task UseAsync()
+    {
+        if (still is not { } shot)
+        {
+            return;
+        }
+
+        busy = true;
+        await StopAsync();
+        still = null;
+        closed = true;
+        await OnUse.InvokeAsync(shot.Id);
+    }
+
+    private async Task CancelAsync()
+    {
+        await StopAsync();
+        await DiscardAllAsync();
+        closed = true;
+        await OnClose.InvokeAsync();
+    }
+
+    /// <summary>Forgets every photo taken here and not used.</summary>
+    private async Task DiscardAllAsync()
+    {
+        foreach (var shot in taken.Concat(still is null ? Array.Empty<Still>() : new[] { still }).ToList())
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("srposCamera.discard", shot.Id);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page is gone, and its photos with it.
+            }
+        }
+
+        taken.Clear();
+        still = null;
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await CancelAsync();
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srposCamera.stop", video);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The page is gone, and its camera with it.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!closed)
+        {
+            await StopAsync();
+            await DiscardAllAsync();
+        }
+    }
+
+    private sealed record Started(bool Ok, int Cameras, string? Problem);
+
+    private sealed record Still(string Id, string Url, int Width, int Height);
+}

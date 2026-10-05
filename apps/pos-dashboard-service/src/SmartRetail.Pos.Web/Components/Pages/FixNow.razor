@@ -1,0 +1,232 @@
+@page "/fix-now"
+@using SmartRetail.Pos.Core.Checks
+@implements IDisposable
+@inject FixNowService Checks
+@inject ILogger<FixNow> Log
+
+<PageTitle>Fix now · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Fix now</h1>
+        <p class="sub">Mistakes in the POS that lose money or break the rules, and things worth a look. Fix them in the POS: each one goes from here by itself once it is fixed. Each says when it happened: a bill's date and time, or, for a price or stock count, which the POS gives no date, when this app first noticed it.</p>
+    </div>
+    <div class="actions">
+        <button type="button" class="btn btn-soft" disabled="@busy" @onclick="CheckAgainAsync"><Icon Name="refresh" /> Check again</button>
+    </div>
+</div>
+
+@if (result is null)
+{
+    <p class="muted"><span class="spinner"></span> Checking the POS…</p>
+}
+else
+{
+    <p class="period-note fix-summary">
+        <span class="pill @(result.FixNow > 0 ? "bad" : "good")">@(result.FixNow == 1 ? "1 to fix now" : $"{result.FixNow} to fix now")</span>
+        <span class="pill @(result.CheckSoon > 0 ? "warn" : null)">@result.CheckSoon to check soon</span>
+        @if (result.OnPurpose.Count > 0)
+        {
+            <span class="pill">@result.OnPurpose.Count on purpose</span>
+        }
+        <span class="muted">Checked @Formats.Time(result.CheckedAt), again every minute while this page is open.</span>
+    </p>
+
+    @if (result.Problem is not null)
+    {
+        <div class="alert alert-danger">Could not read the POS just now: @result.Problem. What is shown is from the last check that worked.</div>
+    }
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    @if (result.Open.Count == 0)
+    {
+        <section class="panel all-clear">
+            <Icon Name="check" />
+            <div>
+                <strong>Nothing to fix.</strong>
+                <div class="muted">No price below cost or above MRP, nothing sold at a loss this week, no missing bills.</div>
+            </div>
+        </section>
+    }
+
+    @foreach (var group in result.Open.GroupBy(f => (f.Level, f.Kind)))
+    {
+        var all = group.ToList();
+        var shown = expanded.Contains(group.Key.Kind) ? all : all.Take(ShowFirst).ToList();
+        <section class="panel fix-group @(group.Key.Level == FindingLevel.FixNow ? "now" : "soon")" aria-label="@group.Key.Kind.Heading()">
+            <div class="panel-head">
+                <h2>@group.Key.Kind.Heading() <span class="count">@all.Count</span></h2>
+                <span class="pill @(group.Key.Level == FindingLevel.FixNow ? "bad" : "warn")">@(group.Key.Level == FindingLevel.FixNow ? "Fix now" : "Check soon")</span>
+            </div>
+            <ul class="findings">
+                @foreach (var finding in shown)
+                {
+                    <li class="finding" @key="finding.Key">
+                        <div class="f-title">@finding.Title</div>
+                        @if (finding.When.Length > 0)
+                        {
+                            <div class="f-when"><Icon Name="clock" Size="14" /> <span>@finding.When</span></div>
+                        }
+                        <div class="f-detail">@finding.Detail</div>
+                        <div class="f-do"><Icon Name="info" /> @finding.WhatToDo</div>
+                        <div class="f-actions">
+                            @if (finding.BillId is { } bill && finding.Kind != FindingKind.MissingBills)
+                            {
+                                <a class="btn btn-sm" href="@($"bills/{bill}")">Open the bill</a>
+                            }
+                            @if (finding.Kind == FindingKind.OwedLong)
+                            {
+                                <a class="btn btn-sm" href="@OwedLink">See the bills</a>
+                            }
+                            @if (finding.Search is { Length: > 0 } search)
+                            {
+                                <a class="btn btn-sm" href="@($"products?q={Uri.EscapeDataString(search)}")">See the product</a>
+                            }
+                            @if (noting == finding.Key)
+                            {
+                                <input class="form-control note-input" maxlength="200" placeholder="Why? e.g. clearance sale (optional)" aria-label="Why it is on purpose" @bind="note" />
+                                <button type="button" class="btn btn-sm btn-primary" @onclick="() => MarkOnPurpose(finding)">Mark as on purpose</button>
+                                <button type="button" class="btn btn-sm btn-link" @onclick="() => noting = null">Cancel</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-link" @onclick="() => StartNote(finding)">It’s on purpose</button>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+            @if (all.Count > shown.Count)
+            {
+                <button type="button" class="link-button show-all" @onclick="() => expanded.Add(group.Key.Kind)">Show all @all.Count</button>
+            }
+        </section>
+    }
+
+    @if (result.OnPurpose.Count > 0)
+    {
+        <section class="panel on-purpose">
+            <div class="panel-head"><h2>On purpose</h2></div>
+            <p class="muted note-line">Hidden until their figures change: a new price or cost, or another sale like it, shows them again.</p>
+            <ul class="findings">
+                @foreach (var (finding, purpose) in result.OnPurpose)
+                {
+                    <li class="finding" @key="finding.Key">
+                        <div class="f-title">@finding.Kind.Heading(): @finding.Title</div>
+                        <div class="f-detail">@(purpose.Note ?? "No reason given.") <span class="muted">Marked @Formats.DateAndTime(purpose.At).</span></div>
+                        <div class="f-actions"><button type="button" class="btn btn-sm btn-link" @onclick="() => Undo(finding.Key)">Show it again</button></div>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+}
+
+@code {
+    private const int ShowFirst = 5;
+
+    private readonly CancellationTokenSource stopping = new();
+    private readonly HashSet<FindingKind> expanded = new();
+    private FixNowResult? result;
+    private string? noting;
+    private string? note;
+    private string? error;
+    private bool busy;
+
+    /// <summary>Bills given on credit more than 30 days ago that are still owed.</summary>
+    private string OwedLink => result is null ? "bills?owed=true"
+        : $"bills?owed=true&to={BillLinks.Iso(DateOnly.FromDateTime(result.CheckedAt).AddDays(-CheckFactsLoader.OwedDays - 1))}";
+
+    protected override void OnInitialized()
+    {
+        Checks.Changed += OnChanged;
+        result = Checks.Last;
+        _ = KeepCheckingAsync();
+    }
+
+    /// <summary>A check now (or the last one when under a minute old), then one a minute while the page is open.</summary>
+    private async Task KeepCheckingAsync()
+    {
+        using var timer = new PeriodicTimer(FixNowService.FreshFor);
+        try
+        {
+            do
+            {
+                await Checks.CheckAsync(ct: stopping.Token);
+            }
+            while (await timer.WaitForNextTickAsync(stopping.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+    }
+
+    private async Task CheckAgainAsync()
+    {
+        busy = true;
+        try
+        {
+            await Checks.CheckAsync(fresh: true, stopping.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void StartNote(Finding finding)
+    {
+        noting = finding.Key;
+        note = null;
+        error = null;
+    }
+
+    private void MarkOnPurpose(Finding finding)
+    {
+        try
+        {
+            Checks.MarkOnPurpose(finding, note);
+            noting = null;
+            error = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Saving an on purpose note failed.");
+            error = "Could not save that: " + ex.Message;
+        }
+    }
+
+    private void Undo(string key)
+    {
+        try
+        {
+            Checks.Undo(key);
+            error = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Removing an on purpose note failed.");
+            error = "Could not change that: " + ex.Message;
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        result = Checks.Last;
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Checks.Changed -= OnChanged;
+        stopping.Cancel();
+    }
+}

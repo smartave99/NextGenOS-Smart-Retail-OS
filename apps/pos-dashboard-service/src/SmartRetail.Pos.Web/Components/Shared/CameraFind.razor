@@ -1,0 +1,325 @@
+@* Finding a product with the camera. The page's camera button calls OpenAsync; the photo taken is looked for on this
+   PC by CameraSearchService (the barcodes in it first, then, once turned on in Settings, the products it looks like)
+   and then forgotten. What it found shows where the page puts this: each product with its photo, the code the till
+   scans, the price and, when found by its look, its match score. Nothing is chosen for the person: a product is used
+   only when its button is pressed, and the page says what that does (show it, add it, give its code). *@
+@implements IDisposable
+@inject CameraSearchService Search
+@inject IJSRuntime Js
+@inject NavigationManager Nav
+@inject ILogger<CameraFind> Log
+
+@if (camera)
+{
+    <CameraDialog Title="Find a product" Hint="Hold one product in front of the camera, with its barcode towards it if it has one."
+                  UseLabel="Find it" OnUse="FindAsync" OnClose="() => camera = false" />
+}
+
+@if (shown)
+{
+    <section class="camera-matches @Class" aria-label="Found with the camera">
+        <div class="cm-head">
+            <h2>@Heading</h2>
+            <button type="button" class="btn btn-sm btn-soft" disabled="@searching" @onclick="OpenAsync"><Icon Name="camera" /> Take again</button>
+            <button type="button" class="icon-btn" title="Close" aria-label="Close what the camera found" @onclick="CloseAsync"><Icon Name="close" /></button>
+        </div>
+        <p class="visually-hidden" role="status">@Announce()</p>
+        <div class="cm-body">
+            @if (searching)
+            {
+                <p class="cm-note"><span class="spinner"></span> Looking for the product…</p>
+            }
+            else if (result is { Problem: { } problem })
+            {
+                <p class="cm-note bad">@problem</p>
+            }
+            else if (result is not null)
+            {
+                @if (result.ByCode.Count > 0 || result.ByLook.Count > 0)
+                {
+                    <ul class="cm-list">
+                        @if (result.ByCode.Count > 0)
+                        {
+                            @* A barcode is exact: products that only look alike are left out. *@
+                            @foreach (var (read, product) in result.ByCode)
+                            {
+                                @Row(product, read, false)
+                            }
+                        }
+                        else
+                        {
+                            @for (var i = 0; i < result.ByLook.Count; i++)
+                            {
+                                @Row(result.ByLook[i], null, i == 0 && result.Sure)
+                            }
+                        }
+                    </ul>
+                }
+
+                @foreach (var unknown in result.UnknownCodes)
+                {
+                    <p class="cm-note">Barcode <span class="till-code">@unknown</span> is not in the POS.</p>
+                }
+
+                @if (result.ByCode.Count == 0)
+                {
+                    @if (result.ByLook.Count > 0)
+                    {
+                        <p class="cm-note">Choose a product only when its photo and name are right: a match score says how alike the photos are, not that it is the same product.</p>
+                    }
+                    else if (result.LookedFor)
+                    {
+                        <p class="cm-note">No product in the shop looks close enough.</p>
+                    }
+
+                    @if (notByLook is not null)
+                    {
+                        <p class="cm-note">
+                            @(offerSettings ? notByLook + " " : notByLook)
+                            @if (offerSettings)
+                            {
+                                @if (InPanel)
+                                {
+                                    <button type="button" class="btn btn-link" @onclick="OpenSettingsAsync">Open Settings</button>
+                                }
+                                else
+                                {
+                                    <a href="settings#camera-search">Open Settings</a>
+                                }
+                            }
+                        </p>
+                    }
+
+                    @if (result.ByLook.Count == 0)
+                    {
+                        <p class="cm-note">Take it again closer, alone in the picture and with its barcode towards the camera, or type its name.</p>
+                    }
+                }
+            }
+        </div>
+    </section>
+}
+
+@code {
+    /// <summary>The largest photo read from the camera: its stills are JPEGs of at most 2000 pixels a side.</summary>
+    private const long MaxPhotoBytes = 20 * 1024 * 1024;
+
+    private readonly CancellationTokenSource stopping = new();
+    private CameraSearchResult? result;
+    private string? notByLook;
+    private bool offerSettings;
+    private bool camera;
+    private bool shown;
+    private bool searching;
+    private int searchVersion;
+
+    /// <summary>The words on each product's button, e.g. "Add"; pressing it closes what was found.</summary>
+    [Parameter] public string SelectLabel { get; set; } = "Select";
+
+    [Parameter, EditorRequired] public EventCallback<FoundProduct> OnSelect { get; set; }
+
+    /// <summary>Called when what the camera found is shown or closed, so the page can make room for it.</summary>
+    [Parameter] public EventCallback<bool> OnShownChanged { get; set; }
+
+    /// <summary>In the side panel, Settings opens in the app's window.</summary>
+    [Parameter] public bool InPanel { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>What the camera found is showing (or being looked for).</summary>
+    public bool Shown => shown;
+
+    /// <summary>Opens the camera; its photo is looked for when the person presses "Find it".</summary>
+    public Task OpenAsync()
+    {
+        camera = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private string Heading =>
+        searching ? "Looking…"
+        : result is null || result.Problem is not null ? "Find with the camera"
+        : result.ByCode.Count > 0 ? "Found by its barcode"
+        : result.ByLook.Count > 0 ? "Possible matches"
+        : "No product found";
+
+    private async Task FindAsync(string id)
+    {
+        // A photo taken while another is looked for replaces it.
+        var mine = ++searchVersion;
+        camera = false;
+        searching = true;
+        result = null;
+        notByLook = null;
+        offerSettings = false;
+        await ShowAsync(true);
+        StateHasChanged();
+        CameraSearchResult found;
+        try
+        {
+            var photo = await ReadStillAsync(id, stopping.Token);
+            found = await Search.SearchAsync(photo, stopping.Token);
+        }
+        catch (JSException ex)
+        {
+            Log.LogWarning(ex, "Reading the camera's photo failed.");
+            found = CameraSearchResult.Failed("The photo could not be read from the camera. Take it again.");
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogError(ex, "Finding a product with the camera failed.");
+            found = CameraSearchResult.Failed("The search did not work: " + ex.Message);
+        }
+
+        if (mine == searchVersion)
+        {
+            result = found;
+            (notByLook, offerSettings) = WhyNotByLook(found);
+            searching = false;
+        }
+    }
+
+    /// <summary>The photo's bytes, from the page (srposCamera.take forgets it there). They are never kept.</summary>
+    private async Task<byte[]> ReadStillAsync(string id, CancellationToken ct)
+    {
+        await using var reference = await Js.InvokeAsync<IJSStreamReference>("srposCamera.take", ct, id);
+        await using var stream = await reference.OpenReadStreamAsync(MaxPhotoBytes, ct);
+        using var copy = new MemoryStream();
+        await stream.CopyToAsync(copy, ct);
+        return copy.ToArray();
+    }
+
+    /// <summary>Why products were not looked for by their look, when they were not; and whether Settings can help.</summary>
+    private (string? Why, bool Settings) WhyNotByLook(CameraSearchResult found)
+    {
+        if (found.LookedFor || found.Problem is not null)
+        {
+            return (null, false);
+        }
+
+        if (!Search.FindByLookIsOn)
+        {
+            return ("Only barcodes are read. To find products by their look too, turn that on in Settings, under Camera search.", true);
+        }
+
+        var status = Search.Status;
+        return status.Model switch
+        {
+            LookModelState.Downloading => ($"Finding by look is getting ready: the model is downloading ({Math.Round(status.Progress * 100)}%).", false),
+            LookModelState.Problem => ("Finding by look is not working: " + status.Problem, true),
+            LookModelState.Ready when status.Learned == 0 => ("No product photos are learned yet: products are found by their look once they have photos on the Product photos page.", false),
+            LookModelState.Ready => (null, false),
+            _ => ("Finding by look is getting ready. Try again in a moment.", false),
+        };
+    }
+
+    /// <summary>What a screen reader says when the search ends.</summary>
+    private string Announce() =>
+        searching || result is null ? "Looking for the product."
+        : result.Problem ?? (result.ByCode.Count > 0 ? $"Found by its barcode: {result.ByCode[0].Product.Name}."
+            : result.ByLook.Count > 0 ? $"{result.ByLook.Count} possible {(result.ByLook.Count == 1 ? "match" : "matches")}, most alike first: {result.ByLook[0].Name}."
+            : "No product found.");
+
+    private async Task SelectAsync(FoundProduct product)
+    {
+        await CloseAsync();
+        await OnSelect.InvokeAsync(product);
+    }
+
+    /// <summary>Closes what the camera found.</summary>
+    public async Task CloseAsync()
+    {
+        searchVersion++;
+        searching = false;
+        result = null;
+        await ShowAsync(false);
+    }
+
+    private async Task ShowAsync(bool show)
+    {
+        if (shown != show)
+        {
+            shown = show;
+            await OnShownChanged.InvokeAsync(show);
+        }
+    }
+
+    private async Task OpenSettingsAsync()
+    {
+        if (!await Js.InvokeAsync<bool>("srpos.send", "open", "settings#camera-search"))
+        {
+            Nav.NavigateTo("settings#camera-search");
+        }
+    }
+
+    /// <summary>A product found: by the barcode read (<paramref name="barcode"/>), else by its look, the best first.</summary>
+    private RenderFragment Row(FoundProduct product, string? barcode, bool best) =>
+        @<li class="cm-item" @key="product.ProductId">
+            <span class="cm-photo">
+                @if (product.Photo is { } photo)
+                {
+                    <img src="@photo" alt="" />
+                }
+                else
+                {
+                    <Icon Name="products" />
+                }
+            </span>
+            <div class="grow">
+                <div class="item-name">@product.Name</div>
+                <div class="item-meta">@Line(product)</div>
+                <div class="cm-tags">
+                    @foreach (var tillCode in product.Codes.Take(2))
+                    {
+                        <span class="till-code @(tillCode == barcode ? "read" : null)" title="The code the till scans">@tillCode</span>
+                    }
+                    @if (product.Codes.Count > 2)
+                    {
+                        <span class="muted">+@(product.Codes.Count - 2) more</span>
+                    }
+                    @if (barcode is not null)
+                    {
+                        @* The barcode read is exact; when it is not one the till scans (a maker's code), it is shown. *@
+                        <span class="pill good" title="@($"Barcode {barcode} is in the photo")"><Icon Name="check" /> Exact match@(product.Codes.Contains(barcode) ? "" : $": barcode {barcode}")</span>
+                    }
+                    else
+                    {
+                        @if (best)
+                        {
+                            <span class="pill good">Best match</span>
+                        }
+                        <span class="pill" title="How alike the photos are, from 0 to 1. It is not the chance that this is the product.">Match score @Score(product)</span>
+                    }
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm @(barcode is not null || best ? "btn-primary" : "btn-soft")" aria-label="@($"{SelectLabel}: {product.Name}")"
+                    @onclick="() => SelectAsync(product)">@SelectLabel</button>
+        </li>;
+
+    private static string Line(FoundProduct product)
+    {
+        var parts = new List<string>();
+        if (product.Code.Length > 0)
+        {
+            parts.Add("Code " + product.Code);
+        }
+
+        parts.Add(Formats.Price(product.Price));
+        parts.Add(product.Stock > 0 ? Money.FormatQty(product.Stock) + " in stock" : "none in stock");
+        return string.Join(" · ", parts);
+    }
+
+    private static string Score(FoundProduct product) =>
+        (product.Score ?? 0f).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        stopping.Cancel();
+        stopping.Dispose();
+    }
+}

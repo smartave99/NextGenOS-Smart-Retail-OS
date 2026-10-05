@@ -1,0 +1,13 @@
+@* An On / Off choice, in the look of the Settings page's choices. *@
+<div class="seg seg-inline" role="radiogroup" aria-label="@Label">
+    <button type="button" class="seg-item @(Value ? "on" : null)" role="radio" aria-checked="@(Value ? "true" : "false")" @onclick="() => Changed.InvokeAsync(true)">On</button>
+    <button type="button" class="seg-item @(Value ? null : "on")" role="radio" aria-checked="@(Value ? "false" : "true")" @onclick="() => Changed.InvokeAsync(false)">Off</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    [Parameter] public bool Value { get; set; }
+
+    [Parameter] public EventCallback<bool> Changed { get; set; }
+}

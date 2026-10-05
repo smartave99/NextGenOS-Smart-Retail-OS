@@ -1,0 +1,67 @@
+@using SmartRetail.Pos.Core.Paging
+
+@* The pager under a long list: which rows are shown, Previous and Next, the page numbers, and how many rows a page holds.
+   The page itself keeps the page and the size (and the address, so Back returns to the same page); this only draws them. *@
+<nav class="pager" aria-label="@Label">
+    <span class="pager-count" role="status">@Summary</span>
+    @if (Window.Pages > 1)
+    {
+        <div class="pager-nav">
+            <button type="button" class="btn btn-sm" disabled="@(!Window.HasPrevious)" @onclick="() => OnPage.InvokeAsync(Window.Page - 1)">
+                <Icon Name="chevron" Class="flip" /> Previous
+            </button>
+            @foreach (var number in Window.Numbers())
+            {
+                @if (number is { } target)
+                {
+                    <button type="button" class="btn btn-sm @(target == Window.Page ? "btn-primary" : "btn-soft")" aria-label="@($"Page {target}")"
+                            aria-current="@(target == Window.Page ? "page" : null)" @onclick="() => OnPage.InvokeAsync(target)">@target</button>
+                }
+                else
+                {
+                    <span class="pager-gap" aria-hidden="true">…</span>
+                }
+            }
+            <button type="button" class="btn btn-sm" disabled="@(!Window.HasNext)" @onclick="() => OnPage.InvokeAsync(Window.Page + 1)">
+                Next <Icon Name="chevron" />
+            </button>
+        </div>
+    }
+    @if (Window.Total > PageWindow.Sizes[0])
+    {
+        <label class="pager-size">Per page
+            <select class="form-select" aria-label="Rows per page" @onchange="Resize">
+                @foreach (var size in PageWindow.Sizes)
+                {
+                    <option value="@size" selected="@(size == Window.Size)">@size</option>
+                }
+            </select>
+        </label>
+    }
+</nav>
+
+@code {
+    [Parameter, EditorRequired] public PageWindow Window { get; set; } = default!;
+
+    /// <summary>What is listed, for the count: "products".</summary>
+    [Parameter] public string Noun { get; set; } = "products";
+
+    [Parameter] public string Label { get; set; } = "Pages";
+
+    /// <summary>A page was chosen: its number.</summary>
+    [Parameter, EditorRequired] public EventCallback<int> OnPage { get; set; }
+
+    /// <summary>A page size was chosen.</summary>
+    [Parameter, EditorRequired] public EventCallback<int> OnSize { get; set; }
+
+    private string Summary => Window.Total == 0
+        ? $"No {Noun}"
+        : Window.Pages == 1
+            ? $"{Window.Total} {(Window.Total == 1 ? Singular : Noun)}"
+            : $"Showing {Window.First}–{Window.Last} of {Window.Total} {Noun} · page {Window.Page} of {Window.Pages}";
+
+    private string Singular => Noun.EndsWith("s", StringComparison.Ordinal) ? Noun[..^1] : Noun;
+
+    private Task Resize(ChangeEventArgs e) =>
+        int.TryParse(e.Value as string, out var size) && PageWindow.Sizes.Contains(size) ? OnSize.InvokeAsync(size) : Task.CompletedTask;
+}

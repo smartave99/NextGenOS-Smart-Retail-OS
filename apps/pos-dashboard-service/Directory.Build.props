@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <Company>NextGen OS</Company>
+    <Product>Smart Retail POS</Product>
+    <Copyright>© 2026 NextGen OS</Copyright>
+    <Version>2.18.0</Version>
+  </PropertyGroup>
+</Project>

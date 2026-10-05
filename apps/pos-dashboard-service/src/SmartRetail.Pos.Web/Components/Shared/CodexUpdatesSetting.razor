@@ -1,0 +1,105 @@
+@* Settings: Codex, the AI tool, kept up to date. Codex only looks for a newer version in its own terminal screen, which this
+   app never opens, so the dashboard looks itself every few hours. A newer release settles for a day, then it is installed at a
+   moment when no AI task is running, with OpenAI's own installer; if the new Codex lacks something this app needs, or is not
+   signed in, the one that worked is put back. The owner can turn that off, look now, or update now. *@
+@implements IDisposable
+@using SmartRetail.AI.Providers
+@inject CodexUpdateService Codex
+
+<div class="setting updates" id="codex-update-card" data-state="@(Outcome?.ToString() ?? "None")" data-busy="@(Codex.IsBusy ? "true" : "false")">
+    <div>
+        <h3>Codex, the AI tool</h3>
+        @if (Codex.IsBusy)
+        {
+            <p role="status"><span class="spinner"></span> @Codex.Doing@(Codex.Doing == CodexUpdateService.Updating ? " Asking the AI waits a moment while Codex is replaced." : "")</p>
+            @if (Codex.Progress.Length > 0)
+            {
+                <p class="small muted">@Codex.Progress</p>
+            }
+        }
+        else
+        {
+            <p>@Line</p>
+        }
+
+        @if (!Codex.IsBusy && Problem.Length > 0)
+        {
+            <p class="update-problem small" role="alert">@Problem</p>
+        }
+
+        <p class="small muted">
+            @(state.Automatic
+                ? "A newer Codex is installed by itself a day after it comes out, at a moment when no AI task is running. If it lacks something this app needs, the one that worked is put back."
+                : "Automatic updates are off: a newer Codex is only installed when you choose Update now.")
+        </p>
+        @if (state.UpdatedTo.Length > 0 && state.UpdatedAt is { } updatedAt)
+        {
+            <p class="small muted">Last updated to @state.UpdatedTo on @When(updatedAt).</p>
+        }
+    </div>
+    <div class="setting-actions">
+        <OnOff Label="Update Codex by itself" Value="state.Automatic" Changed="SetAutomatic" />
+        @if (CanUpdateNow)
+        {
+            <button type="button" class="btn btn-primary" id="codex-update-now" disabled="@Codex.IsBusy" @onclick="UpdateAsync"><Icon Name="download" /> @(Outcome == CodexUpdateOutcome.Skipped ? $"Try {last?.Latest} again" : "Update now")</button>
+        }
+        <button type="button" class="btn btn-soft" id="codex-check-now" disabled="@Codex.IsBusy" @onclick="CheckAsync"><Icon Name="refresh" /> @(Outcome is CodexUpdateOutcome.Failed or CodexUpdateOutcome.Unknown ? "Check again" : "Check now")</button>
+    </div>
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    private CodexUpdateState state = new();
+    private CodexUpdateResult? last;
+
+    private CodexUpdateOutcome? Outcome => last?.Outcome;
+
+    private bool CanUpdateNow => Outcome is CodexUpdateOutcome.Available or CodexUpdateOutcome.Settling or CodexUpdateOutcome.Waiting or CodexUpdateOutcome.Skipped;
+
+    /// <summary>What the last look said, else what was kept of the last one from before the app started.</summary>
+    private string Line => last is { } result
+        ? result.Outcome switch
+        {
+            CodexUpdateOutcome.UpToDate => $"{result.Message} Last checked {When(state.CheckedAt)}.",
+            CodexUpdateOutcome.Failed or CodexUpdateOutcome.RolledBack => "",
+            _ => result.Message,
+        }
+        : state.CheckedAt is { } at ? $"Last checked {When(at)}." : "Not looked at yet: Codex is looked at two minutes after the app starts, and then every six hours.";
+
+    private string Problem => last is { Outcome: CodexUpdateOutcome.Failed or CodexUpdateOutcome.RolledBack } result ? result.Message
+        : last is null ? state.Problem : "";
+
+    protected override void OnInitialized()
+    {
+        Read();
+        Codex.Changed += OnChanged;
+    }
+
+    private void Read()
+    {
+        state = Codex.State;
+        last = Codex.Last;
+    }
+
+    private string When(DateTime? at) => at is { } time ? time.ToString("d MMM, h:mm tt", India) : "not yet";
+
+    private void SetAutomatic(bool automatic)
+    {
+        Codex.SetAutomatic(automatic);
+        Read();
+    }
+
+    private async Task CheckAsync() => await Codex.CheckAsync(CancellationToken.None);
+
+    // The page being closed must not cut an update short, so it does not pass its own token.
+    private async Task UpdateAsync() => await Codex.UpdateAsync(ownerAsked: true, CancellationToken.None);
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Read();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Codex.Changed -= OnChanged;
+}

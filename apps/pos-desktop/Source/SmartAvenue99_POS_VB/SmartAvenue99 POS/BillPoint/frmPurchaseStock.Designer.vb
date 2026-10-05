@@ -1,0 +1,564 @@
+Namespace BillPoint
+	' Token: 0x020001F0 RID: 496
+		Public Partial Class frmPurchaseStock
+		Inherits Global.System.Windows.Forms.Form
+
+		' Token: 0x06008BA1 RID: 35745 RVA: 0x0066A240 File Offset: 0x00668440
+		<Global.System.Diagnostics.DebuggerNonUserCode()>
+		Protected Overrides Sub Dispose(disposing As Boolean)
+			Try
+				Dim flag As Boolean = disposing AndAlso Me.components IsNot Nothing
+				If flag Then
+					Me.components.Dispose()
+				End If
+			Finally
+				MyBase.Dispose(disposing)
+			End Try
+		End Sub
+
+		' Token: 0x06008BA2 RID: 35746 RVA: 0x0066A290 File Offset: 0x00668490
+		<Global.System.Diagnostics.DebuggerStepThrough()>
+		Private Sub InitializeComponent()
+			Dim componentResourceManager As Global.System.ComponentModel.ComponentResourceManager = New Global.System.ComponentModel.ComponentResourceManager(GetType(Global.BillPoint.frmPurchaseStock))
+			Dim dataGridViewCellStyle As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle2 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle3 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle4 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle5 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle6 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle7 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle8 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle9 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle10 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle11 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle12 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle13 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle14 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle15 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle16 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle17 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle18 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle19 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle20 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle21 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle22 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Dim dataGridViewCellStyle23 As Global.System.Windows.Forms.DataGridViewCellStyle = New Global.System.Windows.Forms.DataGridViewCellStyle()
+			Me.SaveFileDialog1 = New Global.System.Windows.Forms.SaveFileDialog()
+			Me.Panel1 = New Global.System.Windows.Forms.Panel()
+			Me.Panel3 = New Global.System.Windows.Forms.Panel()
+			Me.btnSelection = New Global.System.Windows.Forms.Button()
+			Me.txtSupplierID = New Global.System.Windows.Forms.TextBox()
+			Me.Label7 = New Global.System.Windows.Forms.Label()
+			Me.Label8 = New Global.System.Windows.Forms.Label()
+			Me.txtSupplierName = New Global.System.Windows.Forms.TextBox()
+			Me.Label5 = New Global.System.Windows.Forms.Label()
+			Me.txtBarcode = New Global.System.Windows.Forms.TextBox()
+			Me.GelButton2 = New Global.GelButtons.GelButton()
+			Me.GelButton1 = New Global.GelButtons.GelButton()
+			Me.GelButton3 = New Global.GelButtons.GelButton()
+			Me.Label3 = New Global.System.Windows.Forms.Label()
+			Me.TextBox1 = New Global.System.Windows.Forms.TextBox()
+			Me.lblTotalAmount = New Global.System.Windows.Forms.Label()
+			Me.GroupBox2 = New Global.System.Windows.Forms.GroupBox()
+			Me.btnAddCustomer = New Global.GelButtons.GelButton()
+			Me.dtpDateTo = New Global.System.Windows.Forms.DateTimePicker()
+			Me.Label2 = New Global.System.Windows.Forms.Label()
+			Me.Label4 = New Global.System.Windows.Forms.Label()
+			Me.dtpDateFrom = New Global.System.Windows.Forms.DateTimePicker()
+			Me.dgw = New Global.System.Windows.Forms.DataGridView()
+			Me.Label1 = New Global.System.Windows.Forms.Label()
+			Me.Column2 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column3 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column14 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column9 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column10 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column6 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column16 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column17 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column13 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column15 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column18 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column4 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column23 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column1 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column8 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column24 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column25 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column26 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column5 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column19 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column11 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column20 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column12 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column21 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column27 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column22 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column7 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column28 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column29 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column30 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column31 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column32 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column33 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Column34 = New Global.System.Windows.Forms.DataGridViewTextBoxColumn()
+			Me.Panel1.SuspendLayout()
+			Me.Panel3.SuspendLayout()
+			Me.GroupBox2.SuspendLayout()
+			CType(Me.dgw, Global.System.ComponentModel.ISupportInitialize).BeginInit()
+			MyBase.SuspendLayout()
+			Me.Panel1.BackColor = Global.System.Drawing.Color.White
+			Me.Panel1.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel1.Controls.Add(Me.Panel3)
+			Me.Panel1.Controls.Add(Me.GelButton1)
+			Me.Panel1.Controls.Add(Me.GelButton3)
+			Me.Panel1.Controls.Add(Me.Label3)
+			Me.Panel1.Controls.Add(Me.TextBox1)
+			Me.Panel1.Controls.Add(Me.lblTotalAmount)
+			Me.Panel1.Controls.Add(Me.GroupBox2)
+			Me.Panel1.Controls.Add(Me.dgw)
+			Me.Panel1.Controls.Add(Me.Label1)
+			Me.Panel1.Dock = Global.System.Windows.Forms.DockStyle.Fill
+			Me.Panel1.Location = New Global.System.Drawing.Point(0, 0)
+			Me.Panel1.Name = "Panel1"
+			Me.Panel1.Size = New Global.System.Drawing.Size(1246, 660)
+			Me.Panel1.TabIndex = 4
+			Me.Panel3.BorderStyle = Global.System.Windows.Forms.BorderStyle.FixedSingle
+			Me.Panel3.Controls.Add(Me.btnSelection)
+			Me.Panel3.Controls.Add(Me.txtSupplierID)
+			Me.Panel3.Controls.Add(Me.Label7)
+			Me.Panel3.Controls.Add(Me.Label8)
+			Me.Panel3.Controls.Add(Me.txtSupplierName)
+			Me.Panel3.Controls.Add(Me.Label5)
+			Me.Panel3.Controls.Add(Me.txtBarcode)
+			Me.Panel3.Controls.Add(Me.GelButton2)
+			Me.Panel3.Location = New Global.System.Drawing.Point(4, 33)
+			Me.Panel3.Name = "Panel3"
+			Me.Panel3.Size = New Global.System.Drawing.Size(555, 66)
+			Me.Panel3.TabIndex = 530
+			Me.btnSelection.BackColor = Global.System.Drawing.Color.Lime
+			Me.btnSelection.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			Me.btnSelection.Location = New Global.System.Drawing.Point(218, 6)
+			Me.btnSelection.Name = "btnSelection"
+			Me.btnSelection.Size = New Global.System.Drawing.Size(29, 21)
+			Me.btnSelection.TabIndex = 530
+			Me.btnSelection.Text = "..."
+			Me.btnSelection.UseVisualStyleBackColor = False
+			Me.txtSupplierID.Location = New Global.System.Drawing.Point(112, 7)
+			Me.txtSupplierID.Name = "txtSupplierID"
+			Me.txtSupplierID.[ReadOnly] = True
+			Me.txtSupplierID.Size = New Global.System.Drawing.Size(100, 20)
+			Me.txtSupplierID.TabIndex = 531
+			Me.Label7.AutoSize = True
+			Me.Label7.Location = New Global.System.Drawing.Point(18, 33)
+			Me.Label7.Name = "Label7"
+			Me.Label7.Size = New Global.System.Drawing.Size(82, 13)
+			Me.Label7.TabIndex = 533
+			Me.Label7.Text = "Supplier Name :"
+			Me.Label8.AutoSize = True
+			Me.Label8.Location = New Global.System.Drawing.Point(18, 7)
+			Me.Label8.Name = "Label8"
+			Me.Label8.Size = New Global.System.Drawing.Size(65, 13)
+			Me.Label8.TabIndex = 532
+			Me.Label8.Text = "Supplier ID :"
+			Me.txtSupplierName.BackColor = Global.System.Drawing.Color.White
+			Me.txtSupplierName.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 9F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.txtSupplierName.Location = New Global.System.Drawing.Point(112, 33)
+			Me.txtSupplierName.Name = "txtSupplierName"
+			Me.txtSupplierName.Size = New Global.System.Drawing.Size(183, 21)
+			Me.txtSupplierName.TabIndex = 13
+			Me.Label5.AutoSize = True
+			Me.Label5.Location = New Global.System.Drawing.Point(297, 14)
+			Me.Label5.Name = "Label5"
+			Me.Label5.Size = New Global.System.Drawing.Size(105, 13)
+			Me.Label5.TabIndex = 527
+			Me.Label5.Text = "Search By Barcode :"
+			Me.txtBarcode.Location = New Global.System.Drawing.Point(300, 34)
+			Me.txtBarcode.Name = "txtBarcode"
+			Me.txtBarcode.Size = New Global.System.Drawing.Size(132, 20)
+			Me.txtBarcode.TabIndex = 528
+			Me.txtBarcode.TabStop = False
+			Me.GelButton2.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.GelButton2.BackColor = Global.System.Drawing.Color.MediumVioletRed
+			Me.GelButton2.FlatAppearance.BorderSize = 0
+			Me.GelButton2.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.GelButton2.Font = New Global.System.Drawing.Font("Segoe UI Semibold", 12F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.GelButton2.ForeColor = Global.System.Drawing.Color.White
+			Me.GelButton2.GradientBottom = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.GelButton2.GradientTop = Global.System.Drawing.Color.RoyalBlue
+			Me.GelButton2.Image = CType(componentResourceManager.GetObject("GelButton2.Image"), Global.System.Drawing.Image)
+			Me.GelButton2.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.GelButton2.Location = New Global.System.Drawing.Point(439, 26)
+			Me.GelButton2.Name = "GelButton2"
+			Me.GelButton2.Size = New Global.System.Drawing.Size(106, 31)
+			Me.GelButton2.TabIndex = 529
+			Me.GelButton2.Text = "Get Data"
+			Me.GelButton2.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.GelButton2.UseVisualStyleBackColor = False
+			Me.GelButton1.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.GelButton1.BackColor = Global.System.Drawing.Color.MediumVioletRed
+			Me.GelButton1.FlatAppearance.BorderSize = 0
+			Me.GelButton1.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.GelButton1.Font = New Global.System.Drawing.Font("Segoe UI Semibold", 12F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.GelButton1.ForeColor = Global.System.Drawing.Color.White
+			Me.GelButton1.GradientBottom = Global.System.Drawing.Color.LimeGreen
+			Me.GelButton1.GradientTop = Global.System.Drawing.Color.FromArgb(255, 128, 128)
+			Me.GelButton1.Image = CType(componentResourceManager.GetObject("GelButton1.Image"), Global.System.Drawing.Image)
+			Me.GelButton1.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.GelButton1.Location = New Global.System.Drawing.Point(673, 57)
+			Me.GelButton1.Name = "GelButton1"
+			Me.GelButton1.Size = New Global.System.Drawing.Size(102, 37)
+			Me.GelButton1.TabIndex = 525
+			Me.GelButton1.Text = "&Export Excel"
+			Me.GelButton1.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.GelButton1.UseVisualStyleBackColor = False
+			Me.GelButton3.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.GelButton3.BackColor = Global.System.Drawing.Color.MediumVioletRed
+			Me.GelButton3.FlatAppearance.BorderSize = 0
+			Me.GelButton3.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.GelButton3.Font = New Global.System.Drawing.Font("Segoe UI Semibold", 12F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.GelButton3.ForeColor = Global.System.Drawing.Color.White
+			Me.GelButton3.GradientBottom = Global.System.Drawing.Color.Red
+			Me.GelButton3.GradientTop = Global.System.Drawing.Color.FromArgb(255, 128, 128)
+			Me.GelButton3.Image = CType(componentResourceManager.GetObject("GelButton3.Image"), Global.System.Drawing.Image)
+			Me.GelButton3.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.GelButton3.Location = New Global.System.Drawing.Point(564, 57)
+			Me.GelButton3.Name = "GelButton3"
+			Me.GelButton3.Size = New Global.System.Drawing.Size(104, 37)
+			Me.GelButton3.TabIndex = 526
+			Me.GelButton3.Text = "&Reset"
+			Me.GelButton3.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.GelButton3.UseVisualStyleBackColor = False
+			Me.Label3.AutoSize = True
+			Me.Label3.Location = New Global.System.Drawing.Point(396, 58)
+			Me.Label3.Name = "Label3"
+			Me.Label3.Size = New Global.System.Drawing.Size(98, 13)
+			Me.Label3.TabIndex = 61
+			Me.Label3.Text = "Search By GST % :"
+			Me.Label3.Visible = False
+			Me.TextBox1.Location = New Global.System.Drawing.Point(399, 77)
+			Me.TextBox1.Name = "TextBox1"
+			Me.TextBox1.Size = New Global.System.Drawing.Size(100, 20)
+			Me.TextBox1.TabIndex = 62
+			Me.TextBox1.TabStop = False
+			Me.TextBox1.Visible = False
+			Me.lblTotalAmount.AutoSize = True
+			Me.lblTotalAmount.ForeColor = Global.System.Drawing.Color.Blue
+			Me.lblTotalAmount.Location = New Global.System.Drawing.Point(800, 595)
+			Me.lblTotalAmount.Name = "lblTotalAmount"
+			Me.lblTotalAmount.Size = New Global.System.Drawing.Size(77, 13)
+			Me.lblTotalAmount.TabIndex = 60
+			Me.lblTotalAmount.Text = "lblTotalAmount"
+			Me.lblTotalAmount.Visible = False
+			Me.GroupBox2.Controls.Add(Me.btnAddCustomer)
+			Me.GroupBox2.Controls.Add(Me.dtpDateTo)
+			Me.GroupBox2.Controls.Add(Me.Label2)
+			Me.GroupBox2.Controls.Add(Me.Label4)
+			Me.GroupBox2.Controls.Add(Me.dtpDateFrom)
+			Me.GroupBox2.Location = New Global.System.Drawing.Point(6, 38)
+			Me.GroupBox2.Name = "GroupBox2"
+			Me.GroupBox2.Size = New Global.System.Drawing.Size(384, 75)
+			Me.GroupBox2.TabIndex = 0
+			Me.GroupBox2.TabStop = False
+			Me.GroupBox2.Text = "Search by Invoice Date"
+			Me.GroupBox2.Visible = False
+			Me.btnAddCustomer.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.btnAddCustomer.BackColor = Global.System.Drawing.Color.MediumVioletRed
+			Me.btnAddCustomer.FlatAppearance.BorderSize = 0
+			Me.btnAddCustomer.FlatStyle = Global.System.Windows.Forms.FlatStyle.Flat
+			Me.btnAddCustomer.Font = New Global.System.Drawing.Font("Segoe UI Semibold", 12F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.btnAddCustomer.ForeColor = Global.System.Drawing.Color.White
+			Me.btnAddCustomer.GradientBottom = Global.System.Drawing.Color.FromArgb(45, 63, 83)
+			Me.btnAddCustomer.GradientTop = Global.System.Drawing.Color.RoyalBlue
+			Me.btnAddCustomer.Image = CType(componentResourceManager.GetObject("btnAddCustomer.Image"), Global.System.Drawing.Image)
+			Me.btnAddCustomer.ImageAlign = Global.System.Drawing.ContentAlignment.MiddleLeft
+			Me.btnAddCustomer.Location = New Global.System.Drawing.Point(266, 32)
+			Me.btnAddCustomer.Name = "btnAddCustomer"
+			Me.btnAddCustomer.Size = New Global.System.Drawing.Size(106, 31)
+			Me.btnAddCustomer.TabIndex = 524
+			Me.btnAddCustomer.Text = "Get Data"
+			Me.btnAddCustomer.TextAlign = Global.System.Drawing.ContentAlignment.MiddleRight
+			Me.btnAddCustomer.UseVisualStyleBackColor = False
+			Me.dtpDateTo.CustomFormat = "dd/MM/yyyy"
+			Me.dtpDateTo.Format = Global.System.Windows.Forms.DateTimePickerFormat.Custom
+			Me.dtpDateTo.Location = New Global.System.Drawing.Point(134, 41)
+			Me.dtpDateTo.Name = "dtpDateTo"
+			Me.dtpDateTo.Size = New Global.System.Drawing.Size(119, 20)
+			Me.dtpDateTo.TabIndex = 1
+			Me.Label2.AutoSize = True
+			Me.Label2.Location = New Global.System.Drawing.Point(131, 22)
+			Me.Label2.Name = "Label2"
+			Me.Label2.Size = New Global.System.Drawing.Size(26, 13)
+			Me.Label2.TabIndex = 13
+			Me.Label2.Text = "To :"
+			Me.Label4.AutoSize = True
+			Me.Label4.Location = New Global.System.Drawing.Point(4, 22)
+			Me.Label4.Name = "Label4"
+			Me.Label4.Size = New Global.System.Drawing.Size(36, 13)
+			Me.Label4.TabIndex = 12
+			Me.Label4.Text = "From :"
+			Me.dtpDateFrom.CustomFormat = "dd/MM/yyyy"
+			Me.dtpDateFrom.Format = Global.System.Windows.Forms.DateTimePickerFormat.Custom
+			Me.dtpDateFrom.Location = New Global.System.Drawing.Point(7, 41)
+			Me.dtpDateFrom.Name = "dtpDateFrom"
+			Me.dtpDateFrom.Size = New Global.System.Drawing.Size(119, 20)
+			Me.dtpDateFrom.TabIndex = 0
+			Me.dgw.AllowUserToAddRows = False
+			Me.dgw.AllowUserToDeleteRows = False
+			dataGridViewCellStyle.BackColor = Global.System.Drawing.Color.FloralWhite
+			dataGridViewCellStyle.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 12F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.dgw.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle
+			Me.dgw.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Bottom Or Global.System.Windows.Forms.AnchorStyles.Left Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.dgw.AutoSizeColumnsMode = Global.System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill
+			Me.dgw.AutoSizeRowsMode = Global.System.Windows.Forms.DataGridViewAutoSizeRowsMode.AllCells
+			Me.dgw.BackgroundColor = Global.System.Drawing.Color.White
+			Me.dgw.ColumnHeadersBorderStyle = Global.System.Windows.Forms.DataGridViewHeaderBorderStyle.[Single]
+			dataGridViewCellStyle2.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter
+			dataGridViewCellStyle2.BackColor = Global.System.Drawing.Color.DarkViolet
+			dataGridViewCellStyle2.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 12F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle2.ForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle2.SelectionBackColor = Global.System.Drawing.Color.LightSteelBlue
+			dataGridViewCellStyle2.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle2.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[True]
+			Me.dgw.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2
+			Me.dgw.ColumnHeadersHeight = 30
+			Me.dgw.Columns.AddRange(New Global.System.Windows.Forms.DataGridViewColumn() { Me.Column2, Me.Column3, Me.Column14, Me.Column9, Me.Column10, Me.Column6, Me.Column16, Me.Column17, Me.Column13, Me.Column15, Me.Column18, Me.Column4, Me.Column23, Me.Column1, Me.Column8, Me.Column24, Me.Column25, Me.Column26, Me.Column5, Me.Column19, Me.Column11, Me.Column20, Me.Column12, Me.Column21, Me.Column27, Me.Column22, Me.Column7, Me.Column28, Me.Column29, Me.Column30, Me.Column31, Me.Column32, Me.Column33, Me.Column34 })
+			Me.dgw.Cursor = Global.System.Windows.Forms.Cursors.Hand
+			dataGridViewCellStyle3.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft
+			dataGridViewCellStyle3.BackColor = Global.System.Drawing.SystemColors.Window
+			dataGridViewCellStyle3.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 12F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle3.ForeColor = Global.System.Drawing.SystemColors.ControlText
+			dataGridViewCellStyle3.SelectionBackColor = Global.System.Drawing.SystemColors.Highlight
+			dataGridViewCellStyle3.SelectionForeColor = Global.System.Drawing.SystemColors.HighlightText
+			dataGridViewCellStyle3.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[False]
+			Me.dgw.DefaultCellStyle = dataGridViewCellStyle3
+			Me.dgw.EnableHeadersVisualStyles = False
+			Me.dgw.GridColor = Global.System.Drawing.Color.White
+			Me.dgw.Location = New Global.System.Drawing.Point(6, 119)
+			Me.dgw.MultiSelect = False
+			Me.dgw.Name = "dgw"
+			Me.dgw.[ReadOnly] = True
+			Me.dgw.RowHeadersBorderStyle = Global.System.Windows.Forms.DataGridViewHeaderBorderStyle.[Single]
+			dataGridViewCellStyle4.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft
+			dataGridViewCellStyle4.BackColor = Global.System.Drawing.Color.DarkViolet
+			dataGridViewCellStyle4.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 12F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle4.ForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle4.SelectionBackColor = Global.System.Drawing.Color.OrangeRed
+			dataGridViewCellStyle4.SelectionForeColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle4.WrapMode = Global.System.Windows.Forms.DataGridViewTriState.[True]
+			Me.dgw.RowHeadersDefaultCellStyle = dataGridViewCellStyle4
+			Me.dgw.RowHeadersWidth = 25
+			Me.dgw.RowHeadersWidthSizeMode = Global.System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.DisableResizing
+			dataGridViewCellStyle5.BackColor = Global.System.Drawing.Color.White
+			dataGridViewCellStyle5.Font = New Global.System.Drawing.Font("Tahoma", 12F, Global.System.Drawing.FontStyle.Regular, Global.System.Drawing.GraphicsUnit.Point, 0)
+			dataGridViewCellStyle5.SelectionBackColor = Global.System.Drawing.Color.DarkSlateGray
+			dataGridViewCellStyle5.SelectionForeColor = Global.System.Drawing.Color.White
+			Me.dgw.RowsDefaultCellStyle = dataGridViewCellStyle5
+			Me.dgw.RowTemplate.Height = 30
+			Me.dgw.RowTemplate.Resizable = Global.System.Windows.Forms.DataGridViewTriState.[False]
+			Me.dgw.SelectionMode = Global.System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+			Me.dgw.Size = New Global.System.Drawing.Size(1233, 523)
+			Me.dgw.TabIndex = 43
+			Me.dgw.TabStop = False
+			Me.Label1.Anchor = Global.System.Windows.Forms.AnchorStyles.Top Or Global.System.Windows.Forms.AnchorStyles.Left Or Global.System.Windows.Forms.AnchorStyles.Right
+			Me.Label1.BackColor = Global.System.Drawing.Color.RoyalBlue
+			Me.Label1.Font = New Global.System.Drawing.Font("Microsoft Sans Serif", 14.25F, Global.System.Drawing.FontStyle.Bold, Global.System.Drawing.GraphicsUnit.Point, 0)
+			Me.Label1.ForeColor = Global.System.Drawing.Color.White
+			Me.Label1.Location = New Global.System.Drawing.Point(-16, -1)
+			Me.Label1.Name = "Label1"
+			Me.Label1.Size = New Global.System.Drawing.Size(1261, 31)
+			Me.Label1.TabIndex = 57
+			Me.Label1.Text = "Purchases Register (Item Wise)"
+			Me.Label1.TextAlign = Global.System.Drawing.ContentAlignment.MiddleCenter
+			Me.Column2.HeaderText = "Invoice No."
+			Me.Column2.Name = "Column2"
+			Me.Column2.[ReadOnly] = True
+			Me.Column2.Visible = False
+			dataGridViewCellStyle6.Format = "dd/MM/yyyy"
+			Me.Column3.DefaultCellStyle = dataGridViewCellStyle6
+			Me.Column3.HeaderText = "Invoice Date"
+			Me.Column3.Name = "Column3"
+			Me.Column3.[ReadOnly] = True
+			Me.Column3.Visible = False
+			Me.Column14.HeaderText = "Tax Type"
+			Me.Column14.Name = "Column14"
+			Me.Column14.[ReadOnly] = True
+			Me.Column14.Visible = False
+			Me.Column9.HeaderText = "Supplier's Invoice No."
+			Me.Column9.Name = "Column9"
+			Me.Column9.[ReadOnly] = True
+			Me.Column9.Visible = False
+			dataGridViewCellStyle7.Format = "dd/MM/yyyy"
+			Me.Column10.DefaultCellStyle = dataGridViewCellStyle7
+			Me.Column10.HeaderText = "Supplier's Invoice Date"
+			Me.Column10.Name = "Column10"
+			Me.Column10.[ReadOnly] = True
+			Me.Column10.Visible = False
+			Me.Column6.HeaderText = "Supplier Name"
+			Me.Column6.Name = "Column6"
+			Me.Column6.[ReadOnly] = True
+			Me.Column16.HeaderText = "State"
+			Me.Column16.Name = "Column16"
+			Me.Column16.[ReadOnly] = True
+			Me.Column16.Visible = False
+			Me.Column17.HeaderText = "GSTIN"
+			Me.Column17.Name = "Column17"
+			Me.Column17.[ReadOnly] = True
+			Me.Column17.Visible = False
+			Me.Column13.HeaderText = "Product Name"
+			Me.Column13.Name = "Column13"
+			Me.Column13.[ReadOnly] = True
+			Me.Column15.HeaderText = "HSN Code"
+			Me.Column15.Name = "Column15"
+			Me.Column15.[ReadOnly] = True
+			Me.Column15.Visible = False
+			dataGridViewCellStyle8.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle8.Format = "N2"
+			Me.Column18.DefaultCellStyle = dataGridViewCellStyle8
+			Me.Column18.HeaderText = "Purchase Rate"
+			Me.Column18.Name = "Column18"
+			Me.Column18.[ReadOnly] = True
+			dataGridViewCellStyle9.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column4.DefaultCellStyle = dataGridViewCellStyle9
+			Me.Column4.HeaderText = "Qty."
+			Me.Column4.Name = "Column4"
+			Me.Column4.[ReadOnly] = True
+			Me.Column23.HeaderText = "Sale Price1"
+			Me.Column23.Name = "Column23"
+			Me.Column23.[ReadOnly] = True
+			Me.Column23.Visible = False
+			dataGridViewCellStyle10.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column1.DefaultCellStyle = dataGridViewCellStyle10
+			Me.Column1.HeaderText = "Discount %"
+			Me.Column1.Name = "Column1"
+			Me.Column1.[ReadOnly] = True
+			Me.Column1.Visible = False
+			dataGridViewCellStyle11.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column8.DefaultCellStyle = dataGridViewCellStyle11
+			Me.Column8.HeaderText = "Discount Amt"
+			Me.Column8.Name = "Column8"
+			Me.Column8.[ReadOnly] = True
+			Me.Column8.Visible = False
+			dataGridViewCellStyle12.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle12.Format = "N2"
+			dataGridViewCellStyle12.NullValue = Nothing
+			Me.Column24.DefaultCellStyle = dataGridViewCellStyle12
+			Me.Column24.HeaderText = "Taxable Amt"
+			Me.Column24.Name = "Column24"
+			Me.Column24.[ReadOnly] = True
+			Me.Column24.Visible = False
+			dataGridViewCellStyle13.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column25.DefaultCellStyle = dataGridViewCellStyle13
+			Me.Column25.HeaderText = "Total GST%"
+			Me.Column25.Name = "Column25"
+			Me.Column25.[ReadOnly] = True
+			Me.Column25.Visible = False
+			dataGridViewCellStyle14.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			dataGridViewCellStyle14.Format = "N2"
+			dataGridViewCellStyle14.NullValue = Nothing
+			Me.Column26.DefaultCellStyle = dataGridViewCellStyle14
+			Me.Column26.HeaderText = "Total GST Amt"
+			Me.Column26.Name = "Column26"
+			Me.Column26.[ReadOnly] = True
+			Me.Column26.Visible = False
+			dataGridViewCellStyle15.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column5.DefaultCellStyle = dataGridViewCellStyle15
+			Me.Column5.HeaderText = "CGST %"
+			Me.Column5.Name = "Column5"
+			Me.Column5.[ReadOnly] = True
+			Me.Column5.Visible = False
+			dataGridViewCellStyle16.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column19.DefaultCellStyle = dataGridViewCellStyle16
+			Me.Column19.HeaderText = "CGST"
+			Me.Column19.Name = "Column19"
+			Me.Column19.[ReadOnly] = True
+			Me.Column19.Visible = False
+			dataGridViewCellStyle17.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column11.DefaultCellStyle = dataGridViewCellStyle17
+			Me.Column11.HeaderText = "SGST %"
+			Me.Column11.Name = "Column11"
+			Me.Column11.[ReadOnly] = True
+			Me.Column11.Visible = False
+			dataGridViewCellStyle18.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column20.DefaultCellStyle = dataGridViewCellStyle18
+			Me.Column20.HeaderText = "SGST/UTGST"
+			Me.Column20.Name = "Column20"
+			Me.Column20.[ReadOnly] = True
+			Me.Column20.Visible = False
+			dataGridViewCellStyle19.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column12.DefaultCellStyle = dataGridViewCellStyle19
+			Me.Column12.HeaderText = "IGST %"
+			Me.Column12.Name = "Column12"
+			Me.Column12.[ReadOnly] = True
+			Me.Column12.Visible = False
+			dataGridViewCellStyle20.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column21.DefaultCellStyle = dataGridViewCellStyle20
+			Me.Column21.HeaderText = "IGST"
+			Me.Column21.Name = "Column21"
+			Me.Column21.[ReadOnly] = True
+			Me.Column21.Visible = False
+			dataGridViewCellStyle21.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column27.DefaultCellStyle = dataGridViewCellStyle21
+			Me.Column27.HeaderText = "CESS %"
+			Me.Column27.Name = "Column27"
+			Me.Column27.[ReadOnly] = True
+			Me.Column27.Visible = False
+			dataGridViewCellStyle22.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column22.DefaultCellStyle = dataGridViewCellStyle22
+			Me.Column22.HeaderText = "CESS"
+			Me.Column22.Name = "Column22"
+			Me.Column22.[ReadOnly] = True
+			Me.Column22.Visible = False
+			dataGridViewCellStyle23.Alignment = Global.System.Windows.Forms.DataGridViewContentAlignment.MiddleRight
+			Me.Column7.DefaultCellStyle = dataGridViewCellStyle23
+			Me.Column7.HeaderText = "Total Amount"
+			Me.Column7.Name = "Column7"
+			Me.Column7.[ReadOnly] = True
+			Me.Column7.Visible = False
+			Me.Column28.HeaderText = "Purchase Qty"
+			Me.Column28.Name = "Column28"
+			Me.Column28.[ReadOnly] = True
+			Me.Column29.HeaderText = "SaleQty"
+			Me.Column29.Name = "Column29"
+			Me.Column29.[ReadOnly] = True
+			Me.Column30.HeaderText = "StockBalance"
+			Me.Column30.Name = "Column30"
+			Me.Column30.[ReadOnly] = True
+			Me.Column31.HeaderText = "Barcode"
+			Me.Column31.Name = "Column31"
+			Me.Column31.[ReadOnly] = True
+			Me.Column32.HeaderText = "MRP"
+			Me.Column32.Name = "Column32"
+			Me.Column32.[ReadOnly] = True
+			Me.Column33.HeaderText = "Sale Price"
+			Me.Column33.Name = "Column33"
+			Me.Column33.[ReadOnly] = True
+			Me.Column34.HeaderText = "W Price"
+			Me.Column34.Name = "Column34"
+			Me.Column34.[ReadOnly] = True
+			MyBase.AutoScaleDimensions = New Global.System.Drawing.SizeF(6F, 13F)
+			MyBase.AutoScaleMode = Global.System.Windows.Forms.AutoScaleMode.Font
+			Me.BackColor = Global.System.Drawing.Color.RoyalBlue
+			MyBase.ClientSize = New Global.System.Drawing.Size(1246, 660)
+			MyBase.Controls.Add(Me.Panel1)
+			MyBase.FormBorderStyle = Global.System.Windows.Forms.FormBorderStyle.FixedSingle
+			MyBase.Icon = CType(componentResourceManager.GetObject("$this.Icon"), Global.System.Drawing.Icon)
+			MyBase.KeyPreview = True
+			MyBase.MaximizeBox = False
+			MyBase.Name = "frmPurchaseStock"
+			MyBase.ShowIcon = False
+			MyBase.ShowInTaskbar = False
+			MyBase.StartPosition = Global.System.Windows.Forms.FormStartPosition.CenterParent
+			Me.Panel1.ResumeLayout(False)
+			Me.Panel1.PerformLayout()
+			Me.Panel3.ResumeLayout(False)
+			Me.Panel3.PerformLayout()
+			Me.GroupBox2.ResumeLayout(False)
+			Me.GroupBox2.PerformLayout()
+			CType(Me.dgw, Global.System.ComponentModel.ISupportInitialize).EndInit()
+			MyBase.ResumeLayout(False)
+		End Sub
+
+		' Token: 0x04003DB5 RID: 15797
+		Private components As Global.System.ComponentModel.IContainer
+	End Class
+End Namespace

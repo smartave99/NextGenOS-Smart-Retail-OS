@@ -1,0 +1,75 @@
+@* The table a query found, straight from the database (never retyped by the AI): it scrolls inside its own box,
+   with how many rows there are, and Copy and CSV. *@
+@using SmartRetail.AI.Assistant
+@inject IJSRuntime Js
+@inject TimeProvider Clock
+
+<div class="result">
+    <div class="result-bar">
+        <span>@RowsText</span>
+        <button type="button" class="act" title="Copy the table, to paste into Excel or a message" @onclick="CopyAsync">
+            <Icon Name="@(copied ? "check" : "copy")" /><span>@(copied ? "Copied" : "Copy")</span>
+        </button>
+        <button type="button" class="act" title="Download the table as a CSV file for Excel" @onclick="DownloadAsync">
+            <Icon Name="download" /><span>CSV</span>
+        </button>
+    </div>
+    <div class="result-wrap" role="region" aria-label="Result table" tabindex="0">
+        <table class="answer-table">
+            <thead>
+                <tr>
+                    @for (var i = 0; i < Table.Columns.Count; i++)
+                    {
+                        <th scope="col" class="@(Table.IsNumeric(i) ? "num" : null)">@Table.Columns[i]</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Table.Rows)
+                {
+                    <tr>
+                        @for (var i = 0; i < Table.Columns.Count; i++)
+                        {
+                            <td class="@(Table.IsNumeric(i) ? "num" : null)">@Formats.Cell(i < row.Length ? row[i] : null)</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private bool copied;
+
+    [Parameter, EditorRequired] public ChatTable Table { get; set; } = default!;
+
+    private string RowsText => Table.TotalRows > Table.Rows.Count || Table.MoreInDatabase
+        ? $"The first {Table.Rows.Count} of {(Table.MoreInDatabase ? "more than " + Table.TotalRows : Table.TotalRows.ToString())} rows"
+        : Table.Rows.Count == 1 ? "1 row" : $"{Table.Rows.Count} rows";
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", TableExport.Tabs(Table));
+            copied = true;
+        }
+        catch (JSException)
+        {
+            copied = false;
+        }
+    }
+
+    private async Task DownloadAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.download", TableExport.FileName(Clock.GetLocalNow().DateTime), TableExport.Csv(Table), "text/csv");
+        }
+        catch (JSException)
+        {
+            // The browser refused the download; nothing else to do.
+        }
+    }
+}

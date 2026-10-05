@@ -1,0 +1,323 @@
+@* A job's AI: its thinking level and model as a small chip; a small panel beside it changes them, saved at once. The
+   panel closes with Done, Esc or a click outside it. *@
+@using SmartRetail.AI.Providers
+@using SmartRetail.AI.Settings
+@implements IDisposable
+@inject AiEnvironment Ai
+@inject CodexAccountService Account
+@inject CodexUpdateService Updates
+@inject IJSRuntime Js
+@inject ILogger<AiChoice> Log
+
+<div class="ai-choice" @onkeydown="CloseOnEscape">
+    <button type="button" class="chip ai-choice-chip" aria-expanded="@(open ? "true" : "false")" title="@($"The AI for {AiJobs.Name(Job)}: change its model or how long it thinks")" @onclick="ToggleAsync">
+        <Icon Name="sliders" /> @Summary
+    </button>
+    @if (open)
+    {
+        <div class="ai-choice-backdrop" @onclick="() => open = false"></div>
+        <div class="ai-choice-panel" role="dialog" aria-label="@($"AI for {AiJobs.Name(Job)}")">
+            <div class="ai-choice-head">
+                <strong>AI for @AiJobs.Name(Job)</strong>
+                <button type="button" class="icon-btn" aria-label="Close" @onclick="() => open = false"><Icon Name="close" /></button>
+            </div>
+            @if (IsCodex)
+            {
+                <label class="field-label" for="@($"{idPrefix}-model")">Model</label>
+                <select id="@($"{idPrefix}-model")" class="form-select" @onchange="SetModel">
+                    <option value="" selected="@(choice.Model.Length == 0 && !other)">Codex's default@(DefaultModel is { } codexDefault ? $" ({codexDefault.DisplayName})" : "")</option>
+                    @foreach (var model in models)
+                    {
+                        <option value="@model.Id" selected="@(choice.Model == model.Id && !other)">@model.DisplayName@(model.Description.Length > 0 ? $": {model.Description}" : "")</option>
+                    }
+                    @if (choice.Model.Length > 0 && models.All(m => m.Id != choice.Model))
+                    {
+                        <option value="@choice.Model" selected="@(!other)">@choice.Model (typed in)</option>
+                    }
+                    <option value="@OtherValue" selected="@other">Another model…</option>
+                </select>
+                @if (other)
+                {
+                    <label class="field-label" for="@($"{idPrefix}-typed")">Model name <Required /></label>
+                    <div class="ai-choice-other">
+                        <input id="@($"{idPrefix}-typed")" class="form-control" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Like gpt-6.1-sol" aria-required="true" @bind="typed" @bind:event="oninput" @onkeydown="TypedKey" />
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@(typed.Trim().Length == 0)" @onclick="UseTyped">Use</button>
+                    </div>
+                    @if (typedProblem is not null)
+                    {
+                        <p class="small trend-down" role="alert">@typedProblem</p>
+                    }
+                    else
+                    {
+                        <p class="small muted ai-choice-why">Codex tries the name as it is. It works only if your account has that model; if not, the job says so in a few words.</p>
+                    }
+                }
+                <p class="small muted ai-choice-models">
+                    @ModelsLine
+                    <button type="button" class="link-button ai-choice-refresh" disabled="@refreshing" @onclick="RefreshAsync">@(refreshing ? "Asking Codex…" : "Refresh the list")</button>
+                </p>
+                @if (NewerCodex is { } newer)
+                {
+                    <p class="small ai-choice-newer"><Icon Name="info" /> Codex @newer is out. A new model sometimes needs the newest Codex. <a href="settings#updates">Update it in Settings</a></p>
+                }
+                <details class="ai-choice-missing">
+                    <summary>A new model is not in the list?</summary>
+                    <p class="small muted">The list is Codex's own answer for your account. OpenAI turns a new model on for accounts over several days, and an older Codex may not know it yet. Press Refresh the list, update Codex in Settings, or type the model's name under Another model.</p>
+                </details>
+            }
+            else
+            {
+                <p class="small muted ai-choice-tool">@(char.ToUpperInvariant(toolName[0]) + toolName[1..]) runs the AI jobs, as chosen in Advanced settings@(Efforts.Count > 0 ? ". Its model is chosen there; its thinking level here." : ", and it chooses how long to think by itself.")</p>
+                <p class="small muted ai-choice-toolmodel">
+                    Model: <strong>@(toolModel.Length > 0 ? toolModel : "the tool's own choice")</strong>.
+                    A newer model is used once its name is typed in Advanced settings, or the box is left empty to use the tool's own choice.
+                    <button type="button" class="link-button host-only" @onclick="OpenAdvancedAsync">Open Advanced settings</button>
+                </p>
+            }
+            @if (Efforts.Count > 0)
+            {
+                <label class="field-label" for="@($"{idPrefix}-effort")">Thinking</label>
+                <select id="@($"{idPrefix}-effort")" class="form-select" @onchange="SetEffort">
+                    <option value="" selected="@(choice.Effort.Length == 0)">Recommended: @AiJobs.EffortName(AiJobs.Fit(defaultEffort, Efforts))</option>
+                    @foreach (var effort in Efforts)
+                    {
+                        <option value="@effort" selected="@(choice.Effort == effort)">@AiJobs.EffortName(effort)</option>
+                    }
+                </select>
+                <p class="small muted ai-choice-why">@AiJobs.Why(Job) More thinking is slower and @(IsCodex ? "uses more of the Codex limit." : "costs more.")</p>
+            }
+            @if (IsCodex && models.Count == 0)
+            {
+                <p class="small muted">Codex's models show here once Codex is set up.</p>
+            }
+            @if (problem is not null)
+            {
+                <p class="small trend-down" role="alert">@problem</p>
+            }
+            <div class="form-actions">
+                <button type="button" class="btn btn-sm btn-primary" @onclick="() => open = false">Done</button>
+                @if (!choice.IsRecommended)
+                {
+                    <button type="button" class="btn btn-sm btn-link" @onclick="Reset">Back to recommended</button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AiJob Job { get; set; }
+
+    private readonly string idPrefix = "ai-" + Guid.NewGuid().ToString("N")[..8];
+    private IReadOnlyList<CodexModel> models = Array.Empty<CodexModel>();
+    private AiJobChoice choice = new();
+    private (string Model, string Effort) resolved;
+    private string tool = SmartRetail.AI.Providers.ProviderIds.CodexCli;
+    private string toolName = "Codex";
+    private string defaultEffort = "";
+    private string toolModel = "";
+    private bool open;
+    private bool other;
+    private bool refreshing;
+    private string typed = "";
+    private string? typedProblem;
+    private string? problem;
+
+    private const string OtherValue = "+another";
+
+    private CodexModel? DefaultModel => models.FirstOrDefault(m => m.IsDefault) ?? models.FirstOrDefault();
+
+    private bool IsCodex => tool == SmartRetail.AI.Providers.ProviderIds.CodexCli;
+
+    /// <summary>The thinking levels there are to choose from: the chosen Codex model's (Codex's default when none is
+    /// chosen), else the usual three; Claude Code's or Antigravity's; none for a tool that chooses for itself.</summary>
+    private IReadOnlyList<string> Efforts => IsCodex ? ModelEfforts(choice.Model) ?? AiJobs.CommonEfforts : AiJobs.Efforts(tool);
+
+    /// <summary>A Codex model's thinking levels, as its list says; null when not known.</summary>
+    private IReadOnlyList<string>? ModelEfforts(string model)
+    {
+        var found = model.Length > 0 ? models.FirstOrDefault(m => m.Id == model) : DefaultModel;
+        var efforts = found?.ReasoningEfforts.Select(e => e.Effort.ToLowerInvariant()).Distinct().ToList();
+        return efforts is { Count: > 0 } ? efforts : null;
+    }
+
+    /// <summary>"Codex 0.158.0 lists 5 models, read just now." from what the kept list was made from.</summary>
+    private string ModelsLine
+    {
+        get
+        {
+            if (Account.ModelsInfo is not { } info)
+            {
+                return "";
+            }
+
+            var read = DateTime.Now - info.At < TimeSpan.FromMinutes(1) ? "just now" : "at " + Formats.Time(info.At);
+            var who = info.CodexVersion.Length > 0 ? "Codex " + info.CodexVersion : "Codex";
+            return $"{who} lists {(info.Count == 1 ? "1 model" : info.Count + " models")}, read {read}.";
+        }
+    }
+
+    /// <summary>The newest Codex, when a newer one than this PC has is out and not yet installed; null otherwise.</summary>
+    private string? NewerCodex => Updates.Last is { Outcome: CodexUpdateOutcome.Available or CodexUpdateOutcome.Settling or CodexUpdateOutcome.Manual } last && last.Latest.Length > 0
+        ? last.Latest
+        : null;
+
+    private string Summary
+    {
+        get
+        {
+            if (resolved.Effort.Length == 0 && Efforts.Count == 0)
+            {
+                return char.ToUpperInvariant(toolName[0]) + toolName[1..];
+            }
+
+            var model = resolved.Model.Length == 0 ? null : models.FirstOrDefault(m => m.Id == resolved.Model)?.DisplayName ?? resolved.Model;
+            return $"{AiJobs.EffortName(resolved.Effort)} thinking" + (model is null ? "" : " · " + model);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Ai.JobsChanged += OnJobsChanged;
+        Read();
+    }
+
+    private void Read()
+    {
+        try
+        {
+            var settings = Ai.LoadSettings();
+            choice = settings.Choice(Job);
+            resolved = AiJobs.Resolve(settings, Job);
+            tool = AiJobs.Tool(settings);
+            toolName = AiJobs.ToolName(settings);
+            defaultEffort = AiJobs.DefaultEffort(settings, Job);
+            toolModel = AiJobs.ToolModel(settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the AI settings failed.");
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        open = !open;
+        if (open && IsCodex)
+        {
+            other = false;
+            typedProblem = null;
+            models = await Account.ModelsAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>Asks Codex for its list of models now, not the one kept from a few minutes ago.</summary>
+    private async Task RefreshAsync()
+    {
+        refreshing = true;
+        try
+        {
+            models = await Account.ModelsAsync(CancellationToken.None, fresh: true);
+            problem = models.Count == 0 ? "Codex could not be asked. Check that it is set up and signed in on the Get started page." : null;
+        }
+        finally
+        {
+            refreshing = false;
+        }
+    }
+
+    private void SetModel(ChangeEventArgs e)
+    {
+        var model = e.Value as string ?? "";
+        if (model == OtherValue)
+        {
+            other = true;
+            typed = "";
+            typedProblem = null;
+            return;
+        }
+
+        other = false;
+        typedProblem = null;
+        Save(new AiJobChoice { Model = model, Effort = Supported(model, choice.Effort) });
+    }
+
+    private void TypedKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            UseTyped();
+        }
+    }
+
+    /// <summary>Uses a model by the name typed in, checked as a chosen one is (it goes on a command line).</summary>
+    private void UseTyped()
+    {
+        var name = AiJobs.ModelId(typed);
+        if (name.Length == 0)
+        {
+            typedProblem = typed.Trim().Length == 0
+                ? "Type the model's name."
+                : "A model's name has only letters, digits, dots, dashes and underscores, like gpt-6.1-sol.";
+            return;
+        }
+
+        other = false;
+        typedProblem = null;
+        Save(new AiJobChoice { Model = name, Effort = Supported(name, choice.Effort) });
+    }
+
+    private async Task OpenAdvancedAsync() => await Js.InvokeAsync<bool>("srpos.send", "settings", "");
+
+    /// <summary>
+    /// The thinking level to keep for a Codex model: <paramref name="effort"/> (empty: the job's default) when the model
+    /// has it, else the nearest level it has, kept as the job's choice, so Codex is never asked for one the model
+    /// does not have.
+    /// </summary>
+    private string Supported(string model, string effort)
+    {
+        var wanted = effort.Length > 0 ? effort : defaultEffort;
+        var levels = ModelEfforts(model);
+        return levels is null || wanted.Length == 0 || levels.Contains(wanted.ToLowerInvariant()) ? effort : AiJobs.Fit(wanted, levels);
+    }
+
+    private void CloseOnEscape(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            open = false;
+        }
+    }
+
+    private void SetEffort(ChangeEventArgs e)
+    {
+        var effort = e.Value as string ?? "";
+        Save(new AiJobChoice { Model = choice.Model, Effort = IsCodex ? Supported(choice.Model, effort) : effort });
+    }
+
+    private void Reset() => Save(new AiJobChoice());
+
+    private void Save(AiJobChoice next)
+    {
+        try
+        {
+            Ai.SaveJobChoice(Job, next);
+            problem = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Saving the AI settings failed.");
+            problem = "Saving it failed: " + ex.Message;
+        }
+
+        Read();
+    }
+
+    private void OnJobsChanged() => _ = InvokeAsync(() =>
+    {
+        Read();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Ai.JobsChanged -= OnJobsChanged;
+}

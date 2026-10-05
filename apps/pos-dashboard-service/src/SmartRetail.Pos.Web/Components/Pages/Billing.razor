@@ -1,0 +1,667 @@
+@page "/billing"
+@using System.Globalization
+@inject IProductRepository Products
+@inject ICustomerRepository Customers
+@inject IInvoiceRepository Invoices
+@inject DataSourceInfo Source
+@inject BillSession Session
+@inject TimeProvider Clock
+@inject IJSRuntime JS
+@inject IOptions<ShopOptions> Shop
+@inject ILogger<Billing> Log
+
+<PageTitle>New bill · Smart Retail POS</PageTitle>
+
+@if (Session.LastSaved is { } saved && Session.LastInvoice is { } savedInvoice)
+{
+    <div class="saved-view">
+        <section class="panel saved-card">
+            <div class="saved-icon"><Icon Name="check" Size="30" /></div>
+            <h1>Bill saved</h1>
+            <p class="saved-number mono">@saved.Number</p>
+            <dl class="saved-figures">
+                <div><dt>Total</dt><dd>@Money.Format(saved.GrandTotal)</dd></div>
+                @if (saved.ChangeDue > 0)
+                {
+                    <div class="good"><dt>Change to return</dt><dd>@Money.Format(saved.ChangeDue)</dd></div>
+                }
+                @if (saved.Balance > 0)
+                {
+                    <div class="warn"><dt>On credit</dt><dd>@Money.Format(saved.Balance)</dd></div>
+                }
+            </dl>
+            <div class="saved-actions">
+                <button type="button" class="btn btn-primary btn-lg" @ref="newBillButton" @onclick="StartNewBill">New bill</button>
+                <button type="button" class="btn btn-outline-secondary btn-lg" @onclick="PrintAsync"><Icon Name="printer" /> Print receipt</button>
+            </div>
+        </section>
+        <Receipt Invoice="savedInvoice" Saved="saved" Shop="Shop.Value" />
+    </div>
+}
+else
+{
+    var totals = Bill.Totals;
+    var problems = Bill.Problems(Received);
+
+    <div class="billing" @onkeydown="OnPageKeyAsync">
+        <div class="bill-main">
+            <section class="panel scan">
+                <div class="scan-box">
+                    <Icon Name="search" Class="scan-icon" />
+                    <input @ref="searchBox" class="scan-input" type="text" autocomplete="off" spellcheck="false"
+                           placeholder="Scan a barcode, or type a product name or code" aria-label="Find a product"
+                           value="@query" @oninput="OnQueryInputAsync" @onkeydown="OnSearchKeyAsync" />
+                    <kbd>F2</kbd>
+                </div>
+                @if (suggestions.Count > 0)
+                {
+                    <ul class="suggestions" role="listbox" aria-label="Matching products">
+                        @for (var i = 0; i < suggestions.Count; i++)
+                        {
+                            var product = suggestions[i];
+                            <li class="@(i == highlighted ? "active" : null)" role="option" aria-selected="@(i == highlighted ? "true" : "false")"
+                                @onclick="() => AddAsync(product)">
+                                <span class="s-name">@product.Name</span>
+                                <span class="s-code mono">@product.Code</span>
+                                <span class="s-stock @StockTone(product)">@Money.FormatQty(product.StockInHand) in stock</span>
+                                <span class="s-price">@Money.Format(product.SellingPrice)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+                @if (message is not null)
+                {
+                    <div class="scan-message" role="status">@message</div>
+                }
+            </section>
+
+            <section class="panel lines">
+                @if (Bill.IsEmpty)
+                {
+                    <div class="empty">
+                        <Icon Name="bill" Size="40" />
+                        <p><strong>This bill is empty.</strong></p>
+                        <p class="muted">Scan a barcode or search for a product to add it.</p>
+                    </div>
+                }
+                else
+                {
+                    <table class="table lines-table">
+                        <thead>
+                            <tr>
+                                <th class="col-no">#</th>
+                                <th>Item</th>
+                                <th class="num">Qty</th>
+                                <th class="num">Rate</th>
+                                <th class="num">Disc %</th>
+                                <th class="num">GST</th>
+                                <th class="num">Amount</th>
+                                <th class="col-del"><span class="visually-hidden">Remove</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < Bill.Lines.Count; i++)
+                            {
+                                var line = Bill.Lines[i];
+                                var charge = Bill.ChargeFor(line);
+                                <tr @key="line">
+                                    <td class="col-no muted">@(i + 1)</td>
+                                    <td>
+                                        <div class="item-name">@line.Name</div>
+                                        <div class="item-meta">@ItemMeta(line, charge)</div>
+                                    </td>
+                                    <td class="num">
+                                        <div class="stepper">
+                                            <button type="button" aria-label="One less" @onclick="() => Step(line, -1)"><Icon Name="minus" Size="14" /></button>
+                                            <input type="number" min="0" step="any" aria-label="Quantity of @line.Name"
+                                                   @bind="line.Qty" @bind:event="oninput" @bind:after="Edited" />
+                                            <button type="button" aria-label="One more" @onclick="() => Step(line, 1)"><Icon Name="plus" Size="14" /></button>
+                                        </div>
+                                    </td>
+                                    <td class="num">
+                                        <input class="cell-input" type="number" min="0" step="0.01" aria-label="Rate of @line.Name"
+                                               @bind="line.Rate" @bind:event="oninput" @bind:after="Edited" />
+                                    </td>
+                                    <td class="num">
+                                        <input class="cell-input narrow" type="number" min="0" max="100" step="any" aria-label="Discount on @line.Name"
+                                               @bind="line.DiscountPercent" @bind:event="oninput" @bind:after="Edited" />
+                                    </td>
+                                    <td class="num muted">@Formats.Percent(line.GstRatePercent)</td>
+                                    <td class="num amount">@Money.Format(charge.LineTotal)</td>
+                                    <td class="col-del">
+                                        <button type="button" class="icon-btn" title="Remove" aria-label="Remove @line.Name" @onclick="() => Remove(line)">
+                                            <Icon Name="trash" Size="16" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </section>
+        </div>
+
+        <aside class="bill-side">
+            <div class="side-scroll">
+                <section class="panel side-card">
+                    <div class="side-title">Customer</div>
+                    @if (choosingCustomer)
+                    {
+                        <input @ref="customerBox" class="form-control" type="text" autocomplete="off" placeholder="Search by name or phone"
+                               aria-label="Find a customer" value="@customerQuery" @oninput="OnCustomerInputAsync" @onkeydown="OnCustomerKey" />
+                        <ul class="pick-list">
+                            <li @onclick="() => PickCustomer(Customer.WalkIn)"><span>Walk-in customer</span></li>
+                            @foreach (var customer in customerResults)
+                            {
+                                <li @onclick="() => PickCustomer(customer)"><span>@customer.Name</span><span class="muted small">@customer.Phone</span></li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <div class="customer">
+                            <div class="avatar"><Icon Name="user" Size="16" /></div>
+                            <div class="customer-text">
+                                <div class="customer-name">@Bill.Customer.Name</div>
+                                @if (!string.IsNullOrEmpty(Bill.Customer.Phone))
+                                {
+                                    <div class="muted small">@Bill.Customer.Phone</div>
+                                }
+                            </div>
+                            <button type="button" class="btn btn-link btn-sm" @onclick="ChooseCustomerAsync">Change</button>
+                        </div>
+                    }
+                </section>
+
+                <section class="panel side-card totals">
+                    <div class="totals-head">
+                        <div class="side-title">Bill</div>
+                        <div class="segmented compact" role="group" aria-label="GST type">
+                            <button type="button" title="Sale within the shop's state" class="@(Bill.Options.GstMode == GstMode.Intrastate ? "on" : null)"
+                                    @onclick="() => SetGstMode(GstMode.Intrastate)">CGST + SGST</button>
+                            <button type="button" title="Sale to another state" class="@(Bill.Options.GstMode == GstMode.Interstate ? "on" : null)"
+                                    @onclick="() => SetGstMode(GstMode.Interstate)">IGST</button>
+                        </div>
+                    </div>
+                    <dl>
+                        <div><dt>Items</dt><dd>@totals.ItemCount · qty @Money.FormatQty(totals.TotalQty)</dd></div>
+                        <div><dt>Taxable value</dt><dd>@Money.Format(totals.Taxable)</dd></div>
+                        @if (Bill.Options.GstMode == GstMode.Interstate)
+                        {
+                            <div><dt>IGST</dt><dd>@Money.Format(totals.Igst)</dd></div>
+                        }
+                        else
+                        {
+                            <div><dt>CGST</dt><dd>@Money.Format(totals.Cgst)</dd></div>
+                            <div><dt>SGST</dt><dd>@Money.Format(totals.Sgst)</dd></div>
+                        }
+                        @if (totals.RoundOff != 0)
+                        {
+                            <div><dt>Round-off</dt><dd>@Signed(totals.RoundOff)</dd></div>
+                        }
+                    </dl>
+                    <div class="totals-foot">
+                        <label class="switch">
+                            <input type="checkbox" checked="@Bill.Options.PricesIncludeTax" @onchange="OnPricesIncludeTaxChanged" />
+                            Prices include GST
+                        </label>
+                        @if (totals.Discount > 0)
+                        {
+                            <span class="saving">Saves @Money.Format(totals.Discount)</span>
+                        }
+                    </div>
+                </section>
+
+                <section class="panel side-card">
+                    <div class="side-title">Payment</div>
+                    <div class="pay-modes" role="group" aria-label="Payment mode">
+                        @foreach (var mode in PaymentModes.All)
+                        {
+                            <button type="button" class="@(Session.PaymentMode == mode ? "on" : null)" @onclick="() => SetPaymentMode(mode)">@mode</button>
+                        }
+                    </div>
+                    @if (Session.PaymentMode == PaymentModes.Credit)
+                    {
+                        <p class="muted small credit-note">The whole amount goes on the customer's account.</p>
+                    }
+                    else
+                    {
+                        <label class="field-label" for="received">Amount received</label>
+                        <input id="received" class="form-control money-input" type="number" min="0" step="0.01"
+                               placeholder="@totals.GrandTotal.ToString("0.00", CultureInfo.InvariantCulture)"
+                               @bind="Session.AmountReceived" @bind:event="oninput" @bind:after="Edited" />
+                        @if (Session.PaymentMode == PaymentModes.Cash && totals.GrandTotal > 0)
+                        {
+                            <div class="quick-cash">
+                                <button type="button" @onclick="() => SetReceived(null)">Exact</button>
+                                @foreach (var amount in CashSuggestions(totals.GrandTotal))
+                                {
+                                    <button type="button" @onclick="() => SetReceived(amount)">@Money.FormatCompact(amount)</button>
+                                }
+                            </div>
+                        }
+                    }
+                    @if (!Bill.IsEmpty && Received > totals.GrandTotal)
+                    {
+                        <div class="settle good"><span>Change to return</span><strong>@Money.Format(Received - totals.GrandTotal)</strong></div>
+                    }
+                    @if (!Bill.IsEmpty && Received < totals.GrandTotal)
+                    {
+                        <div class="settle warn"><span>On credit</span><strong>@Money.Format(totals.GrandTotal - Received)</strong></div>
+                    }
+                </section>
+            </div>
+
+            <div class="panel side-footer">
+                <div class="grand"><span>Total</span><strong>@Money.Format(totals.GrandTotal)</strong></div>
+                @if (!Source.CanSaveBills)
+                {
+                    <div class="notice" role="note">
+                        This version reads your live POS database but does not save bills to it yet.
+                        Switch to demo mode to try billing end to end.
+                    </div>
+                }
+                @if (!Bill.IsEmpty && problems.Count > 0)
+                {
+                    <ul class="problems">
+                        @foreach (var problem in problems)
+                        {
+                            <li>@problem</li>
+                        }
+                    </ul>
+                }
+                @if (saveError is not null)
+                {
+                    <div class="alert alert-danger" role="alert">@saveError</div>
+                }
+                <button type="button" class="btn btn-success btn-lg save-btn" disabled="@(!CanSave(problems))" @onclick="SaveAsync">
+                    @(saving ? "Saving…" : "Save bill") <kbd>F9</kbd>
+                </button>
+                <button type="button" class="btn btn-link clear-btn" disabled="@Bill.IsEmpty" @onclick="ClearClicked">
+                    @(confirmClear ? "Click again to clear this bill" : "Clear bill")
+                </button>
+            </div>
+        </aside>
+    </div>
+}
+
+@code {
+    private const int SuggestionLimit = 8;
+
+    private ElementReference searchBox;
+    private ElementReference customerBox;
+    private ElementReference newBillButton;
+
+    private string query = "";
+    private List<Product> suggestions = new();
+    private int highlighted;
+    private int searchVersion;
+    private string? message;
+
+    private bool choosingCustomer;
+    private string customerQuery = "";
+    private IReadOnlyList<Customer> customerResults = Array.Empty<Customer>();
+    private int customerVersion;
+
+    private bool saving;
+    private string? saveError;
+    private bool confirmClear;
+
+    private bool focusSearch = true;
+    private bool focusCustomer;
+    private bool focusNewBill;
+
+    private Bill Bill => Session.Bill;
+
+    /// <summary>What the customer is paying now. Credit bills receive nothing.</summary>
+    private decimal Received => Session.PaymentMode == PaymentModes.Credit
+        ? 0m
+        : Session.AmountReceived ?? Bill.Totals.GrandTotal;
+
+    private bool CanSave(IReadOnlyList<string> problems) =>
+        Source.CanSaveBills && !saving && !Bill.IsEmpty && problems.Count == 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusNewBill && Session.LastSaved is not null)
+        {
+            focusNewBill = false;
+            await newBillButton.FocusAsync();
+        }
+        else if (focusCustomer && choosingCustomer)
+        {
+            focusCustomer = false;
+            await customerBox.FocusAsync();
+        }
+        else if (focusSearch && Session.LastSaved is null)
+        {
+            focusSearch = false;
+            await searchBox.FocusAsync();
+        }
+    }
+
+    // ----- Finding and adding products -----
+
+    private async Task OnQueryInputAsync(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? "";
+        message = null;
+        highlighted = 0;
+
+        var version = ++searchVersion;
+        var term = query.Trim();
+        if (term.Length == 0)
+        {
+            suggestions.Clear();
+            return;
+        }
+
+        // Scanners type a whole code in a few milliseconds; wait for the typing to settle.
+        await Task.Delay(120);
+        if (version != searchVersion)
+        {
+            return;
+        }
+
+        try
+        {
+            var found = await Products.SearchAsync(term, SuggestionLimit);
+            if (version == searchVersion)
+            {
+                suggestions = found.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Fail("Product search failed", ex);
+        }
+    }
+
+    private async Task OnSearchKeyAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter":
+                await AddFromQueryAsync();
+                break;
+            case "ArrowDown" when suggestions.Count > 0:
+                highlighted = (highlighted + 1) % suggestions.Count;
+                break;
+            case "ArrowUp" when suggestions.Count > 0:
+                highlighted = (highlighted + suggestions.Count - 1) % suggestions.Count;
+                break;
+            case "Escape":
+                searchVersion++;
+                suggestions.Clear();
+                query = "";
+                break;
+        }
+    }
+
+    private async Task AddFromQueryAsync()
+    {
+        var term = query.Trim();
+        if (term.Length == 0)
+        {
+            return;
+        }
+
+        var shown = suggestions.Count > 0 ? suggestions[Math.Clamp(highlighted, 0, suggestions.Count - 1)] : null;
+        searchVersion++;
+
+        try
+        {
+            // An exact code or barcode (a scan) wins; otherwise take the highlighted suggestion.
+            var product = await Products.FindByCodeAsync(term) ?? shown;
+            if (product is null)
+            {
+                var found = await Products.SearchAsync(term, 2);
+                product = found.Count == 1 ? found[0] : null;
+            }
+
+            if (product is null)
+            {
+                suggestions.Clear();
+                message = $"No product matches “{term}”.";
+                return;
+            }
+
+            await AddAsync(product);
+        }
+        catch (Exception ex)
+        {
+            Fail("Could not look up the product", ex);
+        }
+    }
+
+    private async Task AddAsync(Product product)
+    {
+        Bill.Add(product);
+        searchVersion++;
+        query = "";
+        suggestions.Clear();
+        highlighted = 0;
+        message = product.StockInHand <= 0 ? $"{product.Name} shows no stock in hand. It was added anyway." : null;
+        Edited();
+        await searchBox.FocusAsync();
+    }
+
+    private static string StockTone(Product product) =>
+        product.StockInHand <= 0 ? "out" : product.IsLowStock ? "low" : "";
+
+    private static string ItemMeta(BillLine line, LineCharge charge)
+    {
+        var parts = new List<string> { line.Code };
+        if (!string.IsNullOrWhiteSpace(line.HsnCode))
+        {
+            parts.Add("HSN " + line.HsnCode);
+        }
+        if (charge.Discount > 0)
+        {
+            parts.Add("saves " + Money.Format(charge.Discount));
+        }
+        return string.Join(" · ", parts);
+    }
+
+    // ----- Editing lines -----
+
+    private void Step(BillLine line, int delta)
+    {
+        var next = line.Qty + delta;
+        if (next > 0)
+        {
+            line.Qty = next;
+        }
+        Edited();
+    }
+
+    private void Remove(BillLine line)
+    {
+        Bill.Remove(line);
+        Edited();
+        focusSearch = true;
+    }
+
+    private void Edited()
+    {
+        saveError = null;
+        confirmClear = false;
+    }
+
+    // ----- Customer -----
+
+    private async Task ChooseCustomerAsync()
+    {
+        choosingCustomer = true;
+        focusCustomer = true;
+        customerQuery = "";
+        await LoadCustomersAsync("");
+    }
+
+    private Task OnCustomerInputAsync(ChangeEventArgs e)
+    {
+        customerQuery = e.Value?.ToString() ?? "";
+        return LoadCustomersAsync(customerQuery);
+    }
+
+    private async Task LoadCustomersAsync(string term)
+    {
+        var version = ++customerVersion;
+        try
+        {
+            var found = await Customers.SearchAsync(term, 8);
+            if (version == customerVersion)
+            {
+                customerResults = found;
+            }
+        }
+        catch (Exception ex)
+        {
+            Fail("Customer search failed", ex);
+        }
+    }
+
+    private void OnCustomerKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            choosingCustomer = false;
+            focusSearch = true;
+        }
+        else if (e.Key == "Enter" && customerResults.Count > 0)
+        {
+            PickCustomer(customerResults[0]);
+        }
+    }
+
+    private void PickCustomer(Customer customer)
+    {
+        Bill.Customer = customer;
+        choosingCustomer = false;
+        focusSearch = true;
+        Edited();
+    }
+
+    // ----- GST and payment -----
+
+    private void SetGstMode(GstMode mode)
+    {
+        Bill.Options = Bill.Options with { GstMode = mode };
+        Edited();
+    }
+
+    private void OnPricesIncludeTaxChanged(ChangeEventArgs e)
+    {
+        Bill.Options = Bill.Options with { PricesIncludeTax = e.Value is true };
+        Edited();
+    }
+
+    private void SetPaymentMode(string mode)
+    {
+        Session.PaymentMode = mode;
+        Session.AmountReceived = null;
+        Edited();
+    }
+
+    private void SetReceived(decimal? amount)
+    {
+        Session.AmountReceived = amount;
+        Edited();
+    }
+
+    /// <summary>The next round notes above the bill, e.g. ₹347 → ₹350, ₹400, ₹500.</summary>
+    private static IEnumerable<decimal> CashSuggestions(decimal total)
+    {
+        var offered = new List<decimal>();
+        foreach (var step in new[] { 10m, 50m, 100m, 500m, 2000m })
+        {
+            var amount = Math.Ceiling(total / step) * step;
+            if (amount > total && !offered.Contains(amount))
+            {
+                offered.Add(amount);
+            }
+            if (offered.Count == 3)
+            {
+                break;
+            }
+        }
+        return offered;
+    }
+
+    private static string Signed(decimal amount) => amount > 0 ? "+" + Money.Format(amount) : Money.Format(amount);
+
+    // ----- Saving -----
+
+    private async Task SaveAsync()
+    {
+        if (!CanSave(Bill.Problems(Received)))
+        {
+            return;
+        }
+
+        saving = true;
+        saveError = null;
+        try
+        {
+            var invoice = Bill.ToInvoice(Session.PaymentMode, Received, Clock.GetLocalNow().DateTime);
+            var saved = await Invoices.SaveAsync(invoice);
+            Session.MarkSaved(invoice, saved);
+            focusNewBill = true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            saveError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Saving a bill failed.");
+            saveError = "The bill could not be saved: " + ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void StartNewBill()
+    {
+        Session.StartNew();
+        query = "";
+        message = null;
+        focusSearch = true;
+    }
+
+    private void ClearClicked()
+    {
+        if (!confirmClear)
+        {
+            confirmClear = true;
+            return;
+        }
+
+        StartNewBill();
+        confirmClear = false;
+    }
+
+    private async Task PrintAsync() => await JS.InvokeVoidAsync("print");
+
+    private async Task OnPageKeyAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "F2":
+                choosingCustomer = false;
+                await searchBox.FocusAsync();
+                break;
+            case "F9":
+                await SaveAsync();
+                break;
+        }
+    }
+
+    private void Fail(string what, Exception ex)
+    {
+        Log.LogError(ex, "{What}.", what);
+        message = $"{what}: {ex.Message}";
+    }
+}

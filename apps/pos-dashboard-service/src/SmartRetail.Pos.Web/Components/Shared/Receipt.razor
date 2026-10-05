@@ -1,0 +1,83 @@
+<div class="receipt" aria-label="Receipt">
+    <div class="r-center r-shop">@Shop.Name</div>
+    @if (!string.IsNullOrWhiteSpace(Shop.Address))
+    {
+        <div class="r-center">@Shop.Address</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Shop.Phone))
+    {
+        <div class="r-center">Phone @Shop.Phone</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Shop.Gstin))
+    {
+        <div class="r-center">GSTIN @Shop.Gstin</div>
+    }
+    <div class="r-center r-title">@Shop.ReceiptTitle</div>
+
+    <div class="r-row"><span>Bill no.</span><span>@Saved.Number</span></div>
+    <div class="r-row"><span>Date</span><span>@Formats.DateAndTime(Invoice.CreatedAtLocal)</span></div>
+    <div class="r-row"><span>Customer</span><span>@Invoice.CustomerName</span></div>
+
+    <table class="r-items">
+        <thead>
+            <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var line in Invoice.Lines)
+            {
+                <tr class="r-item-name"><td colspan="4">@line.Name</td></tr>
+                <tr class="r-item-figures">
+                    <td>@LineNote(line)</td>
+                    <td class="num">@Money.FormatQty(line.Qty)</td>
+                    <td class="num">@Money.FormatAmount(line.Rate)</td>
+                    <td class="num">@Money.FormatAmount(line.LineTotal)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="r-sum">
+        <div class="r-row"><span>Taxable value</span><span>@Money.FormatAmount(Invoice.Totals.Taxable)</span></div>
+        @if (Invoice.Options.GstMode == GstMode.Interstate)
+        {
+            <div class="r-row"><span>IGST</span><span>@Money.FormatAmount(Invoice.Totals.Igst)</span></div>
+        }
+        else
+        {
+            <div class="r-row"><span>CGST</span><span>@Money.FormatAmount(Invoice.Totals.Cgst)</span></div>
+            <div class="r-row"><span>SGST</span><span>@Money.FormatAmount(Invoice.Totals.Sgst)</span></div>
+        }
+        @if (Invoice.Totals.RoundOff != 0)
+        {
+            <div class="r-row"><span>Round-off</span><span>@Money.FormatAmount(Invoice.Totals.RoundOff)</span></div>
+        }
+        <div class="r-row r-total"><span>Total</span><span>@Money.Format(Invoice.Totals.GrandTotal)</span></div>
+    </div>
+
+    <div class="r-row"><span>Paid by @Invoice.PaymentMode</span><span>@Money.FormatAmount(Invoice.AmountReceived)</span></div>
+    @if (Invoice.ChangeDue > 0)
+    {
+        <div class="r-row"><span>Change</span><span>@Money.FormatAmount(Invoice.ChangeDue)</span></div>
+    }
+    @if (Invoice.Balance > 0)
+    {
+        <div class="r-row"><span>Balance due</span><span>@Money.FormatAmount(Invoice.Balance)</span></div>
+    }
+    @if (Invoice.Totals.Discount > 0)
+    {
+        <div class="r-center r-saving">You saved @Money.Format(Invoice.Totals.Discount)</div>
+    }
+    <div class="r-center r-foot">@Shop.ReceiptFooter</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public NewInvoice Invoice { get; set; } = default!;
+    [Parameter, EditorRequired] public SavedInvoice Saved { get; set; } = default!;
+    [Parameter, EditorRequired] public ShopOptions Shop { get; set; } = default!;
+
+    private static string LineNote(NewInvoiceLine line)
+    {
+        var gst = "GST " + Formats.Percent(line.GstRatePercent);
+        return string.IsNullOrWhiteSpace(line.HsnCode) ? gst : $"HSN {line.HsnCode} · {gst}";
+    }
+}

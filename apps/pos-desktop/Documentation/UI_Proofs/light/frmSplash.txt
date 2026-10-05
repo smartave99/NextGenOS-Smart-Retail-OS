@@ -1,0 +1,22 @@
+/frmSplash | frmSplash | {X=488,Y=191,Width=560,Height=304} | True | Starting Smart Retail OS
+/frmSplash/RetailStartup | Panel | {X=0,Y=0,Width=560,Height=296} | True | 
+/frmSplash/RetailStartup/ | TableLayoutPanel | {X=24,Y=24,Width=512,Height=216} | True | 
+/frmSplash/RetailStartup// | TableLayoutPanel | {X=24,Y=24,Width=464,Height=80} | True | 
+/frmSplash/RetailStartup///RetailBrandArtwork | RetailArtwork | {X=0,Y=0,Width=76,Height=80} | True | 
+/frmSplash/RetailStartup/// | TableLayoutPanel | {X=76,Y=0,Width=388,Height=80} | True | 
+/frmSplash/RetailStartup//// | Label | {X=8,Y=0,Width=380,Height=40} | True | Smart Retail OS
+/frmSplash/RetailStartup//// | Label | {X=8,Y=48,Width=380,Height=32} | True | By NextGen OS
+/frmSplash/RetailStartup//Label1 | Label | {X=2,Y=295,Width=298,Height=29} | False | Smart Retail OS
+/frmSplash/RetailStartup//lblSet2 | Label | {X=24,Y=112,Width=464,Height=32} | True | Preparing your store…
+/frmSplash/RetailStartup//LabelVersion | Label | {X=24,Y=152,Width=464,Height=32} | True | Version
+/frmSplash/Panel1 | Panel | {X=162,Y=203,Width=138,Height=158} | False | 
+/frmSplash/Panel1/Label4 | Label | {X=1,Y=273,Width=298,Height=29} | False | 
+/frmSplash/Panel1/Label5 | Label | {X=-2,Y=310,Width=305,Height=29} | False | Premium Edition
+/frmSplash/Panel1/PictureBox1 | PictureBox | {X=150,Y=157,Width=127,Height=106} | False | 
+/frmSplash/Label2 | Label | {X=-1,Y=332,Width=305,Height=29} | False | Premium Edition
+/frmSplash/PictureBox2 | PictureBox | {X=22,Y=25,Width=256,Height=260} | False | 
+/frmSplash/ProgressBar2 | ProgressBar | {X=0,Y=296,Width=560,Height=8} | True | 
+/frmSplash/Label3 | Label | {X=1068,Y=737,Width=100,Height=17} | False | Developed By:
+/frmSplash/LinkLabel1 | LinkLabel | {X=1179,Y=738,Width=87,Height=17} | False | NextGen OS
+/frmSplash/lblSet | Label | {X=635,Y=736,Width=14,Height=21} | False | .
+/frmSplash/ProgressBar1 | ProgressBar | {X=0,Y=768,Width=1367,Height=10} | False | 

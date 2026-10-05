@@ -1,0 +1,71 @@
+# Visual Studio & .NET Build Artifacts
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/*.userosscache
+**/*.sln.docstates
+**/*.suo
+**/packages/
+**/TestResults/
+**/[Dd]ebug/
+**/[Rr]elease/
+**/x64/
+**/x86/
+**/*.pdb
+**/*.idb
+**/*.ilk
+
+# Node.js & Web
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/dist-electron/
+**/.turbo/
+**/.cache/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# Testing & Coverage
+**/coverage/
+**/reports/
+
+# Environment Variables & Local Secrets
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+**/local.settings.json
+**/*.pem
+**/*.key
+**/*.pfx
+
+# Mobile / Android (Capacitor)
+**/android/.gradle/
+**/android/build/
+**/android/app/build/
+**/android/local.properties
+**/android/.idea/
+**/*.apk
+**/*.aab
+
+# SQLite / Local DBs
+**/*.db-shm
+**/*.db-wal
+**/SmartRetail.db
+**/smart_avenue.db
+
+# OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Logs
+*.log
+logs/

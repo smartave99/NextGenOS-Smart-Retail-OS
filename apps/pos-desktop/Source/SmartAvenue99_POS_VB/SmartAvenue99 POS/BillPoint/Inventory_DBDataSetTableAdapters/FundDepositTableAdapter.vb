@@ -1,0 +1,518 @@
+Imports System
+Imports System.CodeDom.Compiler
+Imports System.ComponentModel
+Imports System.ComponentModel.Design
+Imports System.Data
+Imports System.Data.Common
+Imports System.Data.SqlClient
+Imports System.Diagnostics
+Imports System.Runtime.CompilerServices
+Imports BillPoint.My
+
+Namespace BillPoint.Inventory_DBDataSetTableAdapters
+	' Token: 0x0200044D RID: 1101
+	<DesignerCategory("code")>
+	<ToolboxItem(True)>
+	<DataObject(True)>
+	<Designer("Microsoft.VSDesigner.DataSource.Design.TableAdapterDesigner, Microsoft.VSDesigner, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")>
+	<HelpKeyword("vs.data.TableAdapter")>
+	Public Class FundDepositTableAdapter
+		Inherits Component
+
+		' Token: 0x170057F7 RID: 22519
+		' (get) Token: 0x0600E434 RID: 58420 RVA: 0x000653AE File Offset: 0x000635AE
+		' (set) Token: 0x0600E435 RID: 58421 RVA: 0x000653B8 File Offset: 0x000635B8
+		Friend Overridable Property _adapter As SqlDataAdapter
+
+		' Token: 0x0600E436 RID: 58422 RVA: 0x000653C1 File Offset: 0x000635C1
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Public Sub New()
+			Me.ClearBeforeFill = True
+		End Sub
+
+		' Token: 0x170057F8 RID: 22520
+		' (get) Token: 0x0600E437 RID: 58423 RVA: 0x00876168 File Offset: 0x00874368
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Protected Friend ReadOnly Property Adapter As SqlDataAdapter
+			Get
+				Dim flag As Boolean = Me._adapter Is Nothing
+				If flag Then
+					Me.InitAdapter()
+				End If
+				Return Me._adapter
+			End Get
+		End Property
+
+		' Token: 0x170057F9 RID: 22521
+		' (get) Token: 0x0600E438 RID: 58424 RVA: 0x00876198 File Offset: 0x00874398
+		' (set) Token: 0x0600E439 RID: 58425 RVA: 0x008761C8 File Offset: 0x008743C8
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Friend Property Connection As SqlConnection
+			Get
+				Dim flag As Boolean = Me._connection Is Nothing
+				If flag Then
+					Me.InitConnection()
+				End If
+				Return Me._connection
+			End Get
+			Set(value As SqlConnection)
+				Me._connection = value
+				Dim flag As Boolean = Me.Adapter.InsertCommand IsNot Nothing
+				If flag Then
+					Me.Adapter.InsertCommand.Connection = value
+				End If
+				Dim flag2 As Boolean = Me.Adapter.DeleteCommand IsNot Nothing
+				If flag2 Then
+					Me.Adapter.DeleteCommand.Connection = value
+				End If
+				Dim flag3 As Boolean = Me.Adapter.UpdateCommand IsNot Nothing
+				If flag3 Then
+					Me.Adapter.UpdateCommand.Connection = value
+				End If
+				For i As Integer = 0 To Me.CommandCollection.Length - 1
+					Dim flag4 As Boolean = Me.CommandCollection(i) IsNot Nothing
+					If flag4 Then
+						Me.CommandCollection(i).Connection = value
+					End If
+				Next
+			End Set
+		End Property
+
+		' Token: 0x170057FA RID: 22522
+		' (get) Token: 0x0600E43A RID: 58426 RVA: 0x0087628C File Offset: 0x0087448C
+		' (set) Token: 0x0600E43B RID: 58427 RVA: 0x008762A4 File Offset: 0x008744A4
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Friend Property Transaction As SqlTransaction
+			Get
+				Return Me._transaction
+			End Get
+			Set(value As SqlTransaction)
+				Me._transaction = value
+				For i As Integer = 0 To Me.CommandCollection.Length - 1
+					Me.CommandCollection(i).Transaction = Me._transaction
+				Next
+				Dim flag As Boolean = Me.Adapter IsNot Nothing AndAlso Me.Adapter.DeleteCommand IsNot Nothing
+				If flag Then
+					Me.Adapter.DeleteCommand.Transaction = Me._transaction
+				End If
+				Dim flag2 As Boolean = Me.Adapter IsNot Nothing AndAlso Me.Adapter.InsertCommand IsNot Nothing
+				If flag2 Then
+					Me.Adapter.InsertCommand.Transaction = Me._transaction
+				End If
+				Dim flag3 As Boolean = Me.Adapter IsNot Nothing AndAlso Me.Adapter.UpdateCommand IsNot Nothing
+				If flag3 Then
+					Me.Adapter.UpdateCommand.Transaction = Me._transaction
+				End If
+			End Set
+		End Property
+
+		' Token: 0x170057FB RID: 22523
+		' (get) Token: 0x0600E43C RID: 58428 RVA: 0x0087638C File Offset: 0x0087458C
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Protected ReadOnly Property CommandCollection As SqlCommand()
+			Get
+				Dim flag As Boolean = Me._commandCollection Is Nothing
+				If flag Then
+					Me.InitCommandCollection()
+				End If
+				Return Me._commandCollection
+			End Get
+		End Property
+
+		' Token: 0x170057FC RID: 22524
+		' (get) Token: 0x0600E43D RID: 58429 RVA: 0x008763BC File Offset: 0x008745BC
+		' (set) Token: 0x0600E43E RID: 58430 RVA: 0x000653D3 File Offset: 0x000635D3
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Public Property ClearBeforeFill As Boolean
+			Get
+				Return Me._clearBeforeFill
+			End Get
+			Set(value As Boolean)
+				Me._clearBeforeFill = value
+			End Set
+		End Property
+
+		' Token: 0x0600E43F RID: 58431 RVA: 0x008763D4 File Offset: 0x008745D4
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Private Sub InitAdapter()
+			Me._adapter = New SqlDataAdapter()
+			Dim dataTableMapping As DataTableMapping = New DataTableMapping()
+			dataTableMapping.SourceTable = "Table"
+			dataTableMapping.DataSetTable = "FundDeposit"
+			dataTableMapping.ColumnMappings.Add("Id", "Id")
+			dataTableMapping.ColumnMappings.Add("DepositerName", "DepositerName")
+			dataTableMapping.ColumnMappings.Add("Amount", "Amount")
+			dataTableMapping.ColumnMappings.Add("Date", "Date")
+			dataTableMapping.ColumnMappings.Add("AccNo", "AccNo")
+			dataTableMapping.ColumnMappings.Add("Notes", "Notes")
+			Me._adapter.TableMappings.Add(dataTableMapping)
+			Me._adapter.DeleteCommand = New SqlCommand()
+			Me._adapter.DeleteCommand.Connection = Me.Connection
+			Me._adapter.DeleteCommand.CommandText = "DELETE FROM [dbo].[FundDeposit] WHERE (([Id] = @Original_Id) AND ((@IsNull_DepositerName = 1 AND [DepositerName] IS NULL) OR ([DepositerName] = @Original_DepositerName)) AND ((@IsNull_Amount = 1 AND [Amount] IS NULL) OR ([Amount] = @Original_Amount)) AND ((@IsNull_Date = 1 AND [Date] IS NULL) OR ([Date] = @Original_Date)) AND ((@IsNull_AccNo = 1 AND [AccNo] IS NULL) OR ([AccNo] = @Original_AccNo)) AND ((@IsNull_Notes = 1 AND [Notes] IS NULL) OR ([Notes] = @Original_Notes)))"
+			Me._adapter.DeleteCommand.CommandType = CommandType.Text
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@Original_Id", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Id", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@IsNull_DepositerName", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "DepositerName", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@Original_DepositerName", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "DepositerName", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@IsNull_Amount", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Amount", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@Original_Amount", SqlDbType.[Decimal], 0, ParameterDirection.Input, 18, 2, "Amount", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@IsNull_Date", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Date", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@Original_Date", SqlDbType.DateTime, 0, ParameterDirection.Input, 0, 0, "Date", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@IsNull_AccNo", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "AccNo", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@Original_AccNo", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "AccNo", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@IsNull_Notes", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Notes", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.DeleteCommand.Parameters.Add(New SqlParameter("@Original_Notes", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "Notes", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.InsertCommand = New SqlCommand()
+			Me._adapter.InsertCommand.Connection = Me.Connection
+			Me._adapter.InsertCommand.CommandText = "INSERT INTO [dbo].[FundDeposit] ([Id], [DepositerName], [Amount], [Date], [AccNo], [Notes]) VALUES (@Id, @DepositerName, @Amount, @Date, @AccNo, @Notes);" & vbCrLf & "SELECT Id, DepositerName, Amount, Date, AccNo, Notes FROM FundDeposit WHERE (Id = @Id)"
+			Me._adapter.InsertCommand.CommandType = CommandType.Text
+			Me._adapter.InsertCommand.Parameters.Add(New SqlParameter("@Id", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Id", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.InsertCommand.Parameters.Add(New SqlParameter("@DepositerName", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "DepositerName", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.InsertCommand.Parameters.Add(New SqlParameter("@Amount", SqlDbType.[Decimal], 0, ParameterDirection.Input, 18, 2, "Amount", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.InsertCommand.Parameters.Add(New SqlParameter("@Date", SqlDbType.DateTime, 0, ParameterDirection.Input, 0, 0, "Date", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.InsertCommand.Parameters.Add(New SqlParameter("@AccNo", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "AccNo", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.InsertCommand.Parameters.Add(New SqlParameter("@Notes", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "Notes", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand = New SqlCommand()
+			Me._adapter.UpdateCommand.Connection = Me.Connection
+			Me._adapter.UpdateCommand.CommandText = "UPDATE [dbo].[FundDeposit] SET [Id] = @Id, [DepositerName] = @DepositerName, [Amount] = @Amount, [Date] = @Date, [AccNo] = @AccNo, [Notes] = @Notes WHERE (([Id] = @Original_Id) AND ((@IsNull_DepositerName = 1 AND [DepositerName] IS NULL) OR ([DepositerName] = @Original_DepositerName)) AND ((@IsNull_Amount = 1 AND [Amount] IS NULL) OR ([Amount] = @Original_Amount)) AND ((@IsNull_Date = 1 AND [Date] IS NULL) OR ([Date] = @Original_Date)) AND ((@IsNull_AccNo = 1 AND [AccNo] IS NULL) OR ([AccNo] = @Original_AccNo)) AND ((@IsNull_Notes = 1 AND [Notes] IS NULL) OR ([Notes] = @Original_Notes)));" & vbCrLf & "SELECT Id, DepositerName, Amount, Date, AccNo, Notes FROM FundDeposit WHERE (Id = @Id)"
+			Me._adapter.UpdateCommand.CommandType = CommandType.Text
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Id", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Id", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@DepositerName", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "DepositerName", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Amount", SqlDbType.[Decimal], 0, ParameterDirection.Input, 18, 2, "Amount", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Date", SqlDbType.DateTime, 0, ParameterDirection.Input, 0, 0, "Date", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@AccNo", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "AccNo", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Notes", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "Notes", DataRowVersion.Current, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Original_Id", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Id", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@IsNull_DepositerName", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "DepositerName", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Original_DepositerName", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "DepositerName", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@IsNull_Amount", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Amount", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Original_Amount", SqlDbType.[Decimal], 0, ParameterDirection.Input, 18, 2, "Amount", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@IsNull_Date", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Date", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Original_Date", SqlDbType.DateTime, 0, ParameterDirection.Input, 0, 0, "Date", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@IsNull_AccNo", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "AccNo", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Original_AccNo", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "AccNo", DataRowVersion.Original, False, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@IsNull_Notes", SqlDbType.Int, 0, ParameterDirection.Input, 0, 0, "Notes", DataRowVersion.Original, True, Nothing, "", "", ""))
+			Me._adapter.UpdateCommand.Parameters.Add(New SqlParameter("@Original_Notes", SqlDbType.NChar, 0, ParameterDirection.Input, 0, 0, "Notes", DataRowVersion.Original, False, Nothing, "", "", ""))
+		End Sub
+
+		' Token: 0x0600E440 RID: 58432 RVA: 0x000653DD File Offset: 0x000635DD
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Private Sub InitConnection()
+			Me._connection = New SqlConnection()
+			Me._connection.ConnectionString = MySettings.[Default].Inventory_DBConnectionString1
+		End Sub
+
+		' Token: 0x0600E441 RID: 58433 RVA: 0x00876E24 File Offset: 0x00875024
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		Private Sub InitCommandCollection()
+			Me._commandCollection = New SqlCommand(0) {}
+			Me._commandCollection(0) = New SqlCommand()
+			Me._commandCollection(0).Connection = Me.Connection
+			Me._commandCollection(0).CommandText = "SELECT Id, DepositerName, Amount, Date, AccNo, Notes FROM dbo.FundDeposit"
+			Me._commandCollection(0).CommandType = CommandType.Text
+		End Sub
+
+		' Token: 0x0600E442 RID: 58434 RVA: 0x00876E84 File Offset: 0x00875084
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		<DataObjectMethod(DataObjectMethodType.Fill, True)>
+		Public Overridable Function Fill(dataTable As Inventory_DBDataSet.FundDepositDataTable) As Integer
+			Me.Adapter.SelectCommand = Me.CommandCollection(0)
+			Dim clearBeforeFill As Boolean = Me.ClearBeforeFill
+			If clearBeforeFill Then
+				dataTable.Clear()
+			End If
+			Return Me.Adapter.Fill(dataTable)
+		End Function
+
+		' Token: 0x0600E443 RID: 58435 RVA: 0x00876ECC File Offset: 0x008750CC
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		<DataObjectMethod(DataObjectMethodType.[Select], True)>
+		Public Overridable Function GetData() As Inventory_DBDataSet.FundDepositDataTable
+			Me.Adapter.SelectCommand = Me.CommandCollection(0)
+			Dim fundDepositDataTable As Inventory_DBDataSet.FundDepositDataTable = New Inventory_DBDataSet.FundDepositDataTable()
+			Me.Adapter.Fill(fundDepositDataTable)
+			Return fundDepositDataTable
+		End Function
+
+		' Token: 0x0600E444 RID: 58436 RVA: 0x00876F08 File Offset: 0x00875108
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		Public Overridable Function Update(dataTable As Inventory_DBDataSet.FundDepositDataTable) As Integer
+			Return Me.Adapter.Update(dataTable)
+		End Function
+
+		' Token: 0x0600E445 RID: 58437 RVA: 0x00876F28 File Offset: 0x00875128
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		Public Overridable Function Update(dataSet As Inventory_DBDataSet) As Integer
+			Return Me.Adapter.Update(dataSet, "FundDeposit")
+		End Function
+
+		' Token: 0x0600E446 RID: 58438 RVA: 0x00876F4C File Offset: 0x0087514C
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		Public Overridable Function Update(dataRow As DataRow) As Integer
+			Return Me.Adapter.Update(New DataRow() { dataRow })
+		End Function
+
+		' Token: 0x0600E447 RID: 58439 RVA: 0x00876F74 File Offset: 0x00875174
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		Public Overridable Function Update(dataRows As DataRow()) As Integer
+			Return Me.Adapter.Update(dataRows)
+		End Function
+
+		' Token: 0x0600E448 RID: 58440 RVA: 0x00876F94 File Offset: 0x00875194
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		<DataObjectMethod(DataObjectMethodType.Delete, True)>
+		Public Overridable Function Delete(Original_Id As Integer, Original_DepositerName As String, Original_Amount As Decimal?, Original_Date As DateTime?, Original_AccNo As String, Original_Notes As String) As Integer
+			Me.Adapter.DeleteCommand.Parameters(0).Value = Original_Id
+			Dim flag As Boolean = Original_DepositerName = Nothing
+			If flag Then
+				Me.Adapter.DeleteCommand.Parameters(1).Value = 1
+				Me.Adapter.DeleteCommand.Parameters(2).Value = DBNull.Value
+			Else
+				Me.Adapter.DeleteCommand.Parameters(1).Value = 0
+				Me.Adapter.DeleteCommand.Parameters(2).Value = Original_DepositerName
+			End If
+			Dim flag2 As Boolean = Original_Amount IsNot Nothing
+			If flag2 Then
+				Me.Adapter.DeleteCommand.Parameters(3).Value = 0
+				Me.Adapter.DeleteCommand.Parameters(4).Value = Original_Amount.Value
+			Else
+				Me.Adapter.DeleteCommand.Parameters(3).Value = 1
+				Me.Adapter.DeleteCommand.Parameters(4).Value = DBNull.Value
+			End If
+			Dim flag3 As Boolean = Original_Date IsNot Nothing
+			If flag3 Then
+				Me.Adapter.DeleteCommand.Parameters(5).Value = 0
+				Me.Adapter.DeleteCommand.Parameters(6).Value = Original_Date.Value
+			Else
+				Me.Adapter.DeleteCommand.Parameters(5).Value = 1
+				Me.Adapter.DeleteCommand.Parameters(6).Value = DBNull.Value
+			End If
+			Dim flag4 As Boolean = Original_AccNo = Nothing
+			If flag4 Then
+				Me.Adapter.DeleteCommand.Parameters(7).Value = 1
+				Me.Adapter.DeleteCommand.Parameters(8).Value = DBNull.Value
+			Else
+				Me.Adapter.DeleteCommand.Parameters(7).Value = 0
+				Me.Adapter.DeleteCommand.Parameters(8).Value = Original_AccNo
+			End If
+			Dim flag5 As Boolean = Original_Notes = Nothing
+			If flag5 Then
+				Me.Adapter.DeleteCommand.Parameters(9).Value = 1
+				Me.Adapter.DeleteCommand.Parameters(10).Value = DBNull.Value
+			Else
+				Me.Adapter.DeleteCommand.Parameters(9).Value = 0
+				Me.Adapter.DeleteCommand.Parameters(10).Value = Original_Notes
+			End If
+			Dim state As ConnectionState = Me.Adapter.DeleteCommand.Connection.State
+			Dim flag6 As Boolean = (Me.Adapter.DeleteCommand.Connection.State And ConnectionState.Open) <> ConnectionState.Open
+			If flag6 Then
+				Me.Adapter.DeleteCommand.Connection.Open()
+			End If
+			Dim num2 As Integer
+			Try
+				Dim num As Integer = Me.Adapter.DeleteCommand.ExecuteNonQuery()
+				num2 = num
+			Finally
+				Dim flag7 As Boolean = state = ConnectionState.Closed
+				If flag7 Then
+					Me.Adapter.DeleteCommand.Connection.Close()
+				End If
+			End Try
+			Return num2
+		End Function
+
+		' Token: 0x0600E449 RID: 58441 RVA: 0x00877358 File Offset: 0x00875558
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		<DataObjectMethod(DataObjectMethodType.Insert, True)>
+		Public Overridable Function Insert(Id As Integer, DepositerName As String, Amount As Decimal?, _Date As DateTime?, AccNo As String, Notes As String) As Integer
+			Me.Adapter.InsertCommand.Parameters(0).Value = Id
+			Dim flag As Boolean = DepositerName = Nothing
+			If flag Then
+				Me.Adapter.InsertCommand.Parameters(1).Value = DBNull.Value
+			Else
+				Me.Adapter.InsertCommand.Parameters(1).Value = DepositerName
+			End If
+			Dim flag2 As Boolean = Amount IsNot Nothing
+			If flag2 Then
+				Me.Adapter.InsertCommand.Parameters(2).Value = Amount.Value
+			Else
+				Me.Adapter.InsertCommand.Parameters(2).Value = DBNull.Value
+			End If
+			Dim flag3 As Boolean = _Date IsNot Nothing
+			If flag3 Then
+				Me.Adapter.InsertCommand.Parameters(3).Value = _Date.Value
+			Else
+				Me.Adapter.InsertCommand.Parameters(3).Value = DBNull.Value
+			End If
+			Dim flag4 As Boolean = AccNo = Nothing
+			If flag4 Then
+				Me.Adapter.InsertCommand.Parameters(4).Value = DBNull.Value
+			Else
+				Me.Adapter.InsertCommand.Parameters(4).Value = AccNo
+			End If
+			Dim flag5 As Boolean = Notes = Nothing
+			If flag5 Then
+				Me.Adapter.InsertCommand.Parameters(5).Value = DBNull.Value
+			Else
+				Me.Adapter.InsertCommand.Parameters(5).Value = Notes
+			End If
+			Dim state As ConnectionState = Me.Adapter.InsertCommand.Connection.State
+			Dim flag6 As Boolean = (Me.Adapter.InsertCommand.Connection.State And ConnectionState.Open) <> ConnectionState.Open
+			If flag6 Then
+				Me.Adapter.InsertCommand.Connection.Open()
+			End If
+			Dim num2 As Integer
+			Try
+				Dim num As Integer = Me.Adapter.InsertCommand.ExecuteNonQuery()
+				num2 = num
+			Finally
+				Dim flag7 As Boolean = state = ConnectionState.Closed
+				If flag7 Then
+					Me.Adapter.InsertCommand.Connection.Close()
+				End If
+			End Try
+			Return num2
+		End Function
+
+		' Token: 0x0600E44A RID: 58442 RVA: 0x008775C4 File Offset: 0x008757C4
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		<DataObjectMethod(DataObjectMethodType.Update, True)>
+		Public Overridable Function Update(Id As Integer, DepositerName As String, Amount As Decimal?, _Date As DateTime?, AccNo As String, Notes As String, Original_Id As Integer, Original_DepositerName As String, Original_Amount As Decimal?, Original_Date As DateTime?, Original_AccNo As String, Original_Notes As String) As Integer
+			Me.Adapter.UpdateCommand.Parameters(0).Value = Id
+			Dim flag As Boolean = DepositerName = Nothing
+			If flag Then
+				Me.Adapter.UpdateCommand.Parameters(1).Value = DBNull.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(1).Value = DepositerName
+			End If
+			Dim flag2 As Boolean = Amount IsNot Nothing
+			If flag2 Then
+				Me.Adapter.UpdateCommand.Parameters(2).Value = Amount.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(2).Value = DBNull.Value
+			End If
+			Dim flag3 As Boolean = _Date IsNot Nothing
+			If flag3 Then
+				Me.Adapter.UpdateCommand.Parameters(3).Value = _Date.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(3).Value = DBNull.Value
+			End If
+			Dim flag4 As Boolean = AccNo = Nothing
+			If flag4 Then
+				Me.Adapter.UpdateCommand.Parameters(4).Value = DBNull.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(4).Value = AccNo
+			End If
+			Dim flag5 As Boolean = Notes = Nothing
+			If flag5 Then
+				Me.Adapter.UpdateCommand.Parameters(5).Value = DBNull.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(5).Value = Notes
+			End If
+			Me.Adapter.UpdateCommand.Parameters(6).Value = Original_Id
+			Dim flag6 As Boolean = Original_DepositerName = Nothing
+			If flag6 Then
+				Me.Adapter.UpdateCommand.Parameters(7).Value = 1
+				Me.Adapter.UpdateCommand.Parameters(8).Value = DBNull.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(7).Value = 0
+				Me.Adapter.UpdateCommand.Parameters(8).Value = Original_DepositerName
+			End If
+			Dim flag7 As Boolean = Original_Amount IsNot Nothing
+			If flag7 Then
+				Me.Adapter.UpdateCommand.Parameters(9).Value = 0
+				Me.Adapter.UpdateCommand.Parameters(10).Value = Original_Amount.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(9).Value = 1
+				Me.Adapter.UpdateCommand.Parameters(10).Value = DBNull.Value
+			End If
+			Dim flag8 As Boolean = Original_Date IsNot Nothing
+			If flag8 Then
+				Me.Adapter.UpdateCommand.Parameters(11).Value = 0
+				Me.Adapter.UpdateCommand.Parameters(12).Value = Original_Date.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(11).Value = 1
+				Me.Adapter.UpdateCommand.Parameters(12).Value = DBNull.Value
+			End If
+			Dim flag9 As Boolean = Original_AccNo = Nothing
+			If flag9 Then
+				Me.Adapter.UpdateCommand.Parameters(13).Value = 1
+				Me.Adapter.UpdateCommand.Parameters(14).Value = DBNull.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(13).Value = 0
+				Me.Adapter.UpdateCommand.Parameters(14).Value = Original_AccNo
+			End If
+			Dim flag10 As Boolean = Original_Notes = Nothing
+			If flag10 Then
+				Me.Adapter.UpdateCommand.Parameters(15).Value = 1
+				Me.Adapter.UpdateCommand.Parameters(16).Value = DBNull.Value
+			Else
+				Me.Adapter.UpdateCommand.Parameters(15).Value = 0
+				Me.Adapter.UpdateCommand.Parameters(16).Value = Original_Notes
+			End If
+			Dim state As ConnectionState = Me.Adapter.UpdateCommand.Connection.State
+			Dim flag11 As Boolean = (Me.Adapter.UpdateCommand.Connection.State And ConnectionState.Open) <> ConnectionState.Open
+			If flag11 Then
+				Me.Adapter.UpdateCommand.Connection.Open()
+			End If
+			Dim num2 As Integer
+			Try
+				Dim num As Integer = Me.Adapter.UpdateCommand.ExecuteNonQuery()
+				num2 = num
+			Finally
+				Dim flag12 As Boolean = state = ConnectionState.Closed
+				If flag12 Then
+					Me.Adapter.UpdateCommand.Connection.Close()
+				End If
+			End Try
+			Return num2
+		End Function
+
+		' Token: 0x0600E44B RID: 58443 RVA: 0x00877B5C File Offset: 0x00875D5C
+		<DebuggerNonUserCode()>
+		<GeneratedCode("System.Data.Design.TypedDataSetGenerator", "17.0.0.0")>
+		<HelpKeyword("vs.data.TableAdapter")>
+		<DataObjectMethod(DataObjectMethodType.Update, True)>
+		Public Overridable Function Update(DepositerName As String, Amount As Decimal?, _Date As DateTime?, AccNo As String, Notes As String, Original_Id As Integer, Original_DepositerName As String, Original_Amount As Decimal?, Original_Date As DateTime?, Original_AccNo As String, Original_Notes As String) As Integer
+			Return Me.Update(Original_Id, DepositerName, Amount, _Date, AccNo, Notes, Original_Id, Original_DepositerName, Original_Amount, Original_Date, Original_AccNo, Original_Notes)
+		End Function
+
+		' Token: 0x0400584E RID: 22606
+		Private _connection As SqlConnection
+
+		' Token: 0x0400584F RID: 22607
+		Private _transaction As SqlTransaction
+
+		' Token: 0x04005850 RID: 22608
+		Private _commandCollection As SqlCommand()
+
+		' Token: 0x04005851 RID: 22609
+		Private _clearBeforeFill As Boolean
+	End Class
+End Namespace

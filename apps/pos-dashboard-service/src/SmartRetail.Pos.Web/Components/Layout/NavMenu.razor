@@ -1,0 +1,206 @@
+@implements IDisposable
+@using SmartRetail.AI.Providers
+@inject DataSourceInfo Source
+@inject IOptions<ShopOptions> Shop
+@inject IStockRepository Stock
+@inject AiSetupService Setup
+@inject FixNowService Checks
+@inject MemoryService Memory
+@inject ActionService Actions
+@inject WhatsNewService News
+@inject ProductPhotoService Photos
+@inject CameraSearchLauncher Camera
+@inject NavigationManager Nav
+@inject ILogger<NavMenu> Log
+
+<a class="brand" href="">
+    <AppMark />
+    <div>
+        <div class="brand-name">Smart Retail POS</div>
+        <div class="brand-by">by NextGen OS</div>
+    </div>
+</a>
+
+<input type="checkbox" class="nav-toggle" title="Menu" aria-label="Menu" />
+
+<form class="side-search" role="search" @onsubmit="Search">
+    <Icon Name="search" />
+    <input id="side-search" type="search" placeholder="Search" aria-label="Search" autocomplete="off" @bind="query" />
+    <button type="button" class="scan-camera" title="Search with the camera" aria-label="Search products with the camera" @onclick="Camera.Request"><Icon Name="camera" /></button>
+    <kbd>Ctrl K</kbd>
+</form>
+
+<nav class="nav" aria-label="Main">
+    <NavLink class="nav-item" href="" Match="NavLinkMatch.All"><Icon Name="house" /> Today</NavLink>
+    <NavLink class="nav-item" href="ask"><Icon Name="spark" /> Ask AI</NavLink>
+    <NavLink class="nav-item" href="fix-now">
+        <Icon Name="alert" /> Fix now
+        @if (Checks.Last is { FixNow: > 0 } found)
+        {
+            <span class="count bad" title="Mistakes to fix now">@found.FixNow</span>
+        }
+    </NavLink>
+    <NavLink class="nav-item" href="memory">
+        <Icon Name="memory" /> Memory
+        @if (waiting > 0)
+        {
+            <span class="count" title="Learned from your chats, waiting for your Save">@waiting</span>
+        }
+    </NavLink>
+
+    <div class="nav-label">Shop</div>
+    <NavLink class="nav-item" href="sales"><Icon Name="chart" /> Sales</NavLink>
+    <NavLink class="nav-item" href="plan"><Icon Name="trend" /> Grow sales</NavLink>
+    <NavLink class="nav-item" href="review"><Icon Name="calendar" /> Monday review</NavLink>
+    <NavLink class="nav-item" href="prices"><Icon Name="tag" /> Price check</NavLink>
+    <NavLink class="nav-item" href="actions">
+        <Icon Name="flag" /> Actions
+        @if (heard > 0)
+        {
+            <span class="count" title="Heard in your chats: track them?">@heard</span>
+        }
+    </NavLink>
+    @if (Source.CanSaveBills)
+    {
+        @* The live POS database is read-only here, so billing is only offered on demo data. *@
+        <NavLink class="nav-item" href="billing"><Icon Name="plus" /> New bill</NavLink>
+    }
+    <NavLink class="nav-item" href="bills"><Icon Name="bill" /> Bills</NavLink>
+    <NavLink class="nav-item" href="products"><Icon Name="products" /> Products</NavLink>
+    <NavLink class="nav-item" href="stock">
+        <Icon Name="stock" /> Low stock
+        @if (lowStock > 0)
+        {
+            <span class="count">@(lowStock >= LowStockCountLimit ? $"{LowStockCountLimit - 1}+" : lowStock.ToString())</span>
+        }
+    </NavLink>
+
+    <div class="nav-label">Create</div>
+    <NavLink class="nav-item" href="photos">
+        <Icon Name="camera" /> Product photos
+        @if (photosLeft > 0)
+        {
+            @if (Photos.Maker.Pause?.Until is { } resumes)
+            {
+                <span class="count busy paused" title="Paused: Codex's usage limit was reached. @photosLeft left; they carry on at @UsageLimitPause.Describe(resumes, DateTimeOffset.Now)."><Icon Name="clock" Size="11" />@photosLeft</span>
+            }
+            else
+            {
+                <span class="count busy" title="The AI is making product photos: @photosLeft left"><span class="spinner"></span>@photosLeft</span>
+            }
+        }
+    </NavLink>
+    <NavLink class="nav-item" href="creatives"><Icon Name="spark" /> Creatives</NavLink>
+    <NavLink class="nav-item" href="posters"><Icon Name="poster" /> Posters</NavLink>
+    <NavLink class="nav-item" href="barcodes"><Icon Name="barcode" /> Barcodes</NavLink>
+</nav>
+
+<div class="side-spacer"></div>
+
+<nav class="nav" aria-label="Setup">
+    @if (Source.IsDemo || Setup.State.Stage is not (AiSetupStage.Ready or AiSetupStage.Unknown or AiSetupStage.Checking))
+    {
+        <NavLink class="nav-item" href="welcome"><Icon Name="check" /> Get started</NavLink>
+    }
+    <NavLink class="nav-item" href="storage"><Icon Name="folder" /> Storage</NavLink>
+    <NavLink class="nav-item" href="settings"><Icon Name="sliders" /> Settings</NavLink>
+    <NavLink class="nav-item" href="whats-new">
+        <Icon Name="news" /> What's new
+        @if (News.HasUnseen)
+        {
+            <span class="count new" title="You have a new version: see what changed">New</span>
+        }
+    </NavLink>
+</nav>
+
+<CodexUsageMeter />
+
+<div class="shop-card" title="@Source.Name">
+    <div class="shop-avatar" aria-hidden="true">@Initials(Shop.Value.Name)</div>
+    <div>
+        <div class="name">@Shop.Value.Name</div>
+        <div class="status-line"><span class="dot @(Source.IsDemo ? "demo" : null)"></span>@(Source.IsDemo ? "Demo data" : "Live · read-only")</div>
+    </div>
+</div>
+
+@code {
+    private const int LowStockCountLimit = 100;
+
+    private string query = "";
+    private int lowStock;
+    private int waiting;
+    private int heard;
+    private int photosLeft;
+
+    protected override async Task OnInitializedAsync()
+    {
+        photosLeft = Photos.Queue().PhotosLeft;
+        Photos.Changed += OnPhotosChanged;
+        Setup.Changed += OnSetupChanged;
+        Checks.Changed += OnSetupChanged;
+        Memory.Changed += OnMemoryChanged;
+        Actions.Changed += OnActionsChanged;
+        News.Changed += OnSetupChanged;
+        waiting = Memory.Load().Pending.Count;
+        heard = Actions.Load().Suggested.Count;
+        _ = Setup.RefreshIfStaleAsync();
+        _ = Checks.CheckAsync();
+
+        try
+        {
+            lowStock = (await Stock.GetLowStockAsync(LowStockCountLimit)).Count;
+        }
+        catch (Exception ex)
+        {
+            // Only a count in the menu: the Low stock page shows the problem itself.
+            Log.LogWarning(ex, "Counting low stock for the menu failed.");
+        }
+    }
+
+    private void Search()
+    {
+        var term = query.Trim();
+        Nav.NavigateTo(term.Length == 0 ? "products" : "products?q=" + Uri.EscapeDataString(term));
+    }
+
+    /// <summary>"SG" for "Sharma General Store".</summary>
+    private static string Initials(string name)
+    {
+        var letters = name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => char.IsLetterOrDigit(word[0]))
+            .Take(2)
+            .Select(word => char.ToUpperInvariant(word[0]));
+        var initials = string.Concat(letters);
+        return initials.Length > 0 ? initials : "S";
+    }
+
+    private void OnSetupChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OnPhotosChanged(int productId) => _ = InvokeAsync(() =>
+    {
+        photosLeft = Photos.Queue().PhotosLeft;
+        StateHasChanged();
+    });
+
+    private void OnMemoryChanged() => _ = InvokeAsync(() =>
+    {
+        waiting = Memory.Load().Pending.Count;
+        StateHasChanged();
+    });
+
+    private void OnActionsChanged() => _ = InvokeAsync(() =>
+    {
+        heard = Actions.Load().Suggested.Count;
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Setup.Changed -= OnSetupChanged;
+        Checks.Changed -= OnSetupChanged;
+        Memory.Changed -= OnMemoryChanged;
+        Actions.Changed -= OnActionsChanged;
+        News.Changed -= OnSetupChanged;
+        Photos.Changed -= OnPhotosChanged;
+    }
+}

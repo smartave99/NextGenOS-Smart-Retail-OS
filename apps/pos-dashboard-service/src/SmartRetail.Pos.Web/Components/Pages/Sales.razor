@@ -1,0 +1,409 @@
+@page "/sales"
+@using System.Globalization
+@using SmartRetail.Pos.Core.Analytics
+@inject ISalesFactsRepository Facts
+@inject TimeProvider Clock
+@inject ILogger<Sales> Log
+
+<PageTitle>Sales · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Sales</h1>
+        <p class="sub">How the shop is doing, worked out from the POS's own bills. Nothing is changed in the POS.</p>
+    </div>
+    <a class="btn btn-primary" href="@($"plan?period={SalesPeriods.Key(period)}")"><Icon Name="spark" /> Plan to grow sales</a>
+</div>
+
+<nav class="seg" aria-label="Period">
+    @foreach (var choice in SalesPeriods.All)
+    {
+        <a class="seg-item @(choice == period ? "active" : null)" href="@($"sales?period={SalesPeriods.Key(choice)}")"
+           aria-current="@(choice == period ? "page" : null)">@SalesPeriods.Label(choice)</a>
+    }
+</nav>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (report is null)
+{
+    <p class="muted">Working it out…</p>
+}
+else if (report.Current.Bills == 0 && report.Previous.Bills == 0)
+{
+    <section class="panel"><p class="muted">No bills in this period.</p></section>
+}
+else
+{
+    var now = report.Current;
+    var before = report.Previous;
+
+    <p class="period-note">
+        <span>@Formats.Date(report.Range.From) – @Formats.Date(report.Range.To) (@report.Range.Days days), compared with the @report.Range.Days days before.</span>
+        @if (quiet && bills is not null)
+        {
+            <span class="pill warn">The latest bill in the POS is from @Formats.Date(bills.Last), so periods end on that day.</span>
+        }
+    </p>
+
+    <div class="kpis kpis-5">
+        <Kpi Label="Sales" Value="@Formats.Rupees(now.Sales)" Hint="@Versus(Formats.Growth(now.Sales, before.Sales), Formats.Rupees(before.Sales))"
+             HintTone="@Formats.ChangeTone(Formats.Growth(now.Sales, before.Sales))" />
+        <Kpi Label="Bills" Value="@Count(now.Bills)" Hint="@Versus(Formats.Growth(now.Bills, before.Bills), Count(before.Bills))"
+             HintTone="@Formats.ChangeTone(Formats.Growth(now.Bills, before.Bills))" />
+        <Kpi Label="Average bill" Value="@Formats.Rupees(now.AverageBill)" Hint="@Versus(Formats.Growth(now.AverageBill, before.AverageBill), Formats.Rupees(before.AverageBill))"
+             HintTone="@Formats.ChangeTone(Formats.Growth(now.AverageBill, before.AverageBill))" />
+        <Kpi Label="Profit before GST" Value="@(now.ProfitMargin is null ? "–" : Formats.Rupees(now.Profit))" Hint="@ProfitHint(now)" />
+        <Kpi Label="Products per bill" Value="@now.ProductsPerBill.ToString("0.0", CultureInfo.InvariantCulture)"
+             Hint="@($"{before.ProductsPerBill.ToString("0.0", CultureInfo.InvariantCulture)} before")" />
+    </div>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>@(ByDay ? "Sales by day" : "Sales by month")</h2>
+            <span class="muted">@Formats.Rupees(now.Sales) from @Count(now.Bills) bills on @now.DaysWithSales days</span>
+        </div>
+        @if (ByDay)
+        {
+            <SalesChart Bars="DayBars" Line="AverageLine" BarLabel="Sales that day" LineLabel="7-day average" AriaLabel="Sales for each day of the period" />
+        }
+        else
+        {
+            <SalesChart Bars="MonthBars" AriaLabel="Sales for each month of the period" />
+        }
+    </section>
+
+    <div class="grid-2">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Average sales by weekday</h2>
+                @if (BestDay is { } best)
+                {
+                    <span class="muted">Best: @best.Day</span>
+                }
+            </div>
+            <SalesChart Bars="WeekdayBars" Width="560" Height="250" AriaLabel="Average sales on each day of the week" />
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><h2>How customers pay</h2></div>
+            @if (report.Payments.Count == 0)
+            {
+                <p class="muted">No payments recorded in this period.</p>
+            }
+            else
+            {
+                <ShareBars Rows="PaymentRows" />
+            }
+        </section>
+    </div>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Sales by hour of day</h2>
+            @if (report.BusiestHours is { } busiest)
+            {
+                <span class="muted">Busiest: @Formats.Hours(busiest.From, busiest.To), @Formats.Share(busiest.Share) of sales</span>
+            }
+        </div>
+        @if (!report.TimesReadable)
+        {
+            <p class="muted">The times of bills are in the POS's own log, which the database login set in the side panel's settings may not read.
+                Run the read-only login script of this version again (<span class="mono">create_readonly_login.sql</span>) and they will show here.</p>
+        }
+        else if (report.Hours.Count == 0)
+        {
+            <p class="muted">The POS's log has no times for these bills, so busy hours cannot be shown.</p>
+        }
+        else
+        {
+            <SalesChart Bars="HourChartBars" Width="1000" Height="230" AriaLabel="Sales in each hour of the day over the period" />
+            <p class="muted small note-line">
+                The POS keeps only the date on a bill; the time comes from its own log of when each bill was saved.
+                @if (now.Bills - report.TimedBills is > 0 and var untimed)
+                {
+                    @(untimed == 1
+                        ? " 1 bill was typed in on a later day or is not in the log, so it is left out."
+                        : $" {Count(untimed)} bills were typed in on a later day or are not in the log, so they are left out.")
+                }
+            </p>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Best-selling products</h2>
+            <span class="muted small">Days left: how long the stock lasts at this period's pace</span>
+        </div>
+        <div class="table-wrap">
+            <table class="table data-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th class="num">Qty</th>
+                        <th class="num">Sales</th>
+                        <th class="num">Share</th>
+                        <th class="num">Margin</th>
+                        <th class="num">Stock</th>
+                        <th class="num">Days left</th>
+                        <th class="num">vs before</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in report.TopProducts)
+                    {
+                        <tr>
+                            <td class="name-cell"><div class="item-name">@product.Name</div><div class="item-meta">@product.Category</div></td>
+                            <td class="num">@Money.FormatQty(product.Qty)</td>
+                            <td class="num">@Formats.Rupees(product.Sales)</td>
+                            <td class="num">@Formats.Share(product.Share)</td>
+                            <td class="num">@Formats.Share(product.ProfitMargin)</td>
+                            <td class="num"><span class="@(product.StockInHand <= 0 ? "trend-down" : null)">@Money.FormatQty(product.StockInHand)</span></td>
+                            <td class="num">@Formats.Days(product.DaysOfStock)</td>
+                            <td class="num"><span class="change @Formats.ChangeTone(product.Change)">@Formats.Change(product.Change)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="grid-2">
+        <section class="panel">
+            <div class="panel-head"><h2>Categories</h2></div>
+            <ShareBars Rows="CategoryRows" />
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><h2>Selling more, selling less</h2></div>
+            @if (report.Rising.Count == 0 && report.Falling.Count == 0)
+            {
+                <p class="muted">Nothing to compare with before this period.</p>
+            }
+            else
+            {
+                <h3 class="list-title trend-up">Selling more</h3>
+                <ul class="change-list">
+                    @foreach (var change in report.Rising)
+                    {
+                        <li><span>@change.Name</span><span class="num">@Formats.Rupees(change.Sales) <span class="muted small">@Was(change.PreviousSales)</span></span></li>
+                    }
+                </ul>
+                <h3 class="list-title trend-down">Selling less</h3>
+                <ul class="change-list">
+                    @foreach (var change in report.Falling)
+                    {
+                        <li><span>@change.Name</span><span class="num">@Formats.Rupees(change.Sales) <span class="muted small">@Was(change.PreviousSales)</span></span></li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+
+    <div class="grid-2">
+        <section class="panel">
+            <div class="panel-head"><h2>Money stuck in stock</h2></div>
+            @if (report.SlowMoverCount == 0)
+            {
+                <p class="muted">Every product in stock sold at least once in this period.</p>
+            }
+            else
+            {
+                <p><span class="big-figure">@Formats.Rupees(report.MoneyInSlowStock)</span>
+                    <span class="muted">at purchase price, in @Count(report.SlowMoverCount) products that did not sell at all in this period.</span></p>
+                <div class="table-wrap">
+                    <table class="table data-table">
+                        <thead><tr><th>Product</th><th class="num">In stock</th><th class="num">Worth</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in report.SlowMovers.Take(10))
+                            {
+                                <tr>
+                                    <td class="name-cell"><div class="item-name">@item.Name</div><div class="item-meta">@item.Category</div></td>
+                                    <td class="num">@Money.FormatQty(item.StockInHand)</td>
+                                    <td class="num">@Formats.Rupees(item.StockValue)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="advice">Ideas: a combo with a best seller, a small discount on the counter, or a return to the supplier.</p>
+            }
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><h2>Reorder soon</h2><span class="muted small">Regular sellers whose stock is running out</span></div>
+            @if (report.ReorderNow.Count == 0)
+            {
+                <p class="muted">No regular seller is running out.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table data-table">
+                        <thead><tr><th>Product</th><th class="num">Stock</th><th class="num">Sells</th><th class="num">Days left</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in report.ReorderNow.Take(12))
+                            {
+                                <tr>
+                                    <td class="name-cell"><div class="item-name">@item.Name</div></td>
+                                    <td class="num"><span class="@(item.StockInHand <= 0 ? "trend-down" : null)">@Money.FormatQty(item.StockInHand)</span></td>
+                                    <td class="num">@Rate(item.QtyPerDay)</td>
+                                    <td class="num">@Formats.Days(item.DaysOfStock)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+
+    <div class="grid-2">
+        <section class="panel">
+            <div class="panel-head"><h2>Customers</h2></div>
+            <div class="stat-list">
+                <div class="stat"><div class="stat-value">@Formats.Share(report.Customers.WalkInShare)</div><div class="stat-label">of bills to the walk-in customer</div></div>
+                <div class="stat"><div class="stat-value">@Count(report.Customers.NamedCustomers)</div><div class="stat-label">named customers bought</div></div>
+                <div class="stat"><div class="stat-value">@Count(report.Customers.RepeatCustomers)</div><div class="stat-label">of them came back (2+ bills)</div></div>
+                <div class="stat"><div class="stat-value">@Count(report.Customers.NewCustomers)</div><div class="stat-label">first-time customers</div></div>
+            </div>
+            @if (report.TopCustomers.Count > 0)
+            {
+                <div class="table-wrap">
+                    <table class="table data-table">
+                        <thead><tr><th>Top customers</th><th class="num">Bills</th><th class="num">Spent</th><th class="num">Last bill</th></tr></thead>
+                        <tbody>
+                            @foreach (var customer in report.TopCustomers.Take(6))
+                            {
+                                <tr>
+                                    <td>@PersonalData.MaskNumbers(customer.Name)</td>
+                                    <td class="num">@customer.Bills</td>
+                                    <td class="num">@Formats.Rupees(customer.Sales)</td>
+                                    <td class="num">@Formats.ShortDate(customer.LastBill)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="muted small">Phone numbers in names are partly hidden here. Customer names are never sent to an AI.</p>
+            }
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><h2>Stock records to correct</h2></div>
+            @if (report.NegativeStockCount == 0)
+            {
+                <p class="muted">No product shows negative stock.</p>
+            }
+            else
+            {
+                <p><span class="big-figure">@Count(report.NegativeStockCount)</span>
+                    <span class="muted">products show negative stock: they were sold before their purchase was entered in the POS.</span></p>
+                <ul class="change-list">
+                    @foreach (var item in report.NegativeStock.Take(8))
+                    {
+                        <li><span>@item.Name</span><span class="num trend-down">@Money.FormatQty(item.StockInHand)</span></li>
+                    }
+                </ul>
+                <p class="advice">Enter the missing purchases (or a stock correction) in the POS, so stock, reorder and profit figures can be trusted.</p>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo India = CultureInfo.GetCultureInfo("en-IN");
+
+    [SupplyParameterFromQuery(Name = "period")]
+    public string? PeriodKey { get; set; }
+
+    private SalesPeriod period = SalesPeriods.Default;
+    private SalesReport? report;
+    private BillSpan? bills;
+    private bool quiet;
+    private string? error;
+
+    private bool ByDay => report is not null && report.Range.Days <= 92;
+
+    private WeekdayPoint? BestDay => report?.Weekdays.Where(w => w.DaysCounted > 0 && w.AverageSales > 0).MaxBy(w => w.AverageSales);
+
+    private IReadOnlyList<ChartBar> DayBars => report!.Daily
+        .Select(d => new ChartBar(Formats.ShortDate(d.Day), d.Sales,
+            $"{Formats.LongDate(d.Day)}: {Formats.Rupees(d.Sales)} from {d.Bills} bills", d.Day == report.Range.To))
+        .ToList();
+
+    private IReadOnlyList<decimal> AverageLine => report!.Daily.Select(d => d.SevenDayAverage).ToList();
+
+    private IReadOnlyList<ChartBar> MonthBars => report!.Monthly
+        .Select(m => new ChartBar(new DateOnly(m.Year, m.Month, 1).ToString("MMM", India), m.Sales,
+            $"{Formats.MonthName(m.Year, m.Month)}{(m.Partial ? " (part)" : "")}: {Formats.Rupees(m.Sales)} from {m.Bills} bills"))
+        .ToList();
+
+    private IReadOnlyList<ChartBar> WeekdayBars => report!.Weekdays
+        .Select(w => new ChartBar(w.Day.ToString()[..3], w.AverageSales,
+            $"{w.Day}: {Formats.Rupees(w.AverageSales)} and {w.AverageBills.ToString("0.#", CultureInfo.InvariantCulture)} bills on an average {w.Day}",
+            w == BestDay))
+        .ToList();
+
+    private IReadOnlyList<ChartBar> HourChartBars => report!.Hours
+        .Select(h => new ChartBar(Formats.Hour(h.Hour), h.Sales,
+            $"{Formats.Hours(h.Hour, h.Hour + 1)}: {Formats.Rupees(h.Sales)} from {Count(h.Bills)} {(h.Bills == 1 ? "bill" : "bills")}, {Formats.Share(h.Share)} of sales",
+            report.BusiestHours is { } busiest && h.Hour >= busiest.From && h.Hour < busiest.To))
+        .ToList();
+
+    private IReadOnlyList<ShareRow> PaymentRows => report!.Payments
+        .Select(p => new ShareRow(p.Group, $"{Formats.Rupees(p.Amount)} · {Formats.Share(p.Share)}", p.Share,
+            p.Payments == 1 ? "1 payment" : $"{Count(p.Payments)} payments", p.Group == "Cash" ? "warn" : null))
+        .ToList();
+
+    private IReadOnlyList<ShareRow> CategoryRows => report!.Categories.Take(8)
+        .Select(c => new ShareRow(c.Name, $"{Formats.Rupees(c.Sales)} · {Formats.Share(c.Share)}", c.Share,
+            $"margin {Formats.Share(c.ProfitMargin)} · {Formats.Change(c.Change)} vs before"))
+        .ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        period = SalesPeriods.Parse(PeriodKey);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        report = null;
+        try
+        {
+            var today = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+            bills = await Facts.GetBillSpanAsync();
+            var end = SalesPeriods.EndDay(today, bills);
+            quiet = end != today;
+            report = await Facts.LoadReportAsync(SalesPeriods.Range(period, end, bills));
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading the sales report failed.");
+            error = ex.Message;
+        }
+    }
+
+    private static string Count(int value) => value.ToString("N0", India);
+
+    private static string Was(decimal before) => before > 0 ? "was " + Formats.Rupees(before) : "new";
+
+    private static string Versus(decimal? change, string before) =>
+        change is null ? $"{before} before" : $"{Formats.Change(change)} vs {before}";
+
+    private static string ProfitHint(SalesTotals totals) => totals.ProfitMargin is { } margin
+        ? $"{Formats.Share(margin)} margin" + (totals.ProfitCoverage < 0.95m ? $", on the {Formats.Share(totals.ProfitCoverage)} of sales with a purchase price" : "")
+        : "No purchase prices recorded";
+
+    /// <summary>"3 a day", "2 a week" or "1.5 a month", whichever reads naturally.</summary>
+    private static string Rate(decimal perDay) => perDay switch
+    {
+        >= 1m => perDay.ToString("0.#", CultureInfo.InvariantCulture) + "/day",
+        >= 1m / 7 => (perDay * 7).ToString("0.#", CultureInfo.InvariantCulture) + "/week",
+        _ => (perDay * 30).ToString("0.#", CultureInfo.InvariantCulture) + "/month",
+    };
+}

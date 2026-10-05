@@ -1,0 +1,12 @@
+﻿using System;
+using xyIvZO4FEX709x1mTfd;
+
+// Token: 0x02000011 RID: 17
+internal class <Module>{536C59E4-9C30-442B-9CBA-6B883AB243F7}
+{
+	// Token: 0x0600009E RID: 158 RVA: 0x00002A14 File Offset: 0x00000C14
+	static <Module>{536C59E4-9C30-442B-9CBA-6B883AB243F7}()
+	{
+		dEVOB24MC4I6IS6wh5O.o7j4AZHa79();
+	}
+}

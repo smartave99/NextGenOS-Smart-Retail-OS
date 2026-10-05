@@ -1,0 +1,666 @@
+@page "/actions"
+@using SmartRetail.Pos.Core.Actions
+@using SmartRetail.Pos.Core.Analytics
+@implements IDisposable
+@inject ActionService Actions
+@inject PlaybookService Playbooks
+@inject IProductRepository Catalog
+@inject ILogger<ShopActions> Log
+
+<PageTitle>Actions and results · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Actions and results</h1>
+        <p class="sub">What the shop tried to sell more, and what it did to sales. Note what you do, like a month of e-rickshaw ads, and the figures show later whether it worked. Nothing here changes the POS.</p>
+    </div>
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="() => OpenForm(null)"><Icon Name="plus" /> Add an action</button>
+    </div>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (book.Suggested.Count > 0)
+{
+    <section class="panel memory-waiting" aria-label="Heard in your chats">
+        <div class="panel-head">
+            <h2>Heard in your chats <span class="count">@book.Suggested.Count</span></h2>
+            <span class="pill warn">Track them?</span>
+        </div>
+        <ul class="memory-list">
+            @foreach (var heard in book.Suggested)
+            {
+                <li class="memory-item" @key="heard.Id">
+                    <div class="m-text"><strong>@heard.Title</strong></div>
+                    <div class="m-meta">@Meta(heard.Kind, heard.Start, heard.End, heard.Cost, heard.Products)</div>
+                    @if (heard.Expected.Length > 0)
+                    {
+                        <div class="m-meta">Hoped for: @heard.Expected</div>
+                    }
+                    <div class="f-actions">
+                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenForm(heard)">Track it</button>
+                        <button type="button" class="btn btn-sm btn-link" @onclick="() => Dismiss(heard)">Don’t track</button>
+                    </div>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@if (form is not null)
+{
+    <section class="panel form-card action-form" aria-label="@(form.Heard is null ? "Add an action" : "Track this action")">
+        <div class="panel-head"><h2>@(form.Heard is null ? "Add an action" : "Track this action")</h2></div>
+        <form @onsubmit="SaveForm">
+            <RequiredNote />
+            <label class="field-label" for="action-title">What did the shop do? <Required /></label>
+            <input id="action-title" class="form-control" maxlength="@ShopAction.MaxTitle" placeholder="e.g. E-rickshaw ads around the market" aria-required="true" @bind="form.Title" />
+
+            <div class="action-fields">
+                <div>
+                    <label class="field-label" for="action-kind">Kind</label>
+                    <select id="action-kind" class="form-select" @bind="form.Kind" @bind:after="KindChanged">
+                        @foreach (var kind in ActionKinds.All)
+                        {
+                            <option value="@kind">@kind.Name()</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="field-label" for="action-start">From</label>
+                    <input id="action-start" class="form-control" type="date" @bind="form.Start" />
+                </div>
+                <div>
+                    <label class="field-label" for="action-end">To (empty while it goes on)</label>
+                    <input id="action-end" class="form-control" type="date" @bind="form.End" />
+                </div>
+                <div>
+                    <label class="field-label" for="action-cost">What it cost, ₹</label>
+                    <input id="action-cost" class="form-control" type="number" min="0" step="1" @bind="form.Cost" />
+                </div>
+            </div>
+
+            <span class="field-label">For @if (form.Kind == ActionKind.NewProduct) {<Required />}</span>
+            <div class="seg seg-inline" role="radiogroup" aria-label="For">
+                <button type="button" class="seg-item @(form.WholeShop ? "on" : null)" role="radio" aria-checked="@(form.WholeShop ? "true" : "false")" @onclick="() => form.WholeShop = true">The whole shop</button>
+                <button type="button" class="seg-item @(form.WholeShop ? null : "on")" role="radio" aria-checked="@(form.WholeShop ? "false" : "true")" @onclick="() => form.WholeShop = false">Some products</button>
+            </div>
+            @if (!form.WholeShop)
+            {
+                <div class="action-products">
+                    @if (form.Chosen.Count > 0)
+                    {
+                        <div class="chips">
+                            @foreach (var product in form.Chosen)
+                            {
+                                <button type="button" class="chip accent" title="Take it off" @onclick="() => form.Chosen.Remove(product)">@product.Name <Icon Name="close" /></button>
+                            }
+                        </div>
+                    }
+                    @if (form.NotFound.Count > 0)
+                    {
+                        <p class="small muted">Said in the chat but not found in the POS: @string.Join(", ", form.NotFound). Find them below.</p>
+                    }
+                    <input class="form-control" type="search" placeholder="Find a product by name or code" aria-label="Find a product" value="@form.Term" @oninput="SearchAsync" />
+                    @if (found.Count > 0)
+                    {
+                        <ul class="found-list">
+                            @foreach (var product in found)
+                            {
+                                <li>
+                                    <span class="grow item-name">@product.Name</span>
+                                    <button type="button" class="btn btn-sm" disabled="@form.Chosen.Any(c => c.Id == product.Id)" @onclick="() => Choose(product)"><Icon Name="plus" /> @(form.Kind == ActionKind.NewProduct ? "Choose" : "Add")</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+
+            @if (form.Kind == ActionKind.NewProduct)
+            {
+                <div class="test-fields" role="group" aria-labelledby="test-head">
+                    <div class="field-label" id="test-head">The test</div>
+                    <p class="small muted">Every new product is a test: buy a few, so it can fail cheaply, say how many you hope to sell, and the app checks on the review day.</p>
+                    <div class="action-fields">
+                        <div>
+                            <label class="field-label" for="test-signal">Why this product?</label>
+                            <select id="test-signal" class="form-select" @bind="form.Signal">
+                                @foreach (var signal in ProductTests.Signals)
+                                {
+                                    <option value="@signal">@signal.Name()</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label" for="test-bought">How many were bought <Required /></label>
+                            <input id="test-bought" class="form-control" type="number" min="1" step="1" aria-required="true" @bind="form.Bought" />
+                        </div>
+                        <div>
+                            <label class="field-label" for="test-hoped">You hope to sell, by the review day <Required /></label>
+                            <input id="test-hoped" class="form-control" type="number" min="1" step="1" aria-required="true" @bind="form.Hoped" />
+                        </div>
+                        <div>
+                            <label class="field-label" for="test-review">Review day (empty: 4 weeks on)</label>
+                            <input id="test-review" class="form-control" type="date" @bind="form.ReviewOn" />
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <label class="field-label" for="action-expected">What should it change? (optional)</label>
+            <input id="action-expected" class="form-control" maxlength="@ShopAction.MaxText" placeholder="e.g. More bills from the market side" @bind="form.Expected" />
+
+            @if (formProblem is not null)
+            {
+                <p class="small trend-down" role="alert">@formProblem</p>
+            }
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-link" @onclick="() => form = null">Cancel</button>
+            </div>
+        </form>
+    </section>
+}
+
+@if (book.Actions.Count == 0 && form is null)
+{
+    <section class="panel empty">
+        <Icon Name="trend" />
+        <h2>Nothing noted yet</h2>
+        <p class="muted">Add what the shop is doing to sell more: an ad, an offer, a new display. Or mention it in Ask AI, for example “This month we are running e-rickshaw ads”, and it will be offered here.</p>
+    </section>
+}
+
+@foreach (var action in Ordered())
+{
+    var result = results.GetValueOrDefault(action.Id);
+    <section class="panel action-card" aria-label="@action.Title" @key="action.Id">
+        <div class="panel-head">
+            <h2>@action.Title</h2>
+            <div class="action-pills">
+                <span class="pill">@action.Kind.Name()</span>
+                <span class="pill @StatusClass(action)">@Status(action)</span>
+            </div>
+        </div>
+        <div class="m-meta">@Meta(action.Kind, action.Start, action.End, action.Cost, action.ProductNames, showKind: false)@(action.Source == "Chat" ? " · heard in a chat" : "")</div>
+        @if (action.Expected.Length > 0)
+        {
+            <div class="m-meta">Hoped for: @action.Expected</div>
+        }
+
+        @if (action.Test is { } spec)
+        {
+            <div class="m-meta">Why: @spec.Signal.Name() · @Money.FormatQty(spec.Bought) bought, @Money.FormatQty(spec.Hoped) hoped to sell by @Formats.Date(spec.ReviewOn)</div>
+        }
+
+        @if (action.Cancelled)
+        {
+            <p class="muted small">Cancelled.</p>
+        }
+        else if (result?.Test is { } test && action.Test is { } tested)
+        {
+            <div class="action-result">
+                <span class="pill @test.Verdict.Tone()">@test.Verdict.Name()</span>
+                @if (test.Verdict != TestVerdict.NotStarted)
+                {
+                    <div class="stat-list action-stats">
+                        <div class="stat"><div class="stat-value">@Money.FormatQty(test.Sold)</div><div class="stat-label">Sold, of @Money.FormatQty(tested.Bought) bought</div></div>
+                        <div class="stat"><div class="stat-value">@(test.SellThrough >= 1m ? "Sold out" : Formats.Share(test.SellThrough))</div><div class="stat-label">Sold through</div></div>
+                        <div class="stat"><div class="stat-value">@Money.FormatQty(tested.Hoped)</div><div class="stat-label">Hoped for by @Formats.Date(tested.ReviewOn)</div></div>
+                        <div class="stat"><div class="stat-value">@(test.Profit is { } profit ? Money.FormatCompact(Money.RoundToRupee(profit)) : "–")</div><div class="stat-label">Profit</div></div>
+                    </div>
+                }
+                <p class="action-summary">@test.Summary</p>
+                @if (tested.Decision is { } decided)
+                {
+                    <p class="small test-decided"><strong>You decided</strong> on @Formats.Date(tested.DecidedOn ?? tested.ReviewOn): @decided.Name().@(tested.DecisionNote.Length > 0 ? " " + tested.DecisionNote : "")</p>
+                }
+                else if (test.Verdict is TestVerdict.AsHoped or TestVerdict.BelowHopes or TestVerdict.Slow)
+                {
+                    <TestDecisionForm Tested="action" Result="test" />
+                }
+                @if (action.Lesson is { } keptLesson)
+                {
+                    <p class="small muted kept-lesson"><Icon Name="memory" /> Kept in memory: @keptLesson</p>
+                }
+                else if (test.Lesson is { } testLesson)
+                {
+                    <div class="lesson">
+                        <p class="small muted">Lesson: @testLesson</p>
+                        <button type="button" class="btn btn-sm btn-soft" @onclick="() => KeepLesson(action, testLesson)"><Icon Name="memory" /> Keep the lesson in memory</button>
+                    </div>
+                }
+                @PlaybookButton(action, result)
+            </div>
+        }
+        else if (result is null)
+        {
+            <p class="muted small"><span class="spinner"></span> Reading the figures…</p>
+        }
+        else
+        {
+            <div class="action-result">
+                <span class="pill @result.Verdict.Tone()">@result.Verdict.Name()</span>
+                @if (result.HasVerdict && result.During is { } during && result.Before is { } before)
+                {
+                    <div class="stat-list action-stats">
+                        <div class="stat"><div class="stat-value">@Money.FormatCompact(Money.RoundToRupee(during.SalesPerDay))</div><div class="stat-label">@(action.IsWholeShop ? "Sales a day" : "Its products a day"), against @Money.FormatCompact(Money.RoundToRupee(before.SalesPerDay)) before</div></div>
+                        <div class="stat"><div class="stat-value @(result.Change >= 0 ? "trend-up" : "trend-down")">@Signed(result.Change)</div><div class="stat-label">Change on the @before.Range.Days days before</div></div>
+                        <div class="stat"><div class="stat-value">@(result.Season is { } season ? Signed(season) : "–")</div><div class="stat-label">The season (same dates last year)</div></div>
+                        <div class="stat"><div class="stat-value">@(result.ExtraProfit is { } profit && result.Verdict == ActionVerdict.Rose ? Money.FormatCompact(Money.RoundToRupee(profit)) : "–")</div><div class="stat-label">Extra profit@(action.Cost > 0 ? $", for {Money.FormatCompact(action.Cost)} spent" : "")</div></div>
+                    </div>
+                }
+                <p class="action-summary">@result.Summary</p>
+                @if (action.Lesson is { } kept)
+                {
+                    <p class="small muted kept-lesson"><Icon Name="memory" /> Kept in memory: @kept</p>
+                }
+                else if (result.Lesson is { } lesson)
+                {
+                    <div class="lesson">
+                        <p class="small muted">Lesson: @lesson</p>
+                        <button type="button" class="btn btn-sm btn-soft" @onclick="() => KeepLesson(action, lesson)"><Icon Name="memory" /> Keep the lesson in memory</button>
+                    </div>
+                }
+                @PlaybookButton(action, result)
+            </div>
+        }
+
+        <div class="f-actions">
+            @if (!action.Cancelled && action.Test is null && action.Start <= Actions.Today && (action.End is null || action.End > Actions.Today))
+            {
+                <button type="button" class="btn btn-sm" @onclick="() => EndToday(action)">It ended today</button>
+            }
+            @if (!action.Cancelled && action.Start > Actions.Today)
+            {
+                <button type="button" class="btn btn-sm btn-link" @onclick="() => Cancel(action)">Cancel it</button>
+            }
+            @if (removing == action.Id)
+            {
+                <span class="small">Remove it from the list?</span>
+                <button type="button" class="btn btn-sm btn-danger" @onclick="() => Remove(action)">Remove</button>
+                <button type="button" class="btn btn-sm btn-link" @onclick="() => removing = null">Keep it</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => removing = action.Id">Remove</button>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private const int SearchLimit = 8;
+
+    private readonly CancellationTokenSource stopping = new();
+    private readonly Dictionary<string, ActionResult> results = new();
+    private ActionBook book = new();
+    private PlaybookBook playbooks = new();
+    private readonly Dictionary<string, string> playbookProblems = new();
+    private IReadOnlyList<Product> found = Array.Empty<Product>();
+    private ActionForm? form;
+    private string? formProblem;
+    private string? error;
+    private string? removing;
+
+    /// <summary>The form's fields, for a new action or one heard in a chat.</summary>
+    private sealed class ActionForm
+    {
+        public SuggestedAction? Heard { get; init; }
+        public string Title { get; set; } = "";
+        public ActionKind Kind { get; set; }
+        public DateOnly Start { get; set; }
+        public DateOnly? End { get; set; }
+        public decimal Cost { get; set; }
+        public bool WholeShop { get; set; } = true;
+        public List<Product> Chosen { get; } = new();
+        public List<string> NotFound { get; } = new();
+        public string Term { get; set; } = "";
+        public string Expected { get; set; } = "";
+        public ProductSignal Signal { get; set; }
+        public decimal? Bought { get; set; }
+        public decimal? Hoped { get; set; }
+        public DateOnly? ReviewOn { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        Actions.Changed += OnChanged;
+        Playbooks.Changed += OnPlaybooksChanged;
+        Reload();
+    }
+
+    private void Reload()
+    {
+        book = Actions.Load();
+        playbooks = Playbooks.Load();
+        _ = MeasureAllAsync();
+    }
+
+    private void OnPlaybooksChanged() => _ = InvokeAsync(() =>
+    {
+        playbooks = Playbooks.Load();
+        StateHasChanged();
+    });
+
+    /// <summary>Each action's figures, one after another, shown as they come.</summary>
+    private async Task MeasureAllAsync()
+    {
+        foreach (var action in Ordered().Where(a => !a.Cancelled).ToList())
+        {
+            try
+            {
+                var result = await Actions.MeasureAsync(action, stopping.Token);
+                await InvokeAsync(() =>
+                {
+                    results[action.Id] = result;
+                    StateHasChanged();
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(ex, "Measuring an action failed.");
+                await InvokeAsync(() =>
+                {
+                    results[action.Id] = new ActionResult { Verdict = ActionVerdict.NothingToCompare, Summary = "Could not read the figures: " + ex.Message };
+                    StateHasChanged();
+                });
+            }
+        }
+    }
+
+    /// <summary>Going on first, then planned, then over; the latest first in each.</summary>
+    private IEnumerable<ShopAction> Ordered() => book.Actions
+        .OrderBy(a => a.Cancelled ? 3 : a.Start > Actions.Today ? 1 : a.End is { } end && end < Actions.Today ? 2 : 0)
+        .ThenByDescending(a => a.Start)
+        .ThenByDescending(a => a.Added);
+
+    private string Status(ShopAction action)
+    {
+        var today = Actions.Today;
+        if (action.Cancelled)
+        {
+            return "Cancelled";
+        }
+
+        if (action.Test is not null)
+        {
+            return ProductTests.Status(action, today);
+        }
+
+        if (action.Start > today)
+        {
+            return "Planned";
+        }
+
+        var day = today.DayNumber - action.Start.DayNumber + 1;
+        return action.End switch
+        {
+            { } end when end < today => "Over",
+            { } end when end == today => "Ends today",
+            { } end => $"Going on · day {day} of {end.DayNumber - action.Start.DayNumber + 1}",
+            _ => $"Going on · day {day}",
+        };
+    }
+
+    private string? StatusClass(ShopAction action) => action.Cancelled ? null
+        : action.Start > Actions.Today ? "blue"
+        : action.Test is { } test ? (test.Decision is not null ? null : Actions.Today >= test.ReviewOn ? "warn" : "good")
+        : action.End is { } end && end < Actions.Today ? null : "good";
+
+    private static string Signed(decimal? share) => share is not { } value ? "–"
+        : (value >= 0 ? "+" : "−") + Math.Round(Math.Abs(value) * 100m, 0, MidpointRounding.AwayFromZero).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private static string Meta(ActionKind kind, DateOnly start, DateOnly? end, decimal cost, IReadOnlyList<string> products, bool showKind = true)
+    {
+        var parts = new List<string>();
+        if (showKind)
+        {
+            parts.Add(kind.Name());
+        }
+
+        parts.Add(end is { } last ? ActionMeasure.Dates(new DateRange(start, last)) : "from " + Formats.Date(start));
+        if (cost > 0)
+        {
+            parts.Add(Money.FormatCompact(cost));
+        }
+
+        parts.Add(products.Count == 0 ? "the whole shop" : "for " + string.Join(", ", products));
+        return string.Join(" · ", parts);
+    }
+
+    private async Task OpenForm(SuggestedAction? heard)
+    {
+        error = null;
+        formProblem = null;
+        found = Array.Empty<Product>();
+        form = new ActionForm
+        {
+            Heard = heard,
+            Title = heard?.Title ?? "",
+            Kind = heard?.Kind ?? ActionKind.Other,
+            Start = heard?.Start ?? Actions.Today,
+            End = heard?.End,
+            Cost = heard?.Cost ?? 0m,
+            Expected = heard?.Expected ?? "",
+            WholeShop = (heard is null || heard.Products.Count == 0) && heard?.Kind != ActionKind.NewProduct,
+        };
+
+        // The products said in the chat, found by name where the POS has exactly one.
+        foreach (var name in heard?.Products ?? Array.Empty<string>())
+        {
+            try
+            {
+                var matches = await Catalog.SearchAsync(name, 2);
+                var exact = matches.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+                if ((exact ?? (matches.Count == 1 ? matches[0] : null)) is { } product && form.Chosen.All(c => c.Id != product.Id))
+                {
+                    form.Chosen.Add(product);
+                }
+                else
+                {
+                    form.NotFound.Add(name);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(ex, "Finding a product said in a chat failed.");
+                form.NotFound.Add(name);
+            }
+        }
+    }
+
+    private async Task SearchAsync(ChangeEventArgs e)
+    {
+        if (form is null)
+        {
+            return;
+        }
+
+        form.Term = e.Value as string ?? "";
+        var term = form.Term.Trim();
+        try
+        {
+            found = term.Length < 2 ? Array.Empty<Product>() : await Catalog.SearchAsync(term, SearchLimit);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Searching products for an action failed.");
+            found = Array.Empty<Product>();
+        }
+    }
+
+    private void Choose(Product product)
+    {
+        if (form is null || form.Chosen.Any(c => c.Id == product.Id))
+        {
+            return;
+        }
+
+        if (form.Kind == ActionKind.NewProduct)
+        {
+            // A test is for one new product, judged by its own units: choosing another one replaces it.
+            form.Chosen.Clear();
+        }
+
+        form.Chosen.Add(product);
+    }
+
+    private void SaveForm()
+    {
+        if (form is null)
+        {
+            return;
+        }
+
+        if (!form.WholeShop && form.Chosen.Count == 0)
+        {
+            formProblem = "Add the products it was for, or choose the whole shop.";
+            return;
+        }
+
+        var action = new ShopAction
+        {
+            Title = form.Title,
+            Kind = form.Kind,
+            Start = form.Start,
+            End = form.End,
+            Cost = form.Cost,
+            ProductIds = form.WholeShop ? Array.Empty<int>() : form.Chosen.Select(p => p.Id).ToList(),
+            ProductNames = form.WholeShop ? Array.Empty<string>() : form.Chosen.Select(p => p.Name).ToList(),
+            Expected = form.Expected ?? "",
+            Test = form.Kind == ActionKind.NewProduct
+                ? new ProductTest
+                {
+                    Signal = form.Signal,
+                    Bought = form.Bought ?? 0m,
+                    Hoped = form.Hoped ?? 0m,
+                    ReviewOn = form.ReviewOn ?? form.Start.AddDays(ProductTests.DefaultReviewDays),
+                }
+                : null,
+        };
+
+        try
+        {
+            formProblem = form.Heard is { } heard ? Actions.Track(heard.Id, action) : Actions.Add(action);
+            if (formProblem is null)
+            {
+                form = null;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Saving an action failed.");
+            formProblem = "Saving it failed: " + ex.Message;
+        }
+    }
+
+    /// <summary>A new product is tested on its own sales, so it is for some products.</summary>
+    private void KindChanged()
+    {
+        if (form is { Kind: ActionKind.NewProduct })
+        {
+            form.WholeShop = false;
+        }
+    }
+
+    /// <summary>Once an action has a lesson, the AI can write (or improve) the playbook for its kind from it.</summary>
+    private RenderFragment PlaybookButton(ShopAction action, ActionResult result) => __builder =>
+    {
+        if (action.Cancelled || (result.Test?.Lesson ?? (result.HasVerdict ? result.Lesson : null)) is null)
+        {
+            return;
+        }
+
+        var kind = action.Kind.Name();
+        <div class="playbook-write">
+            @if (Playbooks.IsWritingFor(kind))
+            {
+                <span class="small muted"><span class="spinner"></span> The AI is writing the playbook for @kind.ToLowerInvariant()…</span>
+            }
+            else if (playbooks.Waiting.Any(p => p.Kind == kind))
+            {
+                <span class="small muted">A playbook for @kind.ToLowerInvariant() waits for your Save on the <a href="memory#playbooks">Memory page</a>.</span>
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm btn-soft" @onclick="() => WritePlaybookAsync(action, result)">
+                    <Icon Name="spark" /> @(playbooks.Saved.Any(p => p.Kind == kind) ? "Improve the playbook" : "Write a playbook")
+                </button>
+            }
+            @if (playbookProblems.GetValueOrDefault(action.Id) is { } problem)
+            {
+                <p class="small trend-down" role="alert">@problem</p>
+            }
+        </div>
+    };
+
+    private async Task WritePlaybookAsync(ShopAction action, ActionResult result)
+    {
+        playbookProblems.Remove(action.Id);
+
+        // Written in the background: leaving the page does not stop it, and the playbook waits on the Memory page.
+        var problem = await Playbooks.WriteAsync(PlaybookService.SourceFrom(action, result), CancellationToken.None);
+        if (problem is not null)
+        {
+            playbookProblems[action.Id] = problem;
+        }
+    }
+
+    private void Dismiss(SuggestedAction heard) => Do(() =>
+    {
+        Actions.Dismiss(heard.Id);
+        return null;
+    });
+
+    private void EndToday(ShopAction action) => Do(() => Actions.Update(action.Id, a => a with { End = Actions.Today }));
+
+    private void Cancel(ShopAction action) => Do(() => Actions.Update(action.Id, a => a with { Cancelled = true }));
+
+    private void Remove(ShopAction action)
+    {
+        removing = null;
+        Do(() =>
+        {
+            Actions.Remove(action.Id);
+            return null;
+        });
+    }
+
+    private void KeepLesson(ShopAction action, string lesson) => Do(() => Actions.KeepLesson(action.Id, lesson));
+
+    private void Do(Func<string?> change)
+    {
+        try
+        {
+            error = change();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing an action failed.");
+            error = "That did not work: " + ex.Message;
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Reload();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Actions.Changed -= OnChanged;
+        Playbooks.Changed -= OnPlaybooksChanged;
+        stopping.Cancel();
+    }
+}

@@ -1,0 +1,70 @@
+@using SmartRetail.Pos.Core.Actions
+@inject ActionService Actions
+
+@* The owner's decision on a new product whose test was judged, the rules' suggestion chosen to start with. *@
+<div class="test-decide">
+    <label class="field-label" for="@Id">What will you do?</label>
+    <div class="test-decide-row">
+        <select id="@Id" class="form-select" @bind="decision">
+            @foreach (var choice in ProductTests.Decisions)
+            {
+                <option value="@choice">@choice.Name()@(choice == Result.Suggested ? " (the rules suggest)" : "")</option>
+            }
+        </select>
+        <input class="form-control" maxlength="@ProductTest.MaxNote" placeholder="A note (you can leave it empty)" aria-label="@($"A note on the decision for {Tested.Title}")" @bind="note" />
+        <button type="button" class="btn btn-sm btn-primary" disabled="@saving" @onclick="SaveAsync">Save the decision</button>
+    </div>
+    @if (problem is not null)
+    {
+        <p class="small trend-down" role="alert">@problem</p>
+    }
+</div>
+
+@code {
+    /// <summary>The new product's action.</summary>
+    [Parameter, EditorRequired] public ShopAction Tested { get; set; } = default!;
+
+    [Parameter, EditorRequired] public TestResult Result { get; set; } = default!;
+
+    [Parameter] public EventCallback OnDecided { get; set; }
+
+    private TestDecision decision;
+    private string note = "";
+    private string? problem;
+    private bool saving;
+    private string? shownFor;
+
+    private string Id => "decide-" + Tested.Id;
+
+    protected override void OnParametersSet()
+    {
+        if (shownFor != Tested.Id)
+        {
+            shownFor = Tested.Id;
+            decision = Result.Suggested ?? TestDecision.Hold;
+            note = "";
+            problem = null;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            problem = Actions.DecideTest(Tested.Id, decision, note);
+            if (problem is null)
+            {
+                await OnDecided.InvokeAsync();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            problem = "Saving it failed: " + ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

@@ -1,0 +1,31 @@
+@using SmartRetail.Pos.Core.Labels
+
+<div class="st-inner">
+    @if (!string.IsNullOrWhiteSpace(Shop))
+    {
+        <div class="st-shop">@Shop</div>
+    }
+    <div class="st-name">@Sticker.Name</div>
+    <Barcode Code="@Sticker.Code" Class="st-bars" />
+    <div class="st-code">@Sticker.Code</div>
+    @if (ShowPrice || (ShowMrp && Sticker.ShowsMrp))
+    {
+        <div class="st-price">
+            @if (ShowPrice && Sticker.Price > 0)
+            {
+                <b>@Formats.Price(Sticker.Price)</b>
+            }
+            @if (ShowMrp && Sticker.ShowsMrp)
+            {
+                <span>MRP @Formats.Price(Sticker.Mrp)</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Sticker Sticker { get; set; } = default!;
+    [Parameter] public string? Shop { get; set; }
+    [Parameter] public bool ShowPrice { get; set; } = true;
+    [Parameter] public bool ShowMrp { get; set; } = true;
+}

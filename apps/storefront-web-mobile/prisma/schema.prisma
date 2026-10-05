@@ -1,0 +1,142 @@
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  price         Float
+  originalPrice Float?
+  categoryId    String
+  subcategoryId String?
+  imageUrl      String?
+  images        String[]
+  videoUrl      String?
+  barcode       String?
+  available     Boolean  @default(true)
+  featured      Boolean  @default(false)
+  offerId       String?
+  tags          String[]
+  highlights    String[]
+  specifications Json?
+  averageRating Float?   @default(0)
+  reviewCount   Int?     @default(0)
+  stockLevel    Int      @default(10)
+  embedding     Unsupported("vector(768)")?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  category      Category   @relation(fields: [categoryId], references: [id])
+  offer         Offer?     @relation(fields: [offerId], references: [id])
+  reviews       Review[]
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  parentId  String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent    Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryToCategory")
+  products  Product[]
+}
+
+model Offer {
+  id          String   @id @default(uuid())
+  title       String
+  discount    String
+  description String
+  createdAt   DateTime @default(now())
+  
+  products    Product[]
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String
+  userName  String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+
+
+enum RequestStatus {
+  PENDING
+  REVIEWED
+  FULFILLED
+  REJECTED
+}
+
+model ProductRequest {
+  id          String        @id @default(uuid())
+  productName String
+  brand       String?
+  description String
+  minPrice    Float?
+  maxPrice    Float?
+  imageUrl    String?
+  contactInfo String?       // Email, phone, etc.
+  status      RequestStatus @default(PENDING)
+  notes       String?       // Admin notes
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  provider    String    @default("google")
+  key         String    @unique
+  isActive    Boolean   @default(true)
+  isValid     Boolean?
+  lastTested  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model NewsletterSubscriber {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  status       String    @default("subscribed")
+  subscribedAt DateTime  @default(now())
+}
+
+model Staff {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  role        String   @default("editor")
+  permissions String[] @default([])
+  photoUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Page {
+  id          String   @id
+  title       String
+  content     String
+  lastUpdated String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -1,0 +1,258 @@
+@page "/bills/{Id:long}"
+@inject IInvoiceRepository Invoices
+@inject ILogger<BillView> Log
+
+<PageTitle>@(bill is null ? "Bill" : "Bill " + bill.Summary.Number) · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        @* Back to the list as it was left: its search and page are in the address Back returns to. *@
+        <div class="eyebrow"><a href="bills" onclick="if (history.length > 1) { history.back(); return false; }">Bills</a> <Icon Name="chevron" /></div>
+        <h1>@(bill is null ? "Bill" : "Bill " + bill.Summary.Number)</h1>
+        @if (bill is not null)
+        {
+            <p class="sub">@Formats.BillWhen(bill.Summary) · @bill.Summary.CustomerName</p>
+            @if (bill.Summary.EnteredLater && bill.Summary.SavedAt is { } saved)
+            {
+                <p class="sub muted small">Typed into the POS later, on @Formats.DateAndTime(saved), so the time it was sold is not known.</p>
+            }
+        }
+    </div>
+    @if (bill is not null)
+    {
+        <div class="actions">
+            @if (bill.Summary.Balance > 0)
+            {
+                <span class="pill warn">@Money.Format(bill.Summary.Balance) due</span>
+            }
+            else
+            {
+                <span class="pill good">Paid</span>
+            }
+        </div>
+    }
+</div>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (!loaded)
+{
+    <p class="muted">Loading…</p>
+}
+else if (bill is null)
+{
+    <section class="panel">
+        <p class="muted">There is no bill with this number in the POS. It may have been deleted there.</p>
+        <a class="btn btn-soft" href="bills">See all bills</a>
+    </section>
+}
+else
+{
+    <div class="kpis">
+        <div class="kpi">
+            <div class="kpi-label">Total</div>
+            <div class="kpi-value">@Money.Format(bill.Summary.GrandTotal)</div>
+            <div class="kpi-hint">@ItemCount()</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Paid</div>
+            <div class="kpi-value">@Money.Format(bill.Paid)</div>
+            <div class="kpi-hint">@PaidBy()</div>
+        </div>
+        <div class="kpi @(bill.Summary.Balance > 0 ? "warn" : null)">
+            <div class="kpi-label">Still owed</div>
+            <div class="kpi-value">@Money.Format(Math.Max(0m, bill.Summary.Balance))</div>
+            <div class="kpi-hint">@(bill.Summary.Balance > 0 ? "given on credit" : "nothing owed")</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">GST in the bill</div>
+            <div class="kpi-value">@Money.Format(bill.Cgst + bill.Sgst + bill.Igst)</div>
+            <div class="kpi-hint">@GstSplit()</div>
+        </div>
+    </div>
+
+    <div class="grid-2 bill-detail">
+        <section class="panel">
+            <div class="panel-head"><h2>Items</h2></div>
+            @if (bill.Items.Count == 0)
+            {
+                <p class="muted">The POS has no items saved for this bill.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table data-table bill-items">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="num">Qty</th>
+                                <th class="num">Rate</th>
+                                <th class="num">GST</th>
+                                <th class="num">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in bill.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="item-name">@item.Name</div>
+                                        <div class="item-meta">@ItemMeta(item)</div>
+                                    </td>
+                                    <td class="num">@Money.FormatQty(item.Qty)@(string.IsNullOrEmpty(item.Unit) ? "" : " " + item.Unit.ToLowerInvariant())</td>
+                                    <td class="num">@Money.FormatAmount(item.Rate)</td>
+                                    <td class="num muted">@Formats.Percent(item.TaxPercent)</td>
+                                    <td class="num">@Money.FormatAmount(item.Amount)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <div class="bill-aside">
+            <section class="panel totals">
+                <div class="panel-head"><h2>Totals</h2></div>
+                <dl>
+                    <div><dt>Items</dt><dd>@Money.FormatAmount(bill.Items.Sum(i => i.Amount))</dd></div>
+                    @if (bill.Discount != 0)
+                    {
+                        <div><dt>Discount on the bill</dt><dd>−@Money.FormatAmount(bill.Discount)</dd></div>
+                    }
+                    @if (bill.RoundOff != 0)
+                    {
+                        <div><dt>Round-off</dt><dd>@Money.FormatAmount(bill.RoundOff)</dd></div>
+                    }
+                </dl>
+                <div class="grand"><span>Total</span><strong>@Money.Format(bill.Summary.GrandTotal)</strong></div>
+                @if (bill.Cgst + bill.Sgst + bill.Igst != 0)
+                {
+                    <p class="muted gst-note">Prices include GST: @GstSplit().</p>
+                }
+            </section>
+
+            <section class="panel">
+                <div class="panel-head"><h2>Payments</h2></div>
+                @if (bill.Payments.Count == 0)
+                {
+                    <p class="muted">No payment is recorded for this bill.</p>
+                }
+                else
+                {
+                    <ul class="plain-list payments">
+                        @foreach (var payment in bill.Payments)
+                        {
+                            <li>
+                                <span>
+                                    <strong>@PaymentModeName(payment.Mode)</strong>
+                                    @if (payment.Date is { } paidOn)
+                                    {
+                                        <span class="muted"> · @Formats.BillDate(paidOn)</span>
+                                    }
+                                </span>
+                                <span class="num">@Money.Format(payment.Amount)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="panel">
+                <div class="panel-head"><h2>Customer and bill</h2></div>
+                <dl class="facts-list">
+                    <div><dt>Customer</dt><dd>@bill.Summary.CustomerName</dd></div>
+                    @if (!string.IsNullOrWhiteSpace(bill.CustomerPhone))
+                    {
+                        <div><dt>Phone</dt><dd class="mono">@bill.CustomerPhone</dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(bill.Operator))
+                    {
+                        <div><dt>Billed by</dt><dd>@bill.Operator</dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(bill.Remarks))
+                    {
+                        <div><dt>Remarks</dt><dd>@bill.Remarks</dd></div>
+                    }
+                </dl>
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private BillDetails? bill;
+    private bool loaded;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            bill = await Invoices.GetAsync(Id);
+            loaded = true;
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading bill {Id} failed.", Id);
+            error = ex.Message;
+        }
+    }
+
+    private string ItemCount()
+    {
+        var count = bill!.Items.Count;
+        return count == 1 ? "1 item" : count + " items";
+    }
+
+    private string PaidBy()
+    {
+        var modes = bill!.Payments.Select(p => PaymentModeName(p.Mode)).Where(m => m.Length > 0).Distinct().ToList();
+        return modes.Count == 0 ? "no payment recorded" : "by " + string.Join(", ", modes);
+    }
+
+    private string GstSplit()
+    {
+        if (bill!.Igst != 0)
+        {
+            return "IGST " + Money.Format(bill.Igst);
+        }
+
+        return bill.Cgst == 0 && bill.Sgst == 0 ? "no GST on these items" : $"CGST {Money.Format(bill.Cgst)} · SGST {Money.Format(bill.Sgst)}";
+    }
+
+    private static string ItemMeta(BillItem item)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.Code))
+        {
+            parts.Add("Code " + item.Code);
+        }
+
+        if (item.Mrp > 0)
+        {
+            parts.Add("MRP " + Money.Format(item.Mrp));
+        }
+
+        if (item.Discount > 0)
+        {
+            parts.Add("discount " + Money.Format(item.Discount));
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>The POS writes "By Cash", "By Credit Card"; people say "Cash", "Credit Card".</summary>
+    private static string PaymentModeName(string mode)
+    {
+        var name = mode.Trim();
+        return name.StartsWith("By ", StringComparison.OrdinalIgnoreCase) ? name[3..].Trim() : name;
+    }
+}

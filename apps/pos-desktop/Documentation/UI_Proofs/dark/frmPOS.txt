@@ -1,0 +1,576 @@
+/frmPOS | frmPOS | {X=0,Y=26,Width=1040,Height=759} | True | New sale · Smart Retail OS
+/frmPOS/RetailWorkspace | TabControl | {X=0,Y=0,Width=1024,Height=720} | True | 
+/frmPOS/RetailWorkspace/ | TabPage | {X=4,Y=48,Width=1016,Height=668} | True | New sale
+/frmPOS/RetailWorkspace//PanelUPI | Panel | {X=558,Y=24,Width=434,Height=295} | False | 
+/frmPOS/RetailWorkspace//PanelUPI/btnHideP6 | Button | {X=1,Y=252,Width=81,Height=40} | False | Alt + &Z
+/frmPOS/RetailWorkspace//PanelUPI/btnCheckout | Button | {X=7,Y=86,Width=17,Height=33} | False | Generate QR Code
+/frmPOS/RetailWorkspace//PanelUPI/Label113 | Label | {X=4,Y=59,Width=69,Height=20} | False | Amount :
+/frmPOS/RetailWorkspace//PanelUPI/LinkLabel2 | LinkLabel | {X=190,Y=104,Width=36,Height=15} | False | (OFF)
+/frmPOS/RetailWorkspace//PanelUPI/pBoxQR | PictureBox | {X=239,Y=3,Width=191,Height=180} | False | 
+/frmPOS/RetailWorkspace//PanelUPI/LinkLabel1 | LinkLabel | {X=184,Y=41,Width=50,Height=48} | False | 2nd Display (ON)
+/frmPOS/RetailWorkspace//PanelUPI/btnInit | Button | {X=5,Y=66,Width=10,Height=28} | False | Initialize
+/frmPOS/RetailWorkspace//PanelUPI/btnLastTxns | Button | {X=1,Y=210,Width=81,Height=25} | False | Last Txns
+/frmPOS/RetailWorkspace//PanelUPI/lblMyUPIID | Label | {X=3,Y=11,Width=81,Height=20} | False | My UPI ID :
+/frmPOS/RetailWorkspace//PanelUPI/tBoxLog | TextBox | {X=85,Y=211,Width=346,Height=80} | False | 
+/frmPOS/RetailWorkspace//PanelUPI/lblValUPIId | Label | {X=70,Y=11,Width=34,Height=13} | False | <NA>
+/frmPOS/RetailWorkspace//PanelUPI/Label115 | Label | {X=5,Y=123,Width=49,Height=20} | False | Status
+/frmPOS/RetailWorkspace//PanelUPI/buttonReloadUPIId | Button | {X=196,Y=6,Width=26,Height=22} | False | R
+/frmPOS/RetailWorkspace//PanelUPI/tBoxConfirmation | TextBox | {X=8,Y=140,Width=226,Height=44} | False | 
+/frmPOS/RetailWorkspace//PanelUPI/tBoxOrderId | TextBox | {X=73,Y=34,Width=104,Height=20} | False | 
+/frmPOS/RetailWorkspace//PanelUPI/btnCancel | Button | {X=381,Y=184,Width=50,Height=26} | False | Cancel
+/frmPOS/RetailWorkspace//PanelUPI/Label114 | Label | {X=4,Y=34,Width=73,Height=20} | False | Order ID :
+/frmPOS/RetailWorkspace//PanelUPI/tBoxAmount | TextBox | {X=8,Y=78,Width=169,Height=29} | False | 
+/frmPOS/RetailWorkspace//dgw4 | DataGridView | {X=24,Y=216,Width=616,Height=228} | False | 
+/frmPOS/RetailWorkspace//dgw4/ | HScrollBar | {X=0,Y=133,Width=80,Height=17} | False | 
+/frmPOS/RetailWorkspace//dgw4/ | VScrollBar | {X=223,Y=0,Width=17,Height=80} | False | 
+/frmPOS/RetailWorkspace// | TableLayoutPanel | {X=8,Y=8,Width=1000,Height=652} | True | 
+/frmPOS/RetailWorkspace/// | TableLayoutPanel | {X=8,Y=8,Width=664,Height=636} | True | 
+/frmPOS/RetailWorkspace//// | Panel | {X=3,Y=3,Width=658,Height=346} | True | 
+/frmPOS/RetailWorkspace///// | TableLayoutPanel | {X=0,Y=0,Width=658,Height=344} | True | 
+/frmPOS/RetailWorkspace////// | Label | {X=24,Y=8,Width=610,Height=40} | True | New sale
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=56,Width=610,Height=68} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=0,Y=0,Width=195,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=195,Height=24} | True | Customer
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=195,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////cmbCustomerName | ComboBox | {X=16,Y=8,Width=163,Height=29} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=203,Y=0,Width=195,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=195,Height=24} | True | Phone
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=195,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////txtContactNo | TextBox | {X=16,Y=11,Width=163,Height=22} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=406,Y=0,Width=204,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=204,Height=24} | True | State
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=204,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////cmbCustomerState | ComboBox | {X=16,Y=8,Width=172,Height=29} | True | 
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=132,Width=610,Height=68} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=0,Y=0,Width=297,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=297,Height=24} | True | Barcode
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=297,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////txtBarcode | TextBox | {X=16,Y=11,Width=265,Height=22} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=305,Y=0,Width=305,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=305,Height=24} | True | Product
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=305,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////TextBox20 | TextBox | {X=16,Y=11,Width=273,Height=22} | True | 
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=208,Width=610,Height=68} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=0,Y=0,Width=195,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=195,Height=24} | True | Quantity
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=195,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////txtQty | TextBox | {X=16,Y=11,Width=163,Height=22} | True | 0
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=203,Y=0,Width=195,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=195,Height=24} | True | Unit
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=195,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////cmbUnit | ComboBox | {X=16,Y=8,Width=163,Height=29} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=406,Y=0,Width=204,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=204,Height=24} | True | Price
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=204,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////txtSalesRate | TextBox | {X=16,Y=11,Width=172,Height=22} | True | 
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=284,Width=610,Height=44} | True | 
+/frmPOS/RetailWorkspace///////btnAdd | Button | {X=0,Y=0,Width=195,Height=44} | True | Add to cart · F11
+/frmPOS/RetailWorkspace///////btnProductSelection | Button | {X=203,Y=0,Width=195,Height=44} | True | Browse products
+/frmPOS/RetailWorkspace///////btnRemove | Button | {X=406,Y=0,Width=204,Height=44} | True | Remove item
+/frmPOS/RetailWorkspace//// | TableLayoutPanel | {X=8,Y=360,Width=648,Height=216} | True | 
+/frmPOS/RetailWorkspace///// | TableLayoutPanel | {X=24,Y=0,Width=600,Height=44} | True | 
+/frmPOS/RetailWorkspace////// | Label | {X=0,Y=0,Width=420,Height=44} | True | Cart
+/frmPOS/RetailWorkspace////// | Button | {X=420,Y=0,Width=180,Height=44} | True | Item details
+/frmPOS/RetailWorkspace/////RetailCartBody | Panel | {X=24,Y=52,Width=600,Height=156} | True | 
+/frmPOS/RetailWorkspace/////RetailCartBody/RetailEmptyCart | TableLayoutPanel | {X=8,Y=30,Width=584,Height=96} | True | 
+/frmPOS/RetailWorkspace/////RetailCartBody/RetailEmptyCart/RetailEmptyCartArtwork | RetailArtwork | {X=0,Y=0,Width=76,Height=96} | True | 
+/frmPOS/RetailWorkspace/////RetailCartBody/RetailEmptyCart/ | TableLayoutPanel | {X=76,Y=12,Width=508,Height=72} | True | 
+/frmPOS/RetailWorkspace/////RetailCartBody/RetailEmptyCart// | Label | {X=8,Y=0,Width=500,Height=24} | True | Your cart is empty
+/frmPOS/RetailWorkspace/////RetailCartBody/RetailEmptyCart// | Label | {X=8,Y=32,Width=500,Height=32} | True | Scan a barcode or choose a product above.
+/frmPOS/RetailWorkspace/////RetailCartBody/DataGridView1 | DataGridView | {X=0,Y=0,Width=600,Height=124} | False | 
+/frmPOS/RetailWorkspace/////RetailCartBody/DataGridView1/ | HScrollBar | {X=0,Y=83,Width=200,Height=17} | False | 
+/frmPOS/RetailWorkspace/////RetailCartBody/DataGridView1/ | VScrollBar | {X=583,Y=0,Width=17,Height=124} | False | 
+/frmPOS/RetailWorkspace///// | Label | {X=24,Y=176,Width=600,Height=32} | False | Review quantities and prices before saving this sale.
+/frmPOS/RetailWorkspace//// | TableLayoutPanel | {X=0,Y=584,Width=664,Height=52} | True | 
+/frmPOS/RetailWorkspace///// | TableLayoutPanel | {X=24,Y=0,Width=616,Height=44} | True | 
+/frmPOS/RetailWorkspace//////btnNew | Button | {X=0,Y=0,Width=115,Height=44} | True | New sale
+/frmPOS/RetailWorkspace//////btnhold | Button | {X=123,Y=0,Width=115,Height=44} | True | Hold sale
+/frmPOS/RetailWorkspace//////btnunhold | Button | {X=246,Y=0,Width=115,Height=44} | True | Recall sale
+/frmPOS/RetailWorkspace//////btnGetData | Button | {X=369,Y=0,Width=115,Height=44} | True | Find invoice
+/frmPOS/RetailWorkspace//////btnPrint | Button | {X=492,Y=0,Width=124,Height=44} | True | Print invoice
+/frmPOS/RetailWorkspace/// | TableLayoutPanel | {X=688,Y=8,Width=304,Height=636} | True | 
+/frmPOS/RetailWorkspace//// | Panel | {X=3,Y=3,Width=298,Height=510} | True | 
+/frmPOS/RetailWorkspace///// | TableLayoutPanel | {X=0,Y=0,Width=281,Height=804} | True | 
+/frmPOS/RetailWorkspace////// | Label | {X=24,Y=24,Width=233,Height=40} | True | Sale total
+/frmPOS/RetailWorkspace//////txtGrandTotal | TextBox | {X=24,Y=72,Width=233,Height=46} | True | 0.00
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=120,Width=233,Height=24} | True | 
+/frmPOS/RetailWorkspace/////// | Label | {X=0,Y=0,Width=116,Height=24} | True | Subtotal
+/frmPOS/RetailWorkspace///////txtSubTotal | TextBox | {X=116,Y=8,Width=117,Height=20} | True | 0.00
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=152,Width=233,Height=24} | True | 
+/frmPOS/RetailWorkspace/////// | Label | {X=0,Y=0,Width=116,Height=24} | True | Tax
+/frmPOS/RetailWorkspace///////TextBox12 | TextBox | {X=116,Y=8,Width=117,Height=20} | True | 0.00
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=184,Width=233,Height=24} | True | 
+/frmPOS/RetailWorkspace/////// | Label | {X=0,Y=0,Width=116,Height=24} | True | Discount
+/frmPOS/RetailWorkspace///////txtBillDiscount | TextBox | {X=116,Y=8,Width=117,Height=20} | True | 0.00
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=216,Width=233,Height=24} | True | 
+/frmPOS/RetailWorkspace/////// | Label | {X=0,Y=0,Width=116,Height=24} | True | Round off
+/frmPOS/RetailWorkspace///////txtRoundOff | TextBox | {X=116,Y=8,Width=117,Height=20} | True | 0.00
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=248,Width=233,Height=24} | True | 
+/frmPOS/RetailWorkspace/////// | Label | {X=0,Y=0,Width=116,Height=24} | True | Paid
+/frmPOS/RetailWorkspace///////txtTotalPayment | TextBox | {X=116,Y=8,Width=117,Height=20} | True | 
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=280,Width=233,Height=24} | True | 
+/frmPOS/RetailWorkspace/////// | Label | {X=0,Y=0,Width=116,Height=24} | True | Balance due
+/frmPOS/RetailWorkspace///////txtPaymentDue | TextBox | {X=116,Y=8,Width=117,Height=20} | True | 
+/frmPOS/RetailWorkspace////// | Label | {X=24,Y=312,Width=233,Height=32} | True | Payment
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=352,Width=233,Height=68} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=0,Y=0,Width=108,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=108,Height=24} | True | Method
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=108,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////cmbPaymentMode | ComboBox | {X=16,Y=8,Width=76,Height=29} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=116,Y=0,Width=117,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=117,Height=24} | True | Amount
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=117,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////txtPayment | TextBox | {X=16,Y=11,Width=85,Height=22} | True | 0.00
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=428,Width=233,Height=68} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=0,Y=0,Width=233,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=233,Height=24} | True | Payment date
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=233,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////dtpPaymentDate | DateTimePicker | {X=16,Y=8,Width=201,Height=29} | True | 01/10/2026
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=504,Width=233,Height=68} | True | 
+/frmPOS/RetailWorkspace/////// | TableLayoutPanel | {X=0,Y=0,Width=233,Height=68} | True | 
+/frmPOS/RetailWorkspace//////// | Label | {X=0,Y=0,Width=233,Height=24} | True | Bank account
+/frmPOS/RetailWorkspace//////// | FieldFrame | {X=0,Y=24,Width=233,Height=44} | True | 
+/frmPOS/RetailWorkspace/////////cmbAccountNo | ComboBox | {X=16,Y=8,Width=201,Height=29} | True | 
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=580,Width=233,Height=44} | True | 
+/frmPOS/RetailWorkspace///////btnAdd1 | Button | {X=0,Y=0,Width=108,Height=44} | True | Add payment
+/frmPOS/RetailWorkspace///////btnRemove1 | Button | {X=116,Y=0,Width=117,Height=44} | True | Remove payment
+/frmPOS/RetailWorkspace//////DataGridView2 | DataGridView | {X=24,Y=632,Width=233,Height=88} | True | 
+/frmPOS/RetailWorkspace//////DataGridView2/ | HScrollBar | {X=0,Y=133,Width=80,Height=17} | False | 
+/frmPOS/RetailWorkspace//////DataGridView2/ | VScrollBar | {X=223,Y=0,Width=17,Height=80} | False | 
+/frmPOS/RetailWorkspace////// | TableLayoutPanel | {X=24,Y=728,Width=233,Height=44} | True | 
+/frmPOS/RetailWorkspace/////// | Button | {X=0,Y=0,Width=233,Height=44} | True | Payment settings and more tools
+/frmPOS/RetailWorkspace//// | TableLayoutPanel | {X=8,Y=524,Width=288,Height=100} | True | 
+/frmPOS/RetailWorkspace///// | TableLayoutPanel | {X=24,Y=8,Width=240,Height=44} | True | 
+/frmPOS/RetailWorkspace//////btnSave | Button | {X=0,Y=0,Width=240,Height=44} | True | Save sale · F2
+/frmPOS/RetailWorkspace///// | Label | {X=24,Y=60,Width=240,Height=32} | True | Review payment, then save the invoice.
+/frmPOS/RetailWorkspace/ | TabPage | {X=4,Y=48,Width=1016,Height=668} | False | All tools
+/frmPOS/RetailWorkspace//Panel1 | Panel | {X=7,Y=7,Width=1264,Height=656} | False | 
+/frmPOS/RetailWorkspace//Panel1/dgwsale | DataGridView | {X=440,Y=221,Width=409,Height=132} | False | 
+/frmPOS/RetailWorkspace//Panel1/dgwsale/ | HScrollBar | {X=1,Y=132,Width=238,Height=17} | False | 
+/frmPOS/RetailWorkspace//Panel1/dgwsale/ | VScrollBar | {X=223,Y=0,Width=17,Height=80} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1 | TabControl | {X=782,Y=469,Width=481,Height=185} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1 | TabPage | {X=4,Y=22,Width=473,Height=159} | False | BIll SUMMARY
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label117 | Label | {X=232,Y=4,Width=98,Height=11} | False | Gift Code Discount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtgiftamt | TextBox | {X=340,Y=1,Width=125,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label111 | Label | {X=4,Y=137,Width=92,Height=11} | False | Coupon Discount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtCoupAmt | TextBox | {X=102,Y=135,Width=116,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label102 | Label | {X=232,Y=22,Width=77,Height=11} | False | Offer Discount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtGTBA | TextBox | {X=340,Y=97,Width=125,Height=20} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label101 | Label | {X=4,Y=118,Width=67,Height=11} | False | Loyalty Disc :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label34 | Label | {X=232,Y=138,Width=86,Height=11} | False | Net Due Balance :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label31 | Label | {X=232,Y=99,Width=100,Height=11} | False | Grand Total Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label35 | Label | {X=232,Y=120,Width=92,Height=11} | False | Total Paid Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtTotal | TextBox | {X=340,Y=58,Width=125,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtOffer | TextBox | {X=340,Y=20,Width=125,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/CheckBox1 | CheckBox | {X=316,Y=79,Width=15,Height=14} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label100 | Label | {X=4,Y=99,Width=71,Height=11} | False | Bill Discount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label37 | Label | {X=232,Y=79,Width=58,Height=11} | False | Round Off :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/TextBox11 | TextBox | {X=102,Y=20,Width=116,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/cb2 | CheckBox | {X=316,Y=20,Width=14,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label36 | Label | {X=232,Y=61,Width=69,Height=11} | False | Total Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtFreightCharges | TextBox | {X=102,Y=80,Width=116,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label41 | Label | {X=4,Y=80,Width=82,Height=11} | False | Bill Sundry Amt :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label29 | Label | {X=3,Y=4,Width=94,Height=11} | False | (Taxable + Tax) Amt :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label30 | Label | {X=232,Y=41,Width=95,Height=11} | False | Total Bill Discount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtbilldisc | TextBox | {X=102,Y=99,Width=116,Height=16} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/txtApplyPoint | TextBox | {X=102,Y=116,Width=116,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/cb1 | CheckBox | {X=76,Y=118,Width=15,Height=14} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label32 | Label | {X=4,Y=61,Width=63,Height=11} | False | Bill Sundry :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/cmbBSundry | ComboBox | {X=102,Y=58,Width=116,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label61 | Label | {X=4,Y=42,Width=86,Height=11} | False | Total Tax Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage1/Label59 | Label | {X=4,Y=23,Width=81,Height=11} | False | Taxable Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2 | TabPage | {X=4,Y=22,Width=473,Height=159} | False | TAX SUMMARY
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/Button15 | Button | {X=4,Y=130,Width=33,Height=23} | False | Button15
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/DGVTaxSummary | DataGridView | {X=133,Y=3,Width=337,Height=153} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/DGVTaxSummary/ | HScrollBar | {X=0,Y=133,Width=80,Height=17} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/DGVTaxSummary/ | VScrollBar | {X=223,Y=0,Width=17,Height=80} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/txtCGST | TextBox | {X=37,Y=26,Width=87,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/txtCESS | TextBox | {X=37,Y=123,Width=87,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/Label27 | Label | {X=9,Y=13,Width=97,Height=11} | False | Total CGST Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/Label43 | Label | {X=8,Y=111,Width=97,Height=11} | False | Total CESS Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/Label26 | Label | {X=8,Y=47,Width=120,Height=11} | False | Total (S/UT)GST  Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/txtIGST | TextBox | {X=37,Y=92,Width=87,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/txtSGST | TextBox | {X=37,Y=60,Width=87,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage2/Label24 | Label | {X=8,Y=80,Width=93,Height=11} | False | Total IGST Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3 | TabPage | {X=4,Y=22,Width=473,Height=159} | False | PRODUCT INFO
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox15 | CheckBox | {X=346,Y=43,Width=115,Height=15} | False | Item Speed Entry - 2
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/Label92 | Label | {X=6,Y=5,Width=114,Height=11} | False | Purc. Price + Tax / Unit :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/txtPurcTaxPrice | TextBox | {X=135,Y=4,Width=90,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox14 | CheckBox | {X=231,Y=77,Width=114,Height=17} | False | Show Item Image
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/Label60 | Label | {X=229,Y=100,Width=88,Height=11} | False | Narration (if any) :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/txtNar | TextBox | {X=231,Y=113,Width=239,Height=40} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox13 | CheckBox | {X=346,Y=95,Width=114,Height=17} | False | UPI QRCode Print
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox10 | CheckBox | {X=346,Y=79,Width=108,Height=15} | False | Product Parameter
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/chkBoxLastSoldPrice | CheckBox | {X=8,Y=66,Width=145,Height=15} | False | Product's Last Sold Price :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox9 | CheckBox | {X=231,Y=61,Width=97,Height=15} | False | IMEI / Serial No.
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/lblLastPrice | Label | {X=159,Y=70,Width=23,Height=11} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox4 | CheckBox | {X=346,Y=61,Width=102,Height=15} | False | Edit Product Info
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox8 | CheckBox | {X=346,Y=6,Width=98,Height=15} | False | Stock Limit Alert
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/cboxSpeed | CheckBox | {X=231,Y=43,Width=115,Height=15} | False | Item Speed Entry - 1
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/Label84 | Label | {X=6,Y=126,Width=74,Height=11} | False | E-Way Bill No :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/txteway | TextBox | {X=85,Y=124,Width=140,Height=29} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/RadioButton1 | RadioButton | {X=231,Y=23,Width=75,Height=15} | False | Retail Price
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/Label49 | Label | {X=6,Y=26,Width=89,Height=11} | False | Purc. Price / Unit :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/RadioButton2 | RadioButton | {X=346,Y=23,Width=96,Height=15} | False | Wholesale Price
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/TextBox21 | TextBox | {X=135,Y=104,Width=90,Height=18} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox3 | CheckBox | {X=104,Y=5,Width=31,Height=57} | False | SHOW
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox6 | CheckBox | {X=231,Y=6,Width=89,Height=15} | False | -Ve Stock Alert
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/lblCustLastItemPrice | Label | {X=159,Y=91,Width=23,Height=11} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/CheckBox7 | CheckBox | {X=8,Y=87,Width=153,Height=15} | False | Customer's Last Sold Price :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/Label50 | Label | {X=6,Y=107,Width=85,Height=11} | False | Last Invoice Amt :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/txtPurchaseRate | TextBox | {X=135,Y=25,Width=90,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/txtMargin | TextBox | {X=135,Y=46,Width=90,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage3/Label48 | Label | {X=6,Y=47,Width=85,Height=11} | False | Total Margin Amt :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4 | TabPage | {X=4,Y=22,Width=473,Height=159} | False | CONFIG
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/chkLang | CheckBox | {X=139,Y=133,Width=106,Height=19} | False | 2nd Lang Print
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/chkboxPrivilege | CheckBox | {X=303,Y=108,Width=164,Height=17} | False | Privilege Card Sender(WA)
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/chkboxgift | CheckBox | {X=159,Y=108,Width=138,Height=17} | False | Gift Card Sender(WA)
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/chkpara | CheckBox | {X=13,Y=133,Width=112,Height=19} | False | Parameter Print
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label104 | Label | {X=332,Y=75,Width=109,Height=13} | False | Weighing Barcode :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/CheckBox12 | CheckBox | {X=363,Y=88,Width=86,Height=17} | False | CheckBox12
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/CheckBox2 | CheckBox | {X=85,Y=109,Width=72,Height=16} | False | ON / OFF
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label62 | Label | {X=5,Y=107,Width=77,Height=15} | False | Auto SMS :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label47 | Label | {X=5,Y=87,Width=136,Height=13} | False | Edit Invoice Numbering :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/CheckBox11 | CheckBox | {X=159,Y=87,Width=177,Height=17} | False | Yes / No    ( Tick Mark = Yes )
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label28 | Label | {X=5,Y=65,Width=82,Height=13} | False | Print Preview :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/ComboBox2 | ComboBox | {X=135,Y=62,Width=194,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label52 | Label | {X=4,Y=36,Width=118,Height=13} | False | Bill Template Design :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/cmbprintcopy | ComboBox | {X=135,Y=8,Width=194,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/ComboBox1 | ComboBox | {X=135,Y=35,Width=194,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label95 | Label | {X=4,Y=8,Width=96,Height=13} | False | Print Copy Type :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/txtGSTNonGST | TextBox | {X=85,Y=131,Width=70,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/TextBox15 | TextBox | {X=356,Y=128,Width=110,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Button8 | Button | {X=356,Y=7,Width=110,Height=61} | False |     Printer Setting
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage4/Label82 | Label | {X=258,Y=128,Width=97,Height=20} | False | Scan L Card
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7 | TabPage | {X=4,Y=22,Width=473,Height=159} | False | GADGET
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2 | TableLayoutPanel | {X=0,Y=0,Width=473,Height=159} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button12 | Button | {X=357,Y=82,Width=113,Height=74} | False | GSTIN Checker
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button7 | Button | {X=3,Y=82,Width=112,Height=74} | False | Refund Calculator
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button3 | Button | {X=121,Y=82,Width=112,Height=74} | False | GST Calculator
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button11 | Button | {X=239,Y=82,Width=112,Height=74} | False | Tax Type
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button1 | Button | {X=3,Y=3,Width=112,Height=73} | False | Screen Keyboard
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button14 | Button | {X=357,Y=3,Width=113,Height=73} | False | Calendar
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button2 | Button | {X=121,Y=3,Width=112,Height=73} | False | Calculator
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage7/TableLayoutPanel2/Button4 | Button | {X=239,Y=3,Width=112,Height=73} | False | Denominator
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8 | TabPage | {X=4,Y=22,Width=473,Height=159} | False | BROKER
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Button9 | Button | {X=403,Y=120,Width=67,Height=23} | False | Pay
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/PictureBox2 | PictureBox | {X=403,Y=76,Width=64,Height=38} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label103 | Label | {X=272,Y=58,Width=113,Height=13} | False | Approved Comm % :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/ComboBox5 | ComboBox | {X=104,Y=6,Width=312,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/TextBox30 | TextBox | {X=104,Y=53,Width=163,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label80 | Label | {X=113,Y=88,Width=65,Height=29} | False | Calculation Type
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/ComboBox4 | ComboBox | {X=109,Y=120,Width=79,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label79 | Label | {X=273,Y=88,Width=85,Height=29} | False | Commission Amount
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label78 | Label | {X=17,Y=88,Width=76,Height=31} | False | Calculation Apply on
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/ComboBox3 | ComboBox | {X=8,Y=120,Width=95,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/TextBox29 | TextBox | {X=104,Y=29,Width=312,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/TextBox28 | TextBox | {X=274,Y=119,Width=89,Height=23} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/TextBox27 | TextBox | {X=194,Y=119,Width=74,Height=23} | False | 0.000
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label77 | Label | {X=6,Y=51,Width=89,Height=13} | False | Broker Contact :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label68 | Label | {X=6,Y=29,Width=91,Height=13} | False | Broker Address :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label67 | Label | {X=192,Y=88,Width=72,Height=29} | False | Commission%
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Label65 | Label | {X=6,Y=6,Width=80,Height=13} | False | Broker Name :
+/frmPOS/RetailWorkspace//Panel1/TabControl1/TabPage8/Button13 | Button | {X=427,Y=6,Width=40,Height=40} | False | 
+/frmPOS/RetailWorkspace//Panel1/lblTotalQty | Label | {X=240,Y=473,Width=72,Height=13} | False | Total Qty(s) :
+/frmPOS/RetailWorkspace//Panel1/Panel3 | Panel | {X=3,Y=495,Width=169,Height=156} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel3/dgw | DataGridView | {X=0,Y=0,Width=167,Height=154} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel3/dgw/ | HScrollBar | {X=0,Y=133,Width=80,Height=17} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel3/dgw/ | VScrollBar | {X=223,Y=0,Width=17,Height=80} | False | 
+/frmPOS/RetailWorkspace//Panel1/lblItemDisc | Label | {X=382,Y=473,Width=93,Height=13} | False | Total Items Disc :
+/frmPOS/RetailWorkspace//Panel1/lblTotGST | Label | {X=82,Y=603,Width=58,Height=13} | False | Total Tax :
+/frmPOS/RetailWorkspace//Panel1/lblSubTotal | Label | {X=511,Y=467,Width=269,Height=28} | False | BILL AMT :
+/frmPOS/RetailWorkspace//Panel1/TabControl2 | TabControl | {X=849,Y=278,Width=414,Height=192} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5 | TabPage | {X=4,Y=22,Width=406,Height=166} | False | SETTLEMENT
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/btnPhonePe | Button | {X=211,Y=51,Width=89,Height=42} | False | Alt+&Y
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Label112 | Label | {X=1,Y=75,Width=66,Height=11} | False | Bank A/c No :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Button16 | Button | {X=355,Y=51,Width=47,Height=43} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Label7 | Label | {X=1,Y=51,Width=72,Height=11} | False | Payment Date :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Label13 | Label | {X=1,Y=28,Width=80,Height=11} | False | Payment/Credit :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/btnListReset1 | Button | {X=304,Y=51,Width=47,Height=43} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Label57 | Label | {X=78,Y=6,Width=12,Height=13} | False | *
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/btnListUpdate1 | Button | {X=355,Y=2,Width=47,Height=43} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Label12 | Label | {X=1,Y=4,Width=76,Height=11} | False | Payment Mode :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/Label58 | Label | {X=78,Y=31,Width=12,Height=13} | False | *
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage5/TextBox13 | TextBox | {X=101,Y=47,Width=23,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9 | TabPage | {X=4,Y=22,Width=406,Height=166} | False | CASH TENDER
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9 | TableLayoutPanel | {X=162,Y=0,Width=242,Height=164} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/Button18 | Button | {X=4,Y=132,Width=73,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn1 | Button | {X=4,Y=4,Width=73,Height=25} | False | 1
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/Button26 | Button | {X=164,Y=100,Width=74,Height=25} | False | <
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn9 | Button | {X=164,Y=68,Width=74,Height=25} | False | 9
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn3 | Button | {X=164,Y=4,Width=74,Height=25} | False | 3
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn6 | Button | {X=164,Y=36,Width=74,Height=25} | False | 6
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn4 | Button | {X=4,Y=36,Width=73,Height=25} | False | 4
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn5 | Button | {X=84,Y=36,Width=73,Height=25} | False | 5
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn0 | Button | {X=84,Y=100,Width=73,Height=25} | False | 0
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn7 | Button | {X=4,Y=68,Width=73,Height=25} | False | 7
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn2 | Button | {X=84,Y=4,Width=73,Height=25} | False | 2
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btndot | Button | {X=4,Y=100,Width=73,Height=25} | False | .
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/btn8 | Button | {X=84,Y=68,Width=73,Height=25} | False | 8
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/Button27 | Button | {X=164,Y=132,Width=74,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/TableLayoutPanel9/Button28 | Button | {X=84,Y=132,Width=73,Height=28} | False | C
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/Label107 | Label | {X=2,Y=94,Width=91,Height=17} | False | Refund Cash :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/Label106 | Label | {X=1,Y=48,Width=104,Height=17} | False | Tendered Cash :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/Label105 | Label | {X=3,Y=1,Width=119,Height=17} | False | Bill Cash Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/txtRefAmt | TextBox | {X=5,Y=114,Width=147,Height=26} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/txtTendAmt | TextBox | {X=5,Y=66,Width=147,Height=26} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage9/txtBillAmt | TextBox | {X=5,Y=20,Width=147,Height=26} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage10 | TabPage | {X=4,Y=22,Width=406,Height=166} | False | UPI PAYMENT
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage10/PictureBox4 | PictureBox | {X=124,Y=0,Width=280,Height=164} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage10/Button29 | Button | {X=3,Y=53,Width=115,Height=50} | False | QR Code Scan To Pay
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage10/Label88 | Label | {X=4,Y=5,Width=65,Height=17} | False | Amount :
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage10/txtUpiAmt | TextBox | {X=2,Y=23,Width=116,Height=26} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TabControl2/TabPage10/Button39 | Button | {X=3,Y=109,Width=115,Height=31} | False | MANUAL UPI &PAY
+/frmPOS/RetailWorkspace//Panel1/TabControl3 | TabControl | {X=170,Y=473,Width=614,Height=182} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6 | TabPage | {X=4,Y=22,Width=606,Height=156} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1 | TableLayoutPanel | {X=3,Y=3,Width=598,Height=148} | False | 
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1/Button36 | Button | {X=301,Y=77,Width=92,Height=67} | False | Token Generate
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1/btnUpdate | Button | {X=202,Y=4,Width=92,Height=66} | False | Update invoice
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1/btnDelete | Button | {X=301,Y=4,Width=92,Height=66} | False | Delete invoice
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1/btnScanItems | Button | {X=103,Y=77,Width=92,Height=67} | False | Scan -F7
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1/Button40 | Button | {X=400,Y=77,Width=92,Height=67} | False | Coupon Entry
+/frmPOS/RetailWorkspace//Panel1/TabControl3/TabPage6/TableLayoutPanel1/btnGift | Button | {X=499,Y=77,Width=95,Height=67} | False | Gift Voucher Entry
+/frmPOS/RetailWorkspace//Panel1/Panel13 | Panel | {X=7,Y=280,Width=556,Height=70} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel13/txtIMEI1 | TextBox | {X=52,Y=37,Width=208,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel13/Label97 | Label | {X=284,Y=40,Width=67,Height=20} | False | IMEI (2) :
+/frmPOS/RetailWorkspace//Panel1/Panel13/Label96 | Label | {X=3,Y=40,Width=65,Height=20} | False | IMEI (1) :
+/frmPOS/RetailWorkspace//Panel1/Panel13/txtIMEI2 | TextBox | {X=335,Y=37,Width=208,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel13/Label94 | Label | {X=0,Y=0,Width=554,Height=26} | False | Mobile IMEI Number
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel10 | TableLayoutPanel | {X=1201,Y=45,Width=56,Height=46} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel10/btnNext | Button | {X=4,Y=26,Width=20,Height=16} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel10/txtPrev | Button | {X=31,Y=26,Width=21,Height=16} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel10/btnFirst | Button | {X=31,Y=4,Width=21,Height=15} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel10/btnLast | Button | {X=4,Y=4,Width=20,Height=15} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11 | Panel | {X=5,Y=170,Width=1252,Height=131} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtWBcode | TextBox | {X=495,Y=2,Width=66,Height=20} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label116 | Label | {X=440,Y=1,Width=74,Height=20} | False | WBCode :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Button30 | Button | {X=596,Y=55,Width=16,Height=17} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label16 | Label | {X=542,Y=58,Width=81,Height=20} | False | Total Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label109 | Label | {X=910,Y=58,Width=72,Height=20} | False | Tax Type :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label108 | Label | {X=717,Y=56,Width=10,Height=12} | False | x
+/frmPOS/RetailWorkspace//Panel1/Panel11/lblAltPrice | Label | {X=731,Y=56,Width=10,Height=12} | False | 0
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label89 | Label | {X=2,Y=13,Width=80,Height=20} | False | Search By :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label20 | Label | {X=1004,Y=58,Width=85,Height=20} | False | HSN Code :
+/frmPOS/RetailWorkspace//Panel1/Panel11/NumericUpDown1 | NumericUpDown | {X=294,Y=4,Width=45,Height=27} | False | 30
+/frmPOS/RetailWorkspace//Panel1/Panel11/NumericUpDown1/ | UpDownButtons | {X=28,Y=1,Width=16,Height=25} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/NumericUpDown1/ | UpDownEdit | {X=2,Y=2,Width=25,Height=23} | False | 30
+/frmPOS/RetailWorkspace//Panel1/Panel11/lblMRP | TextBox | {X=807,Y=56,Width=79,Height=20} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/btnListUpdate | Button | {X=1198,Y=55,Width=48,Height=51} | False | Edit
+/frmPOS/RetailWorkspace//Panel1/Panel11/btnListReset | Button | {X=1100,Y=55,Width=48,Height=51} | False | Reset
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6 | TableLayoutPanel | {X=4,Y=73,Width=1080,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtTaxableAmtI | TextBox | {X=3,Y=3,Width=74,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtTotalAmount | TextBox | {X=543,Y=3,Width=74,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtTaxType | TextBox | {X=873,Y=3,Width=124,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtCESSAmt | TextBox | {X=478,Y=3,Width=59,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtCESSPer | TextBox | {X=428,Y=3,Width=44,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtIGSTAmt | TextBox | {X=363,Y=3,Width=59,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtIGSTPer | TextBox | {X=313,Y=3,Width=44,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtSGSTAmt | TextBox | {X=248,Y=3,Width=59,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtSGSTPer | TextBox | {X=198,Y=3,Width=44,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtCGSTAmt | TextBox | {X=133,Y=3,Width=59,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtCGSTPer | TextBox | {X=83,Y=3,Width=44,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtDesc | TextBox | {X=703,Y=3,Width=164,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/Label93 | Label | {X=623,Y=0,Width=74,Height=28} | False | Product in 2nd Lang :
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel6/txtHSNCode | TextBox | {X=1003,Y=3,Width=74,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label99 | Label | {X=2,Y=58,Width=98,Height=20} | False | Taxable Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label98 | Label | {X=771,Y=56,Width=46,Height=20} | False | MRP :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Button33 | Button | {X=343,Y=3,Width=22,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7 | TableLayoutPanel | {X=4,Y=26,Width=1084,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7/txtDisc | TextBox | {X=1003,Y=3,Width=74,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7/TextBox1 | TextBox | {X=393,Y=3,Width=64,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7/cmbDiscountType | ComboBox | {X=803,Y=3,Width=54,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7/txtDiscPer | TextBox | {X=863,Y=3,Width=54,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7/txtDiscAmtPerQty | TextBox | {X=923,Y=3,Width=74,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel11/TableLayoutPanel7/cmbSearchCat | ComboBox | {X=3,Y=3,Width=94,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/lblwmstatus | Label | {X=565,Y=2,Width=11,Height=12} | False | ..
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label66 | Label | {X=103,Y=0,Width=16,Height=15} | False | ...
+/frmPOS/RetailWorkspace//Panel1/Panel11/Button23 | Button | {X=368,Y=3,Width=22,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label86 | Label | {X=0,Y=0,Width=142,Height=20} | False | Product Information
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label10 | Label | {X=479,Y=58,Width=62,Height=13} | False | CESS Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label46 | Label | {X=806,Y=13,Width=61,Height=13} | False | Disc Type :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label76 | Label | {X=364,Y=58,Width=59,Height=13} | False | IGST Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label23 | Label | {X=104,Y=13,Width=111,Height=20} | False | Product Name :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label75 | Label | {X=252,Y=58,Width=63,Height=13} | False | SGST Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label18 | Label | {X=567,Y=13,Width=72,Height=20} | False | Quantity :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label74 | Label | {X=136,Y=58,Width=63,Height=13} | False | CGST Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/lblUnit | Label | {X=628,Y=13,Width=32,Height=13} | False | Unit :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label72 | Label | {X=679,Y=56,Width=10,Height=12} | False | x
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label39 | Label | {X=395,Y=13,Width=90,Height=20} | False | Curr. Stock  :
+/frmPOS/RetailWorkspace//Panel1/Panel11/lblAltValue | Label | {X=693,Y=56,Width=10,Height=12} | False | 1
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label11 | Label | {X=313,Y=58,Width=49,Height=13} | False | IGST % :
+/frmPOS/RetailWorkspace//Panel1/Panel11/lblAltUnit | Label | {X=619,Y=56,Width=57,Height=13} | False | Alt Unit
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label51 | Label | {X=927,Y=1,Width=78,Height=30} | False | Disc Amt Per Unit :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label54 | Label | {X=182,Y=17,Width=15,Height=20} | False | *
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label42 | Label | {X=428,Y=58,Width=52,Height=13} | False | CESS % :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label17 | Label | {X=724,Y=13,Width=118,Height=20} | False | Price/Main Unit :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label55 | Label | {X=619,Y=17,Width=15,Height=20} | False | *
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label21 | Label | {X=466,Y=13,Width=71,Height=20} | False | Barcode :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label33 | Label | {X=199,Y=58,Width=53,Height=13} | False | SGST % :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label25 | Label | {X=84,Y=58,Width=53,Height=13} | False | CGST % :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label73 | Label | {X=663,Y=17,Width=15,Height=20} | False | *
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label64 | Label | {X=1002,Y=13,Width=82,Height=13} | False | Total Disc Amt :
+/frmPOS/RetailWorkspace//Panel1/Panel11/Label63 | Label | {X=863,Y=1,Width=58,Height=28} | False | Disc% Per Unit :
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtMinStock | TextBox | {X=246,Y=4,Width=51,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtSM_ID | TextBox | {X=227,Y=3,Width=13,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtItemOffer | TextBox | {X=207,Y=3,Width=17,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtBatch1 | TextBox | {X=920,Y=57,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtMfg1 | TextBox | {X=952,Y=56,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtExp1 | TextBox | {X=983,Y=58,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtSize1 | TextBox | {X=1011,Y=57,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel11/txtColour1 | TextBox | {X=1047,Y=57,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10 | Panel | {X=5,Y=90,Width=1252,Height=81} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/chklive | CheckBox | {X=1102,Y=4,Width=146,Height=19} | False | Live Mobile Reporting
+/frmPOS/RetailWorkspace//Panel1/Panel10/Panel4 | Panel | {X=1185,Y=6,Width=19,Height=14} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/txtDiscStatus | TextBox | {X=807,Y=4,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/txtCustomerDiscPer | TextBox | {X=774,Y=4,Width=26,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/txtCustLimitstatus | TextBox | {X=1003,Y=12,Width=37,Height=20} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label56 | Label | {X=954,Y=13,Width=70,Height=20} | False | Cr. Limit :
+/frmPOS/RetailWorkspace//Panel1/Panel10/Button22 | Button | {X=359,Y=3,Width=22,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/Button19 | Button | {X=335,Y=3,Width=22,Height=22} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3 | TableLayoutPanel | {X=4,Y=26,Width=1241,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3/txtCustLimit | TextBox | {X=953,Y=3,Width=84,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3/txtCustomerID | TextBox | {X=3,Y=3,Width=84,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3/btnCustomerSelection | Button | {X=343,Y=3,Width=34,Height=22} | False | F9
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3/txtGSTIN | TextBox | {X=693,Y=3,Width=144,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3/txtPan | TextBox | {X=843,Y=3,Width=104,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel3/textmailid | TextBox | {X=1043,Y=3,Width=445,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/Button10 | Button | {X=211,Y=10,Width=16,Height=10} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label85 | Label | {X=0,Y=0,Width=154,Height=20} | False | Customer Information
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label81 | Label | {X=1044,Y=13,Width=72,Height=20} | False | Email ID :
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label71 | Label | {X=844,Y=13,Width=44,Height=20} | False | PAN :
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4 | TableLayoutPanel | {X=3,Y=56,Width=1242,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/lblcard | Label | {X=803,Y=0,Width=128,Height=20} | False | ..............
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/Label38 | Label | {X=683,Y=0,Width=114,Height=20} | False | Loyalty Card No. :
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/CheckBox5 | CheckBox | {X=3,Y=3,Width=64,Height=14} | False | POS
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/Label70 | Label | {X=363,Y=0,Width=74,Height=20} | False | TCS Active :
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/txtTCSstatus | TextBox | {X=443,Y=3,Width=44,Height=16} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/Label69 | Label | {X=493,Y=0,Width=114,Height=20} | False | Earn Loyalty Points :
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/txtusepoint | TextBox | {X=613,Y=3,Width=64,Height=14} | False | 0
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/lblBalance | Label | {X=163,Y=0,Width=31,Height=20} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/Label40 | Label | {X=73,Y=0,Width=84,Height=19} | False | A/c Balance :
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/Label90 | Label | {X=937,Y=0,Width=144,Height=20} | False | TCS Pending Amount :
+/frmPOS/RetailWorkspace//Panel1/Panel10/TableLayoutPanel4/Label91 | Label | {X=1087,Y=0,Width=31,Height=20} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label6 | Label | {X=3,Y=13,Width=98,Height=20} | False | Customer ID :
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label53 | Label | {X=457,Y=17,Width=15,Height=20} | False | *
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label44 | Label | {X=181,Y=17,Width=15,Height=20} | False | *
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label3 | Label | {X=94,Y=13,Width=123,Height=20} | False | Customer Name :
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label19 | Label | {X=514,Y=13,Width=50,Height=20} | False | State :
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label9 | Label | {X=385,Y=13,Width=94,Height=20} | False | Contact No. :
+/frmPOS/RetailWorkspace//Panel1/Panel10/Label2 | Label | {X=694,Y=13,Width=88,Height=20} | False | GSTIN/UID :
+/frmPOS/RetailWorkspace//Panel1/Panel10/txtaddponit | TextBox | {X=663,Y=4,Width=20,Height=27} | False | 0
+/frmPOS/RetailWorkspace//Panel1/Panel10/txtLpoint | TextBox | {X=628,Y=4,Width=34,Height=27} | False | 0
+/frmPOS/RetailWorkspace//Panel1/Panel10/txtLAmt | TextBox | {X=607,Y=4,Width=19,Height=21} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8 | TableLayoutPanel | {X=5,Y=45,Width=1197,Height=46} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/cmbTaxSelect | ComboBox | {X=584,Y=22,Width=124,Height=23} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label15 | Label | {X=422,Y=1,Width=156,Height=17} | False | Salesman Name
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/btnSelectSalesman | Button | {X=382,Y=22,Width=34,Height=20} | False | F8
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/txtSalesman | TextBox | {X=423,Y=22,Width=154,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/txtHold | TextBox | {X=856,Y=22,Width=114,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label4 | Label | {X=194,Y=1,Width=111,Height=17} | False | Invoice Date
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label14 | Label | {X=310,Y=1,Width=66,Height=17} | False | S.Man ID
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/txtSalesmanID | TextBox | {X=311,Y=22,Width=64,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label5 | Label | {X=3,Y=1,Width=186,Height=17} | False | Invoice Number
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/txtInvoiceNo | TextBox | {X=4,Y=22,Width=184,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label83 | Label | {X=856,Y=1,Width=114,Height=17} | False | Hold No.
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/dtpInvoiceDate | DateTimePicker | {X=194,Y=21,Width=111,Height=23} | False | 01/10/2026
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label45 | Label | {X=382,Y=1,Width=34,Height=17} | False | √
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/TextBox8 | TextBox | {X=715,Y=22,Width=134,Height=18} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label87 | Label | {X=715,Y=1,Width=134,Height=17} | False | Terminal ID
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/cmbRemarks | ComboBox | {X=977,Y=22,Width=216,Height=23} | False | 
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label22 | Label | {X=977,Y=1,Width=216,Height=17} | False | Transport Details
+/frmPOS/RetailWorkspace//Panel1/TableLayoutPanel8/Label110 | Label | {X=584,Y=1,Width=124,Height=17} | False | Tax Type
+/frmPOS/RetailWorkspace//Panel1/lblNoOfItems | Label | {X=4,Y=473,Width=86,Height=13} | False | No(s) of Items :
+/frmPOS/RetailWorkspace//Panel1/Panel14 | Panel | {X=25,Y=357,Width=251,Height=58} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel14/DataGridView3 | DataGridView | {X=14,Y=33,Width=42,Height=0} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel14/DataGridView3/ | HScrollBar | {X=0,Y=133,Width=80,Height=17} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel14/DataGridView3/ | VScrollBar | {X=223,Y=0,Width=17,Height=80} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel14/TextBox16 | TextBox | {X=100,Y=128,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtTCSdbl | TextBox | {X=205,Y=59,Width=46,Height=27} | False | 0
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtbalCreditTotal | TextBox | {X=4,Y=111,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtbalGrid3 | TextBox | {X=76,Y=56,Width=46,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtstatus | TextBox | {X=5,Y=30,Width=51,Height=27} | False | No
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtbal1 | TextBox | {X=5,Y=85,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtsumgrid | TextBox | {X=125,Y=56,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtpretcs | TextBox | {X=100,Y=106,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtTCSAmt | TextBox | {X=175,Y=111,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/dtcp1 | DateTimePicker | {X=5,Y=5,Width=91,Height=23} | False | 01/10/2026
+/frmPOS/RetailWorkspace//Panel1/Panel14/dtcp2 | DateTimePicker | {X=100,Y=5,Width=91,Height=23} | False | 01/10/2026
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtlimit | TextBox | {X=62,Y=30,Width=51,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtwpan | TextBox | {X=118,Y=30,Width=51,Height=27} | False | 0.000
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtwopan | TextBox | {X=175,Y=30,Width=51,Height=27} | False | 0.000
+/frmPOS/RetailWorkspace//Panel1/Panel14/txtBal | TextBox | {X=5,Y=56,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/txttcscal | TextBox | {X=82,Y=85,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel14/TextBox14 | TextBox | {X=157,Y=85,Width=69,Height=27} | False | 0.00
+/frmPOS/RetailWorkspace//Panel1/Panel2 | Panel | {X=5,Y=4,Width=1252,Height=40} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button38 | Button | {X=628,Y=0,Width=127,Height=31} | False | COPY &QUOTATION
+/frmPOS/RetailWorkspace//Panel1/Panel2/CBox | ComboBox | {X=602,Y=9,Width=47,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/LinkLabel4 | LinkLabel | {X=449,Y=10,Width=52,Height=13} | False | Tax Type
+/frmPOS/RetailWorkspace//Panel1/Panel2/lblCPhone | Label | {X=598,Y=13,Width=76,Height=20} | False | lblCPhone
+/frmPOS/RetailWorkspace//Panel1/Panel2/PictureBox3 | PictureBox | {X=397,Y=1,Width=43,Height=35} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/PictureBox111 | PictureBox | {X=467,Y=1,Width=34,Height=34} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/cmbProductName | ComboBox | {X=409,Y=3,Width=17,Height=23} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Panel15 | Panel | {X=482,Y=2,Width=43,Height=26} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button17 | Button | {X=913,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/lblDay | Label | {X=273,Y=19,Width=84,Height=21} | False | DateTime
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button31 | Button | {X=947,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/lblDateTime | Label | {X=273,Y=0,Width=84,Height=21} | False | DateTime
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button37 | Button | {X=758,Y=0,Width=118,Height=31} | False | COPY &ESTIMATE
+/frmPOS/RetailWorkspace//Panel1/Panel2/F2 | TextBox | {X=683,Y=-2,Width=29,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button6 | Button | {X=981,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/F1 | TextBox | {X=725,Y=-1,Width=29,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button5 | Button | {X=1015,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/PictureBox1 | PictureBox | {X=638,Y=2,Width=27,Height=26} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/cmbNP | ComboBox | {X=721,Y=13,Width=49,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button35 | Button | {X=1049,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox26 | TextBox | {X=776,Y=4,Width=40,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox25 | TextBox | {X=870,Y=6,Width=40,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button34 | Button | {X=1083,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/RichTextBox1 | RichTextBox | {X=886,Y=0,Width=16,Height=28} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtWPort | Label | {X=847,Y=0,Width=33,Height=20} | False | ****
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtProductID | TextBox | {X=833,Y=4,Width=70,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtDisplayPort | TextBox | {X=659,Y=14,Width=53,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/DateTimePicker1 | DateTimePicker | {X=218,Y=1,Width=99,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button25 | Button | {X=1117,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtNP | TextBox | {X=680,Y=8,Width=35,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button24 | Button | {X=1151,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtID | TextBox | {X=227,Y=8,Width=70,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button20 | Button | {X=1219,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button21 | Button | {X=1185,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtPartsearch | TextBox | {X=718,Y=8,Width=46,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox19 | TextBox | {X=771,Y=15,Width=46,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox18 | TextBox | {X=867,Y=15,Width=46,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox17 | TextBox | {X=818,Y=15,Width=46,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtSuffix | TextBox | {X=431,Y=2,Width=33,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/DTP2 | DateTimePicker | {X=365,Y=12,Width=25,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/DTP1 | DateTimePicker | {X=306,Y=7,Width=32,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtewayinfo | TextBox | {X=917,Y=16,Width=43,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtInvoiceType | TextBox | {X=966,Y=16,Width=43,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtAutoSMS | TextBox | {X=770,Y=5,Width=31,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox9 | TextBox | {X=905,Y=5,Width=100,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtcompname | TextBox | {X=420,Y=12,Width=70,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/btnClose | Button | {X=1219,Y=0,Width=31,Height=31} | False |                           &C
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtCompanyState | TextBox | {X=495,Y=15,Width=70,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Label1 | Label | {X=3,Y=-2,Width=79,Height=37} | False | SALE
+/frmPOS/RetailWorkspace//Panel1/Panel2/lblUserType | Label | {X=184,Y=12,Width=73,Height=20} | False | User Type
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtCID | TextBox | {X=567,Y=12,Width=70,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtCommissionPer | TextBox | {X=97,Y=4,Width=100,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/lblSet | Label | {X=626,Y=17,Width=30,Height=20} | False | Set
+/frmPOS/RetailWorkspace//Panel1/Panel2/txtTotalQty | TextBox | {X=365,Y=12,Width=43,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/lblUser | Label | {X=626,Y=17,Width=38,Height=20} | False | User
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox10 | TextBox | {X=807,Y=4,Width=20,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox6 | TextBox | {X=1060,Y=12,Width=38,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/Button32 | Button | {X=1117,Y=0,Width=31,Height=31} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/TextBox5 | TextBox | {X=1011,Y=12,Width=43,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/Panel2/RichTextBox2 | RichTextBox | {X=408,Y=1,Width=453,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/cmbaltunit | ComboBox | {X=532,Y=352,Width=72,Height=21} | False | 
+/frmPOS/RetailWorkspace//Panel1/TextBox4 | TextBox | {X=452,Y=377,Width=57,Height=21} | False | Unit
+/frmPOS/RetailWorkspace//Panel1/TextBox3 | TextBox | {X=605,Y=352,Width=47,Height=27} | False | 1
+/frmPOS/RetailWorkspace//Panel1/TextBox2 | TextBox | {X=532,Y=379,Width=120,Height=27} | False | 
+/frmPOS/RetailWorkspace//Panel1/Label8 | Label | {X=6,Y=182,Width=55,Height=13} | False | Remarks :
+/frmPOS/RetailWorkspace//Panel1/txtLStatus | TextBox | {X=301,Y=437,Width=36,Height=10} | False | 
+/frmPOS/RetailWorkspace//Panel1/txtRsToWords | Label | {X=519,Y=435,Width=14,Height=12} | False | ...
+/frmPOS/RetailWorkspace//Panel1/lblTotPrice | Label | {X=78,Y=550,Width=65,Height=13} | False | Total Price :
+/frmPOS/RetailWorkspace//Panel1/txtCalOn | TextBox | {X=382,Y=436,Width=32,Height=11} | False | 
+/frmPOS/RetailWorkspace//Panel1/TextBox7 | TextBox | {X=343,Y=437,Width=33,Height=10} | False | 
+/frmPOS/RetailWorkspace//Panel1/lblAfterDisc | Label | {X=78,Y=576,Width=94,Height=13} | False | Price - Item Disc :
+/frmPOS/RetailWorkspace//Panel1/txtTempQty | TextBox | {X=420,Y=436,Width=32,Height=11} | False | 

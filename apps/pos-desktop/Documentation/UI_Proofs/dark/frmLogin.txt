@@ -1,0 +1,57 @@
+/frmLogin | frmLogin | {X=287,Y=190,Width=576,Height=759} | True | Sign in · Smart Retail OS
+/frmLogin/RetailSignIn | Panel | {X=0,Y=0,Width=560,Height=720} | True | 
+/frmLogin/RetailSignIn/ | TableLayoutPanel | {X=24,Y=24,Width=512,Height=636} | True | 
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=24,Width=464,Height=80} | True | 
+/frmLogin/RetailSignIn///RetailBrandArtwork | RetailArtwork | {X=0,Y=0,Width=76,Height=80} | True | 
+/frmLogin/RetailSignIn/// | TableLayoutPanel | {X=76,Y=0,Width=388,Height=80} | True | 
+/frmLogin/RetailSignIn//// | Label | {X=8,Y=0,Width=380,Height=40} | True | Smart Retail OS
+/frmLogin/RetailSignIn//// | Label | {X=8,Y=48,Width=380,Height=32} | True | Sign in to your store
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=112,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn/// | TableLayoutPanel | {X=0,Y=0,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn//// | Label | {X=0,Y=0,Width=464,Height=24} | True | Store
+/frmLogin/RetailSignIn//// | FieldFrame | {X=0,Y=24,Width=464,Height=44} | True | 
+/frmLogin/RetailSignIn/////cmbCompany | ComboBox | {X=16,Y=8,Width=432,Height=29} | True | 
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=188,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn/// | TableLayoutPanel | {X=0,Y=0,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn//// | Label | {X=0,Y=0,Width=464,Height=24} | True | Username
+/frmLogin/RetailSignIn//// | FieldFrame | {X=0,Y=24,Width=464,Height=44} | True | 
+/frmLogin/RetailSignIn/////UserID | TextBox | {X=16,Y=11,Width=432,Height=22} | True | 
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=264,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn/// | TableLayoutPanel | {X=0,Y=0,Width=348,Height=68} | True | 
+/frmLogin/RetailSignIn//// | Label | {X=0,Y=0,Width=348,Height=24} | True | Password
+/frmLogin/RetailSignIn//// | FieldFrame | {X=0,Y=24,Width=348,Height=44} | True | 
+/frmLogin/RetailSignIn/////Password | TextBox | {X=16,Y=11,Width=316,Height=22} | True | 
+/frmLogin/RetailSignIn/// | Panel | {X=348,Y=0,Width=116,Height=68} | True | 
+/frmLogin/RetailSignIn////Button4 | Button | {X=8,Y=24,Width=108,Height=44} | False | Hide
+/frmLogin/RetailSignIn////Button5 | Button | {X=8,Y=24,Width=108,Height=44} | True | Show
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=340,Width=464,Height=44} | True | 
+/frmLogin/RetailSignIn///OK | Button | {X=0,Y=0,Width=224,Height=44} | True | Sign in
+/frmLogin/RetailSignIn///Cancel | Button | {X=232,Y=0,Width=232,Height=44} | True | Exit
+/frmLogin/RetailSignIn//lblAttempt | Label | {X=24,Y=392,Width=464,Height=32} | True | Enter your store username and password.
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=432,Width=464,Height=44} | True | 
+/frmLogin/RetailSignIn///btnRecoveryPassword | Button | {X=0,Y=0,Width=224,Height=44} | True | Recover password
+/frmLogin/RetailSignIn///btnChangePassword | Button | {X=232,Y=0,Width=232,Height=44} | True | Change password
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=484,Width=464,Height=44} | True | 
+/frmLogin/RetailSignIn///btnCompany | Button | {X=0,Y=0,Width=224,Height=44} | True | Manage stores
+/frmLogin/RetailSignIn///btnKeyboard | Button | {X=232,Y=0,Width=232,Height=44} | True | Open keyboard
+/frmLogin/RetailSignIn// | TableLayoutPanel | {X=24,Y=536,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn/// | TableLayoutPanel | {X=0,Y=0,Width=464,Height=68} | True | 
+/frmLogin/RetailSignIn//// | Label | {X=0,Y=0,Width=464,Height=24} | True | Language
+/frmLogin/RetailSignIn//// | FieldFrame | {X=0,Y=24,Width=464,Height=44} | True | 
+/frmLogin/RetailSignIn/////cmbLang | ComboBox | {X=16,Y=8,Width=432,Height=29} | True | 
+/frmLogin/Panel1 | Panel | {X=0,Y=0,Width=705,Height=370} | False | 
+/frmLogin/Panel1/btnHelp | Button | {X=442,Y=327,Width=75,Height=23} | False | Help
+/frmLogin/Panel1/chkRememberme | CheckBox | {X=550,Y=213,Width=130,Height=22} | False | Remember Me
+/frmLogin/Panel1/Panel6 | Panel | {X=320,Y=5,Width=30,Height=24} | False | 
+/frmLogin/Panel1/Panel5 | Panel | {X=309,Y=13,Width=30,Height=24} | False | 
+/frmLogin/Panel1/Panel4 | Panel | {X=297,Y=21,Width=30,Height=24} | False | 
+/frmLogin/Panel1/Panel3 | Panel | {X=285,Y=28,Width=30,Height=24} | False | 
+/frmLogin/Panel1/LabelMsg | Label | {X=8,Y=5,Width=321,Height=30} | False | LabelMsg
+/frmLogin/Panel1/Label1 | Label | {X=6,Y=303,Width=148,Height=29} | False | NextGen OS
+/frmLogin/Panel1/Label5 | Label | {X=335,Y=31,Width=134,Height=21} | False | Company Name :
+/frmLogin/Panel1/Panel2 | Panel | {X=36,Y=38,Width=254,Height=259} | False | 
+/frmLogin/Panel1/Panel2/PictureBox1 | PictureBox | {X=161,Y=175,Width=94,Height=81} | False | 
+/frmLogin/Panel1/Label3 | Label | {X=335,Y=150,Width=87,Height=21} | False | Password :
+/frmLogin/Panel1/Label2 | Label | {X=335,Y=90,Width=98,Height=21} | False | User Name :
+/frmLogin/Panel1/UserType | TextBox | {X=231,Y=338,Width=55,Height=20} | False | 
+/frmLogin/Panel1/txtDBName | TextBox | {X=173,Y=338,Width=52,Height=20} | False | 

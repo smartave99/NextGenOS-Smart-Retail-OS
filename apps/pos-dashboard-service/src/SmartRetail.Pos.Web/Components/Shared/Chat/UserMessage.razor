@@ -1,0 +1,33 @@
+@* The owner's question: a compact bubble on the right, as typed, with the photos and voice notes sent with it. *@
+@using SmartRetail.AI.Assistant
+
+<div class="msg-user @(Text.Length == 0 ? "only-files" : null)">
+    @if (Attachments.Count > 0)
+    {
+        <div class="msg-files">
+            @foreach (var attachment in Attachments)
+            {
+                @if (attachment.Kind == AttachmentKind.Photo)
+                {
+                    <a href="@ChatAttachmentStore.Url(attachment)" target="_blank" rel="noopener" title="Open the photo">
+                        <img src="@ChatAttachmentStore.Url(attachment)" alt="Photo sent with the question" loading="lazy" />
+                    </a>
+                }
+                else
+                {
+                    <span class="msg-voice"><Icon Name="mic" /><audio controls preload="metadata" src="@ChatAttachmentStore.Url(attachment)" aria-label="Voice question"></audio></span>
+                }
+            }
+        </div>
+    }
+    @if (Text.Length > 0)
+    {
+        <span>@Text</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    [Parameter] public IReadOnlyList<ChatAttachment> Attachments { get; set; } = Array.Empty<ChatAttachment>();
+}

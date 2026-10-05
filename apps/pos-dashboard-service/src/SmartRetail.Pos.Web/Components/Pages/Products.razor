@@ -1,0 +1,273 @@
+@page "/products"
+@using SmartRetail.Pos.Core.Paging
+@inject IProductRepository Catalog
+@inject ProductPhotoService Photos
+@inject NavigationManager Nav
+@inject ILogger<Products> Log
+
+<PageTitle>Products · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Products</h1>
+        <p class="sub">Prices, GST and stock in hand.</p>
+    </div>
+</div>
+
+<section class="panel toolbar">
+    <div class="scan-box compact">
+        <Icon Name="search" Class="scan-icon" />
+        <input class="scan-input" type="text" autocomplete="off" placeholder="Search by name, code or barcode"
+               aria-label="Search products" value="@term" @oninput="OnInputAsync" />
+        <button type="button" class="scan-camera" title="Find with the camera" aria-label="Find a product with the camera" @onclick="OpenCameraAsync"><Icon Name="camera" /></button>
+    </div>
+    @if (all is not null)
+    {
+        <span class="muted">@(all.Count == FetchLimit ? $"First {FetchLimit} products" : all.Count == 1 ? "1 product" : $"{all.Count} products")</span>
+    }
+</section>
+
+<CameraFind @ref="cameraFind" Class="panel" SelectLabel="Show" OnSelect="ShowFoundAsync" />
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (items is null || window is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (window.Total == 0)
+{
+    <section class="panel"><p class="muted">No products match “@term”.</p></section>
+}
+else
+{
+    <section class="panel">
+        <div class="table-wrap">
+            <table class="table data-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Product</th>
+                        <th title="The code on the product's sticker, which the till scans">Barcode</th>
+                        <th>Category</th>
+                        <th>HSN</th>
+                        <th class="num">GST</th>
+                        <th class="num">MRP</th>
+                        <th class="num">Price</th>
+                        <th class="num">In stock</th>
+                        <th><span class="visually-hidden">Google Lens and stickers</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in items)
+                    {
+                        <tr class="@(product.Id == picked ? "picked" : null)">
+                            <td class="mono">@product.Code</td>
+                            <td><div class="item-name">@product.Name</div></td>
+                            <td>
+                                @foreach (var tillCode in codes.GetValueOrDefault(product.Id) ?? NoCodes)
+                                {
+                                    <span class="till-code">@tillCode</span>
+                                }
+                            </td>
+                            <td>@product.Category</td>
+                            <td class="mono">@product.HsnCode</td>
+                            <td class="num">@Formats.Percent(product.GstRatePercent)</td>
+                            <td class="num muted">@Money.Format(product.Mrp)</td>
+                            <td class="num">@Money.Format(product.SellingPrice)</td>
+                            <td class="num"><span class="pill @StockTone(product)">@Money.FormatQty(product.StockInHand)</span></td>
+                            <td class="num act-col">
+                                <LensLink ProductId="product.Id" Available="@withPhoto.Contains(product.Id)" IconOnly="true" Class="btn btn-sm btn-soft lens-btn" />
+                                <a class="btn btn-sm btn-soft" href="@($"barcodes?products={product.Id}")" title="Print barcode stickers for @product.Name"><Icon Name="barcode" /> Stickers</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <Pager Window="window" OnPage="GoToPageAsync" OnSize="ResizeAsync" Label="Pages of products" />
+}
+
+@code {
+    /// <summary>The most products one search brings in: the list is cut into pages from them.</summary>
+    private const int FetchLimit = 5000;
+
+    private const int DefaultSize = 100;
+
+    /// <summary>A search from the sidebar's search box.</summary>
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    /// <summary>A product chosen from what the camera in the top bar or the sidebar found: it comes first, marked.</summary>
+    [SupplyParameterFromQuery(Name = "picked")]
+    public string? PickedText { get; set; }
+
+    private int? PickedId => PageWindow.Parse(PickedText);
+
+    // Text, not numbers: a mistyped address must show the first page, not stop the screen.
+    [SupplyParameterFromQuery(Name = "page")]
+    public string? PageNumber { get; set; }
+
+    [SupplyParameterFromQuery(Name = "size")]
+    public string? PageSizeAsked { get; set; }
+
+    private string term = "";
+    private string? lastQuery;
+    private int? lastPicked;
+    private int page = 1;
+    private int size = DefaultSize;
+    private static readonly IReadOnlyList<string> NoCodes = Array.Empty<string>();
+
+    // Every product the search found, and the part of them on the page shown.
+    private IReadOnlyList<Product>? all;
+    private IReadOnlyList<Product>? items;
+    private PageWindow? window;
+
+    // The codes the till scans, by product: a product has one for each price it is stocked at.
+    private IReadOnlyDictionary<int, IReadOnlyList<string>> codes = new Dictionary<int, IReadOnlyList<string>>();
+    private string? error;
+    private int version;
+    private CameraFind? cameraFind;
+
+    // The products that have a photo to search Google Lens with.
+    private IReadOnlySet<int> withPhoto = new HashSet<int>();
+
+    /// <summary>The product chosen from what the camera found: it comes first, marked.</summary>
+    private int? picked;
+
+    protected override void OnInitialized() =>
+        withPhoto = Photos.All().Where(photo => GoogleLens.BestPhoto(photo.Value) is not null).Select(photo => photo.Key).ToHashSet();
+
+    protected override Task OnParametersSetAsync()
+    {
+        var asked = PageWindow.Parse(PageNumber) ?? 1;
+        var askedSize = PageWindow.SizeOrDefault(PageWindow.Parse(PageSizeAsked), DefaultSize);
+        if (all is not null && Query == lastQuery && PickedId == lastPicked)
+        {
+            // Only the page or its size changed (Back, or a link): show it.
+            if (asked == page && askedSize == size)
+            {
+                return Task.CompletedTask;
+            }
+
+            page = asked;
+            size = askedSize;
+            return ShowPageAsync();
+        }
+
+        lastQuery = Query;
+        lastPicked = PickedId;
+        term = Query?.Trim() ?? "";
+        picked = PickedId;
+        page = asked;
+        size = askedSize;
+        return LoadAsync();
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString() ?? "";
+        picked = null;
+        page = 1;
+        await LoadAsync();
+        SyncAddress();
+    }
+
+    private async Task ResizeAsync(int newSize)
+    {
+        size = newSize;
+        await GoToPageAsync(1);
+    }
+
+    /// <summary>Shows a page, and puts it in the address (without a new history entry), so Back from a product's page comes to the same page.</summary>
+    private async Task GoToPageAsync(int number)
+    {
+        page = number;
+        await ShowPageAsync();
+        SyncAddress();
+    }
+
+    private void SyncAddress()
+    {
+        var address = Nav.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["page"] = page > 1 ? page : null,
+            ["size"] = size == DefaultSize ? null : size,
+        });
+        if (address != Nav.Uri)
+        {
+            Nav.NavigateTo(address, replace: true);
+        }
+    }
+
+    private Task OpenCameraAsync() => cameraFind?.OpenAsync() ?? Task.CompletedTask;
+
+    /// <summary>The product the person chose from what the camera found, looked up by its code (else its name).</summary>
+    private async Task ShowFoundAsync(FoundProduct product)
+    {
+        picked = product.ProductId;
+        page = 1;
+        term = product.Code.Length > 0 ? product.Code : product.Name;
+        await LoadAsync();
+        if (error is null && all is not null && !all.Any(p => p.Id == product.ProductId) && term != product.Name)
+        {
+            term = product.Name;
+            await LoadAsync();
+        }
+    }
+
+    /// <summary>Finds the products for the search, then shows the page asked for.</summary>
+    private async Task LoadAsync()
+    {
+        var mine = ++version;
+        error = null;
+        try
+        {
+            var found = await Catalog.SearchAsync(term, FetchLimit);
+            if (mine != version)
+            {
+                return;
+            }
+
+            all = picked is { } id ? found.OrderBy(p => p.Id == id ? 0 : 1).ToList() : found;
+            await ShowPageAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading products failed.");
+            error = ex.Message;
+        }
+    }
+
+    /// <summary>The products on the page shown, with the codes the till scans for just those.</summary>
+    private async Task ShowPageAsync()
+    {
+        var mine = ++version;
+        try
+        {
+            var shown = PageWindow.Of(page, size, all?.Count ?? 0);
+            var onPage = all?.Skip(shown.Skip).Take(shown.Size).ToList() ?? new List<Product>();
+            var batches = await Catalog.GetBatchesAsync(onPage.Select(p => p.Id).ToList());
+            if (mine == version)
+            {
+                window = shown;
+                page = shown.Page;
+                items = onPage;
+                codes = batches
+                    .GroupBy(b => b.ProductId)
+                    .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(b => b.Code).Distinct().ToList());
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading products failed.");
+            error = ex.Message;
+        }
+    }
+
+    private static string StockTone(Product product) =>
+        product.StockInHand <= 0 ? "bad" : product.IsLowStock ? "warn" : "good";
+}

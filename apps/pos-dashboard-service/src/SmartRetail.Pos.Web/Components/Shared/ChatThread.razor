@@ -1,0 +1,81 @@
+@* The conversation in its reading column: the owner's questions, and the answers laid out like documents. While an
+   answer is written it shows as it grows. The column follows new words only while the reader is at the end: someone
+   who scrolled up to read stays where they are, with "Latest" to jump back (srpos.follow). *@
+@using SmartRetail.AI.Assistant
+@inject IJSRuntime Js
+
+@for (var i = 0; i < Messages.Count; i++)
+{
+    var message = Messages[i];
+    if (message.Role == ChatRole.Owner)
+    {
+        <UserMessage Text="@message.Text" Attachments="message.Attachments" />
+    }
+    else
+    {
+        <AssistantMessage Message="message" Question="QuestionBefore(i)" AskAgain="AskAgain" Busy="Busy" />
+    }
+}
+
+@if (Busy)
+{
+    <StreamingIndicator Status="@Status" Draft="@Draft" Table="DraftTable" />
+}
+<div class="thread-end" @ref="end"></div>
+
+@code {
+    private ElementReference end;
+    private int shownMessages = -1;
+    private string shownDraft = "";
+    private bool shownBusy;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ChatMessage> Messages { get; set; } = Array.Empty<ChatMessage>();
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter] public string Status { get; set; } = "";
+
+    /// <summary>The running answer's words so far.</summary>
+    [Parameter] public string Draft { get; set; } = "";
+
+    /// <summary>The table found for the running answer.</summary>
+    [Parameter] public ChatTable? DraftTable { get; set; }
+
+    /// <summary>Asks a question again, with its photos and voice notes; null hides "Ask again".</summary>
+    [Parameter] public Func<string, IReadOnlyList<ChatAttachment>, bool>? AskAgain { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Messages.Count == shownMessages && Draft == shownDraft && Busy == shownBusy)
+        {
+            return;
+        }
+
+        // A question just asked always shows; anything else follows only a reader who is at the end.
+        var asked = Messages.Count > shownMessages && Messages.Count > 0 && Messages[^1].Role == ChatRole.Owner;
+        shownMessages = Messages.Count;
+        shownDraft = Draft;
+        shownBusy = Busy;
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.follow", end, firstRender || asked);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The page is gone.
+        }
+    }
+
+    private ChatMessage? QuestionBefore(int index)
+    {
+        for (var i = index - 1; i >= 0; i--)
+        {
+            if (Messages[i].Role == ChatRole.Owner)
+            {
+                return Messages[i];
+            }
+        }
+
+        return null;
+    }
+}

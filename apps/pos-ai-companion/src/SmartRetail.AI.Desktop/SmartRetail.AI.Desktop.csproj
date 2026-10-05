@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>SmartRetailAI</AssemblyName>
+    <RootNamespace>SmartRetail.AI.Desktop</RootNamespace>
+    <AssemblyTitle>Smart Retail POS AI Assistant</AssemblyTitle>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartRetail.AI.Core\SmartRetail.AI.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The app's mark for the start screen of its windows (the same drawing as app.ico and the dashboard's). -->
+    <EmbeddedResource Include="app-mark.png" LogicalName="SmartRetail.AI.Desktop.app-mark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+  </ItemGroup>
+
+  <!--
+    Automatic updates: the update folder online and the release workflow whose statements are trusted, kept in the app by
+    the build (build.ps1 -UpdateFeed …, which the release workflow gives its own repository's ids). Without them the app
+    never checks for updates. See SmartRetailAI/README.md, "Automatic updates".
+  -->
+  <PropertyGroup>
+    <ReleaseRef Condition="'$(ReleaseRef)' == ''">refs/heads/main</ReleaseRef>
+    <ReleaseWorkflow Condition="'$(ReleaseWorkflow)' == ''">.github/workflows/installer.yml</ReleaseWorkflow>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UpdateFeed)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>UpdateFeed</_Parameter1>
+      <_Parameter2>$(UpdateFeed)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ReleaseRepositoryId</_Parameter1>
+      <_Parameter2>$(ReleaseRepositoryId)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ReleaseOwnerId</_Parameter1>
+      <_Parameter2>$(ReleaseOwnerId)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ReleaseRef</_Parameter1>
+      <_Parameter2>$(ReleaseRef)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ReleaseWorkflow</_Parameter1>
+      <_Parameter2>$(ReleaseWorkflow)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

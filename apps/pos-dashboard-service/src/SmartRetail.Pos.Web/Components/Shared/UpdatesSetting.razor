@@ -1,0 +1,139 @@
+@* Settings: updates. The Windows app looks for a newer version now and then, in the owner's update folder, and only takes
+   one that GitHub signed as made by this project's own release; it downloads it, checks it, and installs it when the owner
+   says so. This card shows what the app found and asks the app to check or install, by a message (only the app can). *@
+@implements IDisposable
+@using SmartRetail.AI.Updates
+@inject UpdateStatusService Updates
+@inject IJSRuntime Js
+@inject TimeProvider Clock
+
+<div class="setting updates" id="update-card" data-state="@status.State">
+    <div>
+        <h3>@Title</h3>
+        <p>@Line</p>
+        @if (status.State == UpdateState.Ready && status.Notes.Length > 0)
+        {
+            <p class="update-notes"><strong>What is new:</strong> @status.Notes</p>
+        }
+
+        <p class="small"><a href="whats-new">What changed in each update ›</a></p>
+
+        @if (status.State == UpdateState.Failed && status.Problem.Length > 0)
+        {
+            <p class="update-problem small" role="alert">@status.Problem</p>
+        }
+
+        @if (status.State != UpdateState.Off)
+        {
+            <p class="small muted browser-only">Open Smart Retail POS itself to check for an update or to install one.</p>
+        }
+
+        @if (installing)
+        {
+            <p class="small" role="status"><span class="spinner"></span> Starting the update. The app closes in a moment and opens again by itself.</p>
+        }
+        else if (confirming)
+        {
+            <div class="confirm-install" role="alertdialog" aria-label="Install the update?">
+                <p class="small">Install version @status.Available now? Smart Retail POS closes, updates and opens again by itself, which takes about a minute. Windows may ask for permission. Your settings, photos and plans are kept, and photos being made carry on afterwards.</p>
+                <div class="f-actions">
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="InstallAsync">Install and restart</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => confirming = false">Not now</button>
+                </div>
+            </div>
+        }
+    </div>
+    @if (status.State != UpdateState.Off && !installing)
+    {
+        <div class="setting-actions host-only">
+            @if (status.State == UpdateState.Ready)
+            {
+                <button type="button" class="btn btn-primary" disabled="@confirming" @onclick="() => confirming = true"><Icon Name="download" /> Install now</button>
+            }
+            <button type="button" class="btn btn-soft" disabled="@checking" @onclick="CheckAsync"><Icon Name="refresh" /> @(checking ? "Checking…" : status.State == UpdateState.Failed ? "Check again" : "Check now")</button>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    private UpdateStatus status = new();
+    private bool checking;
+    private bool confirming;
+    private bool installing;
+    private DateTime? checkedBefore;
+    private readonly CancellationTokenSource stopped = new();
+
+    private string Title => status.State switch
+    {
+        UpdateState.Off => "Updates are not set up",
+        UpdateState.UpToDate => "You have the latest version",
+        UpdateState.Ready => $"Version {status.Available} is ready to install",
+        UpdateState.Failed => "The last check did not work",
+        _ => "No update check yet",
+    };
+
+    private string Line => status.State switch
+    {
+        UpdateState.Off => "This copy was built without an update folder, so a new version has to be installed by hand from the Releases page.",
+        UpdateState.UpToDate => $"Smart Retail POS {status.Current}. Last checked {When(status.CheckedAt)}.",
+        UpdateState.Ready => "Windows may ask for permission. The app closes, updates and opens again by itself. Your settings, photos and plans are kept.",
+        UpdateState.Failed => status.CheckedAt is null ? "" : $"Last tried {When(status.CheckedAt)}. The app tries again every few hours.",
+        _ => "The app looks for a newer version two minutes after it starts, and then every six hours.",
+    };
+
+    protected override void OnInitialized()
+    {
+        status = Updates.Status;
+        Updates.Changed += OnChanged;
+    }
+
+    private string When(DateTime? at) => at is { } time ? time.ToString("d MMM, h:mm tt", India) : "not yet";
+
+    private async Task CheckAsync()
+    {
+        checking = true;
+        checkedBefore = status.CheckedAt;
+        await Js.InvokeAsync<bool>("srpos.send", "update", "check");
+
+        // A check that got no answer in a minute stops showing as running.
+        _ = Task.Delay(TimeSpan.FromSeconds(60), stopped.Token).ContinueWith(_ => InvokeAsync(() =>
+        {
+            checking = false;
+            StateHasChanged();
+        }), TaskContinuationOptions.OnlyOnRanToCompletion);
+    }
+
+    private async Task InstallAsync()
+    {
+        confirming = false;
+        installing = true;
+        await Js.InvokeAsync<bool>("srpos.send", "update", "install");
+
+        // If the app shows a problem instead of closing, the page is not left waiting.
+        _ = Task.Delay(TimeSpan.FromSeconds(30), stopped.Token).ContinueWith(_ => InvokeAsync(() =>
+        {
+            installing = false;
+            StateHasChanged();
+        }), TaskContinuationOptions.OnlyOnRanToCompletion);
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        status = Updates.Status;
+        if (checking && status.CheckedAt != checkedBefore)
+        {
+            checking = false;
+        }
+
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Updates.Changed -= OnChanged;
+        stopped.Cancel();
+        stopped.Dispose();
+    }
+}

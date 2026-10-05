@@ -1,0 +1,253 @@
+@* The question box with its send button (a stop button while an answer is being written). Enter sends, Shift+Enter
+   starts a new line, and the box grows with the text. "Latest" shows above it when the reader has scrolled up.
+   When the AI that answers can look at photos: add one (a file, a paste, a drop) or take one with the camera. When
+   it can listen: record a voice note. Otherwise, inside the app, the microphone starts Windows voice typing, which
+   types into the box. What waits to be sent shows above the box, each with a way to remove it. *@
+@using SmartRetail.AI.Assistant
+@implements IAsyncDisposable
+@inject IJSRuntime Js
+@inject ChatAttachmentStore Attachments
+@inject ChatInputs Inputs
+@inject AiEnvironment Ai
+@inject ILogger<ChatComposer> Log
+
+<button type="button" class="jump-latest" data-jump aria-label="Jump to the latest message"><Icon Name="chevron" /> Latest</button>
+<div class="composer-files" data-files hidden></div>
+<p class="composer-note" data-files-note hidden role="status"></p>
+@if (problem is not null)
+{
+    <p class="composer-note problem" role="alert">@problem</p>
+}
+<div class="composer @(recording ? "recording" : null)" @ref="composer" data-photos="@(options.Photos ? "1" : "0")">
+    @if (options.Photos)
+    {
+        <button type="button" class="tool" title="Add a photo from a file (or paste or drop one here)" aria-label="Add a photo" disabled="@(Busy || sending)" @onclick="PickAsync"><Icon Name="image" /></button>
+        <button type="button" class="tool" title="Take a photo with the camera" aria-label="Take a photo" disabled="@(Busy || sending)" @onclick="OpenCameraAsync"><Icon Name="camera" /></button>
+        <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden data-pick />
+    }
+    <textarea @ref="box" rows="1" maxlength="@Conversation.MaxQuestionLength" placeholder="@(recording ? "Recording… press Stop when you are done" : Placeholder)" aria-label="Your question"></textarea>
+    @if (options.Voice || inApp || recording)
+    {
+        <button type="button" class="tool mic @(recording ? "on" : null)" disabled="@(Busy || sending)" @onclick="VoiceAsync"
+                title="@(recording ? "Stop recording" : options.Voice ? "Ask by voice" : "Talk: Windows types what you say (Windows voice typing)")"
+                aria-label="@(recording ? "Stop recording" : options.Voice ? "Record a voice question" : "Start Windows voice typing")"
+                aria-pressed="@(recording ? "true" : "false")">
+            <Icon Name="@(recording ? "stop" : "mic")" />
+        </button>
+    }
+    @if (Busy)
+    {
+        <button type="button" class="send stop" title="Stop" aria-label="Stop" @onclick="Stop"><Icon Name="stop" /></button>
+    }
+    else
+    {
+        <button type="button" class="send" title="Send (Enter)" aria-label="Send" disabled="@(sending || recording)" @onclick="SendAsync"><Icon Name="arrow-up" /></button>
+    }
+</div>
+@if (camera)
+{
+    <CameraDialog Title="Take a photo for the AI" Hint="Hold the product, shelf or note in front of the camera." OnUse="UseStillAsync" OnClose="() => camera = false" />
+}
+
+@code {
+    private ElementReference box;
+    private ElementReference composer;
+    private ChatInputOptions options = ChatInputOptions.TypingOnly;
+    private bool inApp;
+    private bool recording;
+    private bool camera;
+    private bool sending;
+    private string? problem;
+
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Ask anything…";
+
+    /// <summary>Puts the cursor in the box as soon as it is shown (the side panel, which opens to be typed in).</summary>
+    [Parameter] public bool AutoFocus { get; set; }
+
+    /// <summary>Sends the question with any photos and voice notes; false when it could not be taken (another one is
+    /// being answered).</summary>
+    [Parameter, EditorRequired] public Func<string, IReadOnlyList<ChatAttachment>, bool> Send { get; set; } = (_, _) => false;
+
+    [Parameter, EditorRequired] public Action Stop { get; set; } = () => { };
+
+    protected override void OnInitialized()
+    {
+        // A model chosen for Ask AI may take other inputs: the buttons follow it.
+        Ai.JobsChanged += OnJobsChanged;
+        _ = LoadOptionsAsync();
+    }
+
+    private void OnJobsChanged() => _ = LoadOptionsAsync();
+
+    /// <summary>Which inputs the AI takes can need a word with Codex: the box is usable meanwhile.</summary>
+    private async Task LoadOptionsAsync()
+    {
+        try
+        {
+            var loaded = await Inputs.ForAskAsync(CancellationToken.None);
+            await InvokeAsync(() =>
+            {
+                if (loaded != options)
+                {
+                    options = loaded;
+                    StateHasChanged();
+                }
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogInformation(ex, "The chat's photo and voice buttons could not be set up.");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Js.InvokeVoidAsync("srpos.composer", box);
+            await Js.InvokeVoidAsync("srposChat.init", composer);
+            if (AutoFocus)
+            {
+                await Js.InvokeVoidAsync("srpos.focus", box);
+            }
+
+            inApp = await Js.InvokeAsync<bool>("srpos.isInApp");
+            if (inApp)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    public ValueTask FocusAsync() => Js.InvokeVoidAsync("srpos.focus", box);
+
+    private async Task PickAsync() => await Js.InvokeVoidAsync("srposChat.pick", composer);
+
+    /// <summary>Opens the camera only when the photo it takes can go with the question.</summary>
+    private async Task OpenCameraAsync()
+    {
+        problem = null;
+        var waiting = await Js.InvokeAsync<Waiting[]>("srposChat.list", composer);
+        if (waiting.Length >= Conversation.MaxAttachments)
+        {
+            problem = $"Send at most {Conversation.MaxAttachments} photos or voice notes with one question. Remove one to take a photo.";
+            return;
+        }
+
+        camera = true;
+    }
+
+    private async Task UseStillAsync(string id)
+    {
+        camera = false;
+        if (!await Js.InvokeAsync<bool>("srposCamera.giveToChat", id, composer))
+        {
+            // The box filled up meanwhile (a paste or a drop): say so; the photo cannot wait anywhere else.
+            problem = $"Send at most {Conversation.MaxAttachments} photos or voice notes with one question. Remove one, then take the photo again.";
+            await Js.InvokeVoidAsync("srposCamera.discard", id);
+        }
+    }
+
+    private async Task VoiceAsync()
+    {
+        problem = null;
+        Outcome done;
+        if (recording)
+        {
+            // A recording always stops here, even if the model changed meanwhile.
+            done = await Js.InvokeAsync<Outcome>("srposChat.stop");
+            recording = false;
+        }
+        else if (!options.Voice)
+        {
+            // No AI here listens: Windows voice typing types into the box instead.
+            await Js.InvokeAsync<bool>("srposChat.dictate", box);
+            return;
+        }
+        else
+        {
+            done = await Js.InvokeAsync<Outcome>("srposChat.record", composer);
+            recording = done.Ok;
+        }
+
+        if (!done.Ok && !string.IsNullOrEmpty(done.Problem))
+        {
+            problem = done.Problem;
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        if (sending || recording)
+        {
+            return;
+        }
+
+        var text = await Js.InvokeAsync<string>("srpos.take", box);
+        var waiting = await Js.InvokeAsync<Waiting[]>("srposChat.list", composer);
+        if (string.IsNullOrWhiteSpace(text) && waiting.Length == 0)
+        {
+            return;
+        }
+
+        sending = true;
+        problem = null;
+        var kept = new List<ChatAttachment>();
+        try
+        {
+            foreach (var file in waiting)
+            {
+                await using var bytes = await Js.InvokeAsync<IJSStreamReference>("srposChat.take", composer, file.Id);
+                await using var stream = await bytes.OpenReadStreamAsync(ChatAttachmentStore.MaxVoiceBytes);
+                kept.Add(await Attachments.SaveAsync(file.Kind == "voice" ? AttachmentKind.Voice : AttachmentKind.Photo, stream, CancellationToken.None));
+            }
+
+            if (!Send(text, kept))
+            {
+                Attachments.Delete(kept);
+                await Js.InvokeVoidAsync("srpos.put", box, text);
+                return;
+            }
+
+            await Js.InvokeVoidAsync("srposChat.clear", composer);
+        }
+        catch (ChatAttachmentException ex)
+        {
+            Attachments.Delete(kept);
+            problem = ex.Message;
+            await Js.InvokeVoidAsync("srpos.put", box, text);
+        }
+        catch (Exception ex) when (ex is JSException or IOException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "A photo or voice note could not be sent.");
+            Attachments.Delete(kept);
+            problem = "A photo or voice note could not be read. Remove it, or add it again.";
+            await Js.InvokeVoidAsync("srpos.put", box, text);
+        }
+        finally
+        {
+            sending = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Ai.JobsChanged -= OnJobsChanged;
+        if (recording)
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("srposChat.cancel");
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page is gone, and the recording with it.
+            }
+        }
+    }
+
+    private sealed record Waiting(string Id, string Kind);
+
+    private sealed record Outcome(bool Ok, string? Problem);
+}

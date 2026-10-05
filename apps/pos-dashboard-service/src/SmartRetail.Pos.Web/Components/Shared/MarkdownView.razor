@@ -1,0 +1,25 @@
+@* Shows an AI answer or plan, drawn from its Markdown (MarkdownRenderer): never as HTML. It redraws only when the
+   text changes, so a streaming answer costs one parse per update. *@
+@using SmartRetail.Pos.Web.Components.Shared.Chat
+
+<div class="md">@content</div>
+
+@code {
+    private string? shown;
+    private RenderFragment? content;
+    private bool changed;
+
+    [Parameter, EditorRequired] public string? Text { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        changed = content is null || !string.Equals(shown, Text, StringComparison.Ordinal);
+        if (changed)
+        {
+            shown = Text;
+            content = MarkdownRenderer.Render(Text);
+        }
+    }
+
+    protected override bool ShouldRender() => changed;
+}

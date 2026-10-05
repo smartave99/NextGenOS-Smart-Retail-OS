@@ -1,0 +1,64 @@
+﻿Imports System
+Imports System.ComponentModel
+Imports System.Drawing
+Imports CrystalDecisions.CrystalReports.Engine
+Imports CrystalDecisions.ReportSource
+Imports CrystalDecisions.[Shared]
+
+Namespace BillPoint
+	' Token: 0x02000565 RID: 1381
+	<ToolboxBitmap(GetType(ExportOptions), "report.bmp")>
+	Public Class CachedrptPurchaseC1
+		Inherits Component
+		Implements ICachedReport
+
+		' Token: 0x17006826 RID: 26662
+		' (get) Token: 0x06010CF6 RID: 68854 RVA: 0x000B7488 File Offset: 0x000B5688
+		' (set) Token: 0x06010CF7 RID: 68855 RVA: 0x00009E98 File Offset: 0x00008098
+		<Browsable(False)>
+		<DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+		Public Overridable Property IsCacheable As Boolean Implements CrystalDecisions.ReportSource.ICachedReport.IsCacheable
+			Get
+				Return True
+			End Get
+			Set(value As Boolean)
+			End Set
+		End Property
+
+		' Token: 0x17006827 RID: 26663
+		' (get) Token: 0x06010CF8 RID: 68856 RVA: 0x000A02C0 File Offset: 0x0009E4C0
+		' (set) Token: 0x06010CF9 RID: 68857 RVA: 0x00009E98 File Offset: 0x00008098
+		<Browsable(False)>
+		<DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+		Public Overridable Property ShareDBLogonInfo As Boolean Implements CrystalDecisions.ReportSource.ICachedReport.ShareDBLogonInfo
+			Get
+				Return False
+			End Get
+			Set(value As Boolean)
+			End Set
+		End Property
+
+		' Token: 0x17006828 RID: 26664
+		' (get) Token: 0x06010CFA RID: 68858 RVA: 0x006E8B6C File Offset: 0x006E6D6C
+		' (set) Token: 0x06010CFB RID: 68859 RVA: 0x00009E98 File Offset: 0x00008098
+		<Browsable(False)>
+		<DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+		Public Overridable Property CacheTimeOut As TimeSpan Implements CrystalDecisions.ReportSource.ICachedReport.CacheTimeOut
+			Get
+				Return CachedReportConstants.DEFAULT_TIMEOUT
+			End Get
+			Set(value As TimeSpan)
+			End Set
+		End Property
+
+		' Token: 0x06010CFC RID: 68860 RVA: 0x009CB3F0 File Offset: 0x009C95F0
+		Public Overridable Function CreateReport() As ReportDocument Implements CrystalDecisions.ReportSource.ICachedReport.CreateReport
+			Return New rptPurchaseC1() With { .Site = Me.Site }
+		End Function
+
+		' Token: 0x06010CFD RID: 68861 RVA: 0x006E8BAC File Offset: 0x006E6DAC
+		Public Overridable Function GetCustomizedCacheKey(request As RequestContext) As String Implements CrystalDecisions.ReportSource.ICachedReport.GetCustomizedCacheKey
+			Return Nothing
+		End Function
+	End Class
+End Namespace

@@ -1,0 +1,275 @@
+@page "/photos"
+@implements IDisposable
+@using SmartRetail.AI.Products
+@using SmartRetail.AI.Storage
+@using SmartRetail.Pos.Core.Analytics
+@using SmartRetail.Pos.Core.Paging
+@inject ISalesFactsRepository Facts
+@inject ProductPhotoService Photos
+@inject StorageService Storage
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+@inject ILogger<ProductPhotos> Log
+
+<PageTitle>Product photos · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Product photos</h1>
+        <p class="sub">Add phone photos of a product and the AI makes five photos for your website and Amazon, one by one: white background, in use, and with a European, an Indian and an East Asian model. It also learns what each product is, and writes its listings for Amazon and your website. The POS is not changed.</p>
+    </div>
+    <div class="actions">
+        <AiChoice Job="SmartRetail.AI.Settings.AiJob.Photos" />
+    </div>
+</div>
+
+<p class="storage-line small muted">
+    Photos are kept in <span class="path">@Storage.DataFolder</span>@(freeText is null ? "" : $" ({freeText} free)").
+    <a href="storage">Change</a>
+</p>
+
+<PhotoQueuePanel />
+
+<section class="panel toolbar wrap">
+    <div class="scan-box compact">
+        <Icon Name="search" Class="scan-icon" />
+        <input class="scan-input" type="text" autocomplete="off" placeholder="Search by name or code" aria-label="Search products"
+               value="@term" @oninput="Search" />
+    </div>
+    <nav class="seg seg-inline" aria-label="Which products">
+        @foreach (var (key, label) in Views)
+        {
+            <a class="seg-item @(key == view ? "active" : null)" href="@($"photos?view={key}{(size == DefaultSize ? "" : $"&size={size}")}")" aria-current="@(key == view ? "page" : null)">@label</a>
+        }
+    </nav>
+</section>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (rows is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    var (shown, window) = Shown();
+    <section class="panel">
+        <div class="panel-head">
+            <h2>@Heading</h2>
+            <span class="muted small">@photographed of @(rows.Count) products have a photo</span>
+        </div>
+        @if (shown.Count == 0)
+        {
+            <p class="muted">@(view == "with" ? "No product has a photo yet." : "No products match.")</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table data-table">
+                    <thead>
+                        <tr>
+                            <th class="thumb-col">Photo</th>
+                            <th>Product</th>
+                            <th class="num">Sold, 90 days</th>
+                            <th class="status-col">Photos</th>
+                            <th class="act-col"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in shown)
+                        {
+                            var link = $"photos/{row.Product.Id}";
+                            <tr>
+                                <td class="thumb-col">
+                                    <a href="@link" tabindex="-1" aria-hidden="true">
+                                        @if (row.Photo?.Thumbnail is { } thumbnail)
+                                        {
+                                            <img class="thumb" src="@ProductPhotoService.Url(row.Product.Id, thumbnail)" alt="" loading="lazy" />
+                                        }
+                                        else
+                                        {
+                                            <span class="thumb thumb-empty"><Icon Name="camera" /></span>
+                                        }
+                                    </a>
+                                </td>
+                                <td class="name-cell">
+                                    <a class="item-name" href="@link">@row.Product.Name</a>
+                                    <div class="item-meta">@row.Product.Code · @row.Product.Category</div>
+                                    @if (row.Photo?.Understanding?.WhatItIs is { Length: > 0 } what)
+                                    {
+                                        <div class="item-what">@what</div>
+                                    }
+                                    <div class="status-inline">@Status(row)</div>
+                                </td>
+                                <td class="num">@(row.Sales > 0 ? Formats.Rupees(row.Sales) : "–")</td>
+                                <td class="status-col">@Status(row)</td>
+                                <td class="num act-col">
+                                    <LensLink ProductId="row.Product.Id" Available="@(GoogleLens.BestPhoto(row.Photo) is not null)" IconOnly="true" Class="btn btn-sm btn-soft lens-btn" />
+                                    <a class="btn btn-sm @(row.Photo?.Thumbnail is null ? "btn-primary" : "btn-outline-secondary")" href="@link">
+                                        @(row.Photo?.Thumbnail is null ? "Add photos" : "Open")
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <Pager Window="window" OnPage="GoToPageAsync" OnSize="ResizeAsync" Label="Pages of products" />
+        }
+    </section>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Views = { ("best", "Best sellers"), ("with", "With photos"), ("all", "All products") };
+
+    [SupplyParameterFromQuery(Name = "view")]
+    public string? ViewKey { get; set; }
+
+    // Text, not numbers: a mistyped address must show the first page, not stop the screen.
+    [SupplyParameterFromQuery(Name = "page")]
+    public string? PageNumber { get; set; }
+
+    [SupplyParameterFromQuery(Name = "size")]
+    public string? PageSizeAsked { get; set; }
+
+    private const int DefaultSize = 50;
+
+    private string view = "best";
+    private string term = "";
+    private int page = 1;
+    private int size = DefaultSize;
+    private List<Row>? rows;
+    private int photographed;
+    private string? freeText;
+    private string? error;
+
+    private sealed record Row(ProductFacts Product, decimal Sales, ProductPhotoInfo? Photo);
+
+    private string Heading => view switch
+    {
+        "with" => "Products with a photo",
+        "all" => "All products",
+        _ => "Best sellers of the last 90 days: give them photos first",
+    };
+
+    protected override void OnInitialized() => Photos.Changed += OnPhotosChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        view = Views.Any(v => v.Key == ViewKey) ? ViewKey! : "best";
+        page = PageWindow.Parse(PageNumber) ?? 1;
+        size = PageWindow.SizeOrDefault(PageWindow.Parse(PageSizeAsked), DefaultSize);
+        if (rows is null)
+        {
+            await LoadAsync();
+        }
+    }
+
+    /// <summary>Photos arrive one by one in the background; show each as it comes.</summary>
+    private void OnPhotosChanged(int productId) => _ = InvokeAsync(() =>
+    {
+        if (rows is null)
+        {
+            return;
+        }
+
+        var photo = Photos.Info(productId);
+        rows = rows.Select(r => r.Product.Id == productId ? r with { Photo = photo } : r).ToList();
+        photographed = rows.Count(r => r.Photo?.Thumbnail is not null);
+        StateHasChanged();
+    });
+
+    private RenderFragment Status(Row row)
+    {
+        var progress = Photos.Progress(row.Product.Id, row.Photo);
+        var (text, tone) = progress switch
+        {
+            { Making: { IsListing: true } } => ("Writing listings", "brand"),
+            { Making: { } work } => ($"Making {work.Kind.Number()} of {PhotoKinds.All.Count}", "brand"),
+            { PlaceInQueue: > 0 } => ("Waiting", ""),
+            { Problem: not null, Pending: > 0 } => ("Stopped", "warn"),
+            { Made: > 0 } => ($"{progress.Made} of {PhotoKinds.All.Count}", progress.Made == PhotoKinds.All.Count ? "good" : ""),
+            _ => ("", ""),
+        };
+        return text.Length == 0 ? _ => { } : @<span class="pill @tone">@text</span>;
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            var today = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+            var end = SalesPeriods.EndDay(today, await Facts.GetBillSpanAsync());
+            var facts = await Facts.GetFactsAsync(DateRange.Ending(end, 90));
+            var sales = facts.ProductDays.GroupBy(d => d.ProductId).ToDictionary(g => g.Key, g => g.Sum(d => d.Sales));
+            var photos = Photos.All();
+            rows = (await Facts.GetProductsAsync())
+                .Select(p => new Row(p, sales.GetValueOrDefault(p.Id), photos.GetValueOrDefault(p.Id)))
+                .ToList();
+            photographed = rows.Count(r => r.Photo?.Thumbnail is not null);
+            var free = DataFolderMover.FreeBytes(Storage.DataFolder);
+            freeText = free >= 0 ? DataFolderMover.Describe(free) : null;
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading products for photos failed.");
+            error = ex.Message;
+        }
+    }
+
+    /// <summary>Typing a search goes back to the first page of what matches.</summary>
+    private Task Search(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString() ?? "";
+        return GoToPageAsync(1);
+    }
+
+    private Task ResizeAsync(int newSize)
+    {
+        size = newSize;
+        return GoToPageAsync(1);
+    }
+
+    /// <summary>Shows a page, and puts it in the address (without a new history entry), so Back from a product comes to the same page.</summary>
+    private Task GoToPageAsync(int number)
+    {
+        page = number;
+        var address = Nav.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["page"] = page > 1 ? page : null,
+            ["size"] = size == DefaultSize ? null : size,
+        });
+        if (address != Nav.Uri)
+        {
+            Nav.NavigateTo(address, replace: true);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The rows on the page shown, and where the page stands in all that match.</summary>
+    private (List<Row> Shown, PageWindow Window) Shown()
+    {
+        IEnumerable<Row> query = rows!;
+        var search = term.Trim();
+        if (search.Length > 0)
+        {
+            query = query.Where(r => r.Product.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || r.Product.Code.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var matching = (view switch
+        {
+            "with" => query.Where(r => r.Photo?.Thumbnail is not null).OrderBy(r => r.Product.Name, StringComparer.OrdinalIgnoreCase),
+            "all" => query.OrderBy(r => r.Product.Name, StringComparer.OrdinalIgnoreCase),
+            _ => query.Where(r => r.Sales > 0).OrderByDescending(r => r.Sales),
+        }).ToList();
+        var window = PageWindow.Of(page, size, matching.Count);
+        return (matching.Skip(window.Skip).Take(window.Size).ToList(), window);
+    }
+
+    public void Dispose() => Photos.Changed -= OnPhotosChanged;
+}

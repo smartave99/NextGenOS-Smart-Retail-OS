@@ -1,0 +1,29 @@
+{
+  "name": "smart-retail-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unified Smart Retail Suite: WinForms Core POS, AI Side-Panel Companion, POS Dashboard Services, and Omnichannel Web/Mobile Storefront.",
+  "scripts": {
+    "dev:storefront": "npm run dev --prefix apps/storefront-web-mobile",
+    "build:storefront": "npm run build --prefix apps/storefront-web-mobile",
+    "desktop:storefront": "npm run desktop --prefix apps/storefront-web-mobile",
+    "test:storefront": "npm run test --prefix apps/storefront-web-mobile",
+    "verify:ai": "npm run verify:ai --prefix apps/storefront-web-mobile",
+    "start:pos-desktop": "powershell -ExecutionPolicy Bypass -File scripts/start-pos-desktop.ps1",
+    "start:pos-ai": "powershell -ExecutionPolicy Bypass -File scripts/start-pos-ai.ps1",
+    "start:pos-dashboard": "powershell -ExecutionPolicy Bypass -File scripts/start-pos-dashboard.ps1"
+  },
+  "keywords": [
+    "retail",
+    "pos",
+    "point-of-sale",
+    "ai",
+    "nextjs",
+    "dotnet",
+    "winforms",
+    "capacitor",
+    "electron"
+  ],
+  "author": "NextGen OS / Smart Avenue",
+  "license": "MIT"
+}

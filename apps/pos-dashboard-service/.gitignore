@@ -1,0 +1,14 @@
+bin/
+obj/
+/dist/
+TestResults/
+.vs/
+*.user
+*.suo
+
+# Machine-specific settings, e.g. the SQL Server connection string. Never commit.
+appsettings.Local.json
+
+# Browser test
+node_modules/
+tests/e2e/screenshots/

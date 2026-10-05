@@ -1,0 +1,357 @@
+@page "/panel"
+@layout PanelLayout
+@implements IAsyncDisposable
+@using SmartRetail.AI.Assistant
+@using SmartRetail.Pos.Core.Analytics
+@inject Conversation Chat
+@inject ISalesFactsRepository Facts
+@inject IProductRepository Catalog
+@inject AiEnvironment Ai
+@inject TimeProvider Clock
+@inject IJSRuntime Js
+@inject ILogger<Panel> Log
+
+<PageTitle>Smart Retail AI</PageTitle>
+
+@* The side panel beside the POS: today's two figures and the chat. Its buttons talk to the Smart Retail AI app. *@
+<div class="panel-page">
+    <div class="panel-top">
+        <AppMark Size="26" />
+        <b>Smart Retail AI</b>
+        <div class="tools host-only">
+            <button type="button" class="round" title="Settings" aria-label="Settings" @onclick='() => SendAsync("settings")'><Icon Name="sliders" /></button>
+            <button type="button" class="round" title="Wider or narrower" aria-label="Wider or narrower" @onclick='() => SendAsync("wide")'><Icon Name="panel" /></button>
+            <button type="button" class="round" title="Open the full app" aria-label="Open the full app" @onclick="OpenAppAsync"><Icon Name="expand" /></button>
+            <button type="button" class="round" title="Hide (Esc)" aria-label="Hide" @onclick='() => SendAsync("hide")'><Icon Name="close" /></button>
+        </div>
+    </div>
+
+    <div class="mini-stats">
+        <div class="mini-stat">
+            <div class="label">Sales today</div>
+            <div class="v">@(today is null ? "–" : Formats.Rupees(today.Sales))</div>
+            @if (today?.ChangeVsLastWeek is { } change)
+            {
+                <div class="d @Formats.ChangeTone(change)">@Formats.Change(change) vs last @ShortDay</div>
+            }
+        </div>
+        <div class="mini-stat">
+            <div class="label">Bills today</div>
+            <div class="v">@(today?.Bills.ToString() ?? "–")</div>
+            @if (today is { Bills: > 0 })
+            {
+                <div class="d muted">@Formats.Rupees(today.AverageBill) average</div>
+            }
+        </div>
+    </div>
+
+    @* A sticker came off: the code the till scans, found by name in a second, or with the camera. *@
+    <div class="panel-find">
+        <div class="scan-box compact">
+            <Icon Name="barcode" Class="scan-icon" />
+            <input class="scan-input" type="search" autocomplete="off" placeholder="Find a barcode: type a name"
+                   aria-label="Find a barcode" value="@findTerm" @oninput="OnFindAsync" @onkeydown="OnFindKey" />
+            <button type="button" class="scan-camera" title="Find with the camera" aria-label="Find a product with the camera" @onclick="OpenCameraAsync"><Icon Name="camera" /></button>
+        </div>
+    </div>
+
+    <CameraFind @ref="cameraFind" InPanel="true" Class="panel-found" OnSelect="ShowCameraProductAsync" OnShownChanged="shown => cameraShown = shown" />
+
+    @if (cameraShown)
+    {
+        @* What the camera found takes this place. *@
+    }
+    else if (Finding)
+    {
+        <div class="panel-found" aria-live="polite">
+            @if (cameraProduct is not null)
+            {
+                <p class="pf-camera"><Icon Name="camera" /> <span>Chosen from the camera: <b>@cameraProduct.Name</b></span></p>
+            }
+            @if (findError is not null)
+            {
+                <p class="muted">@findError</p>
+            }
+            else if (findResults.Count == 0)
+            {
+                <p class="muted">@(findBusy ? "Looking…" : cameraProduct is not null ? "It has no code in the POS’s stock to type." : $"No product matches “{findTerm.Trim()}”.")</p>
+            }
+            else
+            {
+                @foreach (var batch in findResults)
+                {
+                    <div class="pf-row">
+                        <div class="grow">
+                            <div class="item-name">@batch.Name</div>
+                            <div class="item-meta">@FoundLine(batch)</div>
+                        </div>
+                        <span class="pf-code" title="Type this code into the POS">@batch.Code</span>
+                        <button type="button" class="round" title="Copy the code" aria-label="@($"Copy {batch.Code}")" @onclick="() => CopyAsync(batch.Code)"><Icon Name="copy" /></button>
+                    </div>
+                }
+                <button type="button" class="chip host-only pf-stickers" @onclick="PrintStickersAsync"><Icon Name="barcode" /> Print stickers for these</button>
+            }
+        </div>
+    }
+    else
+    {
+    <div class="panel-thread" aria-live="polite">
+        @if (messages.Count == 0 && !busy)
+        {
+            <p class="panel-hello">Ask me about sales, stock, prices or bills, in English or Hindi. I only read the shop’s data, never change it.</p>
+        }
+        <ChatThread Messages="messages" Busy="busy" Status="@status" Draft="@draft" DraftTable="draftTable" AskAgain="Chat.Ask" />
+    </div>
+    }
+
+    <div class="panel-foot">
+        <div class="chips">
+            @foreach (var starter in Chat.Starters.Take(3))
+            {
+                <button type="button" class="chip" title="@starter.Question" disabled="@busy" @onclick="() => Chat.Run(starter)">@starter.Title</button>
+            }
+            @if (messages.Count > 0)
+            {
+                <button type="button" class="chip" disabled="@busy" @onclick="Chat.Clear">New chat</button>
+            }
+            <button type="button" class="chip accent host-only" @onclick="OpenAppAsync"><Icon Name="expand" /> Open the full app</button>
+        </div>
+        <ChatComposer Busy="busy" Send="Chat.Ask" Stop="Chat.Stop" Placeholder="Ask anything…" AutoFocus="true" />
+        @if (shortcut.Length > 0)
+        {
+            <div class="hint host-only">@((MarkupString)Keys(shortcut)) shows or hides this panel</div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly TimeSpan RefreshEvery = TimeSpan.FromMinutes(1);
+
+    private readonly CancellationTokenSource stopping = new();
+    private IReadOnlyList<ChatMessage> messages = Array.Empty<ChatMessage>();
+    private bool busy;
+    private string status = "";
+    private string draft = "";
+    private ChatTable? draftTable;
+    private string shortcut = "";
+    private TodayFigures? today;
+
+    private string ShortDay => Clock.GetLocalNow().DateTime.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture);
+
+    protected override void OnInitialized()
+    {
+        Chat.Changed += OnChatChanged;
+        Read();
+        try
+        {
+            shortcut = Ai.LoadSettings().Panel.Shortcut ?? "";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the panel shortcut failed.");
+        }
+
+        _ = KeepFiguresFreshAsync();
+    }
+
+    /// <summary>The panel stays open all day, so today's figures refresh every minute.</summary>
+    private async Task KeepFiguresFreshAsync()
+    {
+        using var timer = new PeriodicTimer(RefreshEvery);
+        try
+        {
+            do
+            {
+                await RefreshFiguresAsync();
+            }
+            while (await timer.WaitForNextTickAsync(stopping.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            // The panel was closed.
+        }
+    }
+
+    private async Task RefreshFiguresAsync()
+    {
+        try
+        {
+            var day = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+            var facts = await Facts.GetFactsAsync(DateRange.Ending(day, 8), stopping.Token);
+            today = TodayFigures.From(day, facts.Days.Select(d => new TrendPoint(d.Day, d.Sales, d.Bills, 0m)));
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Refreshing the panel's figures failed.");
+        }
+    }
+
+    private void Read()
+    {
+        messages = Chat.Messages;
+        busy = Chat.Busy;
+        status = Chat.Status;
+        draft = Chat.Draft;
+        draftTable = Chat.DraftTable;
+    }
+
+    private void OnChatChanged(object? sender, EventArgs e) => _ = InvokeAsync(() =>
+    {
+        Read();
+        StateHasChanged();
+    });
+
+    private async Task SendAsync(string type, string value = "") => await Js.InvokeAsync<bool>("srpos.send", type, value);
+
+    private const int FindLimit = 8;
+
+    private string findTerm = "";
+    private List<StockBatch> findResults = new();
+    private string? findError;
+    private bool findBusy;
+    private int findVersion;
+
+    private CameraFind? cameraFind;
+    private bool cameraShown;
+
+    /// <summary>The product chosen from what the camera found, whose codes show.</summary>
+    private FoundProduct? cameraProduct;
+
+    private bool Finding => findTerm.Trim().Length > 0 || cameraProduct is not null;
+
+    private async Task OnFindAsync(ChangeEventArgs e)
+    {
+        findTerm = e.Value?.ToString() ?? "";
+        var mine = ++findVersion;
+        findError = null;
+        cameraProduct = null;
+        if (cameraFind is { Shown: true })
+        {
+            await cameraFind.CloseAsync();
+        }
+
+        if (!Finding)
+        {
+            findResults = new();
+            return;
+        }
+
+        findBusy = true;
+        try
+        {
+            await Task.Delay(150);
+            if (mine != findVersion)
+            {
+                return;
+            }
+
+            var products = await Catalog.SearchAsync(findTerm.Trim(), FindLimit, stopping.Token);
+            var batches = await Catalog.GetBatchesAsync(products.Select(p => p.Id).ToList(), stopping.Token);
+            if (mine == findVersion)
+            {
+                // In the order the search found the products; a product stocked at two prices shows both codes.
+                var order = products.Select((p, i) => (p.Id, i)).ToDictionary(x => x.Id, x => x.i);
+                findResults = batches.OrderBy(b => order.GetValueOrDefault(b.ProductId)).ToList();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Finding a barcode failed.");
+            findError = "Could not look it up: " + ex.Message;
+        }
+        finally
+        {
+            if (mine == findVersion)
+            {
+                findBusy = false;
+            }
+        }
+    }
+
+    private void OnFindKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            findTerm = "";
+            findResults = new();
+            cameraProduct = null;
+            findVersion++;
+        }
+    }
+
+    private Task OpenCameraAsync() => cameraFind?.OpenAsync() ?? Task.CompletedTask;
+
+    /// <summary>The product the person chose from what the camera found: its codes, to type into the POS.</summary>
+    private async Task ShowCameraProductAsync(FoundProduct product)
+    {
+        var mine = ++findVersion;
+        findTerm = "";
+        findError = null;
+        findResults = new();
+        cameraProduct = product;
+        findBusy = true;
+        try
+        {
+            var batches = await Catalog.GetBatchesAsync(new[] { product.ProductId }, stopping.Token);
+            if (mine == findVersion)
+            {
+                findResults = batches.OrderByDescending(b => b.Qty).ToList();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Reading the codes of product {Id} failed.", product.ProductId);
+            findError = "Could not read its codes: " + ex.Message;
+        }
+        finally
+        {
+            if (mine == findVersion)
+            {
+                findBusy = false;
+            }
+        }
+    }
+
+    private async Task CopyAsync(string code)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", code);
+        }
+        catch (JSException ex)
+        {
+            Log.LogWarning(ex, "Copying a code failed.");
+        }
+    }
+
+    private Task PrintStickersAsync() =>
+        SendAsync("open", "barcodes?products=" + string.Join(",", findResults.Select(b => b.ProductId).Distinct()));
+
+    private static string FoundLine(StockBatch batch)
+    {
+        var parts = new List<string> { Formats.Price(batch.Price) };
+        if (batch.Mrp > batch.Price)
+        {
+            parts.Add("MRP " + Formats.Price(batch.Mrp));
+        }
+
+        parts.Add(batch.Qty > 0 ? Money.FormatQty(batch.Qty) + " in stock" : "none in stock");
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>The full window, on the chat when there is one to continue.</summary>
+    private Task OpenAppAsync() => SendAsync("open", messages.Count > 0 ? "ask" : "");
+
+    /// <summary>"Ctrl+Shift+Space" as keys.</summary>
+    private static string Keys(string shortcut) =>
+        string.Join(" ", shortcut.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(key => "<kbd>" + System.Net.WebUtility.HtmlEncode(key) + "</kbd>"));
+
+    public async ValueTask DisposeAsync()
+    {
+        Chat.Changed -= OnChatChanged;
+        await stopping.CancelAsync();
+        stopping.Dispose();
+    }
+}

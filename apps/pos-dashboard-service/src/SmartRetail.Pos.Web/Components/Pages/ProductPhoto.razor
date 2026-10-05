@@ -1,0 +1,724 @@
+@page "/photos/{Id:int}"
+@implements IDisposable
+@using SmartRetail.AI.Products
+@using SmartRetail.AI.Providers
+@using SmartRetail.Pos.Core.Analytics
+@inject ISalesFactsRepository Facts
+@inject ProductPhotoService Photos
+@inject StorageService Storage
+@inject IJSRuntime Js
+@inject ILogger<ProductPhoto> Log
+
+<PageTitle>@(product?.Name ?? "Product") · Photos · Smart Retail POS</PageTitle>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (product is null)
+{
+    <p class="muted">@(loaded ? "No product with this number." : "Loading…")</p>
+}
+else
+{
+    var set = info?.LatestSet;
+    var progress = Photos.Progress(Id, info);
+    var busy = uploading || Storage.IsMoving;
+    <div class="page-head">
+        <div>
+            <div class="eyebrow"><a href="photos">Product photos</a> <Icon Name="chevron" /></div>
+            <h1>@product.Name</h1>
+            <p class="lead">@product.Code · @(string.IsNullOrWhiteSpace(product.Category) ? "No category" : product.Category) · @Money.FormatCompact(product.SellingPrice) · @Money.FormatQty(product.StockInHand) in stock</p>
+        </div>
+        <div class="actions">
+            @if (set is not null && progress.Made > 0)
+            {
+                <a class="btn btn-soft" href="@ProductPhotoService.ZipUrl(Id, set.Id)" download title="All the photos in one ZIP file"><Icon Name="download" /> Download all</a>
+            }
+            <LensLink ProductId="Id" Available="@(GoogleLens.BestPhoto(info) is not null)" />
+            <a class="btn btn-soft" href="@($"creatives?product={Id}")" title="An ad for social media or the shop, designed around this product"><Icon Name="spark" /> Make a creative</a>
+            <button type="button" class="btn btn-soft" disabled="@busy" title="Take the product's photos with the camera" @onclick="() => camera = true"><Icon Name="camera" /> Take photos</button>
+            <label class="btn btn-primary upload-button @(busy ? "disabled" : null)">
+                <Icon Name="upload" /> @(set is null ? "Add photos" : "New photos")
+                <InputFile OnChange="UploadAsync" multiple accept="image/jpeg,image/png,image/webp" class="visually-hidden" disabled="@busy" />
+            </label>
+        </div>
+    </div>
+
+    @if (camera)
+    {
+        <CameraDialog Title="@($"Photos of {product.Name}")" Hint="Take up to 4: the front, the back and the label, each filling the picture."
+                      Max="ProductPhotoRequest.MaxPhotos" OnDone="UseStillsAsync" OnClose="() => camera = false" />
+    }
+
+    @if (codex is { IsReady: false })
+    {
+        <section class="panel setup-banner-card">
+            <div class="suggestion">
+                <div class="tile orange"><Icon Name="spark" /></div>
+                <div>
+                    <h3>The AI tool is not ready yet</h3>
+                    <p>Only Codex can make images. Install it and sign in once on the Get started page; it takes a minute.</p>
+                </div>
+                <a class="btn btn-primary btn-sm" href="welcome">Get started</a>
+            </div>
+        </section>
+    }
+
+    @if (uploading)
+    {
+        <p class="muted" role="status"><span class="spinner"></span> Adding the photos…</p>
+    }
+    @if (message is not null)
+    {
+        <p class="plan-error small @(messageIsProblem ? "trend-down" : "trend-up")" role="status">@message</p>
+    }
+
+    @if (set is null)
+    {
+        <section class="panel empty-photos">
+            <div class="empty">
+                <Icon Name="camera" Size="40" />
+                <h2>Add phone photos of this product</h2>
+                <p>Take 1 to 4 clear photos: the front, the back, the label. The AI then makes five photos for your website and Amazon, one by one, and writes the listings for both:</p>
+                <ol class="kind-list small">
+                    @foreach (var kind in PhotoKinds.All)
+                    {
+                        <li>@kind.Title()</li>
+                    }
+                </ol>
+                <div class="empty-buttons">
+                    <button type="button" class="btn btn-soft btn-lg" disabled="@busy" @onclick="() => camera = true"><Icon Name="camera" /> Take photos</button>
+                    <label class="btn btn-primary btn-lg upload-button @(busy ? "disabled" : null)">
+                        <Icon Name="upload" /> Add photos
+                        <InputFile OnChange="UploadAsync" multiple accept="image/jpeg,image/png,image/webp" class="visually-hidden" disabled="@busy" />
+                    </label>
+                </div>
+                <p class="small">JPG, PNG or WEBP. Photos stay on this PC; the POS is not changed.</p>
+                @if (codex is { IsReady: true })
+                {
+                    <p class="small"><span class="pill good">Ready</span> Codex makes the photos with ChatGPT Images.</p>
+                }
+            </div>
+        </section>
+    }
+    else
+    {
+        var stoppedAt = set.Problem is not null && set.Pending.Count > 0 ? set.Pending[0] : (PhotoKind?)null;
+        var queue = Photos.Queue();
+        var shape = ShapeOf(set);
+        <section class="panel steps-bar" role="status">
+            @if (progress.Making is { IsListing: true } writing)
+            {
+                <span class="what">Writing the listings for Amazon and your website <span class="muted">· started @writing.Started.ToString("h:mm tt", India)@(queue.NextKinds.Count > 0 ? " · then " + queue.NextKinds[0].Title() + " photo" : "")</span></span>
+            }
+            else if (progress.Making is { } work)
+            {
+                <span class="what">Making photo @work.Kind.Number() of @PhotoKinds.All.Count: @work.Kind.Title() <span class="muted">· started @work.Started.ToString("h:mm tt", India)@NextAfter(queue)</span></span>
+            }
+            else if (progress.PlaceInQueue > 0 && queue.PausedUntil is { } resumes)
+            {
+                <span class="what"><Icon Name="clock" /> Paused: Codex's usage limit was reached <span class="muted">· it carries on by itself at @UsageLimitPause.Describe(resumes, DateTimeOffset.Now), @CarryOnWith(info!, set)</span></span>
+            }
+            else if (progress.PlaceInQueue > 0)
+            {
+                <span class="what">Waiting for its turn <span class="muted">@(progress.PlaceInQueue > 1 ? $"· {progress.PlaceInQueue - 1} before it" : "· next")@(queue.Now is { } other ? $" · now making {queue.NowName}: " + (other.IsListing ? "its listings" : $"photo {other.Kind.Number()} of {PhotoKinds.All.Count}") : "")</span></span>
+            }
+            else if (stoppedAt is { } at)
+            {
+                <span class="what trend-down">Stopped at photo @at.Number(): @at.Title()</span>
+            }
+            else if (set.Pending.Count > 0)
+            {
+                <span class="what">@set.Pending.Count still to make</span>
+            }
+            else
+            {
+                <span class="what">@(progress.Made == PhotoKinds.All.Count ? "All 5 photos made" : $"{progress.Made} of {PhotoKinds.All.Count} photos made")</span>
+            }
+            <div class="segments" aria-hidden="true">
+                @foreach (var kind in PhotoKinds.All)
+                {
+                    var making = progress.Making is { IsListing: false } w && w.SetId == set.Id && w.Kind == kind;
+                    <i class="@(making ? "doing" : kind == stoppedAt ? "stopped" : set.Latest(kind) is not null && !set.Pending.Contains(kind) ? "done" : null)"></i>
+                }
+            </div>
+            <div class="actions">
+                @if (progress.Making is not null || progress.PlaceInQueue > 0)
+                {
+                    @if (queue.PausedUntil is not null && progress.Making is null)
+                    {
+                        <button class="btn btn-sm btn-primary" title="Try again at once, e.g. after getting more usage" @onclick="TryNow">Try now</button>
+                    }
+
+                    <button class="btn btn-sm" @onclick="Stop">Stop</button>
+                }
+                else if (stoppedAt is { } at)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="Continue">Continue</button>
+                    <button class="btn btn-sm" @onclick="() => Skip(at)">Skip this photo</button>
+                }
+                else if (set.Pending.Count > 0)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="Continue">Continue</button>
+                }
+            </div>
+        </section>
+        @if (stoppedAt is not null)
+        {
+            <p class="plan-error small trend-down">@set.Problem</p>
+        }
+
+        <div class="photo-set">
+            @foreach (var kind in PhotoKinds.All)
+            {
+                var image = set.Latest(kind);
+                var making = progress.Making is { IsListing: false } w && w.SetId == set.Id && w.Kind == kind;
+                var pending = set.Pending.Contains(kind);
+                <figure class="slot @(making ? "making" : kind == stoppedAt ? "stopped" : null)" data-kind="@kind.FilePrefix()">
+                    @if (image is not null)
+                    {
+                        <a class="slot-image" href="@ProductPhotoService.Url(Id, image.File)" target="_blank" title="Open the full photo">
+                            <img src="@ProductPhotoService.Url(Id, image.File)" alt="@kind.Title() photo of @product.Name" />
+                        </a>
+                    }
+                    else
+                    {
+                        <div class="slot-image slot-empty">
+                            @if (making)
+                            {
+                                <span class="spinner"></span>
+                                <span>Making…</span>
+                            }
+                            else if (pending)
+                            {
+                                <Icon Name="@(kind.IsModel() ? "person" : "camera")" />
+                                <span>@(kind == stoppedAt ? "Stopped" : "Waiting")</span>
+                            }
+                            else
+                            {
+                                <Icon Name="camera" />
+                                <span>Skipped</span>
+                            }
+                        </div>
+                    }
+                    <figcaption>
+                        <div>
+                            <strong>@kind.Number() · @kind.Title()</strong>
+                            @if (making && image is not null)
+                            {
+                                <small>Making it again…</small>
+                            }
+                            else if (image is not null)
+                            {
+                                <small>@SizeOf(image, shape)</small>
+                            }
+                            else
+                            {
+                                <small>@(making ? "Making now" : pending ? (kind == stoppedAt ? "Stopped" : "Waiting") : "Skipped")</small>
+                            }
+                            @if (image is { Note.Length: > 0 })
+                            {
+                                <small class="slot-note" title="What you asked to change in this photo">Changed: “@image.Note”</small>
+                            }
+                            @if (!pending && !making)
+                            {
+                                <span class="slot-links">
+                                    <button type="button" class="link-button" @onclick="() => MakeAgain(kind)">@(image is null ? "Make it" : "Make again")</button>
+                                    @if (image is not null)
+                                    {
+                                        <button type="button" class="link-button" aria-expanded="@(changing == kind ? "true" : "false")" @onclick="() => AskChange(kind)">Change it</button>
+                                    }
+                                </span>
+                            }
+                        </div>
+                        @if (image is not null)
+                        {
+                            <a class="dl" href="@ProductPhotoService.Url(Id, image.File, download: true)" download title="Download this photo" aria-label="Download the @kind.Title() photo"><Icon Name="download" /></a>
+                        }
+                    </figcaption>
+                    @if (changing == kind && image is not null)
+                    {
+                        <form class="slot-change" aria-label="@($"Change the {kind.Title()} photo")" @onsubmit="() => SubmitChange(kind)" @onsubmit:preventDefault>
+                            <label class="field-label" for="@($"change-{kind.FilePrefix()}")">What to change in the @kind.Title() photo <Required /></label>
+                            <textarea id="@($"change-{kind.FilePrefix()}")" class="form-control" rows="3" maxlength="@PhotoNotes.MaxLength"
+                                      placeholder="e.g. make the label easier to read" aria-required="true" @bind="changeNote" @bind:event="oninput"></textarea>
+                            <div class="f-actions">
+                                <button type="submit" class="btn btn-sm btn-primary" disabled="@(changeNote.Trim().Length == 0 || busy)">Change photo</button>
+                                <button type="button" class="btn btn-sm btn-link" @onclick="() => changing = null">Cancel</button>
+                            </div>
+                            <p class="small muted">The AI changes this photo as you ask and keeps the rest. The earlier photo is kept. Text, prices and offers are never added.</p>
+                        </form>
+                    }
+                </figure>
+            }
+        </div>
+
+        <div class="below">
+            <section class="panel">
+                <div class="panel-head">
+                    <h2>Your photos</h2>
+                    <span class="muted small">@set.RawFiles.Count phone @(set.RawFiles.Count == 1 ? "photo" : "photos")</span>
+                </div>
+                <div class="raw-strip">
+                    @foreach (var raw in set.RawFiles)
+                    {
+                        <div class="raw-tile @(removingPhoto == raw ? "asking" : null)">
+                            <img class="raw" src="@ProductPhotoService.Url(Id, raw)" alt="Phone photo" />
+                            <LensLink ProductId="Id" Photo="@raw" IconOnly="true" Class="raw-lens" Title="Search Google Lens with this photo: it finds the same product and where it is sold. Nothing goes through the AI." />
+                            <button type="button" class="raw-remove" disabled="@busy" title="Remove this photo" aria-label="Remove this phone photo" @onclick="() => AskRemovePhoto(raw)"><Icon Name="close" /></button>
+                        </div>
+                    }
+                    <label class="add-tile @(busy ? "disabled" : null)" title="New phone photos start a new set of five">
+                        <Icon Name="plus" /> New
+                        <InputFile OnChange="UploadAsync" multiple accept="image/jpeg,image/png,image/webp" class="visually-hidden" disabled="@busy" />
+                    </label>
+                </div>
+                @if (removingPhoto is not null)
+                {
+                    var only = set.RawFiles.Count == 1;
+                    <div class="confirm-remove" role="alertdialog" aria-label="Remove this photo?">
+                        <p class="small">
+                            @if (only)
+                            {
+                                <text>This is the only phone photo of this set, so removing it deletes the whole set: the photo and the @progress.Made @(progress.Made == 1 ? "photo" : "photos") made from it, from this PC.</text>
+                            }
+                            else
+                            {
+                                <text>Remove this photo from this PC? @(progress.Busy ? "The photo being made now starts again without it. " : "")Photos already made stay; you can make them again.</text>
+                            }
+                        </p>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-danger" @onclick="ConfirmRemovePhoto">@(only ? "Delete the set" : "Remove the photo")</button>
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => removingPhoto = null">Keep it</button>
+                        </div>
+                    </div>
+                }
+                @if (removingSet)
+                {
+                    <div class="confirm-remove" role="alertdialog" aria-label="Delete this set of photos?">
+                        <p class="small">Delete this set? Its @set.RawFiles.Count phone @(set.RawFiles.Count == 1 ? "photo" : "photos") and the @progress.Made @(progress.Made == 1 ? "photo" : "photos") made from @(set.RawFiles.Count == 1 ? "it" : "them") are deleted from this PC, and the AI stops working on them. This cannot be undone.</p>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-danger" @onclick="ConfirmRemoveSet">Delete the set</button>
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => removingSet = false">Keep it</button>
+                        </div>
+                    </div>
+                }
+                else if (removingPhoto is null)
+                {
+                    <button type="button" class="link-button danger-link small delete-set" disabled="@busy" title="Delete these phone photos and the photos made from them" @onclick="AskRemoveSet">Delete this set of photos</button>
+                }
+                <div class="kept"><Icon Name="folder" /><span>Kept in <a href="storage" class="path">@Storage.DataFolder</a></span></div>
+                @if (codex is { IsReady: true })
+                {
+                    <p class="small muted" style="margin: 10px 0 0"><span class="pill good">Ready</span> Codex makes the photos with ChatGPT Images, using only copies of these photos.</p>
+                }
+            </section>
+
+            <section class="panel understanding">
+                <div class="panel-head"><h2><Icon Name="spark" /> What the AI sees</h2></div>
+                @if (info!.Understanding is { } seen)
+                {
+                    @if (seen.WhatItIs.Length > 0)
+                    {
+                        <p class="what">@(seen.DisplayName.Length > 0 ? seen.DisplayName + ": " : "")@seen.WhatItIs</p>
+                    }
+                    @if (seen.Description.Length > 0)
+                    {
+                        <p class="desc">@seen.Description</p>
+                    }
+                    <dl>
+                        @Fact("Used in", seen.UseCaseScene)
+                        @Fact("Models", seen.ModelPerson)
+                        @Fact("Category", seen.SuggestedCategory)
+                        @Fact("Type", seen.ProductType)
+                        @Fact("Colours", string.Join(", ", seen.Colours))
+                        @Fact("Material", seen.Material)
+                        @Fact("Size", seen.SizeOrQuantity)
+                        @Fact("Hindi", seen.HindiName)
+                        @Fact("Note", seen.Notes)
+                    </dl>
+                    @if (seen.Keywords.Count > 0)
+                    {
+                        <div class="keywords">
+                            @foreach (var word in seen.Keywords)
+                            {
+                                <span class="pill">@word</span>
+                            }
+                        </div>
+                    }
+                    <p class="muted small" style="margin: 12px 0 0">The AI uses this to know what “@product.Name” is when it plans sales.</p>
+                }
+                else
+                {
+                    <p class="muted">With the first photo, the AI writes what the product is, where it is used and who uses it.</p>
+                }
+            </section>
+        </div>
+
+        <ListingPanel Product="product" Info="info!" Writing="@(progress.Making is { IsListing: true })" Changed="() => info = Photos.Info(Id)" />
+
+        var earlier = Earlier(info!);
+        @if (earlier.Count > 0)
+        {
+            <section class="panel" style="margin-top: 16px">
+                <div class="panel-head"><h2>Earlier photos</h2><span class="muted small">kept in the product's folder</span></div>
+                <div class="raw-strip">
+                    @foreach (var old in earlier.Take(15))
+                    {
+                        <a href="@ProductPhotoService.Url(Id, old.File)" target="_blank" title="@old.Kind.Title(), @old.Made.ToString("d MMM yyyy, h:mm tt", India)">
+                            <img class="raw" src="@ProductPhotoService.Url(Id, old.File)" alt="Earlier @old.Kind.Title() photo" loading="lazy" />
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+    }
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    [Parameter] public int Id { get; set; }
+
+    private ProductFacts? product;
+    private ProductPhotoInfo? info;
+    private SmartRetail.AI.Providers.ProviderStatus? codex;
+    private readonly Dictionary<string, string> sizes = new();
+    private bool loaded;
+    private bool uploading;
+    private bool camera;
+    private string? message;
+    private bool messageIsProblem;
+
+    /// <summary>The message says the photos are being made, so it goes once they are all made.</summary>
+    private bool messageWhileMaking;
+    private string? error;
+    private string? removingPhoto;
+    private bool removingSet;
+    private PhotoKind? changing;
+    private string changeNote = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Photos.Changed += OnPhotosChanged;
+        _ = CheckCodexAsync();
+        await Task.CompletedTask;
+    }
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            product = (await Facts.GetProductsAsync()).FirstOrDefault(p => p.Id == Id);
+            info = Photos.Info(Id);
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading product {Id} for photos failed.", Id);
+            error = ex.Message;
+        }
+        finally
+        {
+            loaded = true;
+        }
+    }
+
+    private void OnPhotosChanged(int productId)
+    {
+        if (productId != Id)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            info = Photos.Info(Id);
+            if (messageWhileMaking && !messageIsProblem && info?.LatestSet is { Pending.Count: 0 })
+            {
+                message = null;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task CheckCodexAsync()
+    {
+        try
+        {
+            codex = await Photos.CheckCodexAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Checking Codex failed.");
+            codex = SmartRetail.AI.Providers.ProviderStatus.NotReady(ex.Message);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (product is null)
+        {
+            return;
+        }
+
+        message = null;
+        uploading = true;
+        try
+        {
+            if (e.FileCount > ProductPhotoRequest.MaxPhotos)
+            {
+                throw new InvalidOperationException($"Add at most {ProductPhotoRequest.MaxPhotos} photos of one product.");
+            }
+
+            await Photos.UploadAsync(product, e.GetMultipleFiles(ProductPhotoRequest.MaxPhotos), CancellationToken.None);
+            info = Photos.Info(Id);
+            Show("Photos added. The AI is making the five photos one by one; you can leave this page meanwhile.", problem: false, whileMaking: true);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Adding photos of product {Id} failed.", Id);
+            Show(ex.Message, problem: true);
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    /// <summary>Photos taken with the camera start the five photos, as added files do.</summary>
+    private async Task UseStillsAsync(IReadOnlyList<string> ids)
+    {
+        camera = false;
+        if (product is null)
+        {
+            return;
+        }
+
+        message = null;
+        uploading = true;
+        StateHasChanged();
+        try
+        {
+            var stills = ids.Select(id => (Func<long, CancellationToken, Task<Stream>>)((max, ct) => OpenStillAsync(id, max, ct))).ToList();
+            await Photos.UploadAsync(product, stills, CancellationToken.None);
+            info = Photos.Info(Id);
+            Show("Photos added. The AI is making the five photos one by one; you can leave this page meanwhile.", problem: false, whileMaking: true);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JSException)
+        {
+            Log.LogWarning(ex, "Adding camera photos of product {Id} failed.", Id);
+            Show(ex is JSException ? "The photos could not be read from the camera. Take them again." : ex.Message, problem: true);
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    /// <summary>A camera photo's bytes, from the page (srposCamera.take forgets it there).</summary>
+    private async Task<Stream> OpenStillAsync(string id, long max, CancellationToken ct)
+    {
+        await using var reference = await Js.InvokeAsync<IJSStreamReference>("srposCamera.take", ct, id);
+        await using var stream = await reference.OpenReadStreamAsync(max, ct);
+        var copy = new MemoryStream();
+        await stream.CopyToAsync(copy, ct);
+        copy.Position = 0;
+        return copy;
+    }
+
+    private void Stop() => Act(() => Photos.Maker.Stop(Id));
+
+    private void Continue() => Act(() => Photos.Maker.Continue(Id));
+
+    /// <summary>Stops waiting for Codex's usage limit: everything is tried again at once.</summary>
+    private void TryNow() => Act(() => Photos.TryNow());
+
+    /// <summary>"from photo 3: European model", or "with the listings": where the work goes on when the limit lifts.</summary>
+    private static string CarryOnWith(ProductPhotoInfo info, PhotoSet set)
+    {
+        if (info.ListingPending && !set.Pending.Contains(PhotoKind.WhiteBackground))
+        {
+            return "with the listings";
+        }
+
+        return set.Pending.Count > 0 ? $"from photo {set.Pending.Min().Number()}: {set.Pending.Min().Title()}" : "with the listings";
+    }
+
+    private void Skip(PhotoKind kind) => Act(() => Photos.Maker.Skip(Id, kind));
+
+    private void MakeAgain(PhotoKind kind) => Act(() => Photos.Maker.MakeAgain(Id, kind));
+
+    /// <summary>Opens (or closes) the box where the owner says what to change in one photo.</summary>
+    private void AskChange(PhotoKind kind)
+    {
+        changing = changing == kind ? null : kind;
+        changeNote = "";
+    }
+
+    /// <summary>Makes the photo again, changed as the owner wrote; the photo made before goes to the AI with the note.</summary>
+    private void SubmitChange(PhotoKind kind)
+    {
+        var note = changeNote.Trim();
+        if (note.Length == 0)
+        {
+            return;
+        }
+
+        Act(() => Photos.Maker.MakeAgain(Id, kind, note));
+        if (messageIsProblem && message is not null)
+        {
+            return;
+        }
+
+        changing = null;
+        changeNote = "";
+        Show("The AI is changing the photo as you asked. Photos made before stay; you can leave this page meanwhile.", problem: false, whileMaking: true);
+    }
+
+    /// <summary>", then Indian model" after the photo being made: what the AI makes next for this product.</summary>
+    private static string NextAfter(PhotoQueue queue) =>
+        queue.NextKinds.Count > 0 ? " · next: " + queue.NextKinds[0].Title() + (queue.NextKinds.Count > 1 ? $" and {queue.NextKinds.Count - 1} more" : "")
+        : queue.ListingNext ? " · then the listings"
+        : " · the last one";
+
+    private void AskRemovePhoto(string file)
+    {
+        removingSet = false;
+        removingPhoto = file;
+    }
+
+    private void AskRemoveSet()
+    {
+        removingPhoto = null;
+        removingSet = true;
+    }
+
+    /// <summary>Removes the phone photo asked about; the only one of a set takes the whole set with it.</summary>
+    private void ConfirmRemovePhoto()
+    {
+        if (removingPhoto is not { } file || info?.LatestSet is not { } set)
+        {
+            return;
+        }
+
+        removingPhoto = null;
+        if (set.RawFiles.Count == 1)
+        {
+            Remove(() => Photos.RemoveSet(Id, set.Id), "The set of photos was deleted.");
+        }
+        else
+        {
+            var working = Photos.Progress(Id, info).Busy;
+            Remove(() => Photos.RemovePhoto(Id, file),
+                working ? "Photo removed. The photo being made starts again without it." : "Photo removed. Photos already made stay; make them again if you like.");
+        }
+    }
+
+    private void ConfirmRemoveSet()
+    {
+        removingSet = false;
+        if (info?.LatestSet is { } set)
+        {
+            Remove(() => Photos.RemoveSet(Id, set.Id), "The set of photos was deleted.");
+        }
+    }
+
+    private void Remove(Action action, string done)
+    {
+        Act(action);
+        if (message is null)
+        {
+            Show(done, problem: false);
+        }
+    }
+
+    private void Act(Action action)
+    {
+        message = null;
+        try
+        {
+            if (Storage.IsMoving)
+            {
+                throw new InvalidOperationException("The data folder is being moved. Try again in a minute.");
+            }
+
+            action();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            Show(ex.Message, problem: true);
+        }
+
+        info = Photos.Info(Id);
+    }
+
+    private void Show(string text, bool problem, bool whileMaking = false)
+    {
+        message = text;
+        messageIsProblem = problem;
+        messageWhileMaking = whileMaking;
+    }
+
+    /// <summary>The shape of the owner's first phone photo of the set, as it is shown: the photos made follow it.</summary>
+    private PhotoShape ShapeOf(PhotoSet set)
+    {
+        foreach (var raw in set.RawFiles)
+        {
+            if (Photos.Store.PathOf(Id, raw) is { } path && ImageFile.TryReadShownSize(path, out var width, out var height))
+            {
+                return new PhotoShape(width, height);
+            }
+        }
+
+        return new PhotoShape(0, 0);
+    }
+
+    /// <summary>"1024 × 1365 px · the shape of your photo (3:4)", with a warning when Amazon would not zoom into it.</summary>
+    private string SizeOf(ProductPhotoImage image, PhotoShape shape)
+    {
+        // The shape is part of the key: removing the first phone photo can change which shape the photos are judged against.
+        var key = $"{image.File}|{shape.Width}x{shape.Height}";
+        if (!sizes.TryGetValue(key, out var text))
+        {
+            text = Photos.Store.PathOf(Id, image.File) is { } path && ImageFile.TryReadSize(path, out var width, out var height)
+                ? $"{width} × {height} px"
+                    + (Math.Max(width, height) < ImageFile.AmazonZoomPixels ? " (small for Amazon zoom)" : "")
+                    + (shape.IsKnown ? (shape.Matches(width, height) ? $" · the shape of your photo ({shape.RatioText})" : $" · not the shape of your photo ({shape.RatioText}): make it again") : "")
+                : "";
+            sizes[key] = text;
+        }
+
+        return text;
+    }
+
+    /// <summary>Photos made before the newest of each kind: earlier versions and older sets.</summary>
+    private static List<ProductPhotoImage> Earlier(ProductPhotoInfo photos)
+    {
+        var newest = photos.LatestSet is { } latest ? PhotoKinds.All.Select(latest.Latest).Where(i => i is not null).ToHashSet() : new HashSet<ProductPhotoImage?>();
+        return photos.Sets.SelectMany(s => s.Images).Where(i => !newest.Contains(i)).OrderByDescending(i => i.Made).ToList();
+    }
+
+    private static RenderFragment Fact(string label, string value) => builder =>
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        builder.OpenElement(0, "dt");
+        builder.AddContent(1, label);
+        builder.CloseElement();
+        builder.OpenElement(2, "dd");
+        builder.AddContent(3, value);
+        builder.CloseElement();
+    };
+
+    public void Dispose() => Photos.Changed -= OnPhotosChanged;
+}

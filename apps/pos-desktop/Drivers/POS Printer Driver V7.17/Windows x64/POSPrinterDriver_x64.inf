@@ -1,0 +1,57 @@
+;
+;	Printer Installation File
+;
+;	 List of supported printers, manufacturers
+;
+
+[Version]
+Signature="$Windows NT$"
+Provider=%POS%
+ClassGUID={4D36E979-E325-11CE-BFC1-08002BE10318}
+Class=Printer
+;
+; Manufacturer section.
+;
+; This section lists all of the manufacturers
+; that we will display in the Dialog box
+;
+
+[Manufacturer]
+"POS"=POS, NTamd64
+
+;
+; Model Specifications Section
+;
+
+[POS]
+"RPT82"    = RPT82.GPD
+
+[POS.NTamd64]
+"RPT82"    = RPT82.GPD
+
+;
+; Installer section(s) referenced above.
+;
+
+
+[RPT82.GPD]
+CopyFiles=@POS80.DLL,@RPT82.GPD
+DataSection=UNIDRV_DATA
+DataFile=RPT82.GPD
+Include=NTPRINT.INF
+Needs=UNIDRV.OEM
+
+
+[DestinationDirs]
+DefaultDestDir=66000
+
+[SourceDisksNames.amd64]
+1 = %disk1%,,,
+
+[SourceDisksFiles]
+POS80.DLL     = 1
+RPT82.GPD     = 1
+
+[Strings]
+PrinterClassName="Printers"
+disk1="POS Printer Driver Setup Disk"

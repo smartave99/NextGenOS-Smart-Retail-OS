@@ -1,0 +1,109 @@
+@page "/ask/past"
+@using SmartRetail.AI.Memory
+@inject ChatHistoryService Chats
+@inject ILogger<PastChats> Log
+
+<PageTitle>Past chats · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Past chats</h1>
+        <p class="sub">Each chat is kept here for six months, saved again after every answer, so you can find it and ask again. Only the words are kept, with phone numbers and e-mail addresses hidden; a table's rows are not. Turn this off, or delete them all, on the <a href="memory">Memory</a> page.</p>
+    </div>
+    <div class="actions">
+        <a class="btn btn-soft" href="ask"><Icon Name="spark" /> Back to Ask AI</a>
+    </div>
+</div>
+
+<form class="past-search" role="search" @onsubmit="Search">
+    <input class="form-control" type="search" placeholder="Search past chats, e.g. sugar Diwali" aria-label="Search past chats" @bind="term" @bind:event="oninput" />
+    <button type="submit" class="btn btn-primary"><Icon Name="search" /> Search</button>
+    @if (searched is not null)
+    {
+        <button type="button" class="btn btn-link" @onclick="Clear">Show the latest</button>
+    }
+</form>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+<section class="panel past-list" aria-label="@(searched is null ? "The latest chats" : "Found")">
+    <div class="panel-head">
+        <h2>@(searched is null ? "The latest chats" : $"Found for “{searched}”")</h2>
+        <span class="muted small">@(hits.Count == 1 ? "1 chat" : $"{hits.Count} chats")</span>
+    </div>
+    @if (hits.Count == 0)
+    {
+        <p class="muted memory-empty">@(searched is null ? "No past chats yet. A chat is kept here when you start a new one." : "Nothing found. Try fewer or other words.")</p>
+    }
+    else
+    {
+        <ul class="memory-list">
+            @foreach (var hit in hits)
+            {
+                <li class="memory-item" @key="hit.Chat.Id">
+                    <a class="m-text past-title" href="@($"ask/past/{hit.Chat.Id}")">@hit.Chat.Title</a>
+                    <div class="m-meta">@Formats.DateAndTime(hit.Chat.Started) · @Questions(hit.Chat)</div>
+                    @if (searched is not null && hit.Snippet.Length > 0)
+                    {
+                        <div class="m-meta past-snippet">@hit.Snippet</div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private const int Shown = 50;
+
+    private IReadOnlyList<ChatSearchHit> hits = Array.Empty<ChatSearchHit>();
+    private string term = "";
+    private string? searched;
+    private string? error;
+
+    protected override void OnInitialized() => Clear();
+
+    private static string Questions(SavedChat chat)
+    {
+        var count = chat.Questions.Count();
+        return count == 1 ? "1 question" : $"{count} questions";
+    }
+
+    private void Search()
+    {
+        var words = term.Trim();
+        if (words.Length == 0)
+        {
+            Clear();
+            return;
+        }
+
+        Read(() => Chats.History.Search(words, Shown));
+        searched = words;
+    }
+
+    private void Clear()
+    {
+        term = "";
+        searched = null;
+        Read(() => Chats.History.Latest(Shown).Select(chat => new ChatSearchHit { Chat = chat }).ToList());
+    }
+
+    private void Read(Func<IReadOnlyList<ChatSearchHit>> read)
+    {
+        try
+        {
+            hits = read();
+            error = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Reading the past chats failed.");
+            hits = Array.Empty<ChatSearchHit>();
+            error = "Could not read the past chats: " + ex.Message;
+        }
+    }
+}

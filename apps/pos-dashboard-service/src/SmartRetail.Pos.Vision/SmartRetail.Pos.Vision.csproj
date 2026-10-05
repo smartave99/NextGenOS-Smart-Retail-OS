@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Finding a product by its look or its barcode, on this PC: photos decoded with SkiaSharp, barcodes read with
+       ZXing.Net, and DINOv2-small (downloaded when camera search is turned on) run with ONNX Runtime. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <PackageReference Include="SkiaSharp" Version="4.152.1" />
+    <!-- For Linux, where the tests run; the Windows package brings its own. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartRetail.Pos.Tests" />
+  </ItemGroup>
+
+</Project>

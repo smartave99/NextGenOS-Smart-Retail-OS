@@ -1,0 +1,14 @@
+{
+  "appId": "com.smartavenue.app",
+  "appName": "Smart Avenue",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://smartavenue99.com",
+    "cleartext": true,
+    "allowNavigation": [
+      "smartavenue99.com",
+      "*.smartavenue99.com"
+    ]
+  }
+}

@@ -1,0 +1,269 @@
+@page "/plan"
+@implements IDisposable
+@using SmartRetail.Pos.Core.Analytics
+@inject ISalesFactsRepository Facts
+@inject GrowthPlanService Planner
+@inject TimeProvider Clock
+@inject ILogger<Plan> Log
+
+<PageTitle>Grow sales · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Plan to grow sales</h1>
+        <p class="sub">An AI reads a summary of the period (figures and product names, never customer details) and writes a 30-day plan.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="@($"sales?period={SalesPeriods.Key(period)}")"><Icon Name="chart" /> See the figures</a>
+</div>
+
+<nav class="seg" aria-label="Period">
+    @foreach (var choice in SalesPeriods.All)
+    {
+        <a class="seg-item @(choice == period ? "active" : null)" href="@($"plan?period={SalesPeriods.Key(choice)}")"
+           aria-current="@(choice == period ? "page" : null)">@SalesPeriods.Label(choice)</a>
+    }
+</nav>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (report is null)
+{
+    <p class="muted">Working out the figures…</p>
+}
+else
+{
+    <div class="grid-2 plan-top">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Ask for a plan</h2>
+                <span class="muted small">@Formats.Date(report.Range.From) – @Formats.Date(report.Range.To)</span>
+            </div>
+
+            @if (report.Current.Bills == 0)
+            {
+                <p class="muted">There are no bills in this period to plan from. Choose a longer period.</p>
+            }
+            else
+            {
+                <div class="plan-form">
+                    <label class="form-label" for="plan-language">Write it in</label>
+                    <select id="plan-language" class="form-select" @bind="language" disabled="@running">
+                        <option value="@PlanLanguage.English">English</option>
+                        <option value="@PlanLanguage.Hindi">हिन्दी (Hindi)</option>
+                        <option value="@PlanLanguage.Hinglish">Hinglish</option>
+                    </select>
+
+                    <label class="form-label" for="plan-goal">Your goal <span class="muted">(optional)</span></label>
+                    <input id="plan-goal" class="form-control" @bind="goal" maxlength="@GrowthPlanPrompt.MaxGoalLength" disabled="@running"
+                           placeholder="For example: more sales on weekdays, or clear the old bangles" />
+                </div>
+
+                <div class="plan-actions">
+                    <button class="btn btn-primary" @onclick="WriteAsync" disabled="@(running || readiness is not { Ready: true })">
+                        <Icon Name="spark" /> @(running ? "Writing…" : "Write my plan")
+                    </button>
+                    <AiChoice Job="SmartRetail.AI.Settings.AiJob.Plan" />
+                    @if (running)
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="Stop">Stop</button>
+                        <span class="muted small" role="status">@progress</span>
+                    }
+                </div>
+            }
+
+            <details class="brief">
+                <summary>What the AI will see</summary>
+                <pre>@Planner.Brief(report)</pre>
+            </details>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><h2>AI tool</h2></div>
+            @if (readiness is null)
+            {
+                <p class="muted">Checking the AI tools on this PC…</p>
+            }
+            else if (readiness.Ready)
+            {
+                <p><span class="pill good">Ready</span> <strong>@readiness.Provider</strong> will write the plan.</p>
+            }
+            else
+            {
+                <p><span class="pill warn">No AI tool is ready</span></p>
+                <p class="small">Set one up in the Smart Retail POS AI side panel: <em>Settings → AI provider</em>. Codex CLI is the default.</p>
+                <details class="small">
+                    <summary>What was checked</summary>
+                    <ul class="problem-list">
+                        @foreach (var problem in readiness.Problems)
+                        {
+                            <li>@problem</li>
+                        }
+                    </ul>
+                </details>
+            }
+
+            <h3 class="list-title">Earlier plans</h3>
+            @if (saved.Count == 0)
+            {
+                <p class="muted small">None yet. Each plan is saved on this PC.</p>
+            }
+            else
+            {
+                <ul class="change-list plan-list">
+                    @foreach (var item in saved)
+                    {
+                        <li>
+                            <a href="@($"plan?period={SalesPeriods.Key(period)}&open={Uri.EscapeDataString(item.FileName)}")">@item.Written.ToString("d MMM yyyy, h:mm tt", India)</a>
+                            <span class="muted small">@item.Period</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+
+    @if (planError is not null)
+    {
+        <section class="panel load-error" role="alert">
+            <strong>The AI could not write the plan.</strong>
+            <p class="plan-error">@planError</p>
+        </section>
+    }
+
+    @if (plan is not null)
+    {
+        <section class="panel plan">
+            <div class="panel-head">
+                <h2>Your plan</h2>
+                <span class="muted small">@PlanCaption</span>
+            </div>
+            <MarkdownView Text="@plan.Value.Text" />
+            <p class="muted small plan-foot">Written by an AI from the figures above. Check a suggestion against what you know about your shop before acting on it.</p>
+        </section>
+    }
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    [SupplyParameterFromQuery(Name = "period")]
+    public string? PeriodKey { get; set; }
+
+    [SupplyParameterFromQuery(Name = "open")]
+    public string? OpenFile { get; set; }
+
+    private SalesPeriod period = SalesPeriod.Last90Days;
+    private SalesReport? report;
+    private AiReadiness? readiness;
+    private IReadOnlyList<SavedPlan> saved = Array.Empty<SavedPlan>();
+    private (SavedPlan Saved, string Text, string Caption)? plan;
+    private PlanLanguage language = PlanLanguage.English;
+    private string? goal;
+    private bool running;
+    private string? progress;
+    private string? error;
+    private string? planError;
+    private CancellationTokenSource? cancel;
+
+    private string PlanCaption => plan?.Caption ?? "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Planning looks at 90 days by default: enough to see what sells, recent enough to act on.
+        period = PeriodKey is null ? SalesPeriod.Last90Days : SalesPeriods.Parse(PeriodKey);
+        saved = Planner.RecentPlans();
+        plan = null;
+        if (Planner.Read(OpenFile) is { } opened)
+        {
+            plan = (opened.Plan, opened.Text, $"{opened.Plan.Period} · {opened.Plan.Provider} · {opened.Plan.Written.ToString("d MMM yyyy, h:mm tt", India)}");
+        }
+
+        await LoadAsync();
+        if (readiness is null)
+        {
+            _ = CheckAiAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        report = null;
+        try
+        {
+            var today = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+            var bills = await Facts.GetBillSpanAsync();
+            report = await Facts.LoadReportAsync(SalesPeriods.Range(period, SalesPeriods.EndDay(today, bills), bills));
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Loading the figures for a plan failed.");
+            error = ex.Message;
+        }
+    }
+
+    private async Task CheckAiAsync()
+    {
+        try
+        {
+            readiness = await Planner.CheckAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Checking the AI tools failed.");
+            readiness = new AiReadiness(false, "", new[] { ex.Message });
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task WriteAsync()
+    {
+        if (report is null || running)
+        {
+            return;
+        }
+
+        running = true;
+        planError = null;
+        progress = "Starting…";
+        cancel = new CancellationTokenSource();
+        try
+        {
+            var written = await Planner.WriteAsync(report, language, goal, new Progress<string>(text =>
+            {
+                progress = text;
+                _ = InvokeAsync(StateHasChanged);
+            }), cancel.Token);
+            plan = (written.Saved, written.Text,
+                $"{written.Saved.Period} · {written.Provider} · {written.Duration.TotalSeconds:0} s · saved on this PC");
+            saved = Planner.RecentPlans();
+        }
+        catch (OperationCanceledException)
+        {
+            planError = "Stopped.";
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Writing a growth plan failed.");
+            planError = ex.Message;
+        }
+        finally
+        {
+            running = false;
+            progress = null;
+            cancel?.Dispose();
+            cancel = null;
+        }
+    }
+
+    private void Stop() => cancel?.Cancel();
+
+    public void Dispose()
+    {
+        cancel?.Cancel();
+        cancel?.Dispose();
+    }
+}

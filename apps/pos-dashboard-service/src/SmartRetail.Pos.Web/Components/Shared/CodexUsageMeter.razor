@@ -1,0 +1,122 @@
+@* How much of Codex's usage limits is used, as Codex says: each window (e.g. 5 hours, a week) with a bar. Shown only
+   when Codex can say, i.e. signed in with ChatGPT; with Explain, it says so otherwise. *@
+@using System.Globalization
+@using SmartRetail.AI.Providers
+@implements IDisposable
+@inject CodexAccountService Account
+
+@if (Windows.Count > 0)
+{
+    <a class="usage-meter @(Worst >= 90 ? "bad" : Worst >= 75 ? "warn" : null)" href="settings#ai-jobs" title="@Tooltip">
+        <span class="usage-title">Codex use</span>
+        @foreach (var (name, window) in Windows)
+        {
+            <span class="usage-row">
+                <span class="usage-name">@name</span>
+                <span class="share-track"><span class="share-fill @(window.UsedPercent >= 90 ? "bad" : window.UsedPercent >= 75 ? "warn" : null)" style="width: @Whole(window.UsedPercent)%"></span></span>
+                <span class="usage-value">@Whole(window.UsedPercent)%</span>
+            </span>
+        }
+        @if (usage?.Allowed == false)
+        {
+            <span class="usage-note">Used up for now@(ResetText(Windows.OrderByDescending(w => w.Window.UsedPercent).First().Window) is { Length: > 0 } reset ? $": {reset}" : "")</span>
+        }
+    </a>
+}
+else if (Explain)
+{
+    <span class="muted small">@(read ? "Codex shows this when it is signed in with ChatGPT." : "Checking…")</span>
+}
+
+@code {
+    private static readonly CultureInfo India = CultureInfo.GetCultureInfo("en-IN");
+    private static readonly TimeSpan Every = TimeSpan.FromMinutes(5);
+
+    private readonly CancellationTokenSource stopping = new();
+    private CodexUsage? usage;
+    private bool read;
+
+    /// <summary>Say why nothing shows when Codex cannot tell.</summary>
+    [Parameter] public bool Explain { get; set; }
+
+    private IReadOnlyList<(string Name, CodexUsageWindow Window)> Windows =>
+        new[] { usage?.Primary, usage?.Secondary }.OfType<CodexUsageWindow>().Select(w => (WindowName(w), w)).ToList();
+
+    private double Worst => Windows.Count == 0 ? 0 : Windows.Max(w => w.Window.UsedPercent);
+
+    private string Tooltip => string.Join(" ", Windows.Select(w =>
+        $"{Whole(w.Window.UsedPercent)}% of the {LongName(w.Window)} limit used{(ResetText(w.Window) is { Length: > 0 } reset ? $", {reset}" : "")}."));
+
+    protected override void OnInitialized()
+    {
+        Account.UsageChanged += OnUsageChanged;
+        usage = Account.LastUsage.Usage;
+        read = usage is not null || Account.LastUsage.Problem is not null;
+        _ = KeepReadingAsync();
+    }
+
+    private async Task KeepReadingAsync()
+    {
+        using var timer = new PeriodicTimer(Every);
+        try
+        {
+            do
+            {
+                usage = (await Account.UsageAsync(fresh: false, stopping.Token)).Usage;
+                read = true;
+                await InvokeAsync(StateHasChanged);
+            }
+            while (await timer.WaitForNextTickAsync(stopping.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+    }
+
+    private static int Whole(double percent) => (int)Math.Round(Math.Clamp(percent, 0, 100), MidpointRounding.AwayFromZero);
+
+    /// <summary>"5 h" or "Week", as short as the menu needs.</summary>
+    private static string WindowName(CodexUsageWindow window) => window.WindowMinutes switch
+    {
+        10080 => "Week",
+        { } minutes when minutes % 1440 == 0 => $"{minutes / 1440} d",
+        { } minutes when minutes % 60 == 0 => $"{minutes / 60} h",
+        { } minutes => $"{minutes} min",
+        _ => "Now",
+    };
+
+    private static string LongName(CodexUsageWindow window) => window.WindowMinutes switch
+    {
+        10080 => "weekly",
+        { } minutes when minutes % 60 == 0 && minutes < 1440 => $"{minutes / 60}-hour",
+        { } minutes when minutes % 1440 == 0 => $"{minutes / 1440}-day",
+        _ => "current",
+    };
+
+    private static string ResetText(CodexUsageWindow window)
+    {
+        if (window.ResetsAt is not { } resets)
+        {
+            return "";
+        }
+
+        var local = resets.ToLocalTime();
+        return local.Date == DateTimeOffset.Now.Date
+            ? "resets at " + local.ToString("h:mm tt", India).ToLowerInvariant()
+            : "resets on " + local.ToString("ddd d MMM", India);
+    }
+
+    private void OnUsageChanged() => _ = InvokeAsync(() =>
+    {
+        usage = Account.LastUsage.Usage;
+        read = true;
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Account.UsageChanged -= OnUsageChanged;
+        stopping.Cancel();
+    }
+}

@@ -1,0 +1,211 @@
+@* A product's place on the owner's website, under its website listing: the category of the website it goes in (chosen from the website's own
+   list after the photos and listing were made, by the AI, and changed here by the owner), and where it stands on the website's waiting list. *@
+@using SmartRetail.AI.Products
+@using SmartRetail.Pos.Core.Analytics
+@implements IDisposable
+@inject WebsiteService Website
+@inject OwnerViewService Owner
+@inject ProductPhotoService Photos
+
+@if (Owner.Status.MainPc is { } main)
+{
+    <div class="listing-field website-counter">
+        <div class="listing-label"><span>On your website</span></div>
+        <p class="small muted"><strong>@main</strong> is the shop's main PC, and it offers the shop's products to your website. This PC is a counter PC, so what you make here stays here.</p>
+    </div>
+}
+else
+{
+    <div class="listing-field website-category">
+        <div class="listing-label"><span>Category on your website</span></div>
+        @if (!Website.Enabled || Website.Categories.IsEmpty)
+        {
+            <p class="listing-value">@(Suggested.Length > 0 ? Suggested : "None suggested")</p>
+            @if (!Website.Enabled)
+            {
+                <p class="small muted">The AI's first guess. To put this product on your website, turn on offering products to it in Settings, under Owner's live view.</p>
+            }
+            else
+            {
+                <p class="small muted">
+                    The AI's first guess. Your website's categories have not reached this PC yet: open <em>From the shop</em> in your website's admin once, then check again.
+                    <button type="button" class="link-button" disabled="@busy" @onclick="CheckAsync">Check again</button>
+                </p>
+            }
+        }
+        else
+        {
+            var choice = info?.WebsiteCategory;
+            var valid = choice?.IsValidIn(Website.Categories) == true;
+            <p class="listing-value">@(valid ? Website.Categories.PathOf(choice!.CategoryId, choice.SubcategoryId) : "Not chosen yet")</p>
+            @if (valid)
+            {
+                <p class="small muted">@(SourceText(choice!.Source))</p>
+            }
+            else if (choice is not null)
+            {
+                <p class="small muted">The category chosen before is not on your website any more.</p>
+            }
+            else if (Suggested.Length > 0)
+            {
+                <p class="small muted">The AI's first guess was “@Suggested”, which is not one of your website's categories.</p>
+            }
+
+            <div class="website-category-pick">
+                <label class="visually-hidden" for="website-category">Category on your website</label>
+                <select id="website-category" class="form-select" @onchange="PickAsync">
+                    <option value="" selected="@(!valid)">Choose a category…</option>
+                    @foreach (var option in Website.Categories.Options())
+                    {
+                        <option value="@option.Id" selected="@IsChosen(option, choice, valid)">@option.Path</option>
+                    }
+                </select>
+                <button type="button" class="btn btn-soft btn-sm" disabled="@busy" @onclick="ChooseAsync"><Icon Name="spark" /> @(valid ? "Let the AI choose again" : "Let the AI choose")</button>
+            </div>
+            @if (message is not null)
+            {
+                <p class="small website-message" role="status">@message</p>
+            }
+        }
+    </div>
+
+    @if (Website.Enabled)
+    {
+        <div class="listing-field website-state">
+            <div class="listing-label"><span>On your website</span></div>
+            @if (Website.StateOf(Product.Id) is { } state)
+            {
+                <p class="listing-value">
+                    <span class="pill @PillOf(state.Kind)">@TitleOf(state.Kind)</span>
+                    <span class="small muted website-state-text">@state.Text</span>
+                </p>
+                @if (state.Kind == "declined")
+                {
+                    <p class="small"><button type="button" class="link-button" disabled="@busy" @onclick="OfferAgainAsync">Offer it again</button> if you changed your mind.</p>
+                }
+            }
+            else
+            {
+                <p class="small muted">Not looked at yet. This PC looks every ten minutes, and when a photo or listing is finished.</p>
+            }
+        </div>
+    }
+}
+
+@code {
+    private ProductPhotoInfo? info;
+    private bool busy;
+    private string? message;
+
+    [Parameter, EditorRequired] public ProductFacts Product { get; set; } = default!;
+
+    /// <summary>The category the AI's first guess named, in its own words (the listing's website category).</summary>
+    [Parameter] public string Suggested { get; set; } = "";
+
+    /// <summary>Called after the category was changed here.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    protected override void OnInitialized() => Website.Changed += OnChanged;
+
+    protected override void OnParametersSet() => info = Photos.Info(Product.Id);
+
+    private static bool IsChosen(SiteCategoryOption option, WebsiteCategoryChoice? choice, bool valid) =>
+        valid && option.Id == (choice!.SubcategoryId.Length > 0 ? choice.SubcategoryId : choice.CategoryId);
+
+    private static string SourceText(string source) => source switch
+    {
+        WebsiteCategoryChoice.ByOwner => "Chosen by you.",
+        WebsiteCategoryChoice.ByAi => "Chosen by the AI from your website's list. Change it if it is wrong.",
+        _ => "Matched from the AI's first guess. Change it if it is wrong.",
+    };
+
+    private static string PillOf(string kind) => kind switch
+    {
+        "published" => "good",
+        "waiting" => "warn",
+        "declined" => "bad",
+        _ => "",
+    };
+
+    private static string TitleOf(string kind) => kind switch
+    {
+        "sending" => "Being sent",
+        "waiting" => "Waiting for you",
+        "published" => "On your website",
+        "declined" => "Declined",
+        "soon" => "Next",
+        _ => "Not yet",
+    };
+
+    private async Task PickAsync(ChangeEventArgs args)
+    {
+        message = null;
+        var id = args.Value?.ToString() ?? "";
+        if (id.Length == 0)
+        {
+            return;
+        }
+
+        if (!Website.SetCategory(Product.Id, id))
+        {
+            message = "That category is not in your website's list any more. Check again.";
+        }
+
+        info = Photos.Info(Product.Id);
+        await Changed.InvokeAsync();
+    }
+
+    private async Task ChooseAsync()
+    {
+        busy = true;
+        message = "The AI is choosing…";
+        try
+        {
+            message = await Website.ChooseAsync(Product.Id);
+            info = Photos.Info(Product.Id);
+            await Changed.InvokeAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task CheckAsync()
+    {
+        busy = true;
+        try
+        {
+            await Website.RefreshCategoriesAsync();
+        }
+        catch (OwnerViewException ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task OfferAgainAsync()
+    {
+        busy = true;
+        try
+        {
+            message = await Website.OfferAgainAsync(Product.Id);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        info = Photos.Info(Product.Id);
+        StateHasChanged();
+    });
+
+    public void Dispose() => Website.Changed -= OnChanged;
+}

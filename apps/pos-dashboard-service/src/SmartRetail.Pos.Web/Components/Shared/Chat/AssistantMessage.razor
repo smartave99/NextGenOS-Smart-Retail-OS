@@ -1,0 +1,34 @@
+@* An answer, laid out like a document in the reading column (no card around it): the words, the table the query
+   found, then quiet actions. *@
+@using SmartRetail.AI.Assistant
+
+<article class="msg-ai @(Message.IsProblem ? "problem" : Message.WasStopped ? "stopped" : null)">
+    @if (Message.Heard is { Length: > 0 } heard)
+    {
+        <p class="answer-heard"><Icon Name="mic" /><span>Heard: “@heard”</span></p>
+    }
+    @if (Message.IsProblem)
+    {
+        <p class="answer-problem"><Icon Name="alert" /><span>@Message.Text</span></p>
+    }
+    else
+    {
+        <MarkdownView Text="@Message.Text" />
+    }
+    @if (Message.Table is { } table)
+    {
+        <ResultTable Table="table" />
+    }
+    <MessageActions Message="Message" Question="Question" AskAgain="AskAgain" Busy="Busy" />
+</article>
+
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+
+    /// <summary>The owner's question this answers.</summary>
+    [Parameter] public ChatMessage? Question { get; set; }
+
+    [Parameter] public Func<string, IReadOnlyList<ChatAttachment>, bool>? AskAgain { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+}

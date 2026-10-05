@@ -1,0 +1,209 @@
+@page "/prices"
+@implements IDisposable
+@using SmartRetail.AI.Prices
+@using SmartRetail.Pos.Core.Analytics
+@using SmartRetail.Pos.Core.Models
+@using SmartRetail.Pos.Core.Prices
+@inject PriceCheckService Prices
+@inject ProductPhotoService Photos
+@inject ISalesFactsRepository ShopFacts
+@inject IProductRepository Catalog
+@inject ILogger<PriceCheck> Log
+
+<PageTitle>Price check · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Price check</h1>
+        <p class="sub">What the same products cost in online shops, next to your own price. Nothing here changes a price in the POS.</p>
+    </div>
+</div>
+
+<section class="panel prices-about" aria-label="How the price check works">
+    <ol class="small prices-steps">
+        <li><strong>Follow</strong> a product below.</li>
+        <li><strong>Look online:</strong> Codex searches the web for it in @PriceShops.Names, and reads the product pages.</li>
+        <li><strong>Confirm</strong> the pages that show exactly this product in this pack (you can open each one). Only those are compared with your price.</li>
+    </ol>
+    <p class="small muted">Only the product's name, its maker's barcode, its category and, when the AI has seen photos of it, a few words on what it is go out from this PC, never your prices, sales or customers. A price is what a shop's page showed at the time, with its date, so check the page before you rely on it. The AI never sets a price.</p>
+</section>
+
+<section class="panel">
+    <div class="panel-head"><h2>Follow a product</h2></div>
+    <input class="form-control" type="search" placeholder="Find a product by name or code" aria-label="Find a product to follow" value="@term" @oninput="SearchAsync" />
+    @if (found.Count > 0)
+    {
+        <ul class="found-list">
+            @foreach (var product in found)
+            {
+                var following = book.Products.Any(p => p.ProductId == product.Id);
+                <li>
+                    <span class="grow item-name">@product.Name</span>
+                    <button type="button" class="btn btn-sm" disabled="@following" @onclick="() => FollowAsync(product)">@(following ? "Following" : "Follow")</button>
+                </li>
+            }
+        </ul>
+    }
+    @if (message is not null)
+    {
+        <p class="small trend-down" role="alert">@message</p>
+    }
+</section>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (book.Products.Count == 0)
+{
+    <p class="muted prices-empty">No product is followed yet.</p>
+}
+else
+{
+    @foreach (var watched in book.Products.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+    {
+        <PriceProductCard @key="watched.ProductId"
+                          Watched="watched"
+                          Product="products.GetValueOrDefault(watched.ProductId)"
+                          Facts="facts.GetValueOrDefault(watched.ProductId)"
+                          Busy="@(Prices.Checking == watched.ProductId)"
+                          Locked="@(Prices.Checking is not null && Prices.Checking != watched.ProductId)"
+                          Problem="@Prices.ProblemOf(watched.ProductId)"
+                          OnCheck="only => CheckAsync(watched.ProductId, only)"
+                          OnStatus="change => SetStatus(watched.ProductId, change.Url, change.Status)"
+                          OnForget="() => Forget(watched.ProductId)" />
+    }
+}
+
+@code {
+    private const int SearchLimit = 8;
+
+    private PriceBook book = new();
+    private Dictionary<int, ProductFacts> products = new();
+    private Dictionary<int, ListingFacts> facts = new();
+    private IReadOnlyList<Product> found = Array.Empty<Product>();
+    private string term = "";
+    private string? message;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Prices.Changed += OnChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            book = Prices.Load();
+            products = (await ShopFacts.GetProductsAsync()).ToDictionary(p => p.Id);
+            foreach (var watched in book.Products)
+            {
+                await LoadFactsAsync(watched.ProductId);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogError(ex, "Loading the price check failed.");
+            error = ex.Message;
+        }
+    }
+
+    /// <summary>The price the customer pays, the MRP and the barcode of a followed product, from the POS.</summary>
+    private async Task LoadFactsAsync(int productId)
+    {
+        if (facts.ContainsKey(productId) || !products.TryGetValue(productId, out var product))
+        {
+            return;
+        }
+
+        try
+        {
+            facts[productId] = await Photos.ListingFactsAsync(product, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Reading the POS prices of product {Id} failed.", productId);
+        }
+    }
+
+    private async Task SearchAsync(ChangeEventArgs e)
+    {
+        term = e.Value as string ?? "";
+        var text = term.Trim();
+        try
+        {
+            found = text.Length < 2 ? Array.Empty<Product>() : await Catalog.SearchAsync(text, SearchLimit);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Searching products failed.");
+            found = Array.Empty<Product>();
+        }
+    }
+
+    private async Task FollowAsync(Product product)
+    {
+        await Do(() =>
+        {
+            Prices.Watch(product.Id, product.Name);
+            return null;
+        });
+        await LoadAsync();
+    }
+
+    private async Task CheckAsync(int productId, bool onlyConfirmed)
+    {
+        message = null;
+        if (!products.TryGetValue(productId, out var product))
+        {
+            return;
+        }
+
+        await LoadFactsAsync(productId);
+        // The maker's barcode wherever the stock has it (not only the batch the till scans): the strongest way to find the same product.
+        var barcode = facts.GetValueOrDefault(productId)?.MakerBarcode ?? "";
+
+        // Runs on in the background: leaving the page does not stop it, and what it finds is kept. A refusal (another product is
+        // being looked up, this one already) is shown; a failure of the look itself is kept with the product and shown on its card.
+        var problem = await Prices.CheckAsync(productId, product.Name, barcode, product.Category, Photos.WhatItIs(productId) ?? "", onlyConfirmed, CancellationToken.None);
+        if (problem is not null && Prices.ProblemOf(productId) is null)
+        {
+            message = problem;
+        }
+    }
+
+    private Task SetStatus(int productId, string url, LinkStatus status) => Do(() => Prices.SetStatus(productId, url, status));
+
+    private Task Forget(int productId) => Do(() =>
+    {
+        Prices.Forget(productId);
+        return null;
+    });
+
+    private Task Do(Func<string?> change)
+    {
+        try
+        {
+            message = change();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing the price check failed.");
+            message = ex.Message;
+        }
+
+        book = Prices.Load();
+        return Task.CompletedTask;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        book = Prices.Load();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Prices.Changed -= OnChanged;
+}

@@ -1,0 +1,207 @@
+@* Settings: the owner's live view. This PC sends the shop's figures to the owner's own Supabase project, and the
+   owner sees them from anywhere on the website's Live shop (the admin panel), or the owner's page. *@
+@implements IDisposable
+@inject OwnerViewService Owner
+
+<div class="setting owner-view">
+    <div>
+        <h3>@(status.Connected ? "Sending to " + (status.ShopName.Length > 0 ? status.ShopName : "your shop") : "See the shop from anywhere")</h3>
+        @if (status.Connected)
+        {
+            <p>
+                The shop's figures go to your Supabase project (<span class="mono">@status.Project</span>) every minute, and within 20 seconds of a new bill,
+                and last week's review, with the stock running out, goes once an hour. See them on your website's Live shop, from anywhere.
+                Questions you ask the shop's AI there are answered by this PC.
+            </p>
+            @if (status.MainPc is { } main)
+            {
+                <p class="owner-state owner-counter" id="owner-counter">
+                    <Icon Name="info" />
+                    <span>
+                        This PC is a counter PC. <strong>@main</strong> is the shop's main PC, and only the main PC sends the figures, the Monday review and the
+                        products to your Supabase project and answers your questions, because each PC keeps its own photos and decisions.
+                        <button type="button" class="link-button" disabled="@(busy || status.Sending)" @onclick="MakeMainAsync">Make this the main PC</button>
+                        if this is the one that should.
+                    </span>
+                </p>
+                @if (mainError is not null)
+                {
+                    <p class="owner-state problem" role="alert"><Icon Name="alert" /><span>@mainError</span></p>
+                }
+            }
+            else
+            {
+                <p class="owner-state @(status.Problem is null ? null : "problem")">
+                    @if (status.Problem is { } problem)
+                    {
+                        <Icon Name="alert" /><span>@problem</span>
+                    }
+                    else if (status.Sending)
+                    {
+                        <span class="spinner"></span><span>Sending…</span>
+                    }
+                    else if (status.LastSentAt is { } sent)
+                    {
+                        <span class="live-dot" aria-hidden="true"></span><span>Last sent at @Formats.TimeWithSeconds(sent.DateTime)</span>
+                    }
+                </p>
+                @if (status.ReviewProblem is { } reviewProblem)
+                {
+                    <p class="owner-state problem owner-review-state"><Icon Name="alert" /><span>@reviewProblem</span></p>
+                }
+                else if (status.ReviewSentAt is { } reviewSent)
+                {
+                    <p class="owner-state owner-review-state"><span class="live-dot" aria-hidden="true"></span><span>The Monday review was sent at @Formats.Time(reviewSent.DateTime). It goes again every hour, and when the week turns.</span></p>
+                }
+                <WebsiteSetting />
+            }
+        }
+        else
+        {
+            <p>
+                Send the shop's live figures to your own Supabase project, and see them on your website's Live shop from anywhere.
+                Only figures are sent: never customer names, phone numbers or what was on a bill.
+            </p>
+            @if (status.Problem is { } problem)
+            {
+                <p class="owner-state problem"><Icon Name="alert" /><span>@problem</span></p>
+            }
+            <ol class="owner-steps">
+                <li>
+                    <h4>Your Supabase project</h4>
+                    <p>
+                        Make a free project at supabase.com, and run <a href="@OwnerViewScript.Address" target="_blank" rel="noopener">the owner view's script</a>
+                        in its SQL Editor. Run it again after an update: that is safe.
+                    </p>
+                </li>
+                <li>
+                    <h4>The owner's account</h4>
+                    <p>
+                        On your website's admin panel, open <em>Live shop</em>. Create the owner's account there and name the shop, then press
+                        <em>Connect a shop PC</em>: it shows a code, the project URL and the public key.
+                    </p>
+                </li>
+                <li>
+                    <h4>Connect this PC</h4>
+                    @if (Owner.HasShopData)
+                    {
+                        <form class="owner-connect" @onsubmit="ConnectAsync" @onsubmit:preventDefault>
+                            <RequiredNote />
+                            <label>Project URL <Required /> <input class="form-control" id="owner-url" aria-required="true" autocomplete="off" spellcheck="false" placeholder="https://abcd.supabase.co" @bind="url" /></label>
+                            <label>Public key <Required /> <input class="form-control mono" id="owner-key" aria-required="true" autocomplete="off" spellcheck="false" placeholder="anon public or publishable key" @bind="key" /></label>
+                            <label>Code from Live shop <Required /> <input class="form-control mono" id="owner-code" aria-required="true" autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABCD-EFGH" @bind="code" /></label>
+                            <div class="owner-connect-go">
+                                <button type="submit" class="btn btn-primary" disabled="@busy">@(busy ? "Connecting…" : "Connect")</button>
+                                @if (error is not null)
+                                {
+                                    <span class="field-error" role="alert">@error</span>
+                                }
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="owner-state problem"><Icon Name="info" /><span>@OwnerViewService.NoPosToConnect</span></p>
+                    }
+                </li>
+            </ol>
+        }
+    </div>
+    @if (status.Connected)
+    {
+        <div class="setting-actions">
+            <button type="button" class="btn btn-soft" disabled="@(busy || status.Sending)" @onclick="SendAsync"><Icon Name="refresh" /> Send now</button>
+            <button type="button" class="btn" disabled="@busy" @onclick="DisconnectAsync">Disconnect</button>
+        </div>
+    }
+</div>
+
+@code {
+    private OwnerViewStatus status = new();
+    private string url = "";
+    private string key = "";
+    private string code = "";
+    private string? error;
+    private string? mainError;
+    private bool busy;
+
+    protected override void OnInitialized()
+    {
+        status = Owner.Status;
+        var settings = Owner.Settings;
+        url = settings.ProjectUrl;
+        key = settings.PublicKey;
+        Owner.Changed += OnChanged;
+    }
+
+    private async Task ConnectAsync()
+    {
+        error = null;
+        busy = true;
+        try
+        {
+            await Owner.ConnectAsync(url, key, code);
+            code = "";
+        }
+        catch (OwnerViewException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        busy = true;
+        try
+        {
+            await Owner.SendNowAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task MakeMainAsync()
+    {
+        mainError = null;
+        busy = true;
+        try
+        {
+            await Owner.MakeMainAsync();
+        }
+        catch (OwnerViewException ex)
+        {
+            mainError = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        busy = true;
+        try
+        {
+            await Owner.DisconnectAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        status = Owner.Status;
+        StateHasChanged();
+    });
+
+    public void Dispose() => Owner.Changed -= OnChanged;
+}

@@ -1,0 +1,35 @@
+@* One click: searches Google Lens with the product's own photo (see GoogleLens). The link opens a small page of this dashboard
+   in the browser, which sends the photo to Google; the app's window opens it in the browser, as it does every new window.
+   A photo finds the same product more exactly than its name, and costs none of the AI's limit. Without a photo it says so. *@
+@if (Available)
+{
+    <a class="@Class" href="@GoogleLens.PageUrl(ProductId, Photo)" target="_blank" rel="noopener" title="@Title" aria-label="@(IconOnly ? Title : null)">
+        <Icon Name="lens" />@if (!IconOnly)
+        {
+            <text> @Label</text>
+        }
+    </a>
+}
+else if (!IconOnly)
+{
+    <span class="@Class disabled" aria-disabled="true" title="Add a photo of this product first, then search Google Lens with it"><Icon Name="lens" /> @Label</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public int ProductId { get; set; }
+
+    /// <summary>One photo of the product to search with; the best one when null.</summary>
+    [Parameter] public string? Photo { get; set; }
+
+    /// <summary>The product has a photo to search with.</summary>
+    [Parameter] public bool Available { get; set; } = true;
+
+    [Parameter] public string Label { get; set; } = "Google Lens";
+
+    [Parameter] public string Class { get; set; } = "btn btn-soft";
+
+    /// <summary>Only the icon, for a tight place (a photo's corner).</summary>
+    [Parameter] public bool IconOnly { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Search Google Lens with this photo: it finds the same product and where it is sold. Nothing goes through the AI.";
+}

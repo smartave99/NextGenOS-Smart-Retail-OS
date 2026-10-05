@@ -1,0 +1,14 @@
+{
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bin": true,
+    "**/obj": true,
+    "**/.next": true,
+    "**/dist-electron": true
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.vs": true
+  },
+  "dotnet.defaultSolution": "SmartRetailSuite.sln"
+}

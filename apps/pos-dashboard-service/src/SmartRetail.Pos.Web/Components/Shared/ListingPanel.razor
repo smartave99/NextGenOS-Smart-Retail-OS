@@ -1,0 +1,445 @@
+@* A product's listings for Amazon and the shop's website, under its photos: written by Codex once, right after the
+   first photo, and kept. Each part can be copied, the whole downloaded (text for Amazon, JSON for the website), changed
+   by hand, written again, or taken back to an earlier version. The price, MRP and barcode come from the POS. *@
+@using SmartRetail.AI.Products
+@using SmartRetail.Pos.Core.Analytics
+@implements IDisposable
+@inject ProductPhotoService Photos
+@inject IJSRuntime Js
+@inject ILogger<ListingPanel> Log
+
+<section class="panel listing" id="listing" aria-labelledby="listing-title">
+    <div class="panel-head listing-head">
+        <h2 id="listing-title"><Icon Name="tag" /> Listings</h2>
+        <div class="listing-tools">
+            <div class="seg seg-inline" role="tablist" aria-label="Which listing">
+                <button type="button" role="tab" class="seg-item @(tab == Tab.Amazon ? "on" : null)" aria-selected="@(tab == Tab.Amazon ? "true" : "false")" @onclick="() => tab = Tab.Amazon">Amazon</button>
+                <button type="button" role="tab" class="seg-item @(tab == Tab.Website ? "on" : null)" aria-selected="@(tab == Tab.Website ? "true" : "false")" @onclick="() => tab = Tab.Website">Your website</button>
+            </div>
+            <AiChoice Job="SmartRetail.AI.Settings.AiJob.Listing" />
+        </div>
+    </div>
+
+    @if (Writing)
+    {
+        <p class="listing-status" role="status"><span class="spinner"></span> Writing the listings for Amazon and your website…</p>
+    }
+    else if (Info.ListingPending)
+    {
+        <p class="listing-status muted small" role="status">The listings are written right after the first photo.</p>
+    }
+    else if (Info.ListingProblem is { } problem)
+    {
+        <p class="plan-error small trend-down" role="alert">@(problem == "Stopped." ? "Writing the listings was stopped." : $"The listings could not be written: {problem}")</p>
+    }
+    @if (message is not null)
+    {
+        <p class="small listing-message" role="status">@message</p>
+    }
+
+    @if (listing is null)
+    {
+        @if (!Writing && !Info.ListingPending)
+        {
+            <div class="listing-empty">
+                <p>Codex writes a title, five bullet points, a description and search words for Amazon, and a name, description, highlights and tags for your website, from the photos. They are kept, so they are written once.</p>
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="WriteAsync"><Icon Name="spark" /> Write the listings</button>
+            </div>
+        }
+    }
+    else if (editing)
+    {
+        <form class="listing-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <label class="form-label" for="l-name">Name on your website and Amazon <span class="count">@draft.DisplayName.Length / @ListingRules.DisplayNameMax</span></label>
+            <input id="l-name" class="form-control" maxlength="@ListingRules.DisplayNameMax" @bind="draft.DisplayName" @bind:event="oninput" />
+            <p class="small muted listing-pos-name">One name for both. Your POS calls this product “@Product.Name” and keeps that name: this app never changes it.</p>
+            @if (tab == Tab.Amazon)
+            {
+                <span class="form-label">Bullet points</span>
+                @for (var i = 0; i < ListingRules.BulletCount; i++)
+                {
+                    var n = i;
+                    <input class="form-control" aria-label="@($"Bullet point {n + 1}")" maxlength="@ListingRules.BulletMax" @bind="bullets[n]" />
+                }
+                <label class="form-label" for="l-desc">Product description</label>
+                <textarea id="l-desc" class="form-control" rows="7" maxlength="@ListingRules.DescriptionMax" @bind="draft.Amazon.Description"></textarea>
+                <label class="form-label" for="l-search">Search terms <span class="count">words not in the title</span></label>
+                <input id="l-search" class="form-control" @bind="draft.Amazon.SearchTerms" />
+                <div class="listing-form-grid">
+                    <div><label class="form-label" for="l-brand">Brand</label><input id="l-brand" class="form-control" placeholder="As printed on the pack" @bind="draft.Amazon.Brand" /></div>
+                    <div><label class="form-label" for="l-generic">Generic name</label><input id="l-generic" class="form-control" @bind="draft.Amazon.GenericName" /></div>
+                    <div><label class="form-label" for="l-type">Product type</label><input id="l-type" class="form-control" @bind="draft.Amazon.ProductType" /></div>
+                    <div><label class="form-label" for="l-colour">Colour</label><input id="l-colour" class="form-control" @bind="draft.Amazon.Colour" /></div>
+                    <div><label class="form-label" for="l-material">Material</label><input id="l-material" class="form-control" @bind="draft.Amazon.Material" /></div>
+                    <div><label class="form-label" for="l-size">Size</label><input id="l-size" class="form-control" @bind="draft.Amazon.Size" /></div>
+                    <div><label class="form-label" for="l-count">Number of items</label><input id="l-count" class="form-control" @bind="draft.Amazon.ItemCount" /></div>
+                    <div><label class="form-label" for="l-included">Included components</label><input id="l-included" class="form-control" @bind="draft.Amazon.Included" /></div>
+                </div>
+            }
+            else
+            {
+                <label class="form-label" for="w-desc">Description</label>
+                <textarea id="w-desc" class="form-control" rows="6" maxlength="@ListingRules.WebsiteDescriptionMax" @bind="draft.Website.Description"></textarea>
+                <label class="form-label" for="w-highlights">Highlights <span class="count">one on each line</span></label>
+                <textarea id="w-highlights" class="form-control" rows="4" @bind="highlights"></textarea>
+                <label class="form-label" for="w-specs">Specifications <span class="count">one on each line, as “Material: Plastic”</span></label>
+                <textarea id="w-specs" class="form-control" rows="4" @bind="specifications"></textarea>
+                <label class="form-label" for="w-tags">Tags <span class="count">separated by commas</span></label>
+                <input id="w-tags" class="form-control" @bind="tags" />
+                <label class="form-label" for="w-category">Category</label>
+                <input id="w-category" class="form-control" @bind="draft.Website.Category" />
+            }
+            <p class="small muted listing-rule">Prices, offers, links and phone numbers are taken out when saved: Amazon does not allow them, and the prices come from the POS.</p>
+            <div class="listing-actions">
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy"><Icon Name="check" /> Save</button>
+                <button type="button" class="btn btn-sm" @onclick="() => editing = false">Cancel</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <p class="listing-meta small muted">
+            Written by @(listing.Provider.Length > 0 ? listing.Provider : "the AI") on @listing.Written.ToString("d MMM yyyy, h:mm tt", India)@(listing.Edited is { } edited ? $" · changed by you on {edited.ToString("d MMM yyyy, h:mm tt", India)}" : "")
+        </p>
+        @if (Info.LatestSet is { } latest && listing.SetId.Length > 0 && listing.SetId != latest.Id)
+        {
+            <p class="small listing-message">New photos were added after these were written. <button type="button" class="link-button" disabled="@(busy || Writing)" @onclick="WriteAsync">Write again</button> to use them.</p>
+        }
+        @if (listing.Notes.Count > 0)
+        {
+            <ul class="listing-notes small">
+                @foreach (var note in listing.Notes)
+                {
+                    <li>@note</li>
+                }
+            </ul>
+        }
+
+        <div class="listing-field listing-name">
+            <div class="listing-label"><span>Name on your website and Amazon</span><span class="count">@listing.PublicName.Length / @ListingRules.DisplayNameMax</span>@CopyButton("name", "the name", listing.PublicName)</div>
+            <p class="listing-value listing-title">@listing.PublicName</p>
+            <p class="small muted listing-pos-name">In your POS this product is called “@Product.Name”. The POS keeps that name: this app never changes it.</p>
+        </div>
+
+        @if (tab == Tab.Amazon)
+        {
+            var amazon = listing.Amazon;
+            <div class="listing-field">
+                <div class="listing-label"><span>Bullet points</span><span class="count">@amazon.Bullets.Count of @ListingRules.BulletCount</span>@CopyButton("bullets", "the bullet points", string.Join("\n", amazon.Bullets))</div>
+                <ul class="listing-list">
+                    @foreach (var bullet in amazon.Bullets)
+                    {
+                        <li>@bullet</li>
+                    }
+                </ul>
+            </div>
+            <div class="listing-field">
+                <div class="listing-label"><span>Product description</span>@CopyButton("description", "the description", amazon.Description)</div>
+                <div class="listing-text">@Paragraphs(amazon.Description)</div>
+            </div>
+            <div class="listing-field">
+                <div class="listing-label"><span>Search terms</span><span class="count">@System.Text.Encoding.UTF8.GetByteCount(amazon.SearchTerms) / @ListingRules.SearchTermsMaxBytes bytes</span>@CopyButton("search", "the search terms", amazon.SearchTerms)</div>
+                <p class="listing-value">@(amazon.SearchTerms.Length > 0 ? amazon.SearchTerms : "None")</p>
+            </div>
+            <div class="listing-field">
+                <div class="listing-label"><span>Details</span></div>
+                <dl class="listing-details">
+                    @foreach (var (label, value) in ListingExport.Details(amazon))
+                    {
+                        <dt>@label</dt>
+                        <dd class="@(value.Length == 0 ? "missing" : null)">@(value.Length > 0 ? value : "Not on the pack: fill in")</dd>
+                    }
+                </dl>
+            </div>
+        }
+        else
+        {
+            var website = listing.Website;
+            <div class="listing-field">
+                <div class="listing-label"><span>Description</span>@CopyButton("w-description", "the description", website.Description)</div>
+                <div class="listing-text">@Paragraphs(website.Description)</div>
+            </div>
+            <div class="listing-field">
+                <div class="listing-label"><span>Highlights</span>@CopyButton("highlights", "the highlights", string.Join("\n", website.Highlights))</div>
+                <ul class="listing-list">
+                    @foreach (var highlight in website.Highlights)
+                    {
+                        <li>@highlight</li>
+                    }
+                </ul>
+            </div>
+            @if (website.Specifications.Count > 0)
+            {
+                <div class="listing-field">
+                    <div class="listing-label"><span>Specifications</span></div>
+                    <dl class="listing-details">
+                        @foreach (var spec in website.Specifications)
+                        {
+                            <dt>@spec.Key</dt>
+                            <dd>@spec.Value</dd>
+                        }
+                    </dl>
+                </div>
+            }
+            <div class="listing-field">
+                <div class="listing-label"><span>Tags</span>@CopyButton("tags", "the tags", string.Join(", ", website.Tags))</div>
+                <div class="keywords listing-tags">
+                    @foreach (var tag in website.Tags)
+                    {
+                        <span class="pill">@tag</span>
+                    }
+                </div>
+            </div>
+            <WebsiteListingStatus Product="Product" Suggested="@website.Category" Changed="Changed" />
+        }
+
+        <div class="listing-field listing-pos">
+            <div class="listing-label"><span>From the POS</span></div>
+            @if (facts is null)
+            {
+                <p class="muted small">@(factsProblem ?? "Reading the price…")</p>
+            }
+            else
+            {
+                <dl class="listing-details">
+                    <dt>Price the customer pays</dt>
+                    <dd>@Money.Format(facts.Price)</dd>
+                    @if (facts.Mrp > 0)
+                    {
+                        <dt>MRP</dt>
+                        <dd>@Money.Format(facts.Mrp)</dd>
+                    }
+                    <dt>Barcode</dt>
+                    <dd>
+                        @if (facts.Barcode.Length == 0)
+                        {
+                            <span>None in the POS</span>
+                        }
+                        else
+                        {
+                            <span class="mono">@facts.Barcode</span>
+                        }
+                        @if (facts.BarcodeKind is { } kind)
+                        {
+                            <span class="pill good">@kind</span>
+                        }
+                        else if (tab == Tab.Amazon)
+                        {
+                            <span class="small muted listing-barcode-note">@(facts.Barcode.Length == 0 ? "Amazon asks for the maker's EAN barcode, or an exemption." : "The shop's own code: Amazon asks for the maker's EAN barcode, or an exemption.")</span>
+                        }
+                    </dd>
+                </dl>
+            }
+        </div>
+
+        <div class="listing-actions">
+            <button type="button" class="btn btn-soft btn-sm" disabled="@(facts is null)" @onclick="CopyAllAsync"><Icon Name="@(copied == "all" ? "check" : "copy")" /> @(copied == "all" ? "Copied" : "Copy all")</button>
+            <button type="button" class="btn btn-soft btn-sm" disabled="@(facts is null)" @onclick="DownloadAsync"><Icon Name="download" /> @(tab == Tab.Amazon ? "Download for Amazon" : "Download for the website")</button>
+            <button type="button" class="btn btn-soft btn-sm" disabled="@busy" @onclick="StartEditing"><Icon Name="edit" /> Edit</button>
+            <button type="button" class="btn btn-soft btn-sm" disabled="@(busy || Writing)" @onclick="WriteAsync"><Icon Name="refresh" /> Write again</button>
+            @if (Info.EarlierListings.Count > 0)
+            {
+                <details class="listing-earlier">
+                    <summary>Earlier versions (@Info.EarlierListings.Count)</summary>
+                    <ul>
+                        @for (var i = 0; i < Info.EarlierListings.Count; i++)
+                        {
+                            var n = i;
+                            var earlier = Info.EarlierListings[n];
+                            <li>
+                                <span>@((earlier.Edited ?? earlier.Written).ToString("d MMM, h:mm tt", India)) · @(earlier.Edited is null ? earlier.Provider : "changed by you")</span>
+                                <span class="muted small listing-earlier-title">@earlier.PublicName</span>
+                                <button type="button" class="link-button" disabled="@busy" @onclick="() => RestoreAsync(n)">Use this one</button>
+                            </li>
+                        }
+                    </ul>
+                </details>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly System.Globalization.CultureInfo India = System.Globalization.CultureInfo.GetCultureInfo("en-IN");
+
+    private enum Tab { Amazon, Website }
+
+    private readonly CancellationTokenSource gone = new();
+    private Tab tab = Tab.Amazon;
+    private ProductListing? listing;
+    private ListingFacts? facts;
+    private string? factsProblem;
+    private int factsFor = -1;
+    private bool editing;
+    private bool busy;
+    private string? message;
+    private string? copied;
+    private ProductListing draft = new();
+    private string[] bullets = new string[ListingRules.BulletCount];
+    private string highlights = "";
+    private string specifications = "";
+    private string tags = "";
+
+    [Parameter, EditorRequired] public ProductFacts Product { get; set; } = default!;
+
+    [Parameter, EditorRequired] public ProductPhotoInfo Info { get; set; } = default!;
+
+    /// <summary>The listings are being written right now.</summary>
+    [Parameter] public bool Writing { get; set; }
+
+    /// <summary>Called after the listings changed here, so the page reads them again.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        listing = Info.Listing;
+        if (factsFor != Product.Id)
+        {
+            factsFor = Product.Id;
+            try
+            {
+                facts = await Photos.ListingFactsAsync(Product, gone.Token);
+                factsProblem = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.LogWarning(ex, "Reading the POS facts for product {Id}'s listing failed.", Product.Id);
+                facts = null;
+                factsProblem = "The price could not be read from the POS. Open this page again to try again.";
+            }
+        }
+    }
+
+    private RenderFragment CopyButton(string key, string what, string text) =>
+        @<button type="button" class="act" aria-label="@($"Copy {what}")" disabled="@(text.Length == 0)" @onclick="() => CopyAsync(key, text)">
+            <Icon Name="@(copied == key ? "check" : "copy")" /><span>@(copied == key ? "Copied" : "Copy")</span>
+        </button>;
+
+    private static RenderFragment Paragraphs(string text) => builder =>
+    {
+        var seq = 0;
+        foreach (var paragraph in (text ?? "").Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            builder.OpenElement(seq++, "p");
+            builder.AddContent(seq++, paragraph);
+            builder.CloseElement();
+        }
+    };
+
+    private async Task CopyAsync(string key, string text)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", text);
+            copied = key;
+            StateHasChanged();
+            await Task.Delay(2000, gone.Token);
+            copied = null;
+        }
+        catch (Exception ex) when (ex is JSException or TaskCanceledException)
+        {
+            // The page is gone, or the clipboard is not allowed: nothing to show.
+        }
+    }
+
+    private Task CopyAllAsync() =>
+        listing is null || facts is null
+            ? Task.CompletedTask
+            : CopyAsync("all", tab == Tab.Amazon ? ListingExport.AmazonText(listing, facts) : ListingExport.WebsiteText(listing, facts));
+
+    private async Task DownloadAsync()
+    {
+        if (listing is null || facts is null)
+        {
+            return;
+        }
+
+        if (tab == Tab.Amazon)
+        {
+            await Js.InvokeVoidAsync("srpos.download", ListingExport.FileName(facts.Name, "Amazon listing.txt"), ListingExport.AmazonText(listing, facts), "text/plain");
+        }
+        else
+        {
+            await Js.InvokeVoidAsync("srpos.download", ListingExport.FileName(facts.Name, "website listing.json"),
+                ListingExport.WebsiteJson(listing, facts, Photos.ZipPhotoNames(Product.Id)), "application/json");
+        }
+    }
+
+    private async Task WriteAsync()
+    {
+        await Act(() =>
+        {
+            Photos.WriteListing(Product.Id);
+            message = null;
+        });
+    }
+
+    private void StartEditing()
+    {
+        if (listing is null)
+        {
+            return;
+        }
+
+        draft = listing.Copy();
+        bullets = Enumerable.Range(0, ListingRules.BulletCount).Select(i => i < draft.Amazon.Bullets.Count ? draft.Amazon.Bullets[i] : "").ToArray();
+        highlights = string.Join("\n", draft.Website.Highlights);
+        specifications = string.Join("\n", draft.Website.Specifications.Select(s => s.Key + ": " + s.Value));
+        tags = string.Join(", ", draft.Website.Tags);
+        message = null;
+        editing = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        draft.Amazon.Bullets = bullets.Where(b => !string.IsNullOrWhiteSpace(b)).ToList();
+        draft.Website.Highlights = Lines(highlights).ToList();
+        draft.Website.Specifications = Lines(specifications)
+            .Select(line => line.Split(':', 2))
+            .Select(parts => new ListingSpec { Key = parts[0].Trim(), Value = parts.Length > 1 ? parts[1].Trim() : "" })
+            .ToList();
+        draft.Website.Tags = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        await Act(() =>
+        {
+            var saved = Photos.SaveListing(Product.Id, draft);
+            editing = false;
+            message = saved.Notes.Count == 0 ? "Saved." : "Saved. " + string.Join(" ", saved.Notes);
+        });
+    }
+
+    private async Task RestoreAsync(int index)
+    {
+        await Act(() =>
+        {
+            Photos.RestoreListing(Product.Id, index);
+            message = "The earlier version is back; the one it replaced is kept under Earlier versions.";
+        });
+    }
+
+    private async Task Act(Action action)
+    {
+        busy = true;
+        try
+        {
+            action();
+            await Changed.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static IEnumerable<string> Lines(string text) =>
+        (text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public void Dispose()
+    {
+        gone.Cancel();
+        gone.Dispose();
+    }
+}

@@ -1,0 +1,9 @@
+# Native frontend code profile
+
+VB.NET, .NET Framework 4.8, x86 WinForms. New frontend modules use Option Explicit, Infer and Strict On; PascalCase for modules, methods and properties, descriptive camelCase locals, and four-space indentation. Retain recovered business code's existing names and line endings when integrating with it.
+
+Keep UI tokens/components and shared row builders in RetailUI, entry-screen layout in RetailLayouts, the selling steps and navigation in RetailCheckoutLayouts, and advanced checkout adapters in RetailAdvancedLayouts. Layout modules depend on RetailUI rather than calling each other's component helpers. Reuse the existing Control instances, event handlers, data columns, numeric formats, local visibility and enabled flags. New layouts must not initiate SQL, payment, messaging or printing effects. UI changes run on the native STA UI thread. Step wrappers may hide actions until their required records exist without overriding their original permission flags. Starting over with a populated cart requires confirmation before the original Reset handler.
+
+Native dimensions, type and colors come from the UI profile/token layer. .NET Framework control visibility is read through its local state only when necessary to preserve explicit visibility through inactive tabs and added layout wrappers; effective Control.Visible includes ancestors and is unsuitable for that purpose. This compatibility behavior is exercised by the native regression.
+
+The gate is the repository's x86 MSBuild plus native runtime/geometry/state verification. The CSS skill checker does not support VB.NET, and the generic craft checker cannot establish native layout correctness. No unsupported automated checker pass is claimed. Preserve unrelated work and prior evidence; exact defect reproductions and changed shared components need post-change native proof.

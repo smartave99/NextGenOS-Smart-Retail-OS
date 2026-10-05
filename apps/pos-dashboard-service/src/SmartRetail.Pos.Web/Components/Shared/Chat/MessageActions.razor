@@ -1,0 +1,74 @@
+@* Quiet actions under an answer: copy it, ask the same question again, see how it was found (the read-only query),
+   and who answered. *@
+@using SmartRetail.AI.Assistant
+@implements IDisposable
+@inject IJSRuntime Js
+
+<div class="msg-actions">
+    @if (!Message.IsProblem && !Message.WasStopped && Message.Text.Length > 0)
+    {
+        <button type="button" class="act" title="Copy the answer" @onclick="CopyAsync">
+            <Icon Name="@(copied ? "check" : "copy")" /><span>@(copied ? "Copied" : "Copy")</span>
+        </button>
+    }
+    @if (Question is not null && AskAgain is not null)
+    {
+        <button type="button" class="act" title="Ask the same question again" disabled="@Busy" @onclick="() => AskAgain(Question.Text, Question.Attachments)">
+            <Icon Name="refresh" /><span>Ask again</span>
+        </button>
+    }
+    @if (Message.Sql is not null)
+    {
+        <button type="button" class="act" aria-expanded="@(showSql ? "true" : "false")" @onclick="() => showSql = !showSql">
+            <Icon Name="database" /><span>How this was found</span>
+        </button>
+    }
+    @if (Message.Source is { Length: > 0 } source)
+    {
+        <span class="act-meta">@source</span>
+    }
+</div>
+@if (showSql && Message.Sql is { } sql)
+{
+    <div class="msg-sql">
+        <p class="muted small">The read-only query the AI wrote. It was checked, and run in a transaction that was undone.</p>
+        <CodeBlock Code="@sql" Language="SQL" />
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource gone = new();
+    private bool copied;
+    private bool showSql;
+
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+
+    /// <summary>The question this answers, to ask again with its photos and voice notes; null when there is none.</summary>
+    [Parameter] public ChatMessage? Question { get; set; }
+
+    [Parameter] public Func<string, IReadOnlyList<ChatAttachment>, bool>? AskAgain { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", Message.Text);
+            copied = true;
+            StateHasChanged();
+            await Task.Delay(2000, gone.Token);
+            copied = false;
+        }
+        catch (Exception ex) when (ex is JSException or TaskCanceledException or JSDisconnectedException)
+        {
+            copied = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        gone.Cancel();
+        gone.Dispose();
+    }
+}

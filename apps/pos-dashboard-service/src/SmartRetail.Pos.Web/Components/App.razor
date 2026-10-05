@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <base href="/" />
+    <script>
+        // Before anything is drawn: light or dark as chosen in Settings, so the page never flashes the other one.
+        try {
+            var theme = localStorage.getItem('srpos-theme');
+            if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) { }
+        // The app window hands its title bar to the page: the page shows its own top bar.
+        if (window.srposFrame === 'app') document.documentElement.setAttribute('data-frame', 'app');
+    </script>
+    <ResourcePreloader />
+    <link rel="preload" href="fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["SmartRetail.Pos.Web.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet @rendermode="PageMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageMode" />
+    <ReconnectModal />
+    <script src="@Assets["app.js"]"></script>
+    <script src="@Assets["camera.js"]"></script>
+    <script src="@Assets["creative.js"]"></script>
+    <script src="@Assets["chat-input.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    // One live session per window, no prerender: a local till gains nothing from it, and it would run every query twice.
+    private static readonly IComponentRenderMode PageMode = new InteractiveServerRenderMode(prerender: false);
+}

@@ -1,0 +1,114 @@
+@page "/ask"
+@implements IDisposable
+@using SmartRetail.AI.Assistant
+@using SmartRetail.AI.Settings
+@inject Conversation Chat
+@inject DataSourceInfo Source
+@inject AiEnvironment Ai
+@inject AiSetupService Setup
+@inject MemoryService Memory
+
+<PageTitle>Ask AI · Smart Retail POS</PageTitle>
+
+<div class="chat">
+    <div class="page-head chat-head">
+        <div>
+            <h1>Ask AI</h1>
+            <p class="lead privacy"><Icon Name="shield" /> @privacy</p>
+        </div>
+        <div class="actions">
+            @if (Setup.State.Stage == AiSetupStage.Ready)
+            {
+                <span class="pill good"><span class="dot"></span> AI ready</span>
+            }
+            else if (Setup.State.Stage is AiSetupStage.NotInstalled or AiSetupStage.NotSignedIn or AiSetupStage.Failed)
+            {
+                <a class="btn btn-soft btn-sm" href="welcome"><Icon Name="spark" /> Set up the AI</a>
+            }
+            <AiChoice Job="AiJob.Ask" />
+            <a class="btn btn-soft btn-sm" href="ask/past" title="Find a chat from before and ask it again"><Icon Name="history" /> Past chats</a>
+            <a class="btn btn-soft btn-sm memory-link" href="memory" title="What the assistant remembers"><Icon Name="memory" /> Memory@(waiting > 0 ? $" · {waiting} to save" : "")</a>
+            <button class="btn" @onclick="Chat.Clear" disabled="@(messages.Count == 0 && !busy)"><Icon Name="plus" /> New chat</button>
+        </div>
+    </div>
+
+    <div class="thread" aria-live="polite">
+        @if (messages.Count == 0 && !busy)
+        {
+            <div class="chat-empty">
+                <AppMark Size="56" />
+                <h2>Ask anything about your shop</h2>
+                <p class="muted">In English, Hindi or Hinglish, for example “Aaj kitna cash aaya?” or “Which products sold most this month?”</p>
+                <p class="muted small">It remembers what you tell it, for example “Remember that I like short answers”, and learns from your chats. See <a href="memory">Memory</a>.</p>
+            </div>
+        }
+        <ChatThread Messages="messages" Busy="busy" Status="@status" Draft="@draft" DraftTable="draftTable" AskAgain="Chat.Ask" />
+    </div>
+
+    <div class="composer-wrap">
+        <div class="chips">
+            @foreach (var starter in Chat.Starters)
+            {
+                <button type="button" class="chip" title="@starter.Question" disabled="@busy" @onclick="() => Chat.Run(starter)">@starter.Title</button>
+            }
+        </div>
+        <ChatComposer Busy="busy" Send="Chat.Ask" Stop="Chat.Stop" Placeholder="Ask about sales, stock or ideas…" />
+        <div class="composer-foot">The AI can make mistakes. Check anything important in the POS.</div>
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<ChatMessage> messages = Array.Empty<ChatMessage>();
+    private bool busy;
+    private string status = "";
+    private string draft = "";
+    private ChatTable? draftTable;
+    private string privacy = "";
+    private int waiting;
+
+    protected override void OnInitialized()
+    {
+        Chat.Changed += OnChatChanged;
+        Setup.Changed += OnSetupChanged;
+        Memory.Changed += OnMemoryChanged;
+        waiting = Memory.Load().Pending.Count;
+        _ = Setup.RefreshIfStaleAsync();
+
+        privacy = Source.IsDemo
+            ? "On the demo shop the AI sees sales figures and product names only."
+            : Ai.LoadSettings().Privacy.MaskContactDetails
+                ? "The AI only reads your data and never changes it. Phone numbers, e-mail and addresses are hidden from it."
+                : "The AI only reads your data and never changes it. Contact details are shared with it (see Settings → Privacy).";
+        Read();
+    }
+
+    private void Read()
+    {
+        messages = Chat.Messages;
+        busy = Chat.Busy;
+        status = Chat.Status;
+        draft = Chat.Draft;
+        draftTable = Chat.DraftTable;
+    }
+
+    private void OnChatChanged(object? sender, EventArgs e) => _ = InvokeAsync(() =>
+    {
+        Read();
+        StateHasChanged();
+    });
+
+    private void OnSetupChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OnMemoryChanged() => _ = InvokeAsync(() =>
+    {
+        waiting = Memory.Load().Pending.Count;
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Chat.Changed -= OnChatChanged;
+        Setup.Changed -= OnSetupChanged;
+        Memory.Changed -= OnMemoryChanged;
+    }
+}

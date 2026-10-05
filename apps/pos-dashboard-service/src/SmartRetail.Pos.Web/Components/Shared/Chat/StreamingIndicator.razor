@@ -1,0 +1,26 @@
+@* The answer being written: what the assistant is doing, then the table found and the words so far as they arrive,
+   in the same place and shape as the finished answer, so nothing jumps when it is done. *@
+@using SmartRetail.AI.Assistant
+
+<article class="msg-ai writing" aria-busy="true">
+    @if (Draft.Length > 0)
+    {
+        <MarkdownView Text="@Draft" />
+    }
+    @if (Table is { } table)
+    {
+        <ResultTable Table="table" />
+    }
+    <div class="working" role="status">
+        <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>@(Draft.Length > 0 ? "Writing…" : Status.Length > 0 ? Status : "Thinking…")</span>
+    </div>
+</article>
+
+@code {
+    [Parameter] public string Status { get; set; } = "";
+
+    [Parameter] public string Draft { get; set; } = "";
+
+    [Parameter] public ChatTable? Table { get; set; }
+}

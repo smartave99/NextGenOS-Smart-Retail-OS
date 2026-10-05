@@ -1,0 +1,81 @@
+@* The Today screen's week: thin columns with round tops, today in the accent colour with its value on top. *@
+@using System.Globalization
+
+<svg class="chart" viewBox="0 0 @Width @Height" role="img" aria-label="@AriaLabel">
+    @foreach (var tick in Ticks)
+    {
+        <g>
+            <line class="c-grid" x1="@F(Left)" x2="@F(Width)" y1="@F(Y(tick))" y2="@F(Y(tick))" />
+            <text class="c-axis" x="@F(Left - 10)" y="@F(Y(tick) + 4)" text-anchor="end">@(tick == 0 ? "0" : Formats.Compact(tick))</text>
+        </g>
+    }
+
+    @for (var i = 0; i < Days.Count; i++)
+    {
+        var day = Days[i];
+        var now = i == Days.Count - 1;
+        var centre = Left + Slot * i + Slot / 2;
+        var top = Y(day.Sales);
+        <g>
+            <title>@Formats.LongDate(day.Day): @Formats.Rupees(day.Sales) from @day.Bills @(day.Bills == 1 ? "bill" : "bills")</title>
+            <rect class="c-hit" x="@F(Left + Slot * i)" y="@F(Top)" width="@F(Slot)" height="@F(Base - Top)" />
+            @if (day.Sales > 0)
+            {
+                <path class="@(now ? "c-bar hi" : "c-bar")" d="@Column(centre - BarWidth / 2, top)" />
+            }
+            <text class="@(now ? "c-axis now" : "c-axis")" x="@F(centre)" y="@F(Height - 6)" text-anchor="middle">@(now ? "Today" : Formats.DayName(day.Day))</text>
+            @if (now && day.Sales > 0)
+            {
+                <g><text class="c-cap" x="@F(centre)" y="@F(top - 8)" text-anchor="middle">@Formats.Compact(day.Sales)</text></g>
+            }
+        </g>
+    }
+</svg>
+
+@code {
+    private const double Width = 620;
+    private const double Height = 212;
+    private const double Left = 40;
+    private const double Top = 22;
+    private const double Bottom = 26;
+    private const double BarWidth = 24;
+    private const double Radius = 4;
+
+    [Parameter, EditorRequired] public IReadOnlyList<SmartRetail.Pos.Core.Analytics.TrendPoint> Days { get; set; } = Array.Empty<SmartRetail.Pos.Core.Analytics.TrendPoint>();
+    [Parameter] public string AriaLabel { get; set; } = "Sales for each of the last 7 days";
+
+    private double Base => Height - Bottom;
+    private double Slot => Days.Count == 0 ? 0 : (Width - Left) / Days.Count;
+    private decimal Step => NiceStep(Math.Max(1m, Days.Count == 0 ? 0 : Days.Max(d => d.Sales)) / 3m);
+    private decimal AxisTop => Math.Ceiling(Math.Max(1m, Days.Count == 0 ? 0 : Days.Max(d => d.Sales)) / Step) * Step;
+
+    private IEnumerable<decimal> Ticks
+    {
+        get
+        {
+            for (var tick = 0m; tick <= AxisTop; tick += Step)
+            {
+                yield return tick;
+            }
+        }
+    }
+
+    private double Y(decimal value) => Base - (double)(Math.Max(0, value) / AxisTop) * (Base - Top);
+
+    /// <summary>A column rising from the baseline, square at the bottom and round at the top.</summary>
+    private string Column(double x, double top)
+    {
+        var r = Math.Min(Radius, (Base - top) / 2);
+        return $"M{F(x)} {F(Base)}V{F(top + r)}Q{F(x)} {F(top)} {F(x + r)} {F(top)}H{F(x + BarWidth - r)}Q{F(x + BarWidth)} {F(top)} {F(x + BarWidth)} {F(top + r)}V{F(Base)}Z";
+    }
+
+    private static string F(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static decimal NiceStep(decimal raw)
+    {
+        var power = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)raw)));
+        var fraction = raw / power;
+        var nice = fraction <= 1m ? 1m : fraction <= 2m ? 2m : fraction <= 2.5m ? 2.5m : fraction <= 5m ? 5m : 10m;
+        return nice * power;
+    }
+}

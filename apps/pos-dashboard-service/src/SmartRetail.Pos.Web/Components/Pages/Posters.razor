@@ -1,0 +1,688 @@
+@page "/posters"
+@page "/posters/{Id}"
+@implements IDisposable
+@using System.Globalization
+@using SmartRetail.Pos.Core.Posters
+@inject PosterService Service
+@inject PosterArtworkWorker Artwork
+@inject NavigationManager Nav
+@inject IJSRuntime Js
+@inject ILogger<Posters> Log
+
+<PageTitle>@(poster is null ? "Posters" : poster.Kind.Title() + " poster") · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        @if (poster is not null)
+        {
+            <div class="eyebrow"><a href="posters">Posters</a> <Icon Name="chevron" /></div>
+            <h1>@poster.Kind.Title() poster</h1>
+            <p class="lead">Made @poster.Made.ToString("d MMMM, h:mm tt", CultureInfo.InvariantCulture) · @Products(poster.Items.Count) · @(poster.PickedBy is null ? "picked by the app's rules" : "picked by " + poster.PickedBy)</p>
+        }
+        else
+        {
+            <h1>Posters</h1>
+            <p class="lead">A4 posters for the shop, chosen from what's selling and what isn't.</p>
+        }
+    </div>
+    @if (poster is null)
+    {
+        <div class="actions ai-jobs">
+            <span class="muted small">Words</span> <AiChoice Job="SmartRetail.AI.Settings.AiJob.PosterWords" />
+            <span class="muted small">Artwork</span> <AiChoice Job="SmartRetail.AI.Settings.AiJob.PosterArtwork" />
+        </div>
+    }
+    @if (poster is not null)
+    {
+        <div class="actions">
+            <a class="btn btn-soft" href="posters"><Icon Name="plus" /> New poster</a>
+            <button type="button" class="btn btn-primary" disabled="@(!CanPrint)" @onclick="PrintAsync" title="@PrintTitle"><Icon Name="printer" /> Print</button>
+        </div>
+    }
+</div>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (Id is not null && poster is null)
+{
+    <p class="muted">@(loaded ? "This poster is not in the data folder." : "Loading…")</p>
+}
+else
+{
+    <div class="poster-page">
+        <div class="poster-side">
+            @if (poster is null)
+            {
+                <section class="panel form-card">
+                    <div class="field-label" id="kind-label">Kind of poster</div>
+                    <div class="seg poster-kinds" role="radiogroup" aria-labelledby="kind-label">
+                        @foreach (var choice in PosterKinds.All)
+                        {
+                            <button type="button" role="radio" aria-checked="@(choice == kind ? "true" : "false")"
+                                    class="seg-item @(choice == kind ? "on" : null)" @onclick="() => ChooseKindAsync(choice)">@choice.Title()</button>
+                        }
+                    </div>
+                    <p class="kind-help">@KindHelp(kind)</p>
+
+                    @if (kind == PosterKind.FestivalOffer)
+                    {
+                        <label class="field-label" for="festival">Festival</label>
+                        <input id="festival" class="form-control" list="festivals" maxlength="@PosterWords.MaxFestivalLength" placeholder="For example Diwali" @bind="festival" />
+                        <datalist id="festivals">
+                            @foreach (var name in PosterKinds.Festivals)
+                            {
+                                <option value="@name"></option>
+                            }
+                        </datalist>
+                    }
+
+                    <div class="field-label" id="count-label">How many products</div>
+                    <div class="seg" role="radiogroup" aria-labelledby="count-label">
+                        @foreach (var choice in PosterKinds.ProductCounts)
+                        {
+                            <button type="button" role="radio" aria-checked="@(choice == count ? "true" : "false")"
+                                    class="seg-item @(choice == count ? "on" : null)" @onclick="() => count = choice">@choice</button>
+                        }
+                    </div>
+                    <p class="small muted fit-count" role="status">@FitText</p>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary btn-lg" disabled="@(making || fits == 0)" @onclick="MakeAsync">
+                            <Icon Name="spark" /> Make the poster
+                        </button>
+                    </div>
+                    @if (making)
+                    {
+                        <p class="muted small" role="status"><span class="spinner"></span> @status</p>
+                    }
+                    @if (problem is not null)
+                    {
+                        <p class="alert alert-danger" role="alert">@problem</p>
+                    }
+                    <div class="note">
+                        <Icon Name="info" />
+                        <span>
+                            @if (ai is null)
+                            {
+                                <text>No AI tool is set up, so the app picks the products and writes the words by its own rules. <a href="welcome">Set up the AI</a></text>
+                            }
+                            else
+                            {
+                                <text>@ai picks the products and writes the words. Names and prices always come from your POS.</text>
+                            }
+                        </span>
+                    </div>
+                </section>
+            }
+            else
+            {
+                @if (note is not null)
+                {
+                    <p class="notice-line" role="status"><Icon Name="info" /> @note</p>
+                }
+                @if (problem is not null)
+                {
+                    <p class="alert alert-danger" role="alert">@problem</p>
+                }
+                @if (changes.Count > 0)
+                {
+                    <section class="panel price-changes" role="alert">
+                        <h3>The POS has changed since this poster was made</h3>
+                        <ul>
+                            @foreach (var change in changes)
+                            {
+                                <li>@Describe(change)</li>
+                            }
+                        </ul>
+                        <p class="small muted">It prints again once these are fixed.</p>
+                        @if (changes.Any(c => c.Kind != PosterChangeKind.Gone))
+                        {
+                            <button type="button" class="btn btn-primary btn-sm" @onclick="UseTodaysPricesAsync">Use today's prices</button>
+                        }
+                    </section>
+                }
+
+                <section class="panel form-card">
+                    <div class="field-label">@(poster.PickedBy is null ? "The app picked these" : "The AI picked these")</div>
+                    <ul class="picks">
+                        @foreach (var item in poster.Items)
+                        {
+                            var candidate = candidates.FirstOrDefault(c => c.ProductId == item.ProductId);
+                            <li class="pick" data-product="@item.ProductId">
+                                <span class="thumb">
+                                    @if (item.Photo is { } photo)
+                                    {
+                                        <img src="@ProductPhotoService.Url(item.ProductId, photo)" alt="" />
+                                    }
+                                    else
+                                    {
+                                        <Icon Name="camera" />
+                                    }
+                                </span>
+                                <div class="pick-main">
+                                    <input class="pick-name" value="@item.Name" maxlength="80" aria-label="Name on the poster" title="The name printed on the poster"
+                                           @onchange="e => Rename(item, e.Value as string)" />
+                                    <div class="why">@(candidate?.Why(poster.Kind, Service.Today, rules) ?? item.Code)</div>
+                                </div>
+                                <div class="pick-offer">
+                                    @if (item.LowestOffer < item.Price)
+                                    {
+                                        <select class="form-select" aria-label="Offer on @item.Name" @onchange="e => SetOffer(item, e.Value as string)">
+                                            <option value="" selected="@(!item.HasOffer)">No offer · @Money.FormatCompact(item.Price)</option>
+                                            @foreach (var choice in PosterPricing.OfferChoices(item.Price, item.LowestOffer, item.OfferPrice))
+                                            {
+                                                <option value="@choice.ToString(CultureInfo.InvariantCulture)" selected="@(item.OfferPrice == choice)">
+                                                    @Money.FormatCompact(choice) · @PosterPricing.PercentOff(item.Price, choice)% off
+                                                </option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <span class="price-only">@Money.FormatCompact(item.Price)</span>
+                                        <small class="muted" title="Offers never go below the purchase price">No offer possible</small>
+                                    }
+                                </div>
+                                <button type="button" class="icon-btn" title="Take it off the poster" aria-label="Take @item.Name off the poster"
+                                        disabled="@(poster.Items.Count <= 1)" @onclick="() => Remove(item)"><Icon Name="close" /></button>
+                            </li>
+                        }
+                    </ul>
+                    @if (poster.Items.Count < 6 && Addable.Count > 0)
+                    {
+                        <div class="add-row">
+                            <select class="form-select" aria-label="Product to add" @bind="addId">
+                                <option value="0">Add a product…</option>
+                                @foreach (var candidate in Addable)
+                                {
+                                    <option value="@candidate.ProductId">@candidate.Name · @Money.FormatCompact(candidate.Price)</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-soft btn-sm" disabled="@(addId == 0)" @onclick="Add"><Icon Name="plus" /> Add</button>
+                        </div>
+                    }
+                    <div class="note">
+                        <Icon Name="info" />
+                        <span>Offers never go below the purchase price plus GST, or past @rules.MaxOfferPercent.ToString("0")% off. The POS prices stay as they are: give the offer at the counter, or change the price in the POS before you put the poster up.</span>
+                    </div>
+                </section>
+
+                <section class="panel form-card">
+                    <div class="field-label">Words</div>
+                    <label class="form-label" for="headline">Headline</label>
+                    <input id="headline" class="form-control" value="@poster.Words.Headline" maxlength="@PosterWords.MaxHeadlineLength"
+                           @onchange="SetHeadline" />
+                    <label class="form-label" for="hindi">Hindi line</label>
+                    <input id="hindi" class="form-control" lang="hi" value="@poster.Words.HindiLine" maxlength="@PosterWords.MaxHindiLineLength"
+                           @onchange="SetHindiLine" />
+                    <label class="form-label" for="subline">Line under them</label>
+                    <input id="subline" class="form-control" value="@poster.Words.Subline" maxlength="@PosterWords.MaxSublineLength"
+                           @onchange="SetSubline" />
+                    <div class="date-row">
+                        <div>
+                            <label class="form-label" for="valid-from">Valid from</label>
+                            <input id="valid-from" type="date" class="form-control" value="@Iso(poster.ValidFrom)" @onchange="e => SetDate(e.Value as string, from: true)" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="valid-till">Valid till</label>
+                            <input id="valid-till" type="date" class="form-control" value="@Iso(poster.ValidTill)" @onchange="e => SetDate(e.Value as string, from: false)" />
+                        </div>
+                    </div>
+                    <label class="form-label" for="shop-name">Shop name</label>
+                    <input id="shop-name" class="form-control" value="@poster.ShopName" maxlength="60"
+                           @onchange="SetShopName" />
+                </section>
+
+                <section class="panel form-card">
+                    <div class="field-label">Artwork</div>
+                    @if (job is { Running: true })
+                    {
+                        <p class="muted small" role="status">
+                            <span class="spinner"></span> @job.Status
+                            @if (Artwork.IsWaitingForLimit)
+                            {
+                                <button type="button" class="link-button" title="Try again at once, e.g. after getting more usage" @onclick="Artwork.TryNow">Try now</button>
+                            }
+                        </p>
+                    }
+                    else
+                    {
+                        @if (job?.Problem is { } artworkProblem)
+                        {
+                            <p class="alert alert-danger" role="alert">The artwork could not be made: @artworkProblem</p>
+                        }
+                        @if (codexReady)
+                        {
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-soft btn-sm" @onclick="StartArtwork"><Icon Name="spark" /> @(poster.Artwork is null ? "Make artwork with AI" : "New artwork")</button>
+                                @if (poster.Artwork is not null)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="UsePlainDesign">Use the plain design</button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="small muted">Artwork is made by Codex with ChatGPT Images. <a href="welcome">Set it up on Get started</a>; the plain design prints well meanwhile.</p>
+                        }
+                    }
+                </section>
+
+                @if (poster.HasOffers)
+                {
+                    <label class="switch confirm">
+                        <input type="checkbox" @bind="confirmed" />
+                        I checked the prices and offers
+                    </label>
+                }
+
+                <div class="form-actions spread">
+                    @if (deleting)
+                    {
+                        <span class="small">Delete this poster?</span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => deleting = false">Keep it</button>
+                        <button type="button" class="btn btn-danger btn-sm" @onclick="Delete"><Icon Name="trash" /> Delete</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-link btn-sm danger-link" @onclick="() => deleting = true"><Icon Name="trash" /> Delete poster</button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="paper-wrap">
+            @if (poster is null)
+            {
+                <div class="paper-placeholder">
+                    <Icon Name="poster" Size="40" />
+                    <p>Your A4 poster appears here.</p>
+                </div>
+            }
+            else
+            {
+                <PosterSheet Poster="poster" Class="print-me" />
+                <p class="paper-caption">
+                    @(poster.Artwork is null
+                        ? "The app's own design. Product names and prices are printed by the app, exactly as in your POS."
+                        : "Artwork by " + (poster.ArtworkBy ?? "the AI") + " with ChatGPT Images. Product names and prices are printed by the app, exactly as in your POS.")
+                </p>
+            }
+        </div>
+    </div>
+
+    @if (recent.Count > 0)
+    {
+        <section class="panel earlier-posters">
+            <div class="panel-head"><h2>Earlier posters</h2></div>
+            <div class="poster-list">
+                @foreach (var earlier in recent)
+                {
+                    <a class="poster-link @(earlier.Id == poster?.Id ? "current" : null)" href="posters/@earlier.Id">
+                        <PosterSheet Poster="earlier" />
+                        <span class="poster-link-title">@earlier.Kind.Title()</span>
+                        <span class="poster-link-sub">@earlier.Made.ToString("d MMM, h:mm tt", CultureInfo.InvariantCulture) · @Products(earlier.Items.Count)</span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    [SupplyParameterFromQuery(Name = "kind")] public string? KindQuery { get; set; }
+
+    private PosterKind kind = PosterKind.Clearance;
+    private int count = 4;
+    private string? festival;
+    private int? fits;
+    private string? ai;
+    private bool making;
+    private string status = "";
+    private string? problem;
+
+    private Poster? poster;
+    private PosterRules rules = PosterRules.Default;
+    private IReadOnlyList<PosterCandidate> candidates = Array.Empty<PosterCandidate>();
+    private IReadOnlyList<PosterChange> changes = Array.Empty<PosterChange>();
+    private IReadOnlyList<Poster> recent = Array.Empty<Poster>();
+    private ArtworkJob? job;
+    private bool codexReady;
+    private string? note;
+    private bool confirmed;
+    private bool deleting;
+    private int addId;
+    private bool loaded;
+    private string? error;
+    private string? shownKey;
+    private readonly CancellationTokenSource _gone = new();
+
+    private bool CanPrint => poster is not null && changes.Count == 0 && (!poster.HasOffers || confirmed);
+
+    private string PrintTitle => changes.Count > 0 ? "Fix what changed in the POS first"
+        : !CanPrint ? "Tick “I checked the prices and offers” first"
+        : "Print on A4 paper";
+
+    private string FitText => fits switch
+    {
+        null => "",
+        0 => NothingFits(kind),
+        1 => "1 product fits this poster right now.",
+        _ => $"{fits} products fit this poster right now.",
+    };
+
+    private IReadOnlyList<PosterCandidate> Addable => poster is null
+        ? Array.Empty<PosterCandidate>()
+        : candidates.Where(c => poster.Items.All(i => i.ProductId != c.ProductId)).ToList();
+
+    protected override void OnInitialized() => Artwork.Changed += OnArtworkChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id is null && PosterKinds.TryParse(KindQuery, out var asked))
+        {
+            kind = asked;
+        }
+
+        var shown = Id + "|" + KindQuery;
+        if (shownKey != shown || !loaded)
+        {
+            shownKey = shown;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        deleting = false;
+        try
+        {
+            rules = Service.Rules;
+            recent = Service.Store.Recent();
+            if (Id is null)
+            {
+                poster = null;
+                note = null;
+                changes = Array.Empty<PosterChange>();
+                ai = await Service.ReadyAiAsync(_gone.Token);
+                await CountFitsAsync();
+            }
+            else
+            {
+                if (poster?.Id != Id)
+                {
+                    note = null;
+                    problem = null;
+                    confirmed = false;
+                }
+
+                poster = Service.Store.Load(Id);
+                changes = Array.Empty<PosterChange>();
+                if (poster is not null)
+                {
+                    job = Artwork.Job(poster.Id);
+                    candidates = await Service.CandidatesAsync(poster.Kind, _gone.Token);
+                    (poster, changes) = await Service.RecheckAsync(poster, _gone.Token);
+                    codexReady = (await Artwork.CheckCodexAsync(_gone.Token)).IsReady;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogError(ex, "Loading posters failed.");
+            error = "The posters could not be loaded: " + ex.Message;
+        }
+
+        loaded = true;
+    }
+
+    private async Task ChooseKindAsync(PosterKind chosen)
+    {
+        kind = chosen;
+        problem = null;
+        await CountFitsAsync();
+    }
+
+    private async Task CountFitsAsync()
+    {
+        fits = null;
+        try
+        {
+            fits = (await Service.CandidatesAsync(kind, _gone.Token)).Count;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogError(ex, "Finding products for a poster failed.");
+            problem = "The products could not be read from the POS: " + ex.Message;
+        }
+    }
+
+    private async Task MakeAsync()
+    {
+        making = true;
+        problem = null;
+        status = "Finding the products…";
+        try
+        {
+            var made = await Service.MakeAsync(kind, count, festival, new Progress<string>(message =>
+            {
+                status = message;
+                _ = InvokeAsync(StateHasChanged);
+            }), _gone.Token);
+            if ((await Artwork.CheckCodexAsync(_gone.Token)).IsReady)
+            {
+                Artwork.Start(made.Poster);
+            }
+
+            poster = made.Poster;
+            note = made.Note;
+            confirmed = false;
+            Nav.NavigateTo("posters/" + made.Poster.Id);
+        }
+        catch (PosterException ex)
+        {
+            problem = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogError(ex, "Making a poster failed.");
+            problem = "The poster could not be made: " + ex.Message;
+        }
+        finally
+        {
+            making = false;
+        }
+    }
+
+    private void Change(Func<Poster, Poster> change) => Do(current => Service.Save(change(current)));
+
+    /// <summary>Saves a change to the poster and shows it; a change refused (the data folder is moving) is explained.</summary>
+    private void Do(Func<Poster, Poster?> action)
+    {
+        if (poster is null)
+        {
+            return;
+        }
+
+        try
+        {
+            problem = null;
+            poster = action(poster) ?? poster;
+            changes = changes.Where(change => poster.Items.Any(item => item.ProductId == change.ProductId)).ToList();
+            recent = Service.Store.Recent();
+        }
+        catch (PosterException ex)
+        {
+            problem = ex.Message;
+        }
+    }
+
+    private void SetHeadline(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { Headline = Text(e) } });
+
+    private void SetHindiLine(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { HindiLine = Text(e) } });
+
+    private void SetSubline(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { Subline = Text(e) } });
+
+    private void SetShopName(ChangeEventArgs e) => Change(p => p with { ShopName = Text(e) });
+
+    private static string Text(ChangeEventArgs e) => e.Value as string ?? "";
+
+    private void Rename(PosterItem item, string? name) =>
+        Change(p => p with { Items = p.Items.Select(i => i.ProductId == item.ProductId ? i with { Name = name ?? "" } : i).ToList() });
+
+    private void SetOffer(PosterItem item, string? value)
+    {
+        decimal? offer = decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var price) ? price : null;
+        confirmed = false;
+        Change(p => p with { Items = p.Items.Select(i => i.ProductId == item.ProductId ? i with { OfferPrice = offer } : i).ToList() });
+    }
+
+    private void Remove(PosterItem item) =>
+        Change(p => p with { Items = p.Items.Where(i => i.ProductId != item.ProductId).ToList() });
+
+    private void Add()
+    {
+        if (candidates.FirstOrDefault(c => c.ProductId == addId) is not { } candidate)
+        {
+            return;
+        }
+
+        addId = 0;
+        confirmed = false;
+        Do(current => Service.Add(current.Id, candidate));
+    }
+
+    private void SetDate(string? value, bool from)
+    {
+        if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        {
+            return;
+        }
+
+        Change(p => from ? p with { ValidFrom = day, ValidTill = p.ValidTill < day ? day : p.ValidTill } : p with { ValidTill = day });
+    }
+
+    private async Task UseTodaysPricesAsync()
+    {
+        if (poster is null)
+        {
+            return;
+        }
+
+        try
+        {
+            problem = null;
+            if (await Service.UseTodaysPricesAsync(poster.Id, _gone.Token) is { } updated)
+            {
+                (poster, changes) = updated;
+            }
+
+            recent = Service.Store.Recent();
+            confirmed = false;
+        }
+        catch (PosterException ex)
+        {
+            problem = ex.Message;
+        }
+    }
+
+    private void StartArtwork()
+    {
+        if (poster is not null)
+        {
+            Artwork.Start(poster);
+            job = Artwork.Job(poster.Id);
+        }
+    }
+
+    private void UsePlainDesign() => Do(current => Service.UsePlainDesign(current.Id));
+
+    private void Delete()
+    {
+        if (poster is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Artwork.Cancel(poster.Id);
+            if (Service.Delete(poster.Id))
+            {
+                poster = null;
+                Nav.NavigateTo("posters");
+            }
+        }
+        catch (PosterException ex)
+        {
+            problem = ex.Message;
+            deleting = false;
+        }
+    }
+
+    private async Task PrintAsync()
+    {
+        if (CanPrint)
+        {
+            await Js.InvokeVoidAsync("srpos.print");
+        }
+    }
+
+    private void OnArtworkChanged(string id)
+    {
+        if (poster?.Id != id)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            job = Artwork.Job(id);
+            if (job is null && Service.Store.Load(id) is { } saved)
+            {
+                poster = saved;
+                recent = Service.Store.Recent();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private static string Describe(PosterChange change) => change.Kind switch
+    {
+        PosterChangeKind.Price => $"{change.Name}: {Money.FormatCompact(change.OnPoster)} on the poster, {Money.FormatCompact(change.PriceNow!.Value)} in the POS now.",
+        PosterChangeKind.OfferRules => $"{change.Name}: the offer {Money.FormatCompact(change.OnPoster)} is below what is allowed now ({Money.FormatCompact(change.LowestNow!.Value)}), because the purchase price, GST or the offer limit changed.",
+        _ => $"{change.Name} is no longer in the POS. Take it off the poster.",
+    };
+
+    private static string KindHelp(PosterKind kind) => kind switch
+    {
+        PosterKind.Clearance => "Products that have not sold for 30 days, most money tied up first, with an offer to clear them.",
+        PosterKind.NewArrivals => "Products added to the POS in the last 30 days, newest first.",
+        PosterKind.BestSellers => "What customers bought most in the last 30 days.",
+        _ => "Popular products with a festival offer.",
+    };
+
+    private static string NothingFits(PosterKind kind) => kind switch
+    {
+        PosterKind.Clearance => "Nothing to clear: every product in stock sold in the last 30 days.",
+        PosterKind.NewArrivals => "No product in stock was added to the POS in the last 30 days.",
+        _ => "No product in stock sold in the last 30 days.",
+    };
+
+    private static string Products(int count) => count == 1 ? "1 product" : count + " products";
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        Artwork.Changed -= OnArtworkChanged;
+        _gone.Cancel();
+        _gone.Dispose();
+    }
+}

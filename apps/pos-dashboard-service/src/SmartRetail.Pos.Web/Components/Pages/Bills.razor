@@ -1,0 +1,348 @@
+@page "/bills"
+@implements IDisposable
+@inject IInvoiceRepository Invoices
+@inject NavigationManager Nav
+@inject TimeProvider Clock
+@inject ILogger<Bills> Log
+
+<PageTitle>Bills · Smart Retail POS</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Bills</h1>
+        <p class="sub">@Subtitle()</p>
+    </div>
+    <div class="actions">
+        <a class="btn btn-soft" href="@BillLinks.Csv(query)" download title="Every bill in this search, for Excel"><Icon Name="download" /> Download</a>
+        <a class="btn btn-primary" href="billing"><Icon Name="bill" /> New bill</a>
+    </div>
+</div>
+
+@if (page is not null)
+{
+    <div class="kpis bill-kpis">
+        <div class="kpi">
+            <div class="kpi-label">Bills</div>
+            <div class="kpi-value">@Formats.Count(page.Total)</div>
+            <div class="kpi-hint">@(page.First is { } first ? "since " + Formats.Date(first) : "none yet")</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Sales</div>
+            <div class="kpi-value">@Formats.Rupees(page.TotalAmount)</div>
+            <div class="kpi-hint">@(Filtered ? "in these bills" : "all bills together")</div>
+        </div>
+        <div class="kpi @(page.TotalOwed > 0 ? "warn" : null)">
+            <div class="kpi-label">Still owed</div>
+            <div class="kpi-value">@Formats.Rupees(page.TotalOwed)</div>
+            <div class="kpi-hint">@(page.TotalOwed > 0 ? "on bills given on credit" : "nothing owed")</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Latest bill</div>
+            <div class="kpi-value">@LatestBill</div>
+            <div class="kpi-hint live-state @(liveProblem ? "problem" : null)">
+                @if (liveProblem)
+                {
+                    <span>Could not check for new bills; trying again</span>
+                }
+                else
+                {
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span>Live · checked @(checkedAt is { } at ? Formats.TimeWithSeconds(at) : "…")</span>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<section class="panel toolbar bill-filters">
+    <div class="scan-box compact">
+        <Icon Name="search" Class="scan-icon" />
+        <input class="scan-input" type="search" autocomplete="off" placeholder="Bill no., customer or phone"
+               aria-label="Search bills" maxlength="@BillQuery.MaxText" value="@text" @oninput="OnTextAsync" />
+    </div>
+    <div class="date-range">
+        <label>From <input type="date" class="form-control" value="@BillLinks.Iso(query.From)" min="@BillLinks.Iso(BillQuery.EarliestDate)" max="@BillLinks.Iso(Today)" @onchange="OnFrom" /></label>
+        <label>To <input type="date" class="form-control" value="@BillLinks.Iso(query.To)" min="@BillLinks.Iso(BillQuery.EarliestDate)" max="@BillLinks.Iso(Today)" @onchange="OnTo" /></label>
+        <button type="button" class="btn btn-sm" @onclick="ShowToday">Today</button>
+        <button type="button" class="btn btn-sm" @onclick="ShowThisMonth">This month</button>
+    </div>
+    <div class="seg seg-inline" role="group" aria-label="Which bills">
+        <button type="button" class="seg-item @(query.OnlyOwed ? null : "on")" aria-pressed="@(!query.OnlyOwed)" @onclick="() => SetOwed(false)">All</button>
+        <button type="button" class="seg-item @(query.OnlyOwed ? "on" : null)" aria-pressed="@query.OnlyOwed" @onclick="() => SetOwed(true)">Money owed</button>
+    </div>
+    @if (Filtered)
+    {
+        <button type="button" class="btn btn-sm btn-link" @onclick="Clear">Clear search</button>
+    }
+</section>
+
+@if (error is not null)
+{
+    <LoadError Message="@error" OnRetry="LoadAsync" />
+}
+else if (page is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    @if (newSince > 0)
+    {
+        <div class="notice new-bills">
+            @(newSince == 1 ? "1 new bill" : Formats.Count(newSince) + " new bills") since this page was opened.
+            <button type="button" class="link-button" @onclick="() => Go(query, 1)">Show the newest</button>
+        </div>
+    }
+
+    <section class="panel">
+        @if (page.Items.Count == 0 && page.Total > 0)
+        {
+            <p class="muted">This page is past the last bill. <button type="button" class="link-button" @onclick="() => Go(query, 1)">Go to the newest bills</button></p>
+        }
+        else
+        {
+            <BillTable Bills="page.Items" NewIds="newIds" Empty="@(Filtered ? "No bills match this search." : "No bills yet.")" />
+        }
+
+        @if (Pages > 1)
+        {
+            <div class="pager">
+                <span class="muted">
+                    Bills @Formats.Count(Math.Min(page.Total, (pageNo - 1) * PageSize + 1))–@Formats.Count(Math.Min(page.Total, (pageNo - 1) * PageSize + page.Items.Count))
+                    of @Formats.Count(page.Total)
+                </span>
+                <div class="pager-buttons">
+                    <button type="button" class="btn btn-sm" disabled="@(pageNo <= 1)" @onclick="() => Go(query, 1)">Newest</button>
+                    <button type="button" class="btn btn-sm" disabled="@(pageNo <= 1)" @onclick="() => Go(query, pageNo - 1)"><Icon Name="chevron" Class="flip" /> Newer</button>
+                    <span class="pager-count">Page @Formats.Count(pageNo) of @Formats.Count(Pages)</span>
+                    <button type="button" class="btn btn-sm" disabled="@(pageNo >= Pages)" @onclick="() => Go(query, pageNo + 1)">Older <Icon Name="chevron" /></button>
+                    <button type="button" class="btn btn-sm" disabled="@(pageNo >= Pages)" @onclick="() => Go(query, Pages)">Oldest</button>
+                </div>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private const int PageSize = 50;
+
+    /// <summary>The latest bill's date, with its time when the newest bills are showing and it is known.</summary>
+    private string LatestBill => page?.Last is not { } last
+        ? "–"
+        : pageNo == 1 && page.Items.FirstOrDefault() is { Time: { } time } newest && newest.Date.Date == last.Date
+            ? Formats.ShortDate(DateOnly.FromDateTime(last)) + ", " + Formats.Time(time)
+            : Formats.Date(last);
+
+    /// <summary>How often the page looks for bills the POS has just made.</summary>
+    private static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(15);
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Text { get; set; }
+    [SupplyParameterFromQuery(Name = "from")] public string? From { get; set; }
+    [SupplyParameterFromQuery(Name = "to")] public string? To { get; set; }
+    [SupplyParameterFromQuery(Name = "owed")] public bool? Owed { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? PageNumber { get; set; }
+
+    private readonly CancellationTokenSource stopping = new();
+    private readonly HashSet<long> newIds = new();
+    private BillQuery query = new();
+    private int pageNo = 1;
+    private string text = "";
+    private string? shown;
+    private BillPage? page;
+
+    // The newest bill when the first page was last read: older pages stay on the bills there were then.
+    private long? upToId;
+
+    // Bills made since an older page was read.
+    private int newSince;
+    private DateTime? checkedAt;
+    private bool liveProblem;
+    private string? error;
+    private int version;
+    private int typing;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private bool Filtered => query.Text is not null || query.From is not null || query.To is not null || query.OnlyOwed;
+    private int Pages => page is null ? 1 : Math.Max(1, (page.Total + PageSize - 1) / PageSize);
+
+    protected override void OnInitialized() => _ = KeepFreshAsync();
+
+    protected override Task OnParametersSetAsync()
+    {
+        var wanted = BillLinks.Parse(Text, From, To, Owed);
+        var wantedPage = Math.Max(1, PageNumber ?? 1);
+        var link = BillLinks.Page(wanted, wantedPage);
+        if (link == shown)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (wanted != query)
+        {
+            // A different search: what counted as new, and where older pages stood, no longer apply.
+            newIds.Clear();
+            upToId = null;
+        }
+
+        query = wanted;
+        pageNo = wantedPage;
+        shown = link;
+        if (text.Trim() != (wanted.Text ?? ""))
+        {
+            text = wanted.Text ?? "";
+        }
+
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var mine = ++version;
+        error = null;
+        try
+        {
+            var anchor = pageNo == 1 ? null : upToId;
+            var found = await Invoices.SearchAsync(query with { Skip = (pageNo - 1) * PageSize, Take = PageSize, UpToId = anchor }, stopping.Token);
+            if (mine != version)
+            {
+                return;
+            }
+
+            page = found;
+            upToId = anchor ?? found.NewestId;
+            newSince = 0;
+            liveProblem = false;
+            checkedAt = Clock.GetLocalNow().DateTime;
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+            // The page was closed.
+        }
+        catch (Exception ex)
+        {
+            if (mine == version)
+            {
+                Log.LogError(ex, "Loading bills failed.");
+                error = ex.Message;
+            }
+        }
+    }
+
+    /// <summary>The POS keeps billing while this page is open: the first page shows new bills as they come, older
+    /// pages say how many came in.</summary>
+    private async Task KeepFreshAsync()
+    {
+        using var timer = new PeriodicTimer(RefreshEvery);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stopping.Token))
+            {
+                await CheckForNewBillsAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+    }
+
+    private async Task CheckForNewBillsAsync()
+    {
+        if (error is not null)
+        {
+            await LoadAsync();
+            return;
+        }
+
+        if (page is null)
+        {
+            return;
+        }
+
+        var mine = version;
+        try
+        {
+            if (pageNo == 1)
+            {
+                var seen = upToId;
+                var found = await Invoices.SearchAsync(query with { Take = PageSize }, stopping.Token);
+                if (mine != version)
+                {
+                    return;
+                }
+
+                if (seen is { } before)
+                {
+                    newIds.UnionWith(found.Items.Where(b => b.Id > before).Select(b => b.Id));
+                }
+
+                page = found;
+                upToId = found.NewestId;
+            }
+            else
+            {
+                var newest = await Invoices.SearchAsync(query with { Take = 1 }, stopping.Token);
+                if (mine != version)
+                {
+                    return;
+                }
+
+                newSince = Math.Max(0, newest.Total - page.Total);
+            }
+
+            liveProblem = false;
+            checkedAt = Clock.GetLocalNow().DateTime;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.LogWarning(ex, "Checking for new bills failed.");
+            liveProblem = true;
+        }
+    }
+
+    private string Subtitle()
+    {
+        if (Filtered)
+        {
+            return "Bills that match your search, newest first. Open a bill to see its items and payments.";
+        }
+
+        return page?.First is { } first
+            ? $"Every bill since {Formats.Date(first)}, newest first, as the POS saves them. Open a bill to see its items and payments."
+            : "Every bill, newest first, as the POS saves them.";
+    }
+
+    private async Task OnTextAsync(ChangeEventArgs e)
+    {
+        text = e.Value?.ToString() ?? "";
+        var mine = ++typing;
+        await Task.Delay(300);
+        if (mine == typing)
+        {
+            Go(query with { Text = text }, 1);
+        }
+    }
+
+    private void OnFrom(ChangeEventArgs e) => Go(query with { From = BillLinks.Date(e.Value as string) }, 1);
+
+    private void OnTo(ChangeEventArgs e) => Go(query with { To = BillLinks.Date(e.Value as string) }, 1);
+
+    private void ShowToday() => Go(query with { From = Today, To = Today }, 1);
+
+    private void ShowThisMonth() => Go(query with { From = new DateOnly(Today.Year, Today.Month, 1), To = Today }, 1);
+
+    private void SetOwed(bool owed) => Go(query with { OnlyOwed = owed }, 1);
+
+    private void Clear()
+    {
+        text = "";
+        Go(new BillQuery(), 1);
+    }
+
+    private void Go(BillQuery next, int number) =>
+        Nav.NavigateTo(BillLinks.Page(next.Checked(), number), new NavigationOptions { ReplaceHistoryEntry = true });
+
+    // Cancelled, not disposed: a check that is still running may yet read the token.
+    public void Dispose() => stopping.Cancel();
+}

@@ -1,0 +1,23 @@
+@inject AiSetupService Setup
+
+<details class="api-key-sign-in">
+    <summary>Use an OpenAI API key instead</summary>
+    <p class="small muted">For shops that pay OpenAI per use instead of a ChatGPT plan. Create a key at platform.openai.com, then paste it here. It is kept by Codex on this PC and never shown again.</p>
+    <label class="field-label" for="openai-api-key">OpenAI API key <Required /></label>
+    <div class="api-key-row">
+        <input id="openai-api-key" class="form-control" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" aria-label="OpenAI API key" aria-required="true"
+               value="@key" @oninput="@(e => key = e.Value?.ToString() ?? "")" />
+        <button class="btn btn-outline-secondary" disabled="@(key.Trim().Length < 20)" @onclick="SaveAsync">Save the key</button>
+    </div>
+</details>
+
+@code {
+    private string key = "";
+
+    private async Task SaveAsync()
+    {
+        var entered = key.Trim();
+        key = "";
+        await Setup.SignInWithApiKeyAsync(entered);
+    }
+}

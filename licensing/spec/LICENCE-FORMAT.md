@@ -119,6 +119,36 @@ Rules, all of which the shared vectors in `testvectors/brand-policy.json` check 
 - Apps that cannot show a field (a printed receipt has no colour) ignore it. Fonts and a light/dark default are allowed at `theme` and `full` and are applied
   by the programs that support them; the Hub does not apply them yet.
 
+#### 5.3 Theme: how a program looks and is laid out
+
+Besides the brand (name, colours, logo), a program can be set up to look and be laid out in different ways, for a brand's own identity and for the device it runs on (a laptop, or a touch-screen counter). The **theme** is a small set of named choices, never free text and never code:
+
+| Token | Values | Default | Kind |
+|---|---|---|---|
+| `density` | `compact`, `comfortable`, `touch` | `comfortable` | device |
+| `fontScale` | a number from 0.85 to 1.35, rounded to the nearest 0.05 (half up) | `1` | device |
+| `nav` | `left`, `top`, `bottom` | `left` | device |
+| `navLabels` | `full`, `icons` | `full` | device |
+| `cart` | `right`, `left`, `bottom` | `right` | device |
+| `mode` | `auto`, `light`, `dark` | `auto` | identity |
+| `surface` | `neutral`, `warm`, `cool`, `paper` | `neutral` | identity |
+| `shape` | `square`, `soft`, `rounded`, `pill` | `rounded` | identity |
+| `font` | `system`, `humanist`, `serif`, `rounded`, `mono` (system fonts only; nothing is downloaded) | `system` | identity |
+| `depth` | `flat`, `soft`, `lifted` | `soft` | identity |
+
+Two places can set a theme: the **profile** that NextGenOS ships with a customer's setup, and the **local** choice the owner makes on their own PC. Field by field, a local value wins over a profile value, which wins over the default. The licence's white-label level decides what counts:
+
+| Level | Device tokens | Identity tokens |
+|---|---|---|
+| `none` | applied | ignored (the default look stays) |
+| `theme`, `full` | applied | applied |
+
+Device tokens are about the screen and the person at it (size of buttons, where the menu is), not about identity, so they work at every level. Rules, checked by `testvectors/theme-policy.json` in every implementation:
+
+- A level that is missing or not exactly `none`, `theme` or `full` counts as `none`.
+- A value that is missing, of the wrong kind, not in the list, or out of range is **ignored** (the next source, then the default, is used). It is never an error.
+- The "by NextGenOS" line and the licence's brand name always stay visible whatever the theme is (a menu that shows icons only still shows them).
+
 ## 6. Modules
 
 `pos`, `hub`, `ai`, `dashboard`, `storefront`, `owner-live`, `chain`, `api`. A client enables a feature only if its module is listed. The POS needs `pos`; the Business Hub (every industry, every country) `hub`; the AI add-on `ai`; the dashboard `dashboard`; the storefront `storefront`.

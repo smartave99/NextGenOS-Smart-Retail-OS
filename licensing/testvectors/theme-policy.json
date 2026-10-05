@@ -1,0 +1,95 @@
+{
+  "description": "Shared by every client: how a theme (profile and local) is resolved for a licence level (licensing/spec/LICENCE-FORMAT.md section 5.3). Only the fields named in \"expect\" are compared; the full default is in \"defaults\".",
+  "defaults": { "mode": "auto", "surface": "neutral", "shape": "rounded", "density": "comfortable", "font": "system", "fontScale": 1, "nav": "left", "navLabels": "full", "cart": "right", "depth": "soft" },
+  "cases": [
+    {
+      "name": "nothing set: the defaults",
+      "level": "theme", "profile": null, "local": null,
+      "expect": { "mode": "auto", "surface": "neutral", "shape": "rounded", "density": "comfortable", "font": "system", "fontScale": 1, "nav": "left", "navLabels": "full", "cart": "right", "depth": "soft" }
+    },
+    {
+      "name": "none: the device tokens apply, the identity tokens are ignored",
+      "level": "none",
+      "profile": { "density": "touch", "nav": "bottom", "navLabels": "icons", "cart": "bottom", "fontScale": 1.2, "mode": "dark", "surface": "warm", "shape": "pill", "font": "serif", "depth": "lifted" },
+      "local": null,
+      "expect": { "density": "touch", "nav": "bottom", "navLabels": "icons", "cart": "bottom", "fontScale": 1.2, "mode": "auto", "surface": "neutral", "shape": "rounded", "font": "system", "depth": "soft" }
+    },
+    {
+      "name": "theme: everything applies",
+      "level": "theme",
+      "profile": { "density": "compact", "nav": "top", "mode": "dark", "surface": "paper", "shape": "square", "font": "humanist", "depth": "flat", "cart": "left", "navLabels": "icons", "fontScale": 0.9 },
+      "local": null,
+      "expect": { "density": "compact", "nav": "top", "mode": "dark", "surface": "paper", "shape": "square", "font": "humanist", "depth": "flat", "cart": "left", "navLabels": "icons", "fontScale": 0.9 }
+    },
+    {
+      "name": "full applies the same as theme",
+      "level": "full",
+      "profile": { "shape": "pill", "font": "rounded", "depth": "lifted", "surface": "cool", "mode": "light" },
+      "local": null,
+      "expect": { "shape": "pill", "font": "rounded", "depth": "lifted", "surface": "cool", "mode": "light" }
+    },
+    {
+      "name": "a level that is missing or oddly spelled counts as none",
+      "levels": [null, "", "FULL", "Theme", "everything", "theme "],
+      "profile": { "shape": "pill", "density": "touch" },
+      "local": null,
+      "expect": { "shape": "rounded", "density": "touch" }
+    },
+    {
+      "name": "the owner's local choice wins over the profile, field by field",
+      "level": "theme",
+      "profile": { "shape": "pill", "density": "touch", "nav": "bottom", "font": "serif" },
+      "local": { "shape": "square", "nav": "left" },
+      "expect": { "shape": "square", "density": "touch", "nav": "left", "font": "serif" }
+    },
+    {
+      "name": "a local identity choice is ignored when the licence has a fixed look, a local device choice is not",
+      "level": "none",
+      "profile": { "density": "comfortable" },
+      "local": { "shape": "pill", "density": "touch" },
+      "expect": { "shape": "rounded", "density": "touch" }
+    },
+    {
+      "name": "values that are not in the list, or of the wrong kind, are ignored and the next source is used",
+      "level": "theme",
+      "profile": { "shape": "pill", "density": "touch", "font": "serif" },
+      "local": { "shape": "triangle", "density": 3, "font": null, "nav": ["left"], "mode": true },
+      "expect": { "shape": "pill", "density": "touch", "font": "serif", "nav": "left", "mode": "auto" }
+    },
+    {
+      "name": "font scale: inside the range it is rounded to the nearest 0.05, outside it is ignored",
+      "levels": ["none", "theme"],
+      "profile": { "fontScale": 1.12 },
+      "local": null,
+      "expect": { "fontScale": 1.1 }
+    },
+    {
+      "name": "font scale rounds half up",
+      "level": "theme",
+      "profile": { "fontScale": 1.075 },
+      "local": null,
+      "expect": { "fontScale": 1.1 }
+    },
+    {
+      "name": "font scale at the edges is kept; beyond them, or not a number, it is ignored",
+      "level": "theme",
+      "profile": { "fontScale": 1.35 },
+      "locals": [{ "fontScale": 2 }, { "fontScale": 0.5 }, { "fontScale": "1.2" }, { "fontScale": null }, { "fontScale": true }],
+      "expect": { "fontScale": 1.35 }
+    },
+    {
+      "name": "font scale low edge",
+      "level": "none",
+      "profile": { "fontScale": 0.85 },
+      "local": null,
+      "expect": { "fontScale": 0.85 }
+    },
+    {
+      "name": "a profile that is not an object is ignored",
+      "level": "theme",
+      "profiles": ["text", 5, [1, 2], true],
+      "local": null,
+      "expect": { "shape": "rounded", "density": "comfortable" }
+    }
+  ]
+}

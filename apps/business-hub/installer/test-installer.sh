@@ -24,7 +24,9 @@ xvfb=$!
 cleanup() {
   wineserver -k > /dev/null 2>&1 || true
   kill "$xvfb" > /dev/null 2>&1 || true
-  rm -rf "$work"
+  # Wine may still be writing into its folder for a moment after it is told to stop: try again, and never let tidying up change the result.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do rm -rf "$work" > /dev/null 2>&1 && break; sleep 1; done
+  rm -rf "$work" > /dev/null 2>&1 || true
 }
 trap cleanup EXIT
 sleep 1

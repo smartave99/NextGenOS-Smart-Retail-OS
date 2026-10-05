@@ -20,6 +20,10 @@ on:
       version_code:
         description: "Whole number, higher for every release"
         default: "1"
+      trial_without_keys:
+        description: "Only to try the Windows setup: build it without your licence keys. It can never be activated. Never give it to a customer."
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -176,7 +180,14 @@ jobs:
           choco install nsis -y --no-progress
       - name: Build the setup (publish, hide the names, audit, write the setup and the zip)
         shell: bash
-        run: node apps/business-hub/installer/build.mjs --version "${VERSION_NAME}" --out dist
+        env:
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          node apps/business-hub/installer/build.mjs --version "${VERSION_NAME}" --out dist ${EXTRA}
+          if [ -n "${EXTRA}" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the Windows setup. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
       - name: Start the program from the zip and check it refuses to work without a licence
         shell: pwsh
         run: |

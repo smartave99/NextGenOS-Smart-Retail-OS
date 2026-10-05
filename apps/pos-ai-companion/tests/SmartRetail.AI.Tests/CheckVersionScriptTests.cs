@@ -191,7 +191,7 @@ namespace SmartRetail.AI.Tests
             {
                 // Typed values (inputs, brand-kit fields) may reach scripts only as environment variables, never inside the script text.
                 var isScriptText = !line.TrimStart().StartsWith("env:") && !line.TrimStart().StartsWith("KIT:") && !line.TrimStart().StartsWith("VERSION_")
-                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:")
+                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:") && !line.TrimStart().StartsWith("TRIAL_")
                                    && !line.TrimStart().StartsWith("#") && !line.TrimStart().StartsWith("description:") && !line.TrimStart().StartsWith("default:");
                 if (isScriptText)
                 {

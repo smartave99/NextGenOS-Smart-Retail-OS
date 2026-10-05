@@ -33,7 +33,11 @@ The workflow does, in order:
 3. **Android**: builds and signs the `.apk` and `.aab`.
 4. **Publish**: the files, `SHA256SUMS.txt` and `BUILD-STATUS.txt` go on the release. If the Windows or the Android part failed, the release still goes out with what was built, and `BUILD-STATUS.txt` and the notes say which part failed.
 
-If the Windows job stops with *"The licence keys are not built in yet"*, step 2 above is not done.
+If the Windows job stops with *"The licence keys are not built in yet"*, step 2 above is not done. After you add the two variables, open the failed run and choose **Re-run failed jobs**: the Windows part is built and added to the same release.
+
+**Trying the Windows setup before you have keys.** Run the workflow by hand and tick **trial_without_keys**. It builds the same setup with no licence key inside, installs it on the Windows machine at GitHub and checks it, and leaves the files with the run (*Actions → the run → Artifacts*; no release is made). That setup can never be activated, so it only shows that installing, the service and uninstalling work. **Never give it to a customer.**
+
+**Tags.** Pushing a tag needs permission to create tags in the repository. If your tools cannot push a tag, make it on GitHub: *Releases → Draft a new release → Choose a tag → type `v1.0.0-rc1` and *Create new tag* → tick *pre-release* → *Publish release*. Publishing makes the tag, and the workflow starts.
 
 ## Test it yourself (about 30 minutes)
 

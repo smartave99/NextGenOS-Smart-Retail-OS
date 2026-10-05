@@ -70,7 +70,7 @@ try {
   say('Writing the zip');
   const zip = join(dist, `${base}.zip`);
   rmSync(zip, { force: true });
-  if (process.platform === 'win32') run('tar', ['-a', '-c', '-f', zip, '-C', out, '.']);   // Windows' own tar writes zip files
+  if (process.platform === 'win32') run(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), ['-a', '-c', '-f', zip, '-C', out, '.']);   // Windows' own tar writes zip files (another tar earlier on the path may not)
   else run('zip', ['-q', '-r', zip, '.'], { cwd: out });
   audit(zip);
 

@@ -155,7 +155,8 @@ export function typeNamesFrom(folders) {
 
 function extract(zip) {
   const out = mkdtempSync(join(tmpdir(), 'ngos-audit-'));
-  const tries = [['unzip', ['-q', zip, '-d', out]], ['tar', ['-xf', zip, '-C', out]], ['python3', ['-m', 'zipfile', '-e', zip, out]]];
+  const windowsTar = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+  const tries = [...(process.platform === 'win32' ? [[windowsTar, ['-xf', zip, '-C', out]]] : []), ['unzip', ['-q', zip, '-d', out]], ['tar', ['-xf', zip, '-C', out]], ['python3', ['-m', 'zipfile', '-e', zip, out]]];
   for (const [cmd, a] of tries) {
     const r = spawnSync(cmd, a, { encoding: 'utf8' });
     if (!r.error && r.status === 0) return out;

@@ -183,7 +183,8 @@ jobs:
           $zip = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-*-win-x64.zip' | Select-Object -First 1
           $dir = Join-Path $env:RUNNER_TEMP 'hub-zip'
           New-Item -ItemType Directory -Path $dir | Out-Null
-          tar -xf $zip.FullName -C $dir
+          & "$env:SystemRoot\System32\tar.exe" -xf $zip.FullName -C $dir
+          if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
           node scripts/smoke-hub.mjs (Join-Path $dir 'NextGenOS.Hub.exe')
           if ($LASTEXITCODE -ne 0) { throw 'The published program did not behave.' }
       - name: Install the setup on this Windows PC, check the service, uninstall, check the shop's data stays

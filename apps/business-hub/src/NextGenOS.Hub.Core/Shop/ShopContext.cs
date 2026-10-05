@@ -55,14 +55,26 @@ public sealed class ShopContext
 
     // ---- tax -------------------------------------------------------------------------------------------------------------------
 
-    /// <summary>"standard", "reduced", "zero", "exempt" or a rate code: the rate code it means in this country.</summary>
+    /// <summary>
+    /// "standard", "reduced", "zero", "exempt" or a rate code: the rate code it means in this country. A country that has no such class gets the
+    /// nearest one: no reduced rate means the standard rate; where only one of "zero" and "exempt" exists (the United States has only exempt), it stands for both.
+    /// </summary>
     public string TaxCode(string classOrCode)
     {
         if (Country.Tax.Rates.Any(r => r.Code == classOrCode)) return classOrCode;
-        if (Country.Tax.Classes != null && Country.Tax.Classes.TryGetValue(classOrCode, out var code)) return code;
-        if (classOrCode == "reduced" && Country.Tax.Classes != null && Country.Tax.Classes.TryGetValue("standard", out var standard)) return standard;
+        var classes = Country.Tax.Classes;
+        if (classes != null)
+        {
+            if (classes.TryGetValue(classOrCode, out var code)) return code;
+            var fallback = classOrCode switch { "reduced" => "standard", "zero" => "exempt", "exempt" => "zero", _ => null };
+            if (fallback != null && classes.TryGetValue(fallback, out var nearest)) return nearest;
+        }
         throw new ArgumentException($"\"{classOrCode}\" is not a tax class or a rate code of {Country.Name}.");
     }
+
+    /// <summary>The tax classes a shop in this country can give an item, for the choice on the item screen: always standard first.</summary>
+    public IReadOnlyList<string> TaxClasses() =>
+        new[] { "standard", "reduced", "zero", "exempt" }.Where(c => Country.Tax.Classes != null && Country.Tax.Classes.ContainsKey(c)).ToList();
 
     public TaxRate Rate(string code) => Country.Tax.Rates.FirstOrDefault(r => r.Code == code) ?? throw new ArgumentException($"Unknown tax code {code}.");
 
@@ -75,11 +87,15 @@ public sealed class ShopContext
         return Industry.RuleNumber(name, fallback);
     }
 
-    /// <summary>A money rule (a fine per day) as minor units.</summary>
+    /// <summary>A money rule (a fine per day) as minor units, rounded to what the currency can hold ("1.00" is 1 yen where there are no decimals).</summary>
     public long RuleMinor(string name)
     {
-        if (Settings.RuleOverrides.TryGetValue(name, out var text)) return Minor(text);
-        return Minor(Industry.RuleText(name, "0"));
+        var text = Settings.RuleOverrides.TryGetValue(name, out var own) ? own : Industry.RuleText(name, "0");
+        if (!decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var value) || value < 0)
+            throw new HubException("rule", $"The setting \"{name}\" should be an amount of money, not \"{text}\".");
+        var unit = 1m;
+        for (var i = 0; i < Decimals; i++) unit *= 10m;
+        return (long)Math.Round(value * unit, 0, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>The adjustments an industry applies to every bill by default (service charge ...), after the owner's changes.</summary>

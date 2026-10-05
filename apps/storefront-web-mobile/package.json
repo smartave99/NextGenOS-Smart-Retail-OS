@@ -2,6 +2,7 @@
   "name": "smart_avenue",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "main": "main.js",
   "scripts": {
     "desktop": "electron .",

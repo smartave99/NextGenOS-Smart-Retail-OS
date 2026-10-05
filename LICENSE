@@ -1,21 +1,100 @@
-MIT License
+NextGen OS Proprietary Software Licence Notice
 
-Copyright (c) 2026 NextGen OS
+Copyright (c) 2026 NextGen OS. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. OWNERSHIP
+
+This repository and everything in it (the source code, compiled programs,
+installers, database scripts, designs, AI prompts, documentation and
+other materials, together the "Software") is the confidential and
+proprietary property of NextGen OS ("NextGen OS"), except for the
+third-party components described in section 6.
+
+
+2. NO LICENCE IS GRANTED BY ACCESS
+
+Having access to this repository, or to a copy, a download, a build or an
+installer of the Software, does not give you any licence or right in it.
+Without a written agreement signed or accepted by NextGen OS that says
+otherwise, you may not:
+
+  a) use, run, install or evaluate the Software;
+  b) copy, reproduce, publish or share the Software or any part of it;
+  c) modify, translate, adapt or create derivative works of it;
+  d) sell, resell, sublicense, rent, lease, lend, give away, distribute
+     or otherwise make it available to anyone else;
+  e) host it, or offer it or its functions to others as a service;
+  f) rename, rebrand or "white-label" it, or present it as your own;
+  g) reverse engineer, decompile, disassemble or try to derive source
+     code from any compiled part of it, except to the extent that a law
+     that cannot be excluded by contract allows this;
+  h) remove, disable, bypass or tamper with any licence check, activation,
+     key, hardware binding, notice or protection in it, or create, use or
+     share a licence key, a key generator or a "crack" for it.
+
+
+3. LICENSED USE
+
+The Software may be used only under a written licence from NextGen OS:
+
+  - a shop or business that buys or is given the Software uses it under
+    the End User Licence Agreement in the file EULA.txt, or the agreement
+    it signed with NextGen OS;
+  - a reseller, partner or white-label customer acts only under a separate
+    written reseller or white-label agreement signed by NextGen OS.
+
+Permission to sell, resell, distribute, host or rebrand the Software is
+never implied. It exists only where NextGen OS has given it in writing.
+
+
+4. CONFIDENTIALITY
+
+The source code and everything else in this repository that is not
+published by NextGen OS is confidential. Keep it private, do not share it
+outside the people NextGen OS has authorised in writing, and do not
+publish any part of it (including in public repositories, issue trackers,
+forums or AI services that keep or train on what they receive).
+
+
+5. CONTRIBUTIONS
+
+A contribution to the Software is accepted only from a person who has a
+written agreement with NextGen OS that gives NextGen OS the ownership of,
+or an exclusive licence to, what they contribute.
+
+
+6. THIRD-PARTY COMPONENTS
+
+The Software includes or uses third-party components that are not owned by
+NextGen OS and are not covered by this notice. Each remains under its own
+licence, which is listed in THIRD-PARTY-NOTICES.md and in the licenses
+folder. Nothing in this notice limits the rights those licences give you
+in those components.
+
+
+7. NAMES
+
+The names "NextGen OS" and "Smart Retail OS", and the logos and product
+names used with them, identify NextGen OS and its products. No right to use
+them is granted, except as an agreement with NextGen OS says.
+
+
+8. NO WARRANTY
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NON-INFRINGEMENT, EXCEPT AS A WRITTEN AGREEMENT WITH
+NEXTGEN OS PROVIDES. IN NO EVENT IS NEXTGEN OS LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR ITS USE, EXCEPT TO THE EXTENT THE LAW DOES NOT ALLOW THIS TO BE LIMITED.
+
+
+9. ENFORCEMENT
+
+Use of the Software that this notice or a written agreement does not
+allow is an infringement of copyright and a breach of confidence, and
+NextGen OS will take the steps the law allows against it.
+
+To ask for a licence, or to report a suspected unlicensed copy, contact
+NextGen OS at the address given in EULA.txt.

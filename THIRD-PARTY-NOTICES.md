@@ -1,6 +1,6 @@
 # Third-party notices
 
-Smart Retail POS is released under the MIT License (see [LICENSE](LICENSE)). It includes or uses the third-party software below, each under its own licence. This file is installed with the app, next to `LICENSE.txt`.
+Smart Retail OS is proprietary software of NextGen OS, used under the licence agreement in [EULA.txt](EULA.txt) (see also [LICENSE](LICENSE)). It includes or uses the third-party software below, each under its own licence, which the agreement does not change. This file is installed with the app, next to `EULA.txt`.
 
 ## Libraries in the app and the dashboard
 

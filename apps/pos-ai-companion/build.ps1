@@ -52,13 +52,13 @@ Copy-Item "src/SmartRetail.AI.Desktop/bin/$Configuration/net48/*" $out -Recurse 
 Copy-Item "sql" (Join-Path $out "sql") -Recurse
 Copy-Item "README.md" $out
 
-# The licence of this software (MIT) and the notices of the software inside it travel with every copy, as their licences ask.
-foreach ($licence in @("../LICENSE", "../THIRD-PARTY-NOTICES.md", "../licenses")) {
-    if (-not (Test-Path $licence)) { throw "$licence is missing: every package carries the licence and the third-party notices." }
+# The licence agreement (EULA) of this software and the notices of the software inside it travel with every copy, as their licences ask.
+foreach ($licence in @("../../EULA.txt", "../../THIRD-PARTY-NOTICES.md", "../../licenses")) {
+    if (-not (Test-Path $licence)) { throw "$licence is missing: every package carries the licence agreement and the third-party notices." }
 }
-Copy-Item "../LICENSE" (Join-Path $out "LICENSE.txt")
-Copy-Item "../THIRD-PARTY-NOTICES.md" $out
-Copy-Item "../licenses" (Join-Path $out "licenses") -Recurse
+Copy-Item "../../EULA.txt" (Join-Path $out "EULA.txt")
+Copy-Item "../../THIRD-PARTY-NOTICES.md" $out
+Copy-Item "../../licenses" (Join-Path $out "licenses") -Recurse
 
 if (-not $SkipDashboard) {
     # From the dashboard's own folder, so its global.json picks the SDK.

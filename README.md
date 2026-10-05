@@ -230,3 +230,16 @@ Add your `GROQ_API_KEY` and `LIGHTNING_API_KEY` values, then verify your keys:
 ```bash
 npm run verify:ai
 ```
+
+---
+
+## 7. Licence
+
+Smart Retail OS is **proprietary software** of NextGen OS. All rights reserved. It is not open source.
+
+- [`LICENSE`](LICENSE): the terms that apply to this source code. Access to it grants no right to use, copy, share, sell, host or rebrand it.
+- [`EULA.txt`](EULA.txt): the agreement under which a customer uses the program. It forbids resale, sublicensing, rebranding, reverse engineering and tampering with licence checks. Selling or white-labelling the software needs a separate written reseller agreement with NextGen OS.
+- [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) and [`licenses/`](licenses): third-party components keep their own licences.
+- [`docs/COMMERCIALIZATION_READINESS.md`](docs/COMMERCIALIZATION_READINESS.md): what has to be done before the suite is sold as a white-label platform in other countries.
+
+Keep this repository private.

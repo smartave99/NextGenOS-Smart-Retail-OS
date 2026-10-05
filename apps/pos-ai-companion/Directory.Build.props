@@ -5,7 +5,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Company>NextGen OS</Company>
     <Product>Smart Retail POS AI Assistant</Product>
-    <Copyright>© 2026 NextGen OS</Copyright>
+    <Copyright>© 2026 NextGen OS. All rights reserved.</Copyright>
     <Version>2.18.0</Version>
     <Deterministic>true</Deterministic>
   </PropertyGroup>

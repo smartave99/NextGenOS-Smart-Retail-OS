@@ -87,4 +87,4 @@ To build the master solution containing all 13 projects:
 
 ## License
 
-This project is open-source software licensed under the [MIT License](LICENSE).
+This is proprietary software of NextGen OS. All rights reserved. It is not open source: see [`LICENSE`](../../LICENSE) for the terms that apply to this source code and [`EULA.txt`](../../EULA.txt) for the agreement under which customers use the program. Third-party components keep their own licences, listed in [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md).

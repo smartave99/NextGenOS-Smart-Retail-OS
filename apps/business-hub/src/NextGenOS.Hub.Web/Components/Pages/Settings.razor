@@ -124,7 +124,9 @@ else if (tab == "look")
         {
             <p class="muted">Your licence lets you change the colours, the logo and the help details@(Brand.WhiteLevel == "full" ? ", and the name of the program" : ""). Changes show on every screen.</p>
             <div class="stack">
-                <div class="field-row">
+                <label for="b-file">Got a look file from your supplier? Load it here, then check it and press Save.</label>
+                <InputFile id="b-file" OnChange="LookFileChosen" accept=".json,application/json" />
+                <div class="field-row look-gap">
                     <div>
                         <label for="b-main">Main colour</label>
                         <div class="look-pick">
@@ -444,14 +446,27 @@ else if (tab == "activity")
     /// <summary>A colour box needs a full #rrggbb; before one is chosen it shows the standard colour.</summary>
     private static string Picker(string? chosen, string standard) => BrandService.Hex(chosen) ?? standard;
 
+    private async Task LookFileChosen(InputFileChangeEventArgs e) => await Run(async () =>
+    {
+        var file = e.File;
+        if (file.Size > 250_000) throw new HubException("look-file", "That file is too big to be a look file.");
+        using var reader = new StreamReader(file.OpenReadStream(250_000));
+        var loaded = NextGenOS.Licensing.LocalBrand.Parse(await reader.ReadToEndAsync());
+        if (loaded.IsEmpty) throw new HubException("look-file", "There is no look in that file. Ask for a new one.");
+        // The logo is checked like one chosen here: only a real small PNG or JPEG.
+        if (!string.IsNullOrEmpty(loaded.Logo) && NextGenOS.Hub.Web.Branding.LocalBrandStore.CheckPicture(loaded.Logo) is { } picture) throw new HubException("look-file", picture);
+        look = loaded;
+    }, "Loaded. Look it over, then press Save.");
+
     private async Task LogoChosen(InputFileChangeEventArgs e) => await Run(async () =>
     {
         var file = e.File;
         if (file.Size > 100_000) throw new HubException("logo", "The logo is too big. Use a picture of at most 100 KB.");
         using var memory = new MemoryStream();
         await using (var stream = file.OpenReadStream(100_000)) await stream.CopyToAsync(memory);
-        look.Logo = NextGenOS.Hub.Web.Branding.LocalBrandStore.FromBytes(memory.ToArray(), out var problem);
-        if (problem is not null) throw new HubException("logo", problem);
+        var uri = NextGenOS.Hub.Web.Branding.LocalBrandStore.FromBytes(memory.ToArray(), out var problem);
+        if (problem is not null) throw new HubException("logo", problem);   // a refused picture never replaces the logo that is there
+        look.Logo = uri;
     });
 
     private Task SaveLook() => Run(() =>

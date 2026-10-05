@@ -81,3 +81,6 @@ licensing/studio/node_modules/
 **/passphrase.txt
 **/*.key.json
 *.tsbuildinfo
+
+# What the Brand Studio makes from a kit (made again whenever it is needed)
+brand-exports/

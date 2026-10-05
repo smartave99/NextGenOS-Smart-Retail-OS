@@ -71,6 +71,21 @@ try {
   step('a sale in pesos with VAT is rung up, paid and billed');
   await page.context().close();
 
+  // ---- the look: what the licence from the Studio allows ("theme": colours and logo, not the name) --------------------------------
+  const page2 = await newPage(browser, []);
+  await signIn(page2, hub);
+  await go(page2, 'Settings');
+  await page2.getByRole('tab', { name: 'Look' }).click();
+  await page2.locator('main h2', { hasText: /^Look$/ }).waitFor();
+  assert.strictEqual(await page2.locator('#b-name').count(), 0, 'a "theme" licence from the Studio cannot rename the program');
+  await page2.locator('#b-main').fill('#0a7d4b');
+  await page2.locator('#save-look').click();
+  await page2.waitForURL(/tab=look&saved=1/);
+  assert.strictEqual(await page2.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()), '#0a7d4b');
+  assert.match(await page2.locator('.side .brand-name').innerText(), new RegExp(brandName));
+  step('the Studio\'s "theme" licence lets the owner choose the colour, and keeps the licence\'s name');
+  await page2.context().close();
+
   // ---- restart: the licence and the data are still there ---------------------------------------------------------------------------
   await hub.stop();
   hub = await startHub([`--Hub:DataFolder=${data}`]);

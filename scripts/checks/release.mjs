@@ -24,6 +24,29 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
       },
     },
     {
+      name: 'brand-studio',
+      title: 'The Brand Studio makes, checks and exports brand kits (rules, command line, files for the Hub, licence, website and app, the local wizard\'s safety)',
+      run: () => {
+        const r = runCmd('brand-studio', 'node', ['--test', 'tools/brand-studio/tests/brand-studio.test.mjs']);
+        if (r.status !== 'PASS') return r;
+        const n = /# pass (\d+)/.exec(r.out);
+        return { status: 'PASS', detail: `${n ? n[1] : 'all'} tests passed` };
+      },
+    },
+    {
+      name: 'brand-studio-wizard',
+      title: 'The Brand Studio wizard in a real browser: fill the form, see the preview, save, make the files',
+      full: true,
+      run: () => {
+        if (!has('node')) return { status: 'SKIP', detail: 'node is not installed here' };
+        const why = browserProblem({ sh, join, existsSync, dir: e2e });
+        if (why) return { status: 'SKIP', detail: why };
+        const r = runCmd('brand-studio-wizard', 'node', ['tools/brand-studio/tests/wizard.e2e.mjs'], { timeout: 300_000 });
+        if (r.status !== 'PASS') return r;
+        return { status: 'PASS', detail: `${(r.out.match(/^✓ /gm) || []).length} steps passed in a real browser (Chromium)` };
+      },
+    },
+    {
       name: 'android-project',
       title: 'The Android app project keeps its safety settings, and its set-up script works and refuses bad input (the app itself is built by the release workflow)',
       run: () => {

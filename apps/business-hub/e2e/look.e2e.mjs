@@ -66,6 +66,24 @@ try {
     assert.strictEqual(await page.locator('#b-name').count(), 0, 'a theme licence cannot rename the program');
     assert.strictEqual(await page.locator('#b-by').count(), 0);
 
+    // a look file from the Brand Studio: loaded into the form, not saved until the owner presses Save
+    const logoUri = 'data:image/png;base64,' + png(64, 32, [34, 102, 170]).toString('base64');
+    writeFileSync(join(work, 'hub-look.json'), JSON.stringify({ name: 'From The File', primaryColor: '#226699', accentColor: '#cc6600', logo: logoUri, supportEmail: 'file@shop.example', poweredBy: false }));
+    writeFileSync(join(work, 'empty.json'), '{"surprise": 1}');
+    writeFileSync(join(work, 'junk.json'), 'not json at all');
+    for (const bad of ['empty.json', 'junk.json']) {
+      await page.locator('#b-file').setInputFiles(join(work, bad));
+      await page.locator('.notice.error', { hasText: /There is no look in that file/ }).waitFor();
+    }
+    await page.locator('#b-file').setInputFiles(join(work, 'hub-look.json'));
+    await page.locator('.notice', { hasText: /Loaded\. Look it over/ }).waitFor();
+    assert.strictEqual(await page.locator('#b-main').inputValue(), '#226699');
+    assert.strictEqual(await page.locator('#b-second').inputValue(), '#cc6600');
+    assert.strictEqual(await page.locator('#b-mail').inputValue(), 'file@shop.example');
+    await page.locator('main .brand-logo').waitFor();
+    assert.strictEqual(await accent(page), '#0f6cbd', 'nothing changes until Save');
+    step('a look file from the Brand Studio fills the form (and a file with no look in it is refused); nothing changes until Save');
+
     await page.locator('#b-main').fill('red');
     await page.locator('#save-look').click();
     await page.locator('.notice.error', { hasText: /must look like #0f6cbd/ }).waitFor();
@@ -74,12 +92,12 @@ try {
     await page.locator('.notice.error', { hasText: /too light to read/ }).waitFor();
     step('a word that is not a colour, and a colour too light to read, are refused in plain words');
 
+    const before = await page.locator('main .brand-logo').getAttribute('src');
     for (const bad of ['notes.txt', 'fake.png', 'big.png']) {
       await page.locator('#b-logo').setInputFiles(join(work, bad));
       await page.locator('.notice.error').waitFor();
-      assert.strictEqual(await page.locator('.brand-logo').count(), 1 - 1 + (await page.locator('.side .brand-logo').count()), 'no logo kept from ' + bad);
+      assert.strictEqual(await page.locator('main .brand-logo').getAttribute('src'), before, 'a refused picture never replaces the logo: ' + bad);
     }
-    assert.strictEqual(await page.locator('main .brand-logo').count(), 0);
     step('a text file, a fake picture and a picture that is too big are refused as a logo');
 
     await page.locator('#b-main').fill('#aa2233');

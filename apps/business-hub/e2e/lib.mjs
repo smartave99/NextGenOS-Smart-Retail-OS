@@ -11,6 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const host = resolve(here, '..', 'tests', 'NextGenOS.Hub.E2EHost');
 
 export function build() {
+  if (process.env.HUB_HOST_DLL) return;     // a published (and perhaps obfuscated) copy is being tested: nothing to build
   const r = spawnSync('dotnet', ['build', host, '-c', 'Release', '--nologo', '-v', 'q'], { encoding: 'utf8' });
   if (r.status !== 0) { console.error(r.stdout, r.stderr); process.exit(1); }
 }
@@ -23,7 +24,7 @@ export async function startHub(extraArgs = []) {
   const data = mkdtempSync(join(tmpdir(), 'hub-e2e-'));
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
-  const dll = join(host, 'bin', 'Release', 'net10.0', 'NextGenOS.Hub.E2EHost.dll');
+  const dll = process.env.HUB_HOST_DLL || join(host, 'bin', 'Release', 'net10.0', 'NextGenOS.Hub.E2EHost.dll');
   const child = spawn('dotnet', [dll, `--Hub:DataFolder=${data}`, `--urls=${url}`, '--Logging:LogLevel:Default=Warning', ...extraArgs], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ASPNETCORE_ENVIRONMENT: 'Production', DOTNET_NOLOGO: '1' } });
   let log = '';
   child.stdout.on('data', (d) => { log += d; });

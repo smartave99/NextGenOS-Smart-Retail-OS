@@ -7,6 +7,8 @@
     <AssemblyName>NextGenOS.Hub</AssemblyName>
     <RootNamespace>NextGenOS.Hub.Web</RootNamespace>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- A mistyped component name would silently become a plain HTML tag: make it a build error. -->
+    <WarningsAsErrors>$(WarningsAsErrors);RZ10012</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

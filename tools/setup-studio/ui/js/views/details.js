@@ -145,7 +145,8 @@ function extras(ctx) {
   return [
     section('The rest of the ecosystem', 'Does this customer also get a website and a phone app?',
       h('div', { class: 'grid2' }, h('div', { class: 'col' }, toggle(ctx, 'ecosystem.website.wanted', { label: 'A website', text: 'An online shop for their products', onChange: drawSite }), site),
-        h('div', { class: 'col' }, toggle(ctx, 'ecosystem.android.wanted', { label: 'An Android app', text: 'Opens their website as an app', onChange: drawApp }), app))),
+        h('div', { class: 'col' }, toggle(ctx, 'ecosystem.android.wanted', { label: 'An Android app', text: 'Opens their website as an app', onChange: drawApp }), app)),
+      h('div', { class: 'mt-s' }, toggle(ctx, 'ecosystem.aiAddon.wanted', { label: 'The AI assistant (Windows)', text: 'Answers questions about sales and stock. It reads the Windows POS database, not yet the new program\'s own data.' }))),
     section('What their licence will allow', 'How much of the look the owner can change on their own. This is what you choose when you make their licence.',
       cards(ctx, 'licence.whiteLabel', ctx.opts.options.whiteLabel, { minWidth: 230 }),
       h('div', { class: 'mt-s', style: { 'max-width': '240px' } }, text(ctx, 'licence.seats', { label: 'Number of PCs', type: 'number', inputmode: 'numeric' }))),

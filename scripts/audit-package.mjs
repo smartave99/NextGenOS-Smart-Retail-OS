@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Looks inside what a customer will receive (a folder, or a .zip / .apk / .msi-extracted folder) and fails if it holds anything it must not
+ * Looks inside what a customer will receive (a folder, or a .zip / .apk / .deb / .msi-extracted folder) and fails if it holds anything it must not
  * (CLAUDE.md, section 3: "No source code in anything a customer receives").
  *
  *   node scripts/audit-package.mjs <folder-or-zip> [more...] [--obfuscated NextGenOS.Hub.Core.dll,...] [--names-from apps/business-hub/src]
@@ -155,6 +155,15 @@ export function typeNamesFrom(folders) {
 
 function extract(zip) {
   const out = mkdtempSync(join(tmpdir(), 'ngos-audit-'));
+  if (/\.deb$/i.test(zip)) {
+    // A Debian package: its files and its scripts (dpkg-deb), or the same by hand when this is not a Debian-like PC.
+    const a = spawnSync('dpkg-deb', ['-R', zip, out], { encoding: 'utf8' });
+    if (!a.error && a.status === 0) return out;
+    const b = spawnSync('sh', ['-c', 'ar x "$1" && for f in control.tar.* data.tar.*; do mkdir -p "x-$f" && tar -xf "$f" -C "x-$f"; done', 'sh', zip], { cwd: out, encoding: 'utf8' });
+    if (!b.error && b.status === 0) return out;
+    rmSync(out, { recursive: true, force: true });
+    throw new Error(`could not open ${zip} (needs dpkg-deb, or ar and tar)`);
+  }
   const windowsTar = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
   const tries = [...(process.platform === 'win32' ? [[windowsTar, ['-xf', zip, '-C', out]]] : []), ['unzip', ['-q', zip, '-d', out]], ['tar', ['-xf', zip, '-C', out]], ['python3', ['-m', 'zipfile', '-e', zip, out]]];
   for (const [cmd, a] of tries) {

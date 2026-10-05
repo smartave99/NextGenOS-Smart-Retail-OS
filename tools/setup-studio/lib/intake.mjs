@@ -77,7 +77,7 @@ export function blankIntake(overrides = {}) {
     words: {},
     features: {},
     starter: { items: [], people: [] },
-    ecosystem: { website: { wanted: false, domain: '' }, android: { wanted: false, appId: '' } },
+    ecosystem: { website: { wanted: false, domain: '' }, android: { wanted: false, appId: '' }, aiAddon: { wanted: false } },
     licence: { whiteLabel: 'none', seats: 1 },
     notes: '',
     ...overrides,
@@ -169,6 +169,8 @@ export function checkIntake(input) {
   const a = isObj(e.android) ? e.android : {};
   value.ecosystem.website = { wanted: w.wanted === true, domain: str(w.domain, 120).trim().toLowerCase() };
   if (value.ecosystem.website.wanted && value.ecosystem.website.domain && !/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(value.ecosystem.website.domain)) bad('ecosystem.website.domain', 'Type the website name without https:// and without a slash, like shop.example.com.');
+  value.ecosystem.aiAddon = { wanted: isObj(e.aiAddon) && e.aiAddon.wanted === true };
+  if (value.ecosystem.aiAddon.wanted && value.device.os !== 'windows') warn('ecosystem.aiAddon', 'The AI assistant is a Windows program, so it cannot go on a Linux machine.');
   value.ecosystem.android = { wanted: a.wanted === true, appId: str(a.appId, 80).trim().toLowerCase() };
   if (value.ecosystem.android.wanted) {
     if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(value.ecosystem.android.appId)) bad('ecosystem.android.appId', 'The app id must look like com.yourshop.app (small letters, at least three parts).');

@@ -435,6 +435,18 @@ export class Workspace {
     return ['setup.json', 'theme.json', 'brand.json'].map((name) => ({ name: 'profile/' + name, data: readFileSync(join(dir, name)) }));
   }
 
+  /** An approved release read back and checked, with everything a customer pack is made from: its record, its details, its profile files and its logo. */
+  releaseParts(id, n) {
+    const verified = this.verifyRelease(id, n);
+    if (!verified.ok) throw new StudioError('This release does not match what was approved: ' + verified.problems.join('; '), 409, 'tampered');
+    const { info, dir } = this.release(id, n);
+    const files = {};
+    for (const name of ['setup.json', 'theme.json', 'brand.json']) files[name] = readFileSync(join(dir, name));
+    const intake = JSON.parse(readFileSync(join(dir, 'intake.json'), 'utf8'));
+    const logoName = Object.keys(info.files).find((f) => /^logo\.(png|jpg|jpeg|svg)$/.test(f));
+    return { info, intake, files, logo: logoName ? { ext: logoName.split('.').pop(), bytes: readFileSync(join(dir, logoName)) } : null };
+  }
+
   recordBuild(actor, id, build) {
     need(actor, 'build', 'make installers');
     const meta = this.#meta(id);

@@ -1,0 +1,25 @@
+#!/bin/sh
+# Runs after the files are in place: makes the account the Hub runs as, makes its data folders, starts the Hub.
+set -e
+case "$1" in
+  configure)
+    if ! getent passwd nextgenos > /dev/null 2>&1; then
+      useradd --system --user-group --home-dir /var/lib/nextgenos --no-create-home --shell /usr/sbin/nologin --comment "Smart Retail POS" nextgenos
+    fi
+    # Printers, scanners and cash drawers: the groups that own those devices, where this PC has them.
+    for g in lp dialout plugdev video; do
+      if getent group "$g" > /dev/null 2>&1; then usermod -aG "$g" nextgenos > /dev/null 2>&1 || true; fi
+    done
+    # The shop's information: only the Hub's own account and administrators can read it.
+    for d in /var/lib/nextgenos /var/lib/nextgenos/hub /var/lib/nextgenos/data /var/lib/nextgenos/tmp; do
+      install -d -o nextgenos -g nextgenos -m 0750 "$d"
+    done
+    if [ -d /run/systemd/system ]; then
+      systemctl daemon-reload > /dev/null 2>&1 || true
+      systemctl enable nextgenos-hub.service > /dev/null 2>&1 || true
+      systemctl restart nextgenos-hub.service > /dev/null 2>&1 || echo "Smart Retail POS: the Hub could not be started now. See: systemctl status nextgenos-hub" >&2
+    fi
+    if command -v update-desktop-database > /dev/null 2>&1; then update-desktop-database -q /usr/share/applications > /dev/null 2>&1 || true; fi
+    ;;
+esac
+exit 0

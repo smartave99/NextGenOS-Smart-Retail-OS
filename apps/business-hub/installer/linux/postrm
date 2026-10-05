@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs after the files are taken away. The shop's information in /var/lib/nextgenos is never removed, not even on "purge": a new installation carries on where this one stopped.
+set -e
+case "$1" in
+  remove|purge)
+    if [ -d /run/systemd/system ]; then systemctl daemon-reload > /dev/null 2>&1 || true; fi
+    if [ "$1" = "purge" ]; then echo "Smart Retail POS: the shop's information in /var/lib/nextgenos was left in place on purpose. To delete it for good, remove that folder yourself." >&2; fi
+    ;;
+esac
+exit 0

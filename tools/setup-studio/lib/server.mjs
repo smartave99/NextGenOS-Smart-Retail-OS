@@ -2,7 +2,7 @@
 // no power of its own: every action goes through the workspace (roles, approval, the activity record) and the AI tools (checked, never trusted).
 import http from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, createReadStream, statSync } from 'node:fs';
 import { join, resolve, dirname, extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -14,6 +14,10 @@ import { diffProposals } from './diff.mjs';
 import { importList } from './csv.mjs';
 import { previewInput, previewHtml, brandCss, readAsset } from './preview.mjs';
 import { makeZip } from './zip.mjs';
+import { readBaseKit } from './basekit.mjs';
+import { buildPack, planPack, PackError } from './pack.mjs';
+import { handoverFor } from './handover.mjs';
+import { inside } from './fsx.mjs';
 import { askForProposal, preview as aiPreview, describeTools, ADAPTERS, AiError } from './ai/index.mjs';
 import { toolStatus, listModels, checkUpdate, updateTool, updateHow } from './ai/control.mjs';
 import { cleanToolConfig, EFFORTS } from './ai/options.mjs';
@@ -142,6 +146,67 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   route('GET', '/api/customers/:id/releases/:n/profile.zip', { raw: true }, ({ params, res }) => {
     const files = state.ws.profileFiles(params.id, Number(params.n));
     return send(res, 200, makeZip(files), 'application/zip', { 'Content-Disposition': `attachment; filename="${basename(params.id)}-profile-${Number(params.n)}.zip"` });
+  });
+
+  // ---- the programs folder, the customer pack, the hand-over sheet ------------------------------------------------------------------
+  const programsFolder = () => String(state.ws.settings().programs?.folder ?? '');
+  const kitSummary = (kit) => ({ ok: kit.ok, folder: kit.folder, version: kit.version, trial: kit.trial, signing: kit.signing, problems: kit.problems, files: kit.files.map((f) => ({ name: f.name, role: f.role, os: f.os, arch: f.arch, bytes: f.bytes })) });
+  const noKit = { ok: false, folder: '', version: null, trial: false, signing: { windows: 'unknown', android: 'unknown' }, problems: [], files: [] };
+  route('GET', '/api/programs', {}, async () => ({ programs: programsFolder() ? kitSummary(await readBaseKit(programsFolder())) : noKit }));
+  route('PUT', '/api/programs', { limit: 5_000 }, async ({ me, body }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can choose the programs folder.', 403, 'role');
+    const folder = String(body.folder ?? '').trim().replace(/^["']|["']$/g, '');
+    const kit = await readBaseKit(folder);
+    if (!folder) { state.ws.saveSettings(me, { programs: { folder: '' } }); return { programs: noKit }; }
+    if (!kit.ok) return { programs: kitSummary(kit), saved: false };
+    state.ws.saveSettings(me, { programs: { folder: kit.folder } });
+    return { programs: kitSummary(kit), saved: true };
+  });
+  const latest = (id) => state.ws.releaseNumbers(id).at(-1) ?? null;
+  route('GET', '/api/customers/:id/outputs', {}, async ({ params }) => {
+    const customer = state.ws.get(params.id);
+    const n = latest(params.id);
+    if (!n) return { release: null, programs: noKit, items: [], builds: customer.builds };
+    const parts = state.ws.releaseParts(params.id, n);
+    const programs = programsFolder() ? await readBaseKit(programsFolder()) : null;
+    const items = programs?.ok ? planPack({ intake: parts.intake, kit: programs, slug: params.id }).map((i) => ({ id: i.id, title: i.title, status: i.status, note: i.note, files: i.files.map((f) => f.name) })) : [];
+    return { release: parts.info, programs: programs ? kitSummary(programs) : noKit, items, builds: customer.builds };
+  });
+  route('POST', '/api/customers/:id/outputs/pack', { limit: 2_000 }, async ({ me, params, body }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot make installers.', 403, 'role');
+    const n = latest(params.id);
+    if (!n) throw new StudioError('Approve a setup first. Installers are made from an approved release.', 409);
+    if (!programsFolder()) throw new StudioError('Choose the programs folder first (the files of a NextGenOS release).', 409, 'no-programs');
+    const kit = await readBaseKit(programsFolder());
+    if (!kit.ok) throw new StudioError('The programs folder has problems:\n' + kit.problems.join('\n'), 409, 'programs', kit.problems);
+    const parts = state.ws.releaseParts(params.id, n);
+    if (state.aiRunning.has('pack:' + params.id)) throw new StudioError('A pack is already being made for this customer.', 409);
+    state.aiRunning.add('pack:' + params.id);
+    try {
+      const out = state.ws.buildsFolder(params.id, n);
+      const company = companySettings();
+      let result;
+      try { result = await buildPack({ customerId: params.id, parts, kit, out, company, builtBy: me.name, studioVersion: JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')).version, allowTrial: body.allowTrial === true }); }
+      catch (e) { if (e instanceof PackError) throw new StudioError(e.message, 409, 'pack'); throw e; }
+      state.ws.recordBuild(me, params.id, { kind: 'pack', release: n, programs: kit.version, trial: kit.trial, file: `${params.id}-pack-release-${n}/${result.name}`, bytes: result.bytes, sha256: result.sha256, parts: result.plan.map((p) => ({ id: p.id, status: p.status })) });
+      return { build: { file: result.name, bytes: result.bytes, sha256: result.sha256, folder: result.dir }, customer: state.ws.get(params.id) };
+    } finally { state.aiRunning.delete('pack:' + params.id); }
+  });
+  route('GET', '/api/customers/:id/builds/:n/pack.zip', { raw: true }, ({ me, params, res }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot download installers.', 403, 'role');
+    const build = [...(state.ws.get(params.id).builds ?? [])].reverse().find((b) => b.kind === 'pack' && b.release === Number(params.n));
+    if (!build) throw new StudioError('No pack was made from that release yet.', 404);
+    const file = inside(state.ws.buildsFolder(params.id, params.n), build.file);
+    if (!existsSync(file)) throw new StudioError('The pack file is no longer there. Make it again.', 404);
+    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': statSync(file).size, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename="${basename(file)}"`, 'Content-Security-Policy': CSP });
+    createReadStream(file).pipe(res);
+    return undefined;
+  });
+  route('GET', '/api/customers/:id/handover', {}, ({ params }) => {
+    const n = latest(params.id);
+    if (!n) throw new StudioError('Approve a setup first.', 409);
+    const parts = state.ws.releaseParts(params.id, n);
+    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: !!(state.ws.get(params.id).builds ?? []).some((b) => b.kind === 'pack' && b.release === n) }) };
   });
 
   // ---- team, record, safe keeping -------------------------------------------------------------------------------------------------

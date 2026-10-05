@@ -1,0 +1,23 @@
+#!/bin/bash
+# Opens Smart Retail POS in the web browser.
+#   smart-retail-pos                 opens it in your usual browser
+#   smart-retail-pos --fullscreen    opens it full screen, like an appliance (touch-screen tills and kiosks)
+url="http://127.0.0.1:5280"
+
+# The program starts with the PC; if the PC has only just started, give it a moment (up to 40 seconds).
+for _ in $(seq 1 40); do
+  (exec 3<>/dev/tcp/127.0.0.1/5280) 2>/dev/null && break
+  sleep 1
+done
+
+if [ "$1" = "--fullscreen" ]; then
+  for browser in chromium chromium-browser google-chrome google-chrome-stable microsoft-edge microsoft-edge-stable brave-browser; do
+    if command -v "$browser" > /dev/null 2>&1; then
+      exec "$browser" --kiosk --no-first-run --noerrdialogs --disable-infobars "$url"
+    fi
+  done
+  if command -v firefox > /dev/null 2>&1; then exec firefox --kiosk "$url"; fi
+fi
+if command -v xdg-open > /dev/null 2>&1; then exec xdg-open "$url"; fi
+echo "Open a web browser and go to $url"
+exit 1

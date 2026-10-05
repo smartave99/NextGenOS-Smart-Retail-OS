@@ -85,6 +85,32 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
       },
     },
     {
+      name: 'prerequisites-and-base-kit',
+      title: 'The prerequisite audit (a package needs nothing a factory-new PC lacks) and the release file list the Setup Studio reads both work and refuse what they should',
+      run: () => {
+        const r = runCmd('prerequisites-and-base-kit', 'node', ['--test', 'scripts/tests/audit-prerequisites.test.mjs', 'scripts/tests/make-base-kit.test.mjs']);
+        if (r.status !== 'PASS') return r;
+        const n = /# pass (\d+)/.exec(r.out);
+        return { status: 'PASS', detail: `${n ? n[1] : 'all'} tests passed` };
+      },
+    },
+    {
+      name: 'hub-linux-package',
+      title: 'The Hub\'s Linux package: built, installed with dpkg on this machine, started as its own unprivileged account, given a customer profile package, removed (the shop\'s data stays)',
+      full: true,
+      run: () => {
+        if (process.platform !== 'linux' || !has('dpkg-deb') || !has('dpkg')) return { status: 'SKIP', detail: 'this check needs a Debian-family Linux with dpkg (Ubuntu, Mint, Debian)' };
+        if (!has('dotnet') || !has('node')) return { status: 'SKIP', detail: 'dotnet or node is not installed here' };
+        if (!findObfuscar()) return { status: 'SKIP', detail: 'the obfuscator (Obfuscar) is not installed and could not be installed here' };
+        const root_ = process.getuid?.() === 0;
+        if (!root_ && sh('sudo', ['-n', 'true']).status !== 0) return { status: 'SKIP', detail: 'this check installs a package, so it needs root or passwordless sudo' };
+        const r = runCmd('hub-linux-package', 'node', ['apps/business-hub/installer/test-linux-package.mjs'], { timeout: 1_200_000 });
+        if (r.status !== 'PASS') return r;
+        const passed = (r.out.match(/^PASS /gm) || []).length;
+        return { status: 'PASS', detail: `${passed} checks passed (real dpkg and a real unprivileged account; not under a real systemd or a desktop)` };
+      },
+    },
+    {
       name: 'hub-protected-e2e',
       title: 'Every Business Hub browser test, run again against the published program with its names hidden',
       full: true,

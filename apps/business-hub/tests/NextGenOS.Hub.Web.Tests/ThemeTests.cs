@@ -148,3 +148,38 @@ public class ThemeTests : IDisposable
         if (level == "none") Assert.DoesNotContain("#aa2233", brand.Style);
     }
 }
+
+/// <summary>A brand's colour must be what the buttons show, not only a variable nobody reads (the Hub reads --ngos-accent*).</summary>
+public class BrandReachesTheScreenTests
+{
+    private static BrandService Brand(string primary, string? accent = null) => new(new ProductLicence(() => new LicenceState
+    {
+        Status = LicenceStatus.Valid,
+        Licence = new LicenceClaims { Modules = ["hub"], White = new WhiteLabel { Level = "theme" }, Brand = new BrandProfile { Id = "B-1", Name = "Luzon Fresh", PrimaryColor = primary, AccentColor = accent } },
+    }));
+
+    [Fact]
+    public void The_shared_design_tokens_carry_the_brand_colour_in_light_and_dark()
+    {
+        var css = Brand("#aa2233", "#0a7d4b").Style;
+        Assert.Contains("--accent:#aa2233", css);                       // what older programs read
+        Assert.Contains("--ngos-accent:#aa2233", css);                  // what the Hub reads
+        Assert.Contains("--ngos-accent-contrast:#ffffff", css);
+        Assert.Contains("--ngos-highlight:#0a7d4b", css);
+        Assert.Contains("--ngos-accent-strong:color-mix(in srgb,#aa2233 85%,black)", css);
+        Assert.Contains("[data-theme=\"dark\"]{--ngos-accent:#", css);
+    }
+
+    [Theory]
+    [InlineData("#0f6cbd", "#ffffff")]   // a dark brand colour carries white words
+    [InlineData("#0a7d4b", "#ffffff")]
+    [InlineData("#767676", "#ffffff")]   // the lightest grey that still reads white words
+    public void The_text_on_a_button_is_the_one_that_reads_better(string colour, string text) => Assert.Contains($"--ngos-accent-contrast:{text}", Brand(colour).Style);
+
+    [Fact]
+    public void A_colour_that_is_not_plain_hex_never_reaches_the_page()
+    {
+        Assert.Equal(string.Empty, Brand("red;}</style><script>").Style);
+        Assert.DoesNotContain("--ngos-highlight", Brand("#aa2233", "javascript:alert(1)").Style);
+    }
+}

@@ -87,8 +87,14 @@ try {
   step('the first people are there');
 
   assert.strictEqual(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()), '#0a7d4b');
+  // What a person sees: the primary button and the active menu item really are the brand's colour (not only a variable nobody reads).
+  await go(page, 'Products');
+  const seen = await page.evaluate(() => { const b = document.querySelector('.btn.primary'); const a = document.querySelector('.side a.active'); return { button: b ? getComputedStyle(b).backgroundColor : null, buttonText: b ? getComputedStyle(b).color : null, menu: a ? getComputedStyle(a).color : null }; });
+  assert.strictEqual(seen.button, 'rgb(10, 125, 75)', 'the button is the brand colour: ' + JSON.stringify(seen));
+  assert.strictEqual(seen.buttonText, 'rgb(255, 255, 255)');
+  assert.notStrictEqual(seen.menu, 'rgb(0, 88, 176)', 'the active menu item is no longer the default blue');
   assert.match(await page.locator('.side .brand-name').innerText(), /Luzon Fresh/);
-  step('the customer\'s colour shows (the licence allows style) and the licence keeps the name');
+  step('the customer\'s colour shows on the buttons and the menu (the licence allows style), and the licence keeps the name');
 
   await go(page, 'Settings');
   await page.getByRole('tab', { name: 'Look' }).click();

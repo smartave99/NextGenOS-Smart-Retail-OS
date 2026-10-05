@@ -12,6 +12,7 @@ public sealed class HubWorker(HubApp app, ILogger<HubWorker> log) : BackgroundSe
         {
             try
             {
+                if (string.IsNullOrEmpty(app.Shop.Settings.Country)) continue;   // nothing to look after until set-up has chosen the shop's country
                 app.Documents.DiscardStaleDrafts();
                 if (app.Shop.Current.Features.Lending) app.Library.ProcessHolds();
             }

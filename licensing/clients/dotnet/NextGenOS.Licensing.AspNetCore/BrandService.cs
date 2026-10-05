@@ -66,8 +66,44 @@ public sealed partial class BrandService(ProductLicence licence, IBrandOverrides
                 return string.Empty;
             }
 
-            return Template.Replace("@@C@@", colour);
+            // The programs that use the shared NextGenOS tokens (the Business Hub) take the same colour through --ngos-accent*, so a brand's colour is what the buttons really show.
+            return Template.Replace("@@C@@", colour) + Environment.NewLine + NgosTokens(colour);
         }
+    }
+
+    /// <summary>The shared design tokens (--ngos-accent*) for a brand colour: light and dark, with the text colour chosen so it can always be read on the button.</summary>
+    private string NgosTokens(string colour)
+    {
+        var dark = MixWithWhite(colour, 0.18);
+        var highlight = Hex(Brand.AccentColor);
+        var light = $"--ngos-accent:{colour};--ngos-accent-strong:color-mix(in srgb,{colour} 85%,black);--ngos-accent-contrast:{TextOn(colour)};--ngos-accent-soft:color-mix(in srgb,{colour} 12%,transparent)" + (highlight is null ? "" : $";--ngos-highlight:{highlight}");
+        var night = $"--ngos-accent:{dark};--ngos-accent-strong:color-mix(in srgb,{colour} 65%,white);--ngos-accent-contrast:{TextOn(dark)};--ngos-accent-soft:color-mix(in srgb,{colour} 22%,transparent)";
+        return $":root{{{light}}}\n@media (prefers-color-scheme:dark){{:root:not([data-theme=\"light\"]){{{night}}}}}\n:root[data-theme=\"dark\"]{{{night}}}";
+    }
+
+    private static string MixWithWhite(string hex, double part)
+    {
+        int Channel(int at) => (int)Math.Round(Convert.ToInt32(hex.Substring(at, 2), 16) * (1 - part) + 255 * part);
+        return $"#{Channel(1):x2}{Channel(3):x2}{Channel(5):x2}";
+    }
+
+    /// <summary>White or near-black, whichever reads better on the colour (WCAG contrast).</summary>
+    private static string TextOn(string hex) => Contrast(hex, "#ffffff") >= Contrast(hex, "#00111f") ? "#ffffff" : "#00111f";
+
+    private static double Contrast(string a, string b)
+    {
+        var (la, lb) = (Luminance(a), Luminance(b));
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    private static double Luminance(string hex)
+    {
+        double Channel(int at)
+        {
+            var c = Convert.ToInt32(hex.Substring(at, 2), 16) / 255.0;
+            return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * Channel(1) + 0.7152 * Channel(3) + 0.0722 * Channel(5);
     }
 
     /// <summary>"#rrggbb" or nothing: nothing else is ever put in the page's style.</summary>

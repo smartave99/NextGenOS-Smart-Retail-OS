@@ -109,6 +109,7 @@ try {
     await page.waitForURL(/tab=look&saved=1/);
     await page.locator('.notice', { hasText: /Saved/ }).waitFor();
     assert.strictEqual(await accent(page), '#aa2233');
+    assert.strictEqual(await page.locator('main .btn.primary').first().evaluate((b) => getComputedStyle(b).backgroundColor), 'rgb(170, 34, 51)', 'the button itself is the chosen colour, not only a variable');
     await page.locator('.side .brand-logo').waitFor();
     assert.ok(await page.locator('.side .brand-logo').evaluate((img) => img.naturalWidth === 64), 'the picture shows');
     assert.match(await page.locator('.side .brand-name').innerText(), /Luzon Fresh/);

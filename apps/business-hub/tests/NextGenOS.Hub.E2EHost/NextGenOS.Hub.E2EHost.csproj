@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Starts the Hub for the browser tests (e2e/*.mjs) with a stand-in for the licence, the way the unit tests do. It is a test tool: it is never built into
+       a package (scripts/audit-package.mjs refuses it) and the program itself has no switch that does the same. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>NextGenOS.Hub.E2EHost</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NextGenOS.Hub.Web\NextGenOS.Hub.Web.csproj" />
+  </ItemGroup>
+
+</Project>

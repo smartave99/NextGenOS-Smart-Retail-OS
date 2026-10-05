@@ -1,9 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NextGenOS.Hub.Core/NextGenOS.Hub.Core.csproj" />
+    <Project Path="src/NextGenOS.Hub.Web/NextGenOS.Hub.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NextGenOS.Hub.Tests/NextGenOS.Hub.Tests.csproj" />
+    <Project Path="tests/NextGenOS.Hub.Web.Tests/NextGenOS.Hub.Web.Tests.csproj" />
+    <Project Path="tests/NextGenOS.Hub.E2EHost/NextGenOS.Hub.E2EHost.csproj" />
   </Folder>
   <Project Path="../../libs/dotnet/NextGenOS.Tax/NextGenOS.Tax.csproj" />
 </Solution>

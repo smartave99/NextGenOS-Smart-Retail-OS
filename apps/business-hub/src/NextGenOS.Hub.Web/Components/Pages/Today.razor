@@ -1,0 +1,126 @@
+@page "/"
+@inherits HubPage
+@using NextGenOS.Hub.Reports
+
+<PageTitle>Today</PageTitle>
+<h1>Today</h1>
+<p class="sub">@Shop.Time.ToLocal(App.Clock.UtcNow).ToString("dddd d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) · @Shop.Settings.Name</p>
+<Notice Error="@Error" />
+
+<div class="grid">
+    @if (Me.Can(Perm.Reports) || Me.Can(Perm.Sell))
+    {
+        <div class="card stat">
+            <span class="label">@Shop.Plural("sale") today</span>
+            <span class="value">@today?.Documents</span>
+            <span class="note">@(today is null ? "" : Money(today.TotalMinor)) in total</span>
+        </div>
+        @if (today is { Documents: > 0 })
+        {
+            <div class="card stat">
+                <span class="label">Average</span>
+                <span class="value">@Money(today.AverageMinor)</span>
+                <span class="note">for each @Shop.Singular("sale").ToLowerInvariant()</span>
+            </div>
+        }
+    }
+    @if (Shop.Features.Tables && Me.Can(Perm.Orders))
+    {
+        <a class="card stat link" href="tables">
+            <span class="label">Tables in use</span>
+            <span class="value">@floor.Count(t => t.Occupied) <small>of @floor.Count</small></span>
+            <span class="note">@(floor.Where(t => t.Occupied).Sum(t => t.TotalMinor) is var open and > 0 ? Money(open) + " on the tables" : "Nobody seated")</span>
+        </a>
+    }
+    @if (Shop.Features.Kitchen && Me.Can(Perm.Kitchen))
+    {
+        <a class="card stat link" href="kitchen">
+            <span class="label">In the kitchen</span>
+            <span class="value">@tickets</span>
+            <span class="note">waiting to be served</span>
+        </a>
+    }
+    @if (Shop.Features.Lending && Me.Can(Perm.Loans))
+    {
+        <a class="card stat link" href="loans">
+            <span class="label">Overdue</span>
+            <span class="value">@overdue</span>
+            <span class="note">@openLoans on loan now</span>
+        </a>
+    }
+    @if (Shop.Features.Projects && Me.Can(Perm.Projects))
+    {
+        <a class="card stat link" href="projects">
+            <span class="label">Active projects</span>
+            <span class="value">@projects</span>
+            <span class="note">@Money(owed) still to be paid to you</span>
+        </a>
+    }
+    @if (Shop.Features.Appointments && Me.Can(Perm.Appointments))
+    {
+        <a class="card stat link" href="appointments">
+            <span class="label">Bookings today</span>
+            <span class="value">@bookings</span>
+            <span class="note">see the day</span>
+        </a>
+    }
+    @if (Shop.Features.Credit && Me.Can(Perm.Reports) && !Shop.Features.Projects)
+    {
+        <a class="card stat link" href="reports">
+            <span class="label">Owed to you</span>
+            <span class="value">@Money(owed)</span>
+            <span class="note">on credit sales</span>
+        </a>
+    }
+</div>
+
+@if (lowStock.Count > 0 && Me.Can(Perm.Stock))
+{
+    <section class="card">
+        <h2>Running low</h2>
+        <table class="tbl">
+            <thead><tr><th>@Shop.Singular("item")</th><th class="num">On hand</th><th class="num">Reorder at</th></tr></thead>
+            <tbody>
+            @foreach (var s in lowStock.Take(8))
+            {
+                <tr><td>@s.Name</td><td class="num">@Qty(s.OnHandMilli) @s.Unit</td><td class="num">@Qty(s.ReorderMilli)</td></tr>
+            }
+            </tbody>
+        </table>
+    </section>
+}
+
+<section class="card">
+    <h2>Start here</h2>
+    <div class="row wrap">
+        @if (Shop.Features.CounterSale && Me.Can(Perm.Sell)) { <a class="btn primary" href="sell">@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</a> }
+        @if (Shop.Features.Tables && Me.Can(Perm.Orders)) { <a class="btn primary" href="tables">Open the tables</a> }
+        @if (Shop.Features.Lending && Me.Can(Perm.Loans)) { <a class="btn primary" href="loans">Lend or take back</a> }
+        @if (Shop.Features.Projects && Me.Can(Perm.Projects)) { <a class="btn primary" href="projects">Projects</a> }
+        @if (Shop.Features.Appointments && Me.Can(Perm.Appointments)) { <a class="btn primary" href="appointments">Bookings</a> }
+        @if (Me.Can(Perm.Catalog)) { <a class="btn secondary" href="items">@Shop.Plural("item")</a> }
+        @if (Me.Can(Perm.Reports)) { <a class="btn secondary" href="reports">Reports</a> }
+    </div>
+</section>
+
+@code {
+    private SalesSummary? today;
+    private IReadOnlyList<Restaurant.FloorTable> floor = Array.Empty<Restaurant.FloorTable>();
+    private int tickets, overdue, openLoans, projects, bookings;
+    private long owed;
+    private IReadOnlyList<StockRow> lowStock = Array.Empty<StockRow>();
+
+    protected override Task LoadAsync()
+    {
+        var f = Shop.Features;
+        if (Me.Can(Perm.Reports) || Me.Can(Perm.Sell)) today = App.Reports.Summary(Today, Today);
+        if (f.Tables) floor = App.Restaurant.Floor();
+        if (f.Kitchen) tickets = App.Restaurant.Tickets().Count(t => t.Status != "served");
+        if (f.Lending) { overdue = App.Library.Overdue().Count; openLoans = App.Library.OpenLoans().Count; }
+        if (f.Projects) { var active = App.Projects.List("active"); projects = active.Count; owed = App.Reports.Outstanding().Sum(a => a.TotalMinor); }
+        else if (f.Credit) owed = App.Reports.Outstanding().Sum(a => a.TotalMinor);
+        if (f.Appointments) bookings = App.Appointments.Day(Today).Count(a => a.Appointment.Status is "booked" or "arrived");
+        if (Shop.Industry.Features.StockTracking != "never" && Me.Can(Perm.Stock)) lowStock = App.Catalog.StockList(lowOnly: true);
+        return Task.CompletedTask;
+    }
+}

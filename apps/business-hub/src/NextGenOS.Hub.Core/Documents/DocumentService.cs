@@ -331,6 +331,36 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         return Get(id)!;
     }
 
+    /// <summary>Throws away a sale that was started and never finished. Only an open invoice or quote with nothing sent to a kitchen can go; anything else is voided or cancelled by its own screen.</summary>
+    public void Discard(long documentId)
+    {
+        db.InTransaction((c, t) =>
+        {
+            var row = HubDb.Query(c, "SELECT type, status, number FROM documents WHERE id = $id", r => (Type: r.Text("type"), Status: r.Text("status"), Number: r.TextOrNull("number")), t, ("$id", documentId)).FirstOrDefault();
+            if (row.Type is null) return;
+            if (row.Status != DocStatus.Open || row.Number is not null || row.Type is not (DocTypes.Invoice or DocTypes.Quote))
+                throw new HubException("not-draft", "Only a sale that was never finished can be thrown away.");
+            HubDb.Exec(c, "DELETE FROM document_lines WHERE document_id = $id", t, ("$id", documentId));
+            HubDb.Exec(c, "DELETE FROM documents WHERE id = $id", t, ("$id", documentId));
+        });
+    }
+
+    /// <summary>Clears sales left open for more than a day (the till was closed in the middle of one). Returns how many went.</summary>
+    public int DiscardStaleDrafts()
+    {
+        var cutoff = Iso.Text(clock.UtcNow.AddDays(-1));
+        return db.InTransaction((c, t) =>
+        {
+            var ids = HubDb.Query(c, "SELECT id FROM documents WHERE status = 'open' AND number IS NULL AND type IN ('invoice','quote') AND project_id IS NULL AND created_at < $cut", r => r.Int("id"), t, ("$cut", cutoff));
+            foreach (var id in ids)
+            {
+                HubDb.Exec(c, "DELETE FROM document_lines WHERE document_id = $id", t, ("$id", id));
+                HubDb.Exec(c, "DELETE FROM documents WHERE id = $id", t, ("$id", id));
+            }
+            return ids.Count;
+        });
+    }
+
     // ---- payments, voiding, credit notes ---------------------------------------------------------------------------------------
 
     /// <summary>Takes a payment on an issued document (a customer settling an invoice). Returns the document with the payment added.</summary>

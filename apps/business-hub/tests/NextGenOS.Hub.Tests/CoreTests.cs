@@ -201,4 +201,30 @@ public class CoreTests
         var sale = f.App.Documents.Checkout(new CheckoutRequest { Lines = { new LineInput { ItemId = item.Id } }, Payments = { new PaymentInput { AmountMinor = 2_176 } } });
         Assert.Equal(2_176, sale.Document.TotalMinor); // 19.99 + 8.875% of it (1.774, so 1.77) = 21.76
     }
+
+    [Fact]
+    public void An_unfinished_sale_can_be_thrown_away_but_a_finished_one_cannot()
+    {
+        using var f = new HubFixture("IN", "retail");
+        var pen = Product(f, "Pen", "11.80", track: false);
+        var draft = f.App.Documents.CreateDraft(new DraftOptions { Lines = { new LineInput { ItemId = pen.Id } } });
+        f.App.Documents.Discard(draft.Document.Id);
+        Assert.Null(f.App.Documents.Get(draft.Document.Id));
+        var done = f.App.Documents.Checkout(new CheckoutRequest { Lines = { new LineInput { ItemId = pen.Id } }, Payments = { new PaymentInput { AmountMinor = 1_180 } } });
+        Assert.Equal("not-draft", Assert.Throws<HubException>(() => f.App.Documents.Discard(done.Document.Id)).Code);
+        Assert.NotNull(f.App.Documents.Get(done.Document.Id));
+    }
+
+    [Fact]
+    public void Sales_left_open_for_more_than_a_day_are_cleared_and_recent_ones_are_kept()
+    {
+        using var f = new HubFixture("IN", "retail");
+        var pen = Product(f, "Pen", "11.80", track: false);
+        var old = f.App.Documents.CreateDraft(new DraftOptions { Lines = { new LineInput { ItemId = pen.Id } } });
+        f.Clock.Advance(TimeSpan.FromHours(30));
+        var recent = f.App.Documents.CreateDraft(new DraftOptions { Lines = { new LineInput { ItemId = pen.Id } } });
+        Assert.Equal(1, f.App.Documents.DiscardStaleDrafts());
+        Assert.Null(f.App.Documents.Get(old.Document.Id));
+        Assert.NotNull(f.App.Documents.Get(recent.Document.Id));
+    }
 }

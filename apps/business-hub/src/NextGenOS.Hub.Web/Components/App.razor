@@ -1,0 +1,45 @@
+@using Microsoft.AspNetCore.Antiforgery
+@using NextGenOS.Licensing.AspNetCore
+@inject BrandService Brand
+@inject IAntiforgery Antiforgery
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="csrf" content="@RequestToken" />
+    <base href="/" />
+    <title>@Brand.Name</title>
+    <script src="theme.js"></script>
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["tokens.css"]" />
+    <link rel="stylesheet" href="@Assets["hub.css"]" />
+    <ImportMap />
+    @if (Brand.Style.Length > 0)
+    {
+        @* The licence's brand colour in place of the default accent (BrandService lets through plain hex only). *@
+        <style>@((MarkupString)Brand.Style)</style>
+    }
+    <HeadOutlet @rendermode="PageMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageMode" />
+    <script src="@Assets["hub.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext? Http { get; set; }
+
+    private string? RequestToken => Http is null ? null : Antiforgery.GetAndStoreTokens(Http).RequestToken;
+
+    // Every screen is live in the browser, except the sign-in page, which is an ordinary form (the cookie is set by the answer to it).
+    private static readonly IComponentRenderMode Live = new InteractiveServerRenderMode(prerender: false);
+
+    private IComponentRenderMode? PageMode => Http?.Request.Path.StartsWithSegments("/login") == true ? null : Live;
+}

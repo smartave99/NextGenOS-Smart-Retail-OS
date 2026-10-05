@@ -1,0 +1,96 @@
+{
+  "description": "Shared by every client: how a local brand is applied on top of a licence brand (licensing/spec/LICENCE-FORMAT.md section 5.2). Only the fields named in \"expect\" are compared.",
+  "logoSmall": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "licence": {
+    "id": "B-7", "name": "Luzon Fresh", "shortName": "Luzon", "legalName": "Luzon Fresh Inc.",
+    "primaryColor": "#0f6cbd", "accentColor": "#e1a100", "supportEmail": "help@luzon.example", "supportPhone": "+63 2 1234 5678",
+    "supportUrl": "https://help.luzon.example", "websiteUrl": "https://luzon.example", "copyright": "(c) Luzon Fresh Inc.", "logo": null, "poweredBy": true
+  },
+  "cases": [
+    {
+      "name": "none: the local brand is ignored completely",
+      "level": "none",
+      "local": { "name": "Mine", "primaryColor": "#aa2233", "logo": "@logoSmall", "poweredBy": false, "supportEmail": "me@mine.example" },
+      "expect": { "name": "Luzon Fresh", "primaryColor": "#0f6cbd", "logo": null, "poweredBy": true, "supportEmail": "help@luzon.example" }
+    },
+    {
+      "name": "theme: colours, logo and support contact come from the local brand; name and powered-by stay",
+      "level": "theme",
+      "local": { "name": "Mine", "shortName": "M", "primaryColor": "#AA2233", "accentColor": "#336699", "logo": "@logoSmall", "supportEmail": "me@mine.example", "supportPhone": "+1 555 0100", "poweredBy": false },
+      "expect": { "name": "Luzon Fresh", "shortName": "Luzon", "primaryColor": "#aa2233", "accentColor": "#336699", "logo": "@logoSmall", "supportEmail": "me@mine.example", "supportPhone": "+1 555 0100", "poweredBy": true, "legalName": "Luzon Fresh Inc.", "websiteUrl": "https://luzon.example" }
+    },
+    {
+      "name": "full: name, short name and powered-by can be changed too",
+      "level": "full",
+      "local": { "name": "  Mine Mart  ", "shortName": "Mine", "poweredBy": false, "primaryColor": "#112233" },
+      "expect": { "name": "Mine Mart", "shortName": "Mine", "poweredBy": false, "primaryColor": "#112233", "legalName": "Luzon Fresh Inc.", "id": "B-7" }
+    },
+    {
+      "name": "a missing, unknown or oddly spelled level counts as none",
+      "levels": [null, "", "FULL", "Theme", "everything", "full "],
+      "local": { "name": "Mine", "primaryColor": "#aa2233" },
+      "expect": { "name": "Luzon Fresh", "primaryColor": "#0f6cbd" }
+    },
+    {
+      "name": "invalid colours are ignored, valid ones kept",
+      "level": "theme",
+      "local": { "primaryColor": "red", "accentColor": "#12345" },
+      "expect": { "primaryColor": "#0f6cbd", "accentColor": "#e1a100" }
+    },
+    {
+      "name": "a colour that is not hex at all, or tries to leave the value, is ignored",
+      "level": "theme",
+      "local": { "primaryColor": "#aa2233;background:url(x)", "accentColor": "javascript:alert(1)" },
+      "expect": { "primaryColor": "#0f6cbd", "accentColor": "#e1a100" }
+    },
+    {
+      "name": "a colour too light for white text is ignored; a dark one is accepted",
+      "level": "theme",
+      "local": { "primaryColor": "#ffff00", "accentColor": "#222222" },
+      "expect": { "primaryColor": "#0f6cbd", "accentColor": "#222222" }
+    },
+    {
+      "name": "a logo must be a small image data URI; web addresses and HTML are ignored",
+      "level": "theme",
+      "locals": [
+        { "logo": "https://evil.example/logo.png" },
+        { "logo": "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==" },
+        { "logo": "data:image/png;base64,AAAA\" onerror=\"alert(1)" },
+        { "logo": "javascript:alert(1)" },
+        { "logo": "" }
+      ],
+      "expect": { "logo": null }
+    },
+    {
+      "name": "a logo that is too big is ignored",
+      "level": "theme",
+      "local": { "logo": "@oversizeLogo" },
+      "expect": { "logo": null }
+    },
+    {
+      "name": "control characters are removed and long text is cut",
+      "level": "full",
+      "local": { "name": "Mi\u0000ne\nMart", "shortName": "@longText", "supportEmail": "a@b.example\u0007" },
+      "expect": { "name": "MineMart", "shortNameLength": 60, "supportEmail": "a@b.example" }
+    },
+    {
+      "name": "powered-by must be true or false; anything else is ignored",
+      "level": "full",
+      "locals": [{ "poweredBy": "no" }, { "poweredBy": 0 }, { "poweredBy": null }],
+      "expect": { "poweredBy": true }
+    },
+    {
+      "name": "with no licence brand the product's own names are the starting point",
+      "level": "theme",
+      "noLicenceBrand": true,
+      "local": { "primaryColor": "#aa2233", "name": "Mine" },
+      "expect": { "name": "Smart Retail POS", "primaryColor": "#aa2233", "poweredBy": false, "legalName": "NextGenOS", "id": "B-0" }
+    },
+    {
+      "name": "no local brand at all leaves the licence brand as it is",
+      "level": "full",
+      "local": null,
+      "expect": { "name": "Luzon Fresh", "primaryColor": "#0f6cbd", "poweredBy": true }
+    }
+  ]
+}

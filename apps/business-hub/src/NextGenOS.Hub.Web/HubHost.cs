@@ -100,6 +100,9 @@ public static class HubHost
         services.AddCascadingAuthenticationState();
         services.AddScoped<Session>();
         services.AddSingleton<SetupState>();
+        // The look the owner chose on this PC; the licence's white-label level decides how much of it shows (BrandService).
+        services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalBrandStore>();
+        services.AddSingleton<NextGenOS.Licensing.AspNetCore.IBrandOverrides>(sp => sp.GetRequiredService<NextGenOS.Hub.Web.Branding.LocalBrandStore>());
         services.AddLicensedWorker<HubWorker>();
 
         // The signed licence: the Hub runs only with a valid one that includes the "hub" module.

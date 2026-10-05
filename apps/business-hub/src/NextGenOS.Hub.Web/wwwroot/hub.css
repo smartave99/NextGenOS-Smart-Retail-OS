@@ -243,3 +243,14 @@ input.note { flex: 1; min-height: 34px; padding: 4px 10px; font-size: .88rem; }
 @page shelf { size: A4; margin: 8mm; }
 @page a3 { size: A3; margin: 10mm; }
 @media print { .paper { border: 0; padding: 0; border-radius: 0; } }
+
+/* The owner's own logo, and the colour pickers on the Look page. */
+.brand-logo{display:block;max-height:2.25rem;max-width:9rem;object-fit:contain;margin:0 auto .35rem 0}
+.look-pick{display:flex;gap:10px;align-items:center;margin-top:4px}
+.look-pick.wrap{flex-wrap:wrap}
+.look-pick input:not([type]),.look-pick input[type=text]{flex:1;min-width:0}
+.look-gap{margin-top:18px}
+label.look-gap{display:block}
+.swatch{display:inline-block;flex:none;width:1.75rem;height:1.75rem;border-radius:.4rem;border:1px solid var(--ngos-line)}
+input[type=color]{flex:none;width:2.75rem;min-height:2.5rem;height:2.5rem;padding:2px;border:1px solid var(--ngos-line);border-radius:.5rem;background:var(--ngos-surface);cursor:pointer}
+.nowrap{white-space:nowrap}

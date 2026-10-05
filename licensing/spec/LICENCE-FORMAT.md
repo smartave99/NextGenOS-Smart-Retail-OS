@@ -96,6 +96,29 @@ Apps read the brand from the licence at start. With no licence, or `brand = null
 
 The licence brand is the starting point; the local brand kit is applied on top of it only as far as the level allows. The apps enforce this when they read the kit.
 
+#### 5.2 How a local brand is applied (the rule every client implements)
+
+The **local brand** is a small set of values a person chose on their own PC (the Hub's "Look" page, or a brand kit made with the Brand Studio):
+`name`, `shortName`, `primaryColor`, `accentColor`, `logo`, `supportEmail`, `supportPhone`, `poweredBy`. The **effective brand** is made from the
+licence's brand (or NextGenOS's own when there is none) and the local brand, field by field:
+
+| Field | `none` | `theme` | `full` |
+|---|---|---|---|
+| `primaryColor`, `accentColor`, `logo`, `supportEmail`, `supportPhone` | licence | local, if valid | local, if valid |
+| `name`, `shortName`, `poweredBy` | licence | licence | local, if valid |
+| everything else (`id`, `legalName`, `supportUrl`, `websiteUrl`, `copyright`) | licence | licence | licence |
+
+Rules, all of which the shared vectors in `testvectors/brand-policy.json` check in every implementation:
+
+- A level that is missing or not exactly `none`, `theme` or `full` counts as `none`.
+- A local value that is missing, empty or **invalid is ignored** (the licence value stays). It is never an error: a bad file must not stop the shop.
+- Colours are `#rrggbb`. A colour whose contrast with white is below 3:1 is invalid (white text is written on it).
+- `logo` is a data URI `data:image/png|jpeg|svg+xml;base64,...` of at most 140,000 characters; nothing else (no web address, no HTML).
+- `name` and `shortName` have control characters removed, are trimmed, and are cut to 60 characters; `supportEmail` to 120, `supportPhone` to 40.
+- `poweredBy` is a true/false value; any other value is ignored.
+- Apps that cannot show a field (a printed receipt has no colour) ignore it. Fonts and a light/dark default are allowed at `theme` and `full` and are applied
+  by the programs that support them; the Hub does not apply them yet.
+
 ## 6. Modules
 
 `pos`, `hub`, `ai`, `dashboard`, `storefront`, `owner-live`, `chain`, `api`. A client enables a feature only if its module is listed. The POS needs `pos`; the Business Hub (every industry, every country) `hub`; the AI add-on `ai`; the dashboard `dashboard`; the storefront `storefront`.

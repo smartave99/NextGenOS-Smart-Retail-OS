@@ -3,15 +3,28 @@ using NextGenOS.Licensing;
 
 namespace NextGenOS.Licensing.AspNetCore;
 
+/// <summary>What a person chose to change about the look on this PC (spec section 5.2); null when nothing was. A program that lets people choose gives this.</summary>
+public interface IBrandOverrides
+{
+    LocalBrand? Current { get; }
+}
+
 /// <summary>
 /// The name and colours the program shows: those of the licence's brand (a reseller or a customer with white label), or
-/// NextGenOS's own Smart Retail POS when the licence has none. Colours are checked as plain hex before they reach the page.
+/// NextGenOS's own Smart Retail POS when the licence has none, with what the person chose on this PC on top as far as the licence's
+/// white-label level allows (<see cref="BrandPolicy"/>). Colours are checked as plain hex before they reach the page.
 /// </summary>
-public sealed partial class BrandService(ProductLicence licence)
+public sealed partial class BrandService(ProductLicence licence, IBrandOverrides? local = null)
 {
     public const string DefaultName = "Smart Retail POS";
 
-    private BrandProfile Brand => licence.State.Brand;
+    private BrandProfile Brand => BrandPolicy.Resolve(licence.State.Brand, WhiteLevel, local?.Current);
+
+    /// <summary>What the licence lets the person change on their own: "none", "theme" or "full" (spec section 5.1).</summary>
+    public string WhiteLevel => licence.State.Licence?.White?.Level is "theme" or "full" ? licence.State.Licence.White.Level : "none";
+
+    /// <summary>The logo, a small picture as a data address, or nothing.</summary>
+    public string? Logo => BrandPolicy.ValidLogo(Brand.Logo);
 
     /// <summary>The name of the product as the customer knows it.</summary>
     public string Name => Clean(Brand.Name, 60) is { Length: > 0 } name ? name : DefaultName;
@@ -24,7 +37,8 @@ public sealed partial class BrandService(ProductLicence licence)
     public string? SupportPhone => Clean(Brand.SupportPhone, 40) is { Length: > 0 } phone ? phone : null;
 
     /// <summary>True when the licence brings its own colour: the default look is not touched otherwise.</summary>
-    public bool HasOwnColour => Hex(Brand.PrimaryColor) is not null && licence.State.Licence?.Brand is { Name.Length: > 0 };
+    public bool HasOwnColour => Hex(Brand.PrimaryColor) is not null
+        && (licence.State.Licence?.Brand is { Name.Length: > 0 } || !string.Equals(Brand.PrimaryColor, licence.State.Brand.PrimaryColor, StringComparison.OrdinalIgnoreCase));
 
     private const string Template = """
     :root{--accent:@@C@@;--accent-hover:color-mix(in srgb,@@C@@ 88%,white);--accent-ink:color-mix(in srgb,@@C@@ 85%,black);--accent-soft:color-mix(in srgb,@@C@@ 12%,transparent);--accent-softer:color-mix(in srgb,@@C@@ 7%,transparent);--bar-now:@@C@@;--bar:color-mix(in srgb,@@C@@ 45%,white);--focus:0 0 0 3.5px color-mix(in srgb,@@C@@ 30%,transparent)}

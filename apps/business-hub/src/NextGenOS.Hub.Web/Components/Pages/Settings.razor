@@ -4,6 +4,8 @@
 @using System.Text.RegularExpressions
 @using NextGenOS.Licensing.AspNetCore
 @inject ProductLicence Licence
+@inject BrandService Brand
+@inject NextGenOS.Hub.Web.Branding.LocalBrandStore Looks
 
 <PageTitle>Settings</PageTitle>
 <h1>Settings</h1>
@@ -108,6 +110,64 @@ else if (tab == "parts")
             </div>
         }
         <div class="row"><button type="button" class="btn primary" id="save-parts" @onclick="SaveParts">Save</button></div>
+    </section>
+}
+else if (tab == "look")
+{
+    <section class="card">
+        <h2>Look</h2>
+        @if (Brand.WhiteLevel == "none")
+        {
+            <p>Your licence has a fixed look: <strong>@Brand.Name</strong>. It cannot be changed here. If you want your own colours or logo, ask the company you bought it from for a licence that allows it.</p>
+        }
+        else
+        {
+            <p class="muted">Your licence lets you change the colours, the logo and the help details@(Brand.WhiteLevel == "full" ? ", and the name of the program" : ""). Changes show on every screen.</p>
+            <div class="stack">
+                <div class="field-row">
+                    <div>
+                        <label for="b-main">Main colour</label>
+                        <div class="look-pick">
+                            <input type="color" aria-label="Pick the main colour" value="@Picker(look.PrimaryColor, "#0f6cbd")" @onchange="e => look.PrimaryColor = e.Value?.ToString()" />
+                            <input id="b-main" @bind="look.PrimaryColor" @bind:event="oninput" maxlength="7" placeholder="#0f6cbd" />
+                            <span class="swatch" aria-hidden="true" style="background:@(BrandService.Hex(look.PrimaryColor) ?? "transparent")"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="b-second">Second colour</label>
+                        <div class="look-pick">
+                            <input type="color" aria-label="Pick the second colour" value="@Picker(look.AccentColor, "#f59e0b")" @onchange="e => look.AccentColor = e.Value?.ToString()" />
+                            <input id="b-second" @bind="look.AccentColor" @bind:event="oninput" maxlength="7" placeholder="#f59e0b" />
+                        </div>
+                    </div>
+                </div>
+                <label for="b-logo" class="look-gap">Logo (a PNG or JPEG picture, at most 100 KB)</label>
+                <div class="look-pick wrap">
+                    <InputFile id="b-logo" OnChange="LogoChosen" accept="image/png,image/jpeg" />
+                    @if (!string.IsNullOrEmpty(look.Logo))
+                    {
+                        <img class="brand-logo" src="@look.Logo" alt="Your logo" />
+                        <button type="button" class="btn ghost small nowrap" id="remove-logo" @onclick="() => look.Logo = null">Remove logo</button>
+                    }
+                </div>
+                <div class="field-row look-gap">
+                    <div><label for="b-mail">Help email (shown to your people)</label><input id="b-mail" @bind="look.SupportEmail" maxlength="120" /></div>
+                    <div><label for="b-phone">Help phone</label><input id="b-phone" @bind="look.SupportPhone" maxlength="40" /></div>
+                </div>
+                @if (Brand.WhiteLevel == "full")
+                {
+                    <div class="field-row">
+                        <div><label for="b-name">Name of the program</label><input id="b-name" @bind="look.Name" maxlength="60" /></div>
+                        <div><label for="b-short">Short name</label><input id="b-short" @bind="look.ShortName" maxlength="60" /></div>
+                    </div>
+                    <label class="check"><input type="checkbox" id="b-by" checked="@(look.PoweredBy ?? Brand.By is not null)" @onchange="e => look.PoweredBy = (bool)(e.Value ?? false)" /> Show "by NextGenOS" under the name</label>
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn primary" id="save-look" @onclick="SaveLook">Save</button>
+                <button type="button" class="btn secondary" id="reset-look" @onclick="ResetLook">Go back to the standard look</button>
+            </div>
+        }
     </section>
 }
 else if (tab == "printers")
@@ -320,6 +380,9 @@ else if (tab == "activity")
 
 @code {
     private string tab = "shop";
+    private NextGenOS.Licensing.LocalBrand look = new();
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
+    [SupplyParameterFromQuery(Name = "saved")] public string? Saved { get; set; }
     private ShopSettings s = new();
     private string payText = "";
     private readonly Dictionary<string, string> rates = new();
@@ -337,6 +400,7 @@ else if (tab == "activity")
         yield return ("shop", "Business");
         yield return ("tax", "Tax");
         yield return ("parts", "Parts and words");
+        yield return ("look", "Look");
         yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         yield return ("licence", "Licence");
@@ -345,6 +409,8 @@ else if (tab == "activity")
 
     protected override Task LoadAsync()
     {
+        if (TabName is "look" && !shownTab) { tab = "look"; shownTab = true; if (Saved == "1") Info = "Saved. The new look shows on every screen."; }
+        look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
         rates.Clear();
@@ -371,9 +437,38 @@ else if (tab == "activity")
         _ = Reload();
     }
 
+    private bool shownTab;
+
+    private static NextGenOS.Licensing.LocalBrand LocalBrandCopy(NextGenOS.Licensing.LocalBrand b) => NextGenOS.Licensing.LocalBrand.Parse(b.ToJson());
+
+    /// <summary>A colour box needs a full #rrggbb; before one is chosen it shows the standard colour.</summary>
+    private static string Picker(string? chosen, string standard) => BrandService.Hex(chosen) ?? standard;
+
+    private async Task LogoChosen(InputFileChangeEventArgs e) => await Run(async () =>
+    {
+        var file = e.File;
+        if (file.Size > 100_000) throw new HubException("logo", "The logo is too big. Use a picture of at most 100 KB.");
+        using var memory = new MemoryStream();
+        await using (var stream = file.OpenReadStream(100_000)) await stream.CopyToAsync(memory);
+        look.Logo = NextGenOS.Hub.Web.Branding.LocalBrandStore.FromBytes(memory.ToArray(), out var problem);
+        if (problem is not null) throw new HubException("logo", problem);
+    });
+
+    private Task SaveLook() => Run(() =>
+    {
+        Looks.Save(look, Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private Task ResetLook() => Run(() =>
+    {
+        Looks.Reset(Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
     private string brandHelp()
     {
-        var brand = new BrandService(Licence);
+        var brand = Brand;
         var bits = new[] { brand.SupportEmail, brand.SupportPhone }.Where(x => !string.IsNullOrEmpty(x));
         return bits.Any() ? string.Join(" · ", bits) : "Ask the company you bought it from.";
     }

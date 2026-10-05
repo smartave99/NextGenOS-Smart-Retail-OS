@@ -50,7 +50,7 @@ function signToken(payload, signer) {
  */
 function verifyToken(token, trustedKeys, expectedType) {
   const parts = String(token || '').split('.');
-  if (parts.length !== 3 || parts[0] !== TOKEN_PREFIX) throw new Error('Not a NextGen OS token.');
+  if (parts.length !== 3 || parts[0] !== TOKEN_PREFIX) throw new Error('Not a NextGenOS token.');
   let payload;
   try {
     payload = JSON.parse(fromB64u(parts[1]).toString('utf8'));

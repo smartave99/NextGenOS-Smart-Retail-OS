@@ -35,7 +35,7 @@ Namespace BillPoint
 			AddHandler MyBase.Closing, AddressOf Me.frmCategory_Closing
 			Me.Photoname = ""
 			Me.IsImageChanged = False
-			Me.password = "mysecretpassword"
+			Me.password = ""
 			Me.InitializeComponent()
 		End Sub
 

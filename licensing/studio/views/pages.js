@@ -93,7 +93,7 @@ function licenceNew(ctx, { plans, customers, brands, resellers, values = {}, err
   const chosenPlan = v('planCode', 'business');
   const body = html`
   <h1>New licence</h1>
-  <p class="lead">Five quick steps. You can change most things later.</p>
+  <p class="lead">A few quick questions. You can change most things later.</p>
   <form method="post" action="/licences/new" id="new-licence">
     ${csrfField(ctx.csrf)}
     <div class="card"><ol class="steps">
@@ -148,7 +148,7 @@ function licenceNew(ctx, { plans, customers, brands, resellers, values = {}, err
               ${['none', 'theme', ...(isAdmin ? ['full'] : [])].map((k) => html`<option value="${k}" ${v('whiteLevel', 'theme') === k ? raw('selected') : ''}>${WHITE_LABELS[k]}</option>`)}
             </select></div>
           <div><label for="brandId">Brand shown to the customer</label>
-            <select id="brandId" name="brandId"><option value="">Our own (NextGen OS)</option>
+            <select id="brandId" name="brandId"><option value="">Our own (NextGenOS)</option>
               ${brands.map((b) => html`<option value="${b.id}" ${String(v('brandId')) === String(b.id) ? raw('selected') : ''}>${b.name}</option>`)}</select></div>
           <div><label for="resellerId">Sold through a reseller?</label>
             <select id="resellerId" name="resellerId"><option value="">No, direct</option>
@@ -201,7 +201,7 @@ function licenceView(ctx, { lic, customer, plan, brand, reseller, devices, histo
         <dt>Ends</dt><dd>${lic.exp ? fmtDate(lic.exp) : 'no end date'}</dd>
         <dt>Tied to</dt><dd>${lic.bind.mode === 'device' ? 'Windows PCs' : lic.bind.mode === 'domain' ? 'Website: ' + lic.bind.domains.join(', ') : 'Nothing (special)'}</dd>
         <dt>Look</dt><dd>${WHITE_LABELS[lic.white_level] || lic.white_level}</dd>
-        <dt>Brand</dt><dd>${brand ? brand.name : 'NextGen OS'}</dd>
+        <dt>Brand</dt><dd>${brand ? brand.name : 'NextGenOS'}</dd>
         <dt>Reseller</dt><dd>${reseller ? reseller.name : 'Direct'}</dd>
         <dt>Internet</dt><dd>${lic.act.online ? 'Checks in every ' + lic.act.checkInDays + ' days' : 'Works offline'}</dd>
         <dt>Revision</dt><dd>${lic.rev}</dd>
@@ -314,7 +314,7 @@ function brands(ctx, { list }) {
     ${ctx.can('brands.manage') ? html`<a class="btn primary" href="/brands/new">+ New brand</a>` : ''}</div>
   <div class="card table-wrap">${list.length ? html`<table><thead><tr><th>Brand</th><th>Support</th><th>Powered by</th></tr></thead><tbody>
     ${list.map((b) => html`<tr><td>${ctx.can('brands.manage') ? html`<a href="/brands/${b.id}"><strong>${b.name}</strong></a>` : html`<strong>${b.name}</strong>`}</td><td>${b.data.supportEmail || '-'}</td><td>${b.data.poweredBy ? 'Shown' : 'Hidden'}</td></tr>`)}
-  </tbody></table>` : html`<p class="muted">No brands yet. Licences use NextGen OS's own name and colours.</p>`}</div>`;
+  </tbody></table>` : html`<p class="muted">No brands yet. Licences use NextGenOS's own name and colours.</p>`}</div>`;
   return page('Brands', body, ctx, 'brands');
 }
 
@@ -339,7 +339,7 @@ function brandEdit(ctx, { brand, resellers }) {
     <input id="b-logo-file" type="file" accept="image/png,image/jpeg,image/svg+xml" data-logo-target="#b-logo">
     <input id="b-logo" name="logo" type="hidden" value="${d.logo || ''}">
     ${d.logo ? html`<img class="logo-preview" id="logo-preview" alt="Current logo" src="${d.logo}">` : html`<img class="logo-preview hidden" id="logo-preview" alt="Logo preview">`}
-    <label class="choice"><input type="checkbox" name="poweredBy" ${d.poweredBy ? raw('checked') : ''}> <strong>Show "Powered by NextGen OS"</strong></label>
+    <label class="choice"><input type="checkbox" name="poweredBy" ${d.poweredBy ? raw('checked') : ''}> <strong>Show "Powered by NextGenOS"</strong></label>
     <p class="row"><button class="btn primary" type="submit">Save brand</button><a class="btn" href="/brands">Cancel</a></p>
   </form>`;
   return page(brand ? brand.name : 'New brand', body, ctx, 'brands');
@@ -403,6 +403,7 @@ function settings(ctx, { settings, keys }) {
     <div class="grid cols-2">
       <div><label for="s-company">Company name <span class="hint">(in messages to customers)</span></label><input id="s-company" name="company_name" type="text" value="${settings.company_name}"></div>
       <div><label for="s-support">Support e-mail <span class="hint">(in messages to customers)</span></label><input id="s-support" name="support_email" type="email" value="${settings.support_email}"></div>
+      <div><label for="s-phone">Support phone <span class="hint">(in messages to customers)</span></label><input id="s-phone" name="support_phone" type="text" value="${settings.support_phone}"></div>
       <div><label for="s-url">This server's public address</label><input id="s-url" name="public_url" type="text" value="${settings.public_url}" placeholder="https://licence.example.com"></div>
     </div>
     <h2>Rules for PCs</h2>

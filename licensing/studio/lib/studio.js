@@ -37,8 +37,9 @@ const DEFAULT_PLANS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  company_name: 'NextGen OS',
-  support_email: '',
+  company_name: 'NextGenOS',
+  support_email: 'smartave99@gmail.com',
+  support_phone: '+91 6123115368',
   public_url: '',
   check_in_days: '7',
   grace_days: '14',
@@ -416,7 +417,7 @@ class Studio {
       until = next + (lic.act.graceDays || 14) * DAY;
     }
     if (lic.exp) { next = Math.min(next, lic.exp); until = Math.min(until, lic.exp); }
-    return C.signToken({ typ: 'act', lid: lic.lid, rev: lic.rev, iat: t, fp: fpList, fpMin: Math.min(2, fpList.length), next, until }, this.signer);
+    return C.signToken({ typ: 'act', lid: lic.lid, rev: lic.rev, iat: t, fp: fpList, fpMin: Studio.fpMin(fpList.length), next, until }, this.signer);
   }
 
   crlToken() {
@@ -433,7 +434,8 @@ class Studio {
     for (const [kind, hash] of Object.entries(fp)) {
       if (!FP_KINDS.includes(kind)) continue;
       if (!/^[0-9a-f]{32}$/.test(String(hash))) throw new ApiError(400, 'bad_request', 'The PC fingerprint is not valid.');
-      if (!parts.includes(hash)) parts.push(hash);
+      const part = `${kind}:${hash}`;
+      if (!parts.includes(part)) parts.push(part);
     }
     if (!parts.length) throw new ApiError(400, 'bad_request', 'The PC fingerprint is empty.');
     return parts.sort();
@@ -442,16 +444,25 @@ class Studio {
   fingerprintList(value) {
     if (Array.isArray(value)) {
       const list = value.map(String);
-      if (!list.length || list.some((h) => !/^[0-9a-f]{32}$/.test(h))) throw new ApiError(400, 'bad_request', 'The PC fingerprint is not valid.');
+      if (!list.length || list.some((h) => !/^(bios|board|cpu|disk|os):[0-9a-f]{32}$/.test(h))) throw new ApiError(400, 'bad_request', 'The PC fingerprint is not valid.');
       return list.slice().sort();
     }
     return this.parseFingerprint(value);
   }
 
+  /** Spec section 7: at least 60% of the stored parts, and at least two strong parts (everything except the CPU id). */
   matches(stored, current) {
+    return Studio.fingerprintMatches(stored, current, Studio.fpMin(stored.length));
+  }
+
+  static fpMin(count) { return Math.max(1, Math.ceil(count * 0.6)); }
+
+  static fingerprintMatches(stored, current, fpMin) {
     const have = new Set(current);
-    const common = stored.filter((h) => have.has(h)).length;
-    return common >= Math.min(2, stored.length) && common > 0;
+    const common = stored.filter((p) => have.has(p));
+    const strongStored = stored.filter((p) => !p.startsWith('cpu:')).length;
+    const strongCommon = common.filter((p) => !p.startsWith('cpu:')).length;
+    return common.length >= fpMin && strongCommon >= Math.min(2, strongStored) && common.length > 0;
   }
 
   checkUsable(lic) {
@@ -584,7 +595,9 @@ class Studio {
     const customer = this.getCustomer(lic.customer_id) || {};
     const brand = lic.brand_id ? this.getBrand(lic.brand_id) : null;
     const company = brand ? brand.data.name : this.setting('company_name');
-    const support = brand && brand.data.supportEmail ? brand.data.supportEmail : this.setting('support_email');
+    const supportEmail = brand && brand.data.supportEmail ? brand.data.supportEmail : this.setting('support_email');
+    const supportPhone = brand && brand.data.supportPhone ? brand.data.supportPhone : this.setting('support_phone');
+    const support = [supportEmail, supportPhone].filter(Boolean).join(' · ');
     const until = lic.exp ? new Date(lic.exp * 1000).toISOString().slice(0, 10) : 'no end date';
     const lines = [
       `Hello ${customer.contact_name || customer.name || ''},`.replace(/,$/, ',').replace('Hello ,', 'Hello,'),

@@ -1,20 +1,20 @@
 NEXTGEN OS - END USER LICENCE AGREEMENT
-Smart Retail OS and the software of its suite
+Smart Retail POS and the software of its suite
 
-Copyright (c) 2026 NextGen OS. All rights reserved.
+Copyright (c) 2026 NextGenOS. All rights reserved.
 
 Please read this agreement. By installing, activating or using the
 Software you accept it. If you do not accept it, do not install or use the
 Software.
 
-Licensor:  NextGen OS  [LEGAL ENTITY NAME AND REGISTERED ADDRESS - TO BE COMPLETED]
-Contact:   [LICENSING CONTACT E-MAIL - TO BE COMPLETED]
+Licensor:  NextGenOS  [LEGAL ENTITY NAME AND REGISTERED ADDRESS - TO BE COMPLETED]
+Contact:   smartave99@gmail.com, +91 6123115368
 
 
 1. DEFINITIONS
 
-"Software" means Smart Retail OS and every program, app, website, service
-component, script, database script, document and update that NextGen OS
+"Software" means Smart Retail POS and every program, app, website, service
+component, script, database script, document and update that NextGenOS
 supplies with or for it, in object code or other form.
 
 "Licensee" means the business named in the licence key, licence file or
@@ -23,21 +23,21 @@ order for the Software (and nobody else).
 "Store" means one physical shop, branch or sales location, or one online
 shop (website or app), of the Licensee.
 
-"Licence" means the licence key or licence file issued by NextGen OS, with
+"Licence" means the licence key or licence file issued by NextGenOS, with
 the edition, modules, number of Stores, terminals and users, the term, the
 territory and the other limits stated in it or in the order.
 
-"Reseller" means a person that NextGen OS has appointed in a written reseller
+"Reseller" means a person that NextGenOS has appointed in a written reseller
 or white-label agreement.
 
 
 2. LICENCE GRANT
 
-Subject to this agreement and to payment of the fees due, NextGen OS grants
+Subject to this agreement and to payment of the fees due, NextGenOS grants
 the Licensee a limited, non-exclusive, non-transferable, non-sublicensable
 and revocable Licence to install and use the Software, in object code only,
 solely for the Licensee's own internal business operations, within the
-limits of the Licence. All rights not granted are reserved by NextGen OS.
+limits of the Licence. All rights not granted are reserved by NextGenOS.
 
 Where the Licensee is a chain or group, the Licence covers only the legal
 entities and Stores named in it.
@@ -60,7 +60,7 @@ The Licensee may not, and may not allow anyone else to:
   e) modify the Software, translate it or create derivative works of it;
   f) reverse engineer, decompile, disassemble or try to find the source code
      of the Software, except to the extent a law that cannot be excluded by
-     contract allows it, and then only after giving NextGen OS written
+     contract allows it, and then only after giving NextGenOS written
      notice and a fair chance to supply the information;
   g) remove, disable, bypass or tamper with any licence check, activation,
      key, hardware or domain binding, usage limit, notice, trademark or
@@ -75,36 +75,36 @@ The Licensee may not, and may not allow anyone else to:
 
 The Software verifies its Licence, on the PC or server and with NextGen
 OS's licence service. The Licensee agrees that, for this purpose and to
-prevent unlicensed use, the Software may send to NextGen OS: the licence
+prevent unlicensed use, the Software may send to NextGenOS: the licence
 key or identifier, a device or installation identifier (a one-way
 fingerprint, not a name or a document), the Software version, the number of
 Stores, terminals or users in use, and the time of the check. It does not
 send the Licensee's sales, customers, bills or prices for this purpose.
 
-The Licensee keeps its keys secret. NextGen OS may suspend or revoke a
+The Licensee keeps its keys secret. NextGenOS may suspend or revoke a
 Licence that is shared, copied, used beyond its limits or used in breach of
 this agreement, or whose fees are unpaid. Moving a Licence to another PC or
-server is allowed only as NextGen OS's activation process or support
+server is allowed only as NextGenOS's activation process or support
 allows.
 
 
 5. RESELLERS AND WHITE-LABEL
 
 Nobody may sell, distribute or brand the Software for others except under a
-separate written reseller or white-label agreement with NextGen OS. A Reseller
+separate written reseller or white-label agreement with NextGenOS. A Reseller
 may supply the Software only to end customers who accept this agreement, or
-terms at least as protective of NextGen OS, and only with the names, logos
-and brand profile that NextGen OS has approved in writing.
+terms at least as protective of NextGenOS, and only with the names, logos
+and brand profile that NextGenOS has approved in writing.
 
 
 6. OWNERSHIP
 
-The Software, and every copy of it, belongs to NextGen OS and its licensors.
+The Software, and every copy of it, belongs to NextGenOS and its licensors.
 This agreement gives a licence, not ownership. The Licensee gets no right
-to the names, logos or trademarks of NextGen OS, except as stated in a
+to the names, logos or trademarks of NextGenOS, except as stated in a
 written agreement. The Licensee's own data (its products, prices, customers,
 bills and settings) remains the Licensee's. If the Licensee gives feedback,
-NextGen OS may use it without restriction or payment.
+NextGenOS may use it without restriction or payment.
 
 
 7. THIRD-PARTY SOFTWARE AND AI SERVICES
@@ -118,7 +118,7 @@ Some functions use third-party services chosen and configured by the
 Licensee (for example AI providers, payment providers, messaging, cloud
 storage and databases). The Licensee needs its own accounts and keys for
 them, accepts their terms, pays their charges, and decides what data it
-sends to them. NextGen OS is not responsible for them. Answers produced by
+sends to them. NextGenOS is not responsible for them. Answers produced by
 AI may be wrong and must be checked by the Licensee before it relies on
 them, above all prices, tax and stock.
 
@@ -132,14 +132,14 @@ consumer protection, payments and personal data (for example the GDPR or
 India's Digital Personal Data Protection Act, 2023). Tax rates, invoice and
 receipt formats and other local settings may not meet the requirements of
 every country, state or industry; the Licensee must check and set them
-with its own adviser. NextGen OS does not give legal, tax or accounting
+with its own adviser. NextGenOS does not give legal, tax or accounting
 advice.
 
 
 9. UPDATES AND SUPPORT
 
 Updates, support and the service levels that come with the Licence are those
-stated in the order or support plan. NextGen OS may change, replace or stop
+stated in the order or support plan. NextGenOS may change, replace or stop
 a feature or a version, and may require an update for security or legal
 reasons. Software marked as trial, preview or beta is supplied without
 support and may stop working.
@@ -148,7 +148,7 @@ support and may stop working.
 10. TERM AND TERMINATION
 
 The Licence lasts for the term stated in it. It ends at once, without
-notice, if the Licensee breaches section 2, 3, 4 or 5, and NextGen OS may
+notice, if the Licensee breaches section 2, 3, 4 or 5, and NextGenOS may
 end it on written notice if the Licensee breaches another part of this
 agreement and does not put it right within 30 days, or does not pay.
 When it ends the Licensee must stop using the Software, remove all copies,
@@ -179,7 +179,7 @@ AGREEMENT LIMITS A LIABILITY THAT THE LAW DOES NOT ALLOW TO BE LIMITED.
 
 The Licensee keeps accurate records of where and how it uses the Software.
 On reasonable written notice, and no more than once a year unless a breach is
-suspected, it will give NextGen OS a statement of its use, and let NextGen OS
+suspected, it will give NextGenOS a statement of its use, and let NextGenOS
 (or an auditor bound to keep it confidential) check it. If the check shows
 use beyond the Licence, the Licensee will pay the fees for that use, from
 the date it began.
@@ -193,13 +193,13 @@ Software in breach of the export-control or sanctions law that applies.
 Law and courts: this agreement is governed by
 [GOVERNING LAW - TO BE COMPLETED BY COUNSEL], and its courts [or arbitration
 seat - TO BE COMPLETED BY COUNSEL] have exclusive jurisdiction, except that
-NextGen OS may seek an injunction to protect its rights in any court.
+NextGenOS may seek an injunction to protect its rights in any court.
 
 Assignment: the Licensee may not assign or transfer this agreement without
-NextGen OS's written consent; NextGen OS may assign it.
+NextGenOS's written consent; NextGenOS may assign it.
 
-Entire agreement: this agreement, the order and any signed agreement with NextGen OS
+Entire agreement: this agreement, the order and any signed agreement with NextGenOS
 are the whole agreement about the Software and replace earlier terms. A
 signed agreement prevails over this text if they differ. If a part of this
 agreement is not enforceable, the rest continues. A right not used is not
-given up. Notices to NextGen OS go to the contact above.
+given up. Notices to NextGenOS go to the contact above.

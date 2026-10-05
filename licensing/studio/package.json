@@ -2,7 +2,7 @@
   "name": "nextgenos-licence-studio",
   "version": "1.0.0",
   "private": true,
-  "description": "NextGen OS Licence Studio: issues, activates and revokes signed licences. PRIVATE: never ship this to customers.",
+  "description": "NextGenOS Licence Studio: issues, activates and revokes signed licences. PRIVATE: never ship this to customers.",
   "license": "UNLICENSED",
   "engines": { "node": ">=22.5" },
   "scripts": {

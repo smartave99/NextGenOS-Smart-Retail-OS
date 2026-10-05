@@ -106,9 +106,46 @@ const commands = {
     if (!customer) customer = studio.createCustomer({ name: flags.customer, country: flags.country, email: flags.email }, actor, 'cli');
     const lic = studio.createLicence({
       customerId: customer.id, planCode: flags.plan || 'business', term: flags.term || 'y1', devices: flags.devices, stores: flags.stores, users: flags.users,
-      bindMode: flags.bind || 'device', domains: flags.domains, offline: !!flags.offline, whiteLevel: flags.white || 'theme', startDate: flags.start,
+      bindMode: flags.bind || 'device', domains: flags.domains, offline: !!flags.offline, whiteLevel: flags.white || 'theme', startDate: flags.start, brandId: flags.brand,
     }, actor, 'cli');
     console.log(JSON.stringify({ lid: lic.lid, key: lic.licence_key, exp: lic.exp }));
+    db.close();
+  },
+
+  async 'licence-file'(flags, [lid]) {
+    const { db, studio } = openStudio();
+    const l = studio.getLicence(lid);
+    if (!l) throw new Error('No such licence.');
+    process.stdout.write(studio.licenceFile(l));
+    db.close();
+  },
+
+  async 'create-brand'(flags) {
+    const { db, studio } = openStudio();
+    const id = studio.saveBrand(null, { name: flags.name, shortName: flags.short, primaryColor: flags.primary, accentColor: flags.accent, supportEmail: flags.email, supportPhone: flags.phone, poweredBy: flags.powered === 'no' ? '' : 'on' }, actor, 'cli');
+    console.log(JSON.stringify({ brand: id }));
+    db.close();
+  },
+
+  async renew(flags, [lid]) {
+    const { db, studio } = openStudio();
+    const l = studio.updateLicence(lid, { extendTerm: flags.term || 'y1' }, actor, 'cli');
+    console.log(JSON.stringify({ lid: l.lid, exp: l.exp, rev: l.rev }));
+    db.close();
+  },
+
+  async change(flags, [lid]) {
+    const { db, studio } = openStudio();
+    const l = studio.updateLicence(lid, { planCode: flags.plan, devices: flags.devices, stores: flags.stores, users: flags.users, whiteLevel: flags.white }, actor, 'cli');
+    console.log(JSON.stringify({ lid: l.lid, limits: l.limits, rev: l.rev }));
+    db.close();
+  },
+
+  async 'free-devices'(flags, [lid]) {
+    const { db, studio } = openStudio();
+    let n = 0;
+    for (const a of studio.listActivations(lid)) if (a.active) { studio.freeDevice(a.id, actor, 'cli'); n += 1; }
+    console.log(`Released ${n} PC(s).`);
     db.close();
   },
 
@@ -180,7 +217,7 @@ async function main() {
   const { positional, flags } = parseArgs(process.argv.slice(2));
   const name = positional.shift();
   if (!name || !commands[name]) {
-    console.log('NextGen OS Licence Studio: command line\n\nCommands:\n  init                    create the signing key and the first administrator\n  add-user                --email --name --role sales|support|admin\n  reset-password <email>\n  create-licence          --customer "Name" --plan business --term y1 [--devices N] [--bind domain --domains a.com]\n  list | status\n  revoke|suspend|resume <licence id> [--reason "..."]\n  offline-activate <request code>\n  sync-clients --url https://licence.example.com   build the public key into the apps\n  export-public-keys\n  backup [file]\n');
+    console.log('NextGenOS Licence Studio: command line\n\nCommands:\n  init                    create the signing key and the first administrator\n  add-user                --email --name --role sales|support|admin\n  reset-password <email>\n  create-licence          --customer "Name" --plan business --term y1 [--devices N] [--bind domain --domains a.com]\n  list | status\n  revoke|suspend|resume <licence id> [--reason "..."]\n  licence-file <licence id>   |   create-brand --name X [--primary #112233]\n  renew <licence id> [--term y1]   |   change <licence id> [--devices N --plan business]\n  free-devices <licence id>\n  offline-activate <request code>\n  sync-clients --url https://licence.example.com   build the public key into the apps\n  export-public-keys\n  backup [file]\n');
     process.exit(name ? 1 : 0);
   }
   try {

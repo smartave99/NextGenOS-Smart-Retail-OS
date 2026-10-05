@@ -61,13 +61,13 @@ Namespace BillPoint
 
 		' Token: 0x060129C0 RID: 76224 RVA: 0x00AB6070 File Offset: 0x00AB4270
 		Public Function GetValue(Id As String) As String
-			Dim firebaseClient As IFirebaseClient = New FirebaseClient(New FirebaseConfig() With { .AuthSecret = "mYPrYRI2v2ivDvNRf3CQmi62glH9MoSAvZVuJd5u", .BasePath = "https://sdata-d4757-default-rtdb.asia-southeast1.firebasedatabase.app/" })
+			Dim firebaseClient As IFirebaseClient = New FirebaseClient(New FirebaseConfig() With { .AuthSecret = NextGenOS.Licensing.CloudSettings.Secret("data"), .BasePath = NextGenOS.Licensing.CloudSettings.Url("data") })
 			Return firebaseClient.[Get]("/" + Id + "/Data2").ResultAs(Of String)()
 		End Function
 
 		' Token: 0x060129C1 RID: 76225 RVA: 0x00AB60C8 File Offset: 0x00AB42C8
 		Public Function GetValue1(Id As String) As String
-			Dim firebaseClient As IFirebaseClient = New FirebaseClient(New FirebaseConfig() With { .AuthSecret = "4PZeAlIxtAolC88fBumRvIKfICOF0qDJNw0vvIoc", .BasePath = "https://update-89a0d-default-rtdb.firebaseio.com/" })
+			Dim firebaseClient As IFirebaseClient = New FirebaseClient(New FirebaseConfig() With { .AuthSecret = NextGenOS.Licensing.CloudSettings.Secret("updates"), .BasePath = NextGenOS.Licensing.CloudSettings.Url("updates") })
 			Return firebaseClient.[Get]("/" + Id + "/Data2").ResultAs(Of String)()
 		End Function
 

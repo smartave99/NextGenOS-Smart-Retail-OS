@@ -1,4 +1,4 @@
-# NextGen OS licence format and activation protocol (version 1)
+# NextGenOS licence format and activation protocol (version 1)
 
 This is the contract between the **Licence Studio** (the server that issues and signs licences) and every **client** (the POS, the AI add-on, the dashboard, the storefront). The Studio, the .NET library (`clients/dotnet`) and the Node library (`clients/node`) all follow it, and `testvectors/` holds signed examples that every client's tests must accept or refuse exactly as listed.
 
@@ -49,7 +49,7 @@ A **public key** is written as `b64u` of the 65-byte uncompressed point (`0x04 |
 | `modules` | List of enabled modules (see 6) |
 | `limits` | `{devices, stores, users}` (integers, `0` = not limited) |
 | `bind` | `{mode: "device" \| "domain" \| "none", domains: [..]}` |
-| `brand` | The brand profile (see 5) or `null` for NextGen OS's own |
+| `brand` | The brand profile (see 5) or `null` for NextGenOS's own |
 | `reseller` | `{id, name}` or `null` |
 | `act` | `{online: bool, checkInDays, graceDays, offlineDays}` |
 | `trial` | `true` for an evaluation licence |
@@ -62,8 +62,8 @@ A **public key** is written as `b64u` of the 65-byte uncompressed point (`0x04 |
 | `typ` `v` `iss` `kid` | `"act"`, `1`, ... |
 | `lid` `rev` | The licence it belongs to |
 | `iat` | When the Studio issued it |
-| `fp` | The PC's fingerprint parts (see 7): a list of hash strings |
-| `fpMin` | How many of `fp` must still match this PC |
+| `fp` | The PC's fingerprint parts (see 7): a sorted list of `kind:hash` strings |
+| `fpMin` | How many of `fp` must still match this PC (the Studio sets it to 60% of the parts, rounded up) |
 | `next` | When the next check-in is due |
 | `until` | When the activation stops working if no check-in happened |
 
@@ -73,24 +73,24 @@ A **public key** is written as `b64u` of the 65-byte uncompressed point (`0x04 |
 
 ## 5. Brand profile
 
-Carried inside `lic.brand` (so a partner can use only branding NextGen OS approved):
+Carried inside `lic.brand` (so a partner can use only branding NextGenOS approved):
 
 ```
 { id, name, shortName, legalName, primaryColor, accentColor,
   supportEmail, supportPhone, supportUrl, websiteUrl, copyright,
   logo,            // data URI (PNG/SVG/JPEG), at most about 100 KB, or null
-  poweredBy }      // true: show "Powered by NextGen OS"
+  poweredBy }      // true: show "Powered by NextGenOS"
 ```
 
-Apps read the brand from the licence at start. With no licence, or `brand = null`, they show NextGen OS's own names.
+Apps read the brand from the licence at start. With no licence, or `brand = null`, they show NextGenOS's own names.
 
 ### 5.1 White-label level
 
-`white.level` says what the customer (or reseller) may change **locally**, with the Brand Studio, without asking NextGen OS:
+`white.level` says what the customer (or reseller) may change **locally**, with the Brand Studio, without asking NextGenOS:
 
 | Level | May change on their own |
 |---|---|
-| `none` | Nothing. The apps show the licence's brand (or NextGen OS's). |
+| `none` | Nothing. The apps show the licence's brand (or NextGenOS's). |
 | `theme` | Shop name, logo, colours, fonts, light/dark, receipt and label headers and footers, poster styles, home-page texts. The product name and "Powered by" line stay. |
 | `full` | Everything above, plus the product name, installer names and "Powered by" (a reseller licence). |
 
@@ -111,7 +111,12 @@ kinds: bios, board, cpu, disk, os
 
 On Windows the values come from WMI (`Win32_BIOS.SerialNumber`, `Win32_BaseBoard.SerialNumber`, `Win32_Processor.ProcessorId`, the first physical disk's serial number) and the registry `MachineGuid`; on Linux from `/etc/machine-id`. Empty or placeholder values (such as `To be filled by O.E.M.`) are skipped.
 
-The activation stores the parts. A PC **matches** when at least `fpMin` of the stored parts are among its current parts, where `fpMin = min(2, number of stored parts)`. So changing a disk or a motherboard does not unlock the licence by itself, while a copy to a different PC does.
+The activation stores the parts as a sorted list of `kind:hash` strings. A PC **matches** when both hold:
+
+1. at least `fpMin` of the stored parts are among its current parts (the Studio sets `fpMin` to 60% of the stored parts, rounded up: 3 of 5, 2 of 3, 1 of 1), and
+2. at least `min(2, number of stored strong parts)` of the **strong** parts match. Every kind except `cpu` is strong: identical CPU models report the same `cpu` value, so it can support a match but never carry one.
+
+So replacing a disk, or reinstalling Windows, does not unlock the licence by itself. A **copied disk image on identical PCs** (same CPU model, same Windows machine id, different BIOS, board and disk) is a different PC, and so is a licence file copied to any other machine. Replacing most of a PC's hardware needs a new activation (the supplier frees the old seat). A virtual machine that is cloned with its virtual hardware cannot be told from the original by the PC alone; the seat count, the check-in history and the contract cover that case.
 
 ## 8. Online protocol (JSON over HTTPS)
 

@@ -61,18 +61,20 @@ namespace NextGenOS.Licensing
         [JsonProperty("logo")] public string Logo { get; set; }
         [JsonProperty("poweredBy")] public bool PoweredBy { get; set; }
 
-        /// <summary>NextGen OS's own identity, used when there is no licence or the licence has no brand.</summary>
+        /// <summary>NextGenOS's own identity, used when there is no licence or the licence has no brand.</summary>
         public static BrandProfile Default()
         {
             return new BrandProfile
             {
                 Id = "B-0",
-                Name = "Smart Retail OS",
-                ShortName = "Smart Retail OS",
-                LegalName = "NextGen OS",
+                Name = "Smart Retail POS",
+                ShortName = "Smart Retail POS",
+                LegalName = "NextGenOS",
                 PrimaryColor = "#0f6cbd",
                 AccentColor = "#f59e0b",
-                Copyright = "© 2026 NextGen OS. All rights reserved.",
+                SupportEmail = "smartave99@gmail.com",
+                SupportPhone = "+91 6123115368",
+                Copyright = "© 2026 NextGenOS. All rights reserved.",
                 PoweredBy = false,
             };
         }

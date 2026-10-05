@@ -1,6 +1,6 @@
 # Commercialisation readiness: what must be done to sell this as a white-label platform
 
-Product: **Smart Retail OS by NextGen OS** (the four apps in `apps/`). Goal: sell it, white-labelled, to retail businesses of any type and in any country, single shops and chains, with strong protection so that nobody can resell it without NextGen OS's permission.
+Product: **Smart Retail POS by NextGenOS** (the four apps in `apps/`). Goal: sell it, white-labelled, to retail businesses of any type and in any country, single shops and chains, with strong protection so that nobody can resell it without NextGenOS's permission.
 
 Audit date: 5 October 2026. Method: a read-through of the whole repository (structure, licences, secrets, licensing code, installers, build scripts, auth, schema, localisation, dependencies), `npm audit` and a licence scan of the storefront's lockfile. **Not done:** building or running the Windows apps (no .NET SDK or Windows here), a penetration test, or legal review. Nothing here is legal advice; items marked *for counsel* need a lawyer who knows the countries you will sell in.
 
@@ -10,7 +10,7 @@ Audit date: 5 October 2026. Method: a read-through of the whole repository (stru
 
 **Not ready to sell yet.** Three things block a sale, and they come before any feature work:
 
-1. **Ownership (section 2.1).** The Windows POS in `apps/pos-desktop` is decompiler output from compiled programs, including libraries that a vendor had protected with a commercial obfuscator. A decompiled copy does not give you the right to relicense or resell it. You need proof that NextGen OS owns, or is licensed to resell, the original.
+1. **Ownership (section 2.1).** The Windows POS in `apps/pos-desktop` is decompiler output from compiled programs, including libraries that a vendor had protected with a commercial obfuscator. A decompiled copy does not give you the right to relicense or resell it. You need proof that NextGenOS owns, or is licensed to resell, the original.
 2. **Nothing enforces a licence (section 2.2).** The licence check is switched off in code, a keygen script ships in the repository, and the installer runs it for every customer. Today anyone can copy and resell the POS.
 3. **Secrets and shared backends are in the code (sections 2.3 and 2.4).** Live credentials are committed, and every installed copy talks to the same Firebase projects with an admin secret.
 
@@ -50,9 +50,9 @@ What the repository shows:
 - The POS project builds against `..\..\..\Original_Binaries\*.dll` (60 references). Those original binaries are not in the repository, so **the POS cannot be built from this repository alone**, and its real behaviour comes from files you did not write.
 - It talks to Firebase projects named `androidbillsoftreport`, `sdata-d4757`, `update-89a0d` and `softwarelicensemanager-a9582`. Whoever owns those projects can read, change or switch off every install that uses them.
 
-What to do (*for counsel*): collect the paper that shows NextGen OS owns the original source and every library in it, or holds a licence that allows modifying and reselling it (a purchase or source-code agreement, an IP assignment from the developers). If you do not hold it, you cannot lawfully sell this as proprietary, and the options are to obtain the rights or to rewrite those parts. A buyer's lawyer will ask for this first.
+What to do (*for counsel*): collect the paper that shows NextGenOS owns the original source and every library in it, or holds a licence that allows modifying and reselling it (a purchase or source-code agreement, an IP assignment from the developers). If you do not hold it, you cannot lawfully sell this as proprietary, and the options are to obtain the rights or to rewrite those parts. A buyer's lawyer will ask for this first.
 
-The rest of the suite (`pos-ai-companion`, `pos-dashboard-service`, `storefront-web-mobile`) reads as written for NextGen OS; confirm that the people who wrote it assigned their rights to the company.
+The rest of the suite (`pos-ai-companion`, `pos-dashboard-service`, `storefront-web-mobile`) reads as written for NextGenOS; confirm that the people who wrote it assigned their rights to the company.
 
 **Third-party components to confirm for commercial redistribution.** The existing `THIRD-PARTY-NOTICES.md` covers only the AI add-on and the dashboard. It has nothing for the desktop POS or the storefront. Verify each licence (a tool such as ScanCode, FOSSA or ClearlyDefined helps) and add notices:
 
@@ -74,7 +74,7 @@ The rest of the suite (`pos-ai-companion`, `pos-dashboard-service`, `storefront-
 
 | Finding | Where |
 |---|---|
-| `Validate()` returns a hard-coded licence ("Smart Retail OS", key `ACTV99-…`, valid for 50 years) whenever the registry has none, with `ShowActivation = false`. **The check is never enforced.** | `apps/pos-desktop/Source/Libraries/DevNetLM/DevNetLM/DevNet.cs` |
+| `Validate()` returns a hard-coded licence ("Smart Retail POS", key `ACTV99-…`, valid for 50 years) whenever the registry has none, with `ShowActivation = false`. **The check is never enforced.** | `apps/pos-desktop/Source/Libraries/DevNetLM/DevNetLM/DevNet.cs` |
 | Because `Validate()` always returns a licence, the start-up screen goes straight to the login: **the activation screen can never appear** | `…/BillPoint/frmSplash.vb` (around line 180) |
 | `Activate_POS.ps1` is a **licence generator**: it writes a permanent "2020 to 2099" licence for any PC, with the AES key inside the script, and prints the login `admin` / `admin` | `apps/pos-desktop/Activate_POS.ps1`, `Activate_POS.bat` |
 | The installer **runs that script on every customer's PC** ("Auto-activate permanent license during installation") | `apps/pos-desktop/installer/SmartRetailOS_Setup.iss`, `[Run]` section |
@@ -102,7 +102,7 @@ Because the history is a single commit, the cleanest way to get rid of the old s
 
 ### 2.4 Every install shares your vendors' backends
 
-The POS reads and writes four Firebase projects with an admin secret that is the same for every shop. For a product sold to many customers this means one leaked secret exposes all customers' data, and the owner of those projects can disable every install. Replace them with **a backend NextGen OS owns, with one isolated tenant per customer and per-tenant credentials**. The same rule applies to the update feed (below) and to anything that phones home.
+The POS reads and writes four Firebase projects with an admin secret that is the same for every shop. For a product sold to many customers this means one leaked secret exposes all customers' data, and the owner of those projects can disable every install. Replace them with **a backend NextGenOS owns, with one isolated tenant per customer and per-tenant credentials**. The same rule applies to the update feed (below) and to anything that phones home.
 
 ---
 
@@ -209,7 +209,7 @@ The existing updater is a good start (a public feed plus a check that GitHub sig
 
 - Proof of ownership of the POS and of every library (section 2.1); IP assignments from all developers and contractors.
 - The EULA reviewed for each country you sell in; a **reseller and white-label agreement**; a privacy policy and a data-processing agreement; terms for any hosted service.
-- Trademark search and registration for "NextGen OS" and "Smart Retail OS" in your target countries (check for clashes first).
+- Trademark search and registration for "NextGenOS" and "Smart Retail POS" in your target countries (check for clashes first).
 - Open-source compliance for the LGPL and MPL parts; notices for the desktop POS and storefront added to `THIRD-PARTY-NOTICES.md`.
 - Tax, fiscal and e-invoicing rules for each market you enter; payment-card rules (keep card data out of scope); export-control and sanctions checks.
 - Earlier public copies under the MIT licence (the three source repositories named above).

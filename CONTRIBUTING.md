@@ -2,7 +2,7 @@
 
 Thank you for helping. This software sits beside a shop's POS and works with real sales, so a few rules matter more than speed. They are written down so that nobody has to guess.
 
-This is a **private, proprietary codebase** of NextGen OS (see [`LICENSE`](LICENSE)). It may be read and changed only by people who have a written agreement with NextGen OS, and nothing in it may be copied, published or shared outside that group: not in a public repository, an issue, a forum, or an AI service that keeps or trains on what it receives.
+This is a **private, proprietary codebase** of NextGenOS (see [`LICENSE`](LICENSE)). It may be read and changed only by people who have a written agreement with NextGenOS, and nothing in it may be copied, published or shared outside that group: not in a public repository, an issue, a forum, or an AI service that keeps or trains on what it receives.
 
 ## What is here
 
@@ -36,5 +36,5 @@ Try the dashboard without a shop's database: `Pos__Mode=Demo` starts it on made-
 - For anything bigger than a small fix, open an issue first and say what the shop owner or cashier will see change.
 - One thing at a time, with the README or `AGENTS.md` lines that describe it. Match the code around it: naming, comments, idiom.
 - Say what changed in [`CHANGELOG.md`](CHANGELOG.md), under the version being built, in plain words for the shop owner (new, improved or fixed). The owner reads that list in the app, under *What's new*, and a release is refused without its entry.
-- A change is accepted only from a person who has a written agreement with NextGen OS (employment, contract or contributor agreement) that gives NextGen OS the ownership of it. By sending a change you confirm that you wrote it or have the right to give it, and that it holds no code copied from another project whose licence forbids this.
+- A change is accepted only from a person who has a written agreement with NextGenOS (employment, contract or contributor agreement) that gives NextGenOS the ownership of it. By sending a change you confirm that you wrote it or have the right to give it, and that it holds no code copied from another project whose licence forbids this.
 - To report a security problem, follow [`SECURITY.md`](SECURITY.md) and do not open a public issue.

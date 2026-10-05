@@ -42,6 +42,24 @@ namespace NextGenOS.Licensing
             return result;
         }
 
+        /// <summary>The parts as sorted "kind:hash" strings, the form stored in an activation.</summary>
+        public static List<string> AsList(IDictionary<string, string> parts)
+        {
+            return parts.Select(p => p.Key + ":" + p.Value).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        }
+
+        /// <summary>Spec section 7: at least <paramref name="required"/> stored parts present, and at least two strong parts (every kind except the CPU id).</summary>
+        public static bool Matches(IList<string> stored, int required, IList<string> current)
+        {
+            if (stored == null || stored.Count == 0 || current == null) return false;
+            var have = new HashSet<string>(current);
+            var common = stored.Where(have.Contains).ToList();
+            var strongStored = stored.Count(p => !p.StartsWith("cpu:", StringComparison.Ordinal));
+            var strongCommon = common.Count(p => !p.StartsWith("cpu:", StringComparison.Ordinal));
+            var need = Math.Max(1, Math.Min(required > 0 ? required : (int)Math.Ceiling(stored.Count * 0.6), stored.Count));
+            return common.Count >= need && strongCommon >= Math.Min(2, strongStored);
+        }
+
         public static Dictionary<string, string> ComputeForThisPc()
         {
             return Compute(CreateDefaultSource());

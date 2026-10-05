@@ -8,7 +8,7 @@ using Xunit;
 namespace SmartRetail.AI.Tests
 {
     /// <summary>
-    /// The software is proprietary and held by NextGen OS (no open-source grant, and customers use it under the EULA), and what it
+    /// The software is proprietary and held by NextGenOS (no open-source grant, and customers use it under the EULA), and what it
     /// is built from keeps its own licences. The agreement and the notices travel with every copy (the package and so the setup),
     /// the files they point to are there, and a library cannot join a shipped project without its notice.
     /// </summary>
@@ -21,8 +21,8 @@ namespace SmartRetail.AI.Tests
         {
             var licence = Read("LICENSE");
 
-            Assert.StartsWith("NextGen OS Proprietary Software Licence Notice", licence);
-            Assert.Matches(@"(?m)^Copyright \(c\) 20\d\d NextGen OS\. All rights reserved\.\r?$", licence);
+            Assert.StartsWith("NextGenOS Proprietary Software Licence Notice", licence);
+            Assert.Matches(@"(?m)^Copyright \(c\) 20\d\d NextGenOS\. All rights reserved\.\r?$", licence);
             Assert.Contains("NO LICENCE IS GRANTED BY ACCESS", licence);
             Assert.Contains("sell, resell, sublicense", licence);
 

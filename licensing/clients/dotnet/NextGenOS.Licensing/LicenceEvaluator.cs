@@ -11,7 +11,7 @@ namespace NextGenOS.Licensing
         public string ActivationToken { get; set; }
         public string RevocationListToken { get; set; }
 
-        /// <summary>This PC's fingerprint parts (hash values).</summary>
+        /// <summary>This PC's fingerprint parts as "kind:hash" strings.</summary>
         public IList<string> Fingerprint { get; set; }
 
         /// <summary>The web site's host name, for domain-bound licences.</summary>
@@ -117,10 +117,7 @@ namespace NextGenOS.Licensing
 
                 case "device":
                     if (act == null) { state.Status = LicenceStatus.NotActivated; return state; }
-                    var current = new HashSet<string>(input.Fingerprint ?? new List<string>());
-                    var matching = act.Fingerprint.Count(current.Contains);
-                    var needed = Math.Max(1, Math.Min(act.FingerprintMin > 0 ? act.FingerprintMin : 2, act.Fingerprint.Count));
-                    if (matching < needed) { state.Status = LicenceStatus.DeviceMismatch; return state; }
+                    if (!DeviceFingerprint.Matches(act.Fingerprint, act.FingerprintMin, input.Fingerprint)) { state.Status = LicenceStatus.DeviceMismatch; return state; }
                     if (input.Now <= act.NextCheckIn) { state.Status = LicenceStatus.Valid; return state; }
                     if (input.Now <= act.Until)
                     {

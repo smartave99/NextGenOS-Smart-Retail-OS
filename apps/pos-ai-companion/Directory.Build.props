@@ -3,9 +3,9 @@
     <LangVersion>12.0</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Company>NextGen OS</Company>
+    <Company>NextGenOS</Company>
     <Product>Smart Retail POS AI Assistant</Product>
-    <Copyright>© 2026 NextGen OS. All rights reserved.</Copyright>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
     <Version>2.18.0</Version>
     <Deterministic>true</Deterministic>
   </PropertyGroup>

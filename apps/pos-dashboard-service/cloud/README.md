@@ -1,6 +1,6 @@
 # The SQL scripts
 
-Smart Retail POS by NextGen OS. Every script the owner has to run is also a **separate file on each GitHub release** (the release page lists them with a line each), so nothing has to be taken out of a zip or looked for in the repository. All three are safe to run again, and none changes the POS's own data.
+Smart Retail POS by NextGenOS. Every script the owner has to run is also a **separate file on each GitHub release** (the release page lists them with a line each), so nothing has to be taken out of a zip or looked for in the repository. All three are safe to run again, and none changes the POS's own data.
 
 | Script | Where to run it | What it is for | When |
 |---|---|---|---|

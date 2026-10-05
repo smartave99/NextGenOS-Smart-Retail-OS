@@ -1,82 +1,32 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    DevNetLM: the licence manager of the Windows POS. The name and the public API stay (the POS calls DevNet.Validate() and
+    DevNet.ShowActivation()), but everything underneath is new: it uses NextGenOS.Licensing (signed licences, activation bound
+    to the PC, revocation, offline codes). The old hard-coded key, the registry store and the Firebase licence database are gone.
+  -->
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{03E11218-0BCF-4276-9D33-B36FA9DAC215}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DevNetLM</RootNamespace>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <Nullable>disable</Nullable>
     <AssemblyName>DevNetLM</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <RootNamespace>DevNetLM</RootNamespace>
+    <Company>NextGenOS</Company>
+    <Product>Smart Retail POS</Product>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
+    <Version>2.0.0</Version>
+    <Deterministic>true</Deterministic>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <ApplicationIcon>DevNetLM.ico</ApplicationIcon>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="FireSharp">
-      <HintPath>..\..\..\..\Original_Binaries\FireSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Original_Binaries\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
+    <ProjectReference Include="..\..\..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Management" />
-    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
-  <ItemGroup>
-    <AppDesigner Include="Properties\" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Classes\Encryption.cs" />
-    <Compile Include="Classes\GlobalValues.cs" />
-    <Compile Include="Classes\Utility.cs" />
-    <Compile Include="DevNet.cs" />
-    <Compile Include="Forms\FrmActivate.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\FrmActivate.Designer.cs">
-      <DependentUpon>FrmActivate.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Models\HardDrive.cs" />
-    <Compile Include="Models\LicenseData.cs" />
-    <Compile Include="Models\LicenseData1.cs" />
-    <Compile Include="Models\LicenseResponse.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\Resources.Designer.cs">
-      <DependentUpon>Resources.resx</DependentUpon>
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-    </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Forms\FrmActivate.resx">
-      <DependentUpon>FrmActivate.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
 </Project>

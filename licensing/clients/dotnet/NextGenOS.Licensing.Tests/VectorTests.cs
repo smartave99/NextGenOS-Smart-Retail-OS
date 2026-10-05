@@ -15,6 +15,11 @@ namespace NextGenOS.Licensing.Tests
             return JObject.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "vectors.json")));
         }
 
+        private static List<string> Fp(JToken map)
+        {
+            return map.Children<JProperty>().Select(p => p.Name + ":" + (string)p.Value).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        }
+
         public static IEnumerable<object[]> CaseNames()
         {
             return Load()["cases"].Select(c => new object[] { (string)c["name"] });
@@ -33,7 +38,7 @@ namespace NextGenOS.Licensing.Tests
                 LicenceToken = (string)c["lic"],
                 ActivationToken = (string)c["act"],
                 RevocationListToken = (string)c["crl"],
-                Fingerprint = c["fp"].Children<JProperty>().Select(p => (string)p.Value).ToList(),
+                Fingerprint = Fp(c["fp"]),
                 Host = (string)c["host"],
                 RequiredModule = (string)c["module"],
                 Now = (long)c["now"],
@@ -63,7 +68,7 @@ namespace NextGenOS.Licensing.Tests
             var state = LicenceEvaluator.Evaluate(new EvaluationInput
             {
                 LicenceToken = (string)c["lic"], ActivationToken = (string)c["act"],
-                Fingerprint = c["fp"].Children<JProperty>().Select(p => (string)p.Value).ToList(),
+                Fingerprint = Fp(c["fp"]),
                 Now = (long)c["now"], TrustedKeys = vectors["publicKeys"].Select(k => new TrustedKey((string)k["kid"], (string)k["publicKey"])).ToList(),
             });
             Assert.Equal(LicenceStatus.Grace, state.Status);
@@ -78,12 +83,12 @@ namespace NextGenOS.Licensing.Tests
             var vectors = Load();
             var keys = vectors["publicKeys"].Select(k => new TrustedKey((string)k["kid"], (string)k["publicKey"])).ToList();
             var good = vectors["cases"].First(x => (string)x["name"] == "valid_online");
-            var state = LicenceEvaluator.Evaluate(new EvaluationInput { LicenceToken = (string)good["lic"], ActivationToken = (string)good["act"], Fingerprint = good["fp"].Children<JProperty>().Select(p => (string)p.Value).ToList(), Now = (long)good["now"], TrustedKeys = keys });
+            var state = LicenceEvaluator.Evaluate(new EvaluationInput { LicenceToken = (string)good["lic"], ActivationToken = (string)good["act"], Fingerprint = Fp(good["fp"]), Now = (long)good["now"], TrustedKeys = keys });
             Assert.Equal("RetailPro", state.Brand.Name);
             Assert.True(state.Brand.PoweredBy);
 
             var none = new LicenceState { Status = LicenceStatus.Missing };
-            Assert.Equal("Smart Retail OS", none.Brand.Name);
+            Assert.Equal("Smart Retail POS", none.Brand.Name);
         }
 
         [Fact]
@@ -91,7 +96,7 @@ namespace NextGenOS.Licensing.Tests
         {
             var vectors = Load();
             var good = vectors["cases"].First(x => (string)x["name"] == "valid_online");
-            var state = LicenceEvaluator.Evaluate(new EvaluationInput { LicenceToken = (string)good["lic"], ActivationToken = (string)good["act"], Fingerprint = good["fp"].Children<JProperty>().Select(p => (string)p.Value).ToList(), Now = (long)good["now"], TrustedKeys = new List<TrustedKey>() });
+            var state = LicenceEvaluator.Evaluate(new EvaluationInput { LicenceToken = (string)good["lic"], ActivationToken = (string)good["act"], Fingerprint = Fp(good["fp"]), Now = (long)good["now"], TrustedKeys = new List<TrustedKey>() });
             Assert.Equal(LicenceStatus.Invalid, state.Status);
         }
     }

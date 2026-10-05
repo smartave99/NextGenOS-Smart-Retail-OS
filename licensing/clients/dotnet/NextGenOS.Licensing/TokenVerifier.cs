@@ -26,7 +26,7 @@ namespace NextGenOS.Licensing
         public LicenceException(string message) : base(message) { }
     }
 
-    /// <summary>Checks the signature and shape of a NextGen OS token (spec section 3). Throws <see cref="LicenceException"/> for anything wrong.</summary>
+    /// <summary>Checks the signature and shape of a NextGenOS token (spec section 3). Throws <see cref="LicenceException"/> for anything wrong.</summary>
     public static class TokenVerifier
     {
         public const string Prefix = "NGOS1";
@@ -35,7 +35,7 @@ namespace NextGenOS.Licensing
         public static T Verify<T>(string token, IEnumerable<TrustedKey> keys, string expectedType) where T : class
         {
             var parts = (token ?? string.Empty).Trim().Split('.');
-            if (parts.Length != 3 || parts[0] != Prefix) throw new LicenceException("Not a NextGen OS token.");
+            if (parts.Length != 3 || parts[0] != Prefix) throw new LicenceException("Not a NextGenOS token.");
 
             JObject payload;
             byte[] signature;

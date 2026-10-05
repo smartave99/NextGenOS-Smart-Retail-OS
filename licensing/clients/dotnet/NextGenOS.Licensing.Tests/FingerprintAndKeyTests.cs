@@ -46,6 +46,33 @@ namespace NextGenOS.Licensing.Tests
             Assert.DoesNotContain(parts.Values, v => v.Contains("SERIAL"));
         }
 
+        private static List<string> Parts(params string[] kinds)
+        {
+            return kinds.Select(k => k + ":" + DeviceFingerprint.Part(k, "v-" + k)).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        }
+
+        [Fact]
+        public void Matching_needs_most_parts_and_two_strong_ones()
+        {
+            var stored = Parts("bios", "board", "cpu", "disk", "os");
+            Assert.True(DeviceFingerprint.Matches(stored, 3, stored));
+            Assert.True(DeviceFingerprint.Matches(stored, 3, Parts("bios", "board", "cpu", "disk")));        // Windows reinstalled
+            Assert.True(DeviceFingerprint.Matches(stored, 3, Parts("bios", "cpu", "os")));                   // 3 of 5, two strong
+            Assert.False(DeviceFingerprint.Matches(stored, 3, Parts("cpu", "os")));                          // cloned image on the same model
+            Assert.False(DeviceFingerprint.Matches(stored, 3, Parts("cpu", "bios")));                        // too few
+            Assert.False(DeviceFingerprint.Matches(stored, 3, new List<string>()));
+            Assert.False(DeviceFingerprint.Matches(null, 3, stored));
+            Assert.False(DeviceFingerprint.Matches(new List<string>(), 1, stored));
+        }
+
+        [Fact]
+        public void A_PC_with_one_part_is_matched_by_that_part_only()
+        {
+            var one = Parts("os");
+            Assert.True(DeviceFingerprint.Matches(one, 1, one));
+            Assert.False(DeviceFingerprint.Matches(one, 1, Parts("disk")));
+        }
+
         [Fact]
         public void This_PC_gives_a_fingerprint()
         {

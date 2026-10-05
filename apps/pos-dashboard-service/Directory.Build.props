@@ -4,9 +4,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>
-    <Company>NextGen OS</Company>
+    <Company>NextGenOS</Company>
     <Product>Smart Retail POS</Product>
-    <Copyright>© 2026 NextGen OS. All rights reserved.</Copyright>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
     <Version>2.18.0</Version>
   </PropertyGroup>
 </Project>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Signed-licence client for NextGen OS products. net48 for the Windows apps (POS, AI add-on), net8.0 for the dashboard and tests.
+  <!-- Signed-licence client for NextGenOS products. net48 for the Windows apps (POS, AI add-on), net8.0 for the dashboard and tests.
        Specification: licensing/spec/LICENCE-FORMAT.md -->
   <PropertyGroup>
     <TargetFrameworks>net48;net8.0</TargetFrameworks>
@@ -9,9 +9,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>NextGenOS.Licensing</RootNamespace>
     <AssemblyName>NextGenOS.Licensing</AssemblyName>
-    <Company>NextGen OS</Company>
-    <Product>NextGen OS Licensing</Product>
-    <Copyright>© 2026 NextGen OS. All rights reserved.</Copyright>
+    <Company>NextGenOS</Company>
+    <Product>NextGenOS Licensing</Product>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
     <Version>1.0.0</Version>
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>

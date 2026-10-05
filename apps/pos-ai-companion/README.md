@@ -1,6 +1,6 @@
 # Smart Retail POS — AI Assistant
 
-*by NextGen OS*
+*by NextGenOS*
 
 A Windows app for a shop that runs Smart Retail POS: today's sales at a glance, **Ask AI** for questions about sales, stock, customers, suppliers, payments and expenses (in English, Hindi or Hinglish), the plan to grow sales, and product photos made by AI. It runs **beside the existing POS** on the same PC and only **reads** the POS database; it never changes anything. The POS keeps doing all the billing, printing and barcode work, with all its features and hardware, exactly as before.
 
@@ -86,7 +86,7 @@ The assistant talks to AI through **command-line tools installed on the PC** (pr
 | **OpenAI-compatible** | e.g. [Ollama](https://ollama.com) | optional key | `/v1/chat/completions`; a local model keeps everything on the PC |
 | **Custom CLI** | any tool | its own | command and arguments from Settings (`{model}`, `{prompt_file}`, `{system_file}`, `{workdir}`) |
 
-**Whose accounts:** every shop uses **its own** AI accounts and keys, entered on its own PC. Never ship NextGen OS keys or sign-ins with the app.
+**Whose accounts:** every shop uses **its own** AI accounts and keys, entered on its own PC. Never ship NextGenOS keys or sign-ins with the app.
 
 **Account rules to respect:**
 - **Anthropic** does not allow third-party apps to use a Claude.ai (Free/Pro/Max) *subscription* sign-in. So the Claude CLI provider always runs in `--bare` mode with an Anthropic API key from [platform.claude.com](https://platform.claude.com), and never touches a subscription login.
@@ -98,7 +98,7 @@ The assistant talks to AI through **command-line tools installed on the PC** (pr
 
 1. **Install the app.** Run `SmartRetailAI-Setup.exe`, from the repository's **Releases** page on GitHub (or see *Building* below), signed in to Windows as the user who works at the POS.
    - **SmartScreen:** Windows may say *Windows protected your PC*, because the setup is not code-signed yet. Click **More info**, then **Run anyway** (see *The Windows warning when installing*, just below).
-   - **For whom:** *Install for anyone using this computer* puts it in `C:\Program Files\NextGen OS\Smart Retail POS AI` and asks for administrator rights. *Install just for me* needs no administrator and uses `%LOCALAPPDATA%\Programs\NextGen OS\Smart Retail POS AI`.
+   - **For whom:** *Install for anyone using this computer* puts it in `C:\Program Files\NextGenOS\Smart Retail POS AI` and asks for administrator rights. *Install just for me* needs no administrator and uses `%LOCALAPPDATA%\Programs\NextGenOS\Smart Retail POS AI`.
    - **Folder:** any folder or drive. Type it or click **Browse**. If the folder already holds other files, setup offers a new folder inside it; if it cannot write there, it says so.
    - **Options:** a desktop shortcut, and **Start with Windows**, which is the same as *Settings → Start with Windows*. Both are on by default. The start-up entry is made for the Windows user who runs the setup: if Windows asks for an administrator's password and that administrator is not the user who works at the POS, sign in as the POS user after setup and check that *Settings → Start with Windows* is on.
    - **Requirements:** Windows 10 or 11 (64-bit) and .NET Framework 4.8, which the POS already requires; setup checks for it. The app's windows use the Microsoft Edge WebView2 Runtime: if the PC does not have it, setup downloads it from Microsoft (it needs the internet for a minute).
@@ -138,7 +138,7 @@ The assistant talks to AI through **command-line tools installed on the PC** (pr
 | Way | What it takes | What it gives |
 |---|---|---|
 | **SignPath Foundation** (free signing for open source) | Not available: it signs only public open-source projects, and this software is proprietary. | None. |
-| **A certificate in the company's name** from a certificate authority (DigiCert, Sectigo, SSL.com and others) | Usually a few hundred US dollars a year and papers that prove the company exists. Since 2023 the certificate's key must stay on a hardware token or in the authority's cloud signing service, so it cannot be kept as a secret file in GitHub; the release workflow then needs a signing step for that service. | *Verified publisher: NextGen OS* in the box. SmartScreen still warns until enough people have installed the same signed program without trouble (weeks); after that the box stops. |
+| **A certificate in the company's name** from a certificate authority (DigiCert, Sectigo, SSL.com and others) | Usually a few hundred US dollars a year and papers that prove the company exists. Since 2023 the certificate's key must stay on a hardware token or in the authority's cloud signing service, so it cannot be kept as a secret file in GitHub; the release workflow then needs a signing step for that service. | *Verified publisher: NextGenOS* in the box. SmartScreen still warns until enough people have installed the same signed program without trouble (weeks); after that the box stops. |
 | **Microsoft's own signing service** (Artifact Signing, earlier called Trusted Signing) | About 10 US dollars a month; open to companies and individuals in only some countries. | The same as above, with Microsoft doing the checks and the signing. |
 | **The Microsoft Store** | Packaging the app as MSIX and passing the store's review. | No box at all, because Microsoft vouches for the app. It does not fit this app today: it installs another program (Codex) and runs a local dashboard. |
 
@@ -192,8 +192,8 @@ Checked by tests: `dotnet test` (`CodexUpdateTests`: the versions, the release c
   - For product photos (Codex only): the phone photos, the white-background photo and the AI's own description of the product, and the product's name, code and category.
   - For posters: the kind of poster and, for each product that fits, its name, category, price, the biggest offer allowed, stock and recent sales. For a poster's artwork (Codex only): its theme, nothing else.
 - **CLI tools are boxed in.** Each request runs in a new, empty temporary folder that is deleted afterwards. Codex runs in its read-only sandbox, Claude has every tool switched off, and Antigravity runs sandboxed. To make a product photo or a poster's artwork, Codex may write, but only in its own temporary folder, which holds nothing but copies of the photos (or nothing at all, for artwork).
-- **Keys and passwords are encrypted** with Windows DPAPI for the current Windows user, in `%APPDATA%\NextGen OS\Smart Retail POS AI\settings.json`. A copy of that file is useless on another PC or account.
-- **The log** (`%LOCALAPPDATA%\NextGen OS\Smart Retail POS AI\logs\assistant.log`) records errors only, never questions, answers or data.
+- **Keys and passwords are encrypted** with Windows DPAPI for the current Windows user, in `%APPDATA%\NextGenOS\Smart Retail POS AI\settings.json`. A copy of that file is useless on another PC or account.
+- **The log** (`%LOCALAPPDATA%\NextGenOS\Smart Retail POS AI\logs\assistant.log`) records errors only, never questions, answers or data.
 
 ## Troubleshooting
 
@@ -283,4 +283,4 @@ The assistant and its dashboard are separate programs that sit beside the POS. T
 
 ## Licence
 
-Smart Retail POS is proprietary software of NextGen OS. All rights reserved. It is not open source: it may be used only under a written licence, and the customer's agreement is [`EULA.txt`](../../EULA.txt); the terms that apply to this source code are in [`LICENSE`](../../LICENSE). Nobody may resell, sublicense, host for others or rebrand it without NextGen OS's written permission. The licences of the third-party software it is built from stay in force and are in [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md); a few libraries in the binary downloads (Microsoft's SQL Server network library, for one) have their own terms. The setup and the zip carry `EULA.txt`, `THIRD-PARTY-NOTICES.md` and `licenses\` (the Apache 2.0 text, and the vendors' own notices in `licenses\third-party\`) in the app's folder (`build.ps1` refuses to package without them, and a test checks that every library a project names has its notice). To work on the code, see [`CONTRIBUTING.md`](../../CONTRIBUTING.md); to report a security problem, see [`SECURITY.md`](../../SECURITY.md).
+Smart Retail POS is proprietary software of NextGenOS. All rights reserved. It is not open source: it may be used only under a written licence, and the customer's agreement is [`EULA.txt`](../../EULA.txt); the terms that apply to this source code are in [`LICENSE`](../../LICENSE). Nobody may resell, sublicense, host for others or rebrand it without NextGenOS's written permission. The licences of the third-party software it is built from stay in force and are in [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md); a few libraries in the binary downloads (Microsoft's SQL Server network library, for one) have their own terms. The setup and the zip carry `EULA.txt`, `THIRD-PARTY-NOTICES.md` and `licenses\` (the Apache 2.0 text, and the vendors' own notices in `licenses\third-party\`) in the app's folder (`build.ps1` refuses to package without them, and a test checks that every library a project names has its notice). To work on the code, see [`CONTRIBUTING.md`](../../CONTRIBUTING.md); to report a security problem, see [`SECURITY.md`](../../SECURITY.md).

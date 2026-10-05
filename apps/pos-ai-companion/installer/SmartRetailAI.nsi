@@ -1,4 +1,4 @@
-; Smart Retail POS AI (NextGen OS): the Windows installer for the AI side panel and its sales dashboard.
+; Smart Retail POS AI (NextGenOS): the Windows installer for the AI side panel and its sales dashboard.
 ;
 ; build.ps1 -Installer builds it with NSIS (makensis) from the package folder, dist\SmartRetailAI:
 ;   makensis -DVERSION=1.1.0 -DSOURCE=<dist\SmartRetailAI> -DUNINSTALL_LIST=<dist\uninstall-files.nsh>
@@ -42,7 +42,7 @@ SetCompressor /SOLID lzma
 !define /math UPDATE_WAIT_TICKS ${UPDATE_WAIT_SECONDS} * 2
 
 !define APP "Smart Retail POS AI"
-!define COMPANY "NextGen OS"
+!define COMPANY "NextGenOS"
 !define EXE "SmartRetailAI.exe"
 !define DASHBOARD_EXE "SmartRetail.Pos.Web.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NextGenOS.SmartRetailPOS.AI"
@@ -373,7 +373,7 @@ Section "Uninstall"
   !include /CHARSET=UTF8 "${UNINSTALL_LIST}"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
-  ; The "NextGen OS" folder around the default place, if nothing else is in it.
+  ; The "NextGenOS" folder around the default place, if nothing else is in it.
   ${GetParent} "$INSTDIR" $0
   ${GetFileName} "$0" $1
   ${If} $1 == "${COMPANY}"

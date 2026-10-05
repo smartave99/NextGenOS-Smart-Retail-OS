@@ -171,7 +171,7 @@ namespace SmartRetail.AI.Tests
         {
             using (var drive = new TempFolder())
             {
-                var pos = Directory.CreateDirectory(Path.Combine(drive.Path, "NextGen OS", "SmartAvenue99 POS")).FullName;
+                var pos = Directory.CreateDirectory(Path.Combine(drive.Path, "NextGenOS", "SmartAvenue99 POS")).FullName;
                 File.WriteAllText(Path.Combine(pos, PosConnectionDetector.DatabaseFile), "Raintech_DB1");
                 var tooDeep = Directory.CreateDirectory(Path.Combine(drive.Path, "a", "b", "c")).FullName;
                 File.WriteAllText(Path.Combine(tooDeep, PosConnectionDetector.DatabaseFile), "Other_DB");

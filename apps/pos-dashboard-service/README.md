@@ -1,6 +1,6 @@
 # Smart Retail POS: the app's screens
 
-*by NextGen OS*
+*by NextGenOS*
 
 Every screen of the Smart Retail POS AI add-on: Today, Ask AI, sales, the growth plan, product photos, storage and settings, in light and dark. It reads the shop's existing POS database and never writes to it. It shows:
 
@@ -138,7 +138,7 @@ The box under Ask AI (in the app window and the side panel) takes more than typi
 - **The camera.** It starts only when the camera button is pressed, shows a live picture, and takes one photo at a time: *Take photo*, then *Retake*, *Use photo* or *Cancel*. *Switch camera* shows when there is more than one. The camera turns off as soon as the window closes, the page is left or the app is hidden. When the camera is blocked, it says where to turn it on (in the app: Windows Settings → Privacy & security → Camera).
 - **Voice notes.** With an AI whose model listens (Codex models that list audio as an input), the microphone button records a question until it is pressed again; the note is sent as a WAV file, and the answer starts with *Heard: "…"*, so the owner can check what the AI understood. With other models, the microphone button in the app starts Windows voice typing (Win+H), which types the question into the box instead.
 - **Which AI reads what.** Codex reads photos with every model (`--image`, or the app server's `localImage`), and voice notes only with a model whose `inputModalities` include audio; the buttons follow the model chosen for Ask AI (`ChatInputs`). A custom command-line tool gets the files when its arguments ask for `{image_files}` or `{audio_files}`. Other tools take typing only, and the buttons are not shown.
-- **Where they are kept.** Only while the chat lasts, in `%LOCALAPPDATA%\NextGen OS\Smart Retail POS AI\chat-attachments` (`ChatAttachmentStore`): never in the data folder or the POS database. They are checked by their first bytes (JPEG, PNG, WebP; WAV) and size (10 MB a photo, 12 MB a voice note), deleted when the chat ends or the app closes, and any left behind (the app stopped suddenly) are deleted when it starts. `/chat-attachments/…` serves only names the store made. The AI gets copies, in its own empty folder. Past chats and the memory review keep such a question as words, e.g. *(photo)* or *(voice note) aaj kitna cash aaya*, never the files.
+- **Where they are kept.** Only while the chat lasts, in `%LOCALAPPDATA%\NextGenOS\Smart Retail POS AI\chat-attachments` (`ChatAttachmentStore`): never in the data folder or the POS database. They are checked by their first bytes (JPEG, PNG, WebP; WAV) and size (10 MB a photo, 12 MB a voice note), deleted when the chat ends or the app closes, and any left behind (the app stopped suddenly) are deleted when it starts. `/chat-attachments/…` serves only names the store made. The AI gets copies, in its own empty folder. Past chats and the memory review keep such a question as words, e.g. *(photo)* or *(voice note) aaj kitna cash aaya*, never the files.
 - **In the Windows app**, only the dashboard's own pages may use the camera and the microphone; any other page is refused.
 
 ## The owner's live view
@@ -174,7 +174,7 @@ The owner can see the shop from anywhere, on the website's *Live shop* (the admi
 ## The AI growth plan
 
 - It uses the AI tool set up in the side panel: Codex CLI first by default, then Claude, Antigravity or an API key.
-  - The dashboard reads the side panel's settings file (`%APPDATA%\NextGen OS\Smart Retail POS AI\settings.json`) on every request, so a tool set up a minute ago is used.
+  - The dashboard reads the side panel's settings file (`%APPDATA%\NextGenOS\Smart Retail POS AI\settings.json`) on every request, so a tool set up a minute ago is used.
   - Saved API keys are decrypted with Windows DPAPI, for the same Windows user only.
 - The AI receives the brief shown under *What the AI will see* and nothing else: totals, trend, weekdays, categories, products, stock and payment figures, plus customer counts. It never receives customer names, phone numbers or bills.
 - Plans are saved as Markdown in the **Growth plans** folder of the data folder (see *Storage*).
@@ -296,7 +296,7 @@ A photo finds a product: by its barcode always, and by its look once that is tur
 - **The person picks.** Nothing is chosen from a photo alone: each product has its own button. In the side panel, *Select* shows the codes to type into the POS, with *Copy*. On the Products page, *Show* puts the product first, marked. On the Barcodes page, *Add* puts it on the sticker list.
 
 - **Barcodes.** ZXing.Net reads EAN-13, EAN-8, UPC-A and UPC-E, Code 128, Code 39 and ITF in a photo, turned either way. Each code is looked up in the POS as the till would: a product's code or barcode, or a stock batch's code (a UPC is tried as EAN-13 too).
-- **By look (optional).** Turning it on downloads DINOv2-small (Meta, Apache 2.0; onnx-community's ONNX copy at a fixed revision, 88.5 MB) once into `%LOCALAPPDATA%\NextGen OS\Smart Retail POS AI\models`. Its size and SHA-256 are checked as it comes, and again each time the app starts: a file that is not exactly that model is never kept. ONNX Runtime runs it on two threads, about a tenth of a second a photo.
+- **By look (optional).** Turning it on downloads DINOv2-small (Meta, Apache 2.0; onnx-community's ONNX copy at a fixed revision, 88.5 MB) once into `%LOCALAPPDATA%\NextGenOS\Smart Retail POS AI\models`. Its size and SHA-256 are checked as it comes, and again each time the app starts: a file that is not exactly that model is never kept. ONNX Runtime runs it on two threads, about a tenth of a second a photo.
 - **A better model, when one comes.** The app has a list of the models it can use (`VisionModels.All`), each pinned to a fixed revision with its exact size and SHA-256, the one every shop starts with first: DINOv2-small, then DINOv2-base (Meta, Apache 2.0; onnx-community's ONNX copy, 347 MB, 768 numbers a picture): it sees more detail, so it tells look-alike packs apart better, and it is about four times the size and slower to learn the photos. A better model reaches a shop with an update of the app, which adds it at the end of the list and says so in *What's new*; an update never changes a model or switches the shop by itself, because a switch downloads the model and learns every photo again. Under *Settings → Camera search* a card says which model is used and, when there is a better one, *A better model is available*; *Use this model* switches. The new model is downloaded and checked **while the one working goes on finding products**, then it takes its place, the photos are learned again with it in the background (vectors of another model are never read, so each product's `visual.json` is replaced as it is learned; products learned so far are found meanwhile, and barcodes always), and the old model's file is deleted once the new one works. If the download fails the model working goes on and the card says why, with *Try again*; choosing the model working again cancels a download. Going back to the smaller model is the same switch.
 - **What it learns.** Each product's newest phone photos and its white-background photo (the model photos show people and places, so they are left out), in the background, one product at a time, and never while the data folder moves. Each photo becomes DINOv2's class-token vector (384 numbers) and a colour histogram of its middle, kept in `visual.json` next to the photos: each photo is looked at once, and the vectors move with the data folder. New photos are learned as they come.
 - **How alike.** 70% what DINOv2 sees and 30% colour: DINOv2 goes mostly by shape, so two bottles of the same shape in different colours look alike to it, and their colours tell them apart. Each product counts once, by its most alike photo. The five most alike show; the first is called the best match only when it leads the next by 0.05, and nothing under 0.35 shows. The person always picks the product: nothing is chosen for them.
@@ -494,7 +494,7 @@ What the same product costs in online shops, next to the shop's own price. It on
 
 The **Storage** page decides where the dashboard keeps its data: the **Product photos**, **Growth plans**, **Posters**, **Shop checks** (Fix now notes), **Memory**, **Creatives** and **Price checks** folders.
 
-- **Default:** `%LOCALAPPDATA%\NextGen OS\Smart Retail POS AI`, on the C: drive.
+- **Default:** `%LOCALAPPDATA%\NextGenOS\Smart Retail POS AI`, on the C: drive.
 - **Choosing another folder:**
   1. The page lists the drives on the PC with their free space. **Use this drive** suggests a folder on that drive, e.g. `D:\Smart Retail POS AI`, or you can type any folder.
   2. **Check** makes sure the folder is on this PC (not a network folder), can be written to, and has room for the data plus 200 MB to spare.
@@ -503,7 +503,7 @@ The **Storage** page decides where the dashboard keeps its data: the **Product p
 - **Open folder** opens the data folder in File Explorer.
 - **While photos are being made** the folder cannot be changed; wait until they are done, or stop them. The same goes for a poster's artwork, a creative's picture, and for the moment the assistant saves what it learned from a chat or a decision from the Monday review.
 - **Adding photos** is refused, with a message, when less than 100 MB would be left on the drive.
-- **Where the choice is saved:** in `storage.json`, beside the side panel's `settings.json` in `%APPDATA%\NextGen OS\Smart Retail POS AI`. The settings and saved keys stay there, and the log and short-lived working folders stay in `%LOCALAPPDATA%\NextGen OS\Smart Retail POS AI`.
+- **Where the choice is saved:** in `storage.json`, beside the side panel's `settings.json` in `%APPDATA%\NextGenOS\Smart Retail POS AI`. The settings and saved keys stay there, and the log and short-lived working folders stay in `%LOCALAPPDATA%\NextGenOS\Smart Retail POS AI`.
 
 Back the data folder up with the shop's other files. It holds the photos, which took AI time (and, with an API key, money) to make.
 
@@ -514,7 +514,7 @@ The dashboard normally ships inside the AI add-on's package, `SmartRetailAI.zip`
 To run it on its own:
 
 1. Build `dist\SmartRetailPOS.zip` with `build.ps1` (see *Developing*).
-2. Unzip it, e.g. to `C:\Program Files\NextGen OS\Smart Retail POS\`.
+2. Unzip it, e.g. to `C:\Program Files\NextGenOS\Smart Retail POS\`.
 3. Double-click **Start Smart Retail POS.cmd**. It opens `http://127.0.0.1:5080` in its own Microsoft Edge window.
 
 ### Connecting a database by hand

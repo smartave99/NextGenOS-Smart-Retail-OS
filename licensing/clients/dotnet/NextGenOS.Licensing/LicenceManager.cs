@@ -15,7 +15,7 @@ namespace NextGenOS.Licensing
     public sealed class LicenceOptions
     {
         /// <summary>The folder name under NextGenOS. All the suite's programs use the default so that one activation covers them.</summary>
-        public string Product { get; set; } = "SmartRetailOS";
+        public string Product { get; set; } = "SmartRetailPOS";
 
         /// <summary>The module this program needs ("pos", "ai", "dashboard", "storefront"); null to skip the check.</summary>
         public string RequiredModule { get; set; }
@@ -78,7 +78,7 @@ namespace NextGenOS.Licensing
 
         private Dictionary<string, string> Fingerprint() { return DeviceFingerprint.Compute(_source); }
 
-        private string[] FingerprintParts() { return Fingerprint().Values.ToArray(); }
+        private string[] FingerprintParts() { return DeviceFingerprint.AsList(Fingerprint()).ToArray(); }
 
         /// <summary>Reads the files and decides. Cheap enough to call on every start and every few minutes.</summary>
         public LicenceState Evaluate()
@@ -135,8 +135,23 @@ namespace NextGenOS.Licensing
                 Save(tokens, true);
             }
             LastError = null;
-            _store.TouchState(parts.Values.ToArray(), Now(), true);
+            ResetClock(DeviceFingerprint.AsList(parts).ToArray());
             return Evaluate();
+        }
+
+        /// <summary>Takes the time from the signed tokens just received (the licence server's clock).</summary>
+        private void ResetClock(string[] fingerprint)
+        {
+            long server = 0;
+            try
+            {
+                var act = _store.ActivationToken;
+                if (!string.IsNullOrEmpty(act)) server = TokenVerifier.Verify<ActivationClaims>(act, _keys, "act").IssuedAt;
+                if (server == 0) server = TokenVerifier.Verify<LicenceClaims>(_store.LicenceToken, _keys, "lic").IssuedAt;
+            }
+            catch (LicenceException) { }
+            if (server > 0) _store.ResetState(fingerprint, server);
+            else _store.TouchState(fingerprint, Now(), true);
         }
 
         /// <summary>Checks in with the server when it is time (or when forced). Never throws for a network problem: the grace period handles that.</summary>
@@ -147,7 +162,9 @@ namespace NextGenOS.Licensing
             var act = _store.ActivationToken;
             if (string.IsNullOrEmpty(act)) return state;
 
+            // A held or withdrawn licence, or a clock problem, is asked about again so that a release or a repaired clock is noticed.
             var due = force || state.Status == LicenceStatus.Grace || state.Status == LicenceStatus.NeedsCheckIn
+                      || state.Status == LicenceStatus.Revoked || state.Status == LicenceStatus.ClockTampered
                       || (state.Activation != null && Now() >= state.Activation.NextCheckIn - 2 * 86400L);
             if (!due) return state;
             if (!force && NowUtc() - _lastAttemptUtc < TimeSpan.FromHours(1)) return state;
@@ -161,7 +178,7 @@ namespace NextGenOS.Licensing
                     var tokens = await client.CheckInAsync(state.Licence.LicenceId, act, parts, _o.AppVersion, stores, devices, users, ct).ConfigureAwait(false);
                     Save(tokens, false);
                     LastError = null;
-                    _store.TouchState(parts.Values.ToArray(), Now(), true);
+                    ResetClock(DeviceFingerprint.AsList(parts).ToArray());
                 }
             }
             catch (LicenceServerException ex)
@@ -254,12 +271,12 @@ namespace NextGenOS.Licensing
             var tokens = new ServerTokens { Licence = (string)body["lic"], Activation = (string)body["act"], RevocationList = (string)body["crl"] };
             if (string.IsNullOrEmpty(tokens.Licence) || string.IsNullOrEmpty(tokens.Activation)) throw new LicenceException("The answer code has no activation in it.");
             var act = TokenVerifier.Verify<ActivationClaims>(tokens.Activation, _keys, "act");
-            var current = new HashSet<string>(Fingerprint().Values);
-            if (act.Fingerprint == null || act.Fingerprint.Count(current.Contains) < Math.Max(1, Math.Min(act.FingerprintMin, act.Fingerprint.Count)))
+            var current = FingerprintParts();
+            if (!DeviceFingerprint.Matches(act.Fingerprint, act.FingerprintMin, current))
                 throw new LicenceException("This answer code was made for a different PC.");
             Save(tokens, true);
             LastError = null;
-            _store.TouchState(current.ToArray(), Now(), true);
+            ResetClock(current);
             return Evaluate();
         }
 

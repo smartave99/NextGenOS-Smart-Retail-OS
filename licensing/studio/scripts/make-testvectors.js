@@ -27,8 +27,9 @@ const lic = (over = {}, s = signer) => C.signToken({
   reseller: null, act: { online: true, checkInDays: 7, graceDays: 14, offlineDays: 365 }, trial: false, white: { level: 'theme' }, ...over,
 }, s);
 
+const fpList = (map) => Object.entries(map).map(([k, v]) => `${k}:${v}`).sort();
 const act = (fpMap, over = {}, s = signer) => C.signToken({
-  typ: 'act', lid: 'L-TEST0001', rev: 1, iat: NOW - 3 * DAY, fp: Object.values(fpMap).sort(), fpMin: 2,
+  typ: 'act', lid: 'L-TEST0001', rev: 1, iat: NOW - 3 * DAY, fp: fpList(fpMap), fpMin: Math.max(1, Math.ceil(Object.keys(fpMap).length * 0.6)),
   next: NOW + 4 * DAY, until: NOW + 18 * DAY, ...over,
 }, s);
 
@@ -57,7 +58,13 @@ const cases = [
   { name: 'perpetual_is_valid', lic: lic({ exp: null }), act: goodAct, fp: A, expect: 'Valid' },
   { name: 'revoked_by_crl', lic: goodLic, act: goodAct, crl: crl(['L-TEST0001']), fp: A, expect: 'Revoked' },
   { name: 'other_licence_in_crl_is_fine', lic: goodLic, act: goodAct, crl: crl(['L-OTHER']), fp: A, expect: 'Valid' },
+  { name: 'single_part_pc_matches_itself', lic: goodLic, act: act({ os: A.os }), fp: { os: A.os }, expect: 'Valid' },
+  { name: 'single_part_pc_other_machine', lic: goodLic, act: act({ os: A.os }), fp: { os: pc('z').os }, expect: 'DeviceMismatch' },
   { name: 'copied_to_another_pc', lic: goodLic, act: goodAct, fp: pc('pc-b'), expect: 'DeviceMismatch' },
+  { name: 'two_parts_changed_still_same_pc', lic: goodLic, act: goodAct, fp: { ...A, disk: part('disk', 'r1'), board: part('board', 'r2') }, expect: 'Valid' },
+  { name: 'three_parts_changed_is_another_pc', lic: goodLic, act: goodAct, fp: { ...A, disk: part('disk', 'r1'), board: part('board', 'r2'), bios: part('bios', 'r3') }, expect: 'DeviceMismatch' },
+  { name: 'cloned_image_same_cpu_and_os_only', lic: goodLic, act: goodAct, fp: { ...pc('clone'), cpu: A.cpu, os: A.os }, expect: 'DeviceMismatch' },
+  { name: 'cpu_alone_never_carries_a_match', lic: goodLic, act: goodAct, fp: { ...pc('other'), cpu: A.cpu, os: A.os, disk: A.disk }, expect: 'Valid' },
   { name: 'only_one_part_matches', lic: goodLic, act: goodAct, fp: { ...pc('pc-b'), bios: A.bios }, expect: 'DeviceMismatch' },
   { name: 'not_activated', lic: goodLic, act: null, fp: A, expect: 'NotActivated' },
   { name: 'activation_of_another_licence', lic: goodLic, act: act(A, { lid: 'L-OTHER' }), fp: A, expect: 'Invalid' },
@@ -85,7 +92,7 @@ const out = {
   now: NOW,
   publicKeys: [{ kid: key.kid, publicKey: key.publicKey }],
   fingerprintKinds: kinds,
-  fingerprintExample: { kind: 'bios', value: 'ABC123', part: require('node:crypto').createHash('sha256').update('ngos-fp-v1:bios:ABC123').digest('hex').slice(0, 32) },
+  fingerprintExample: { kind: 'bios', value: 'ABC123', listed: 'bios:' + require('node:crypto').createHash('sha256').update('ngos-fp-v1:bios:ABC123').digest('hex').slice(0, 32), part: require('node:crypto').createHash('sha256').update('ngos-fp-v1:bios:ABC123').digest('hex').slice(0, 32) },
   cases: cases.map((c) => ({ name: c.name, lic: c.lic, act: c.act || null, crl: c.crl || null, fp: c.fp, host: c.host === undefined ? null : c.host, module: c.module || null, now: c.now || NOW, lastSeen: c.lastSeen || null, expect: c.expect })),
 };
 

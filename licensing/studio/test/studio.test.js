@@ -26,7 +26,7 @@ test('tokens: sign, verify, and refuse tampering, wrong keys and wrong type', ()
   forged.lid = 'L-2';
   const tampered = [p, Buffer.from(JSON.stringify(forged)).toString('base64url'), sig].join('.');
   assert.throws(() => C.verifyToken(tampered, trusted, 'lic'), /Signature/);
-  assert.throws(() => C.verifyToken('garbage', trusted), /Not a NextGen OS token/);
+  assert.throws(() => C.verifyToken('garbage', trusted), /Not a NextGenOS token/);
 });
 
 test('private key encryption round-trips and rejects a wrong passphrase', () => {
@@ -57,7 +57,7 @@ test('activate: issues a signed licence and activation bound to the PC', () => {
   assert.equal(l.cust.name, 'Green Mart');
   assert.equal(a.lid, lic.lid);
   assert.equal(a.fp.length, 5);
-  assert.equal(a.fpMin, 2);
+  assert.equal(a.fpMin, 3); // 60% of 5 parts
   assert.equal(a.next, ctx.state.t + 7 * DAY);
   assert.equal(a.until, ctx.state.t + 21 * DAY);
   assert.deepEqual(crl.revoked, []);

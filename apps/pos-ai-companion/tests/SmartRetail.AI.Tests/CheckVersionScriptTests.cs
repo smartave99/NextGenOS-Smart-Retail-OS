@@ -52,7 +52,7 @@ namespace SmartRetail.AI.Tests
         }
 
         private static string Props(string version) =>
-            "<Project>\n  <PropertyGroup>\n    <Company>NextGen OS</Company>\n    <Version>" + version + "</Version>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n";
+            "<Project>\n  <PropertyGroup>\n    <Company>NextGenOS</Company>\n    <Version>" + version + "</Version>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n";
 
         private static (int ExitCode, string Output, string Error) Run(string script, string version)
         {

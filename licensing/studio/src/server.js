@@ -14,7 +14,7 @@ try {
 
 app.server.listen(config.port, config.host, () => {
   const where = config.host === '0.0.0.0' ? 'all network cards' : config.host;
-  console.log(`\nNextGen OS Licence Studio is running.\n  Open:  http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}\n  Listening on: ${where}\n  Data folder:  ${config.dataDir}\n\nPress Ctrl+C to stop.\n`);
+  console.log(`\nNextGenOS Licence Studio is running.\n  Open:  http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}\n  Listening on: ${where}\n  Data folder:  ${config.dataDir}\n\nPress Ctrl+C to stop.\n`);
 });
 
 const stop = () => { console.log('Stopping...'); app.server.close(() => { app.db.close(); process.exit(0); }); setTimeout(() => process.exit(0), 3000).unref(); };

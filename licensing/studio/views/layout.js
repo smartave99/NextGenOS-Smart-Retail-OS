@@ -57,7 +57,7 @@ function csrfField(csrf) { return html`<input type="hidden" name="_csrf" value="
 function page(title, body, ctx, active = '') {
   const u = ctx.user;
   const item = (href, label, key, perm) => (perm && !ctx.can(perm) ? '' : html`<a href="${href}" class="${active === key ? 'on' : ''}">${label}</a>`);
-  const nav = u ? html`
+  const nav = u && !u.mustChange ? html`
     <nav aria-label="Main">
       ${item('/', 'Home', 'home')}
       ${item('/licences', 'Licences', 'licences', 'licences.view')}
@@ -88,12 +88,12 @@ function page(title, body, ctx, active = '') {
 <script src="/static/app.js" defer></script>
 </head>
 <body>
-<header class="top"><a class="brand" href="/">Licence Studio</a>${nav}</header>
+<header class="top"><a class="brand" href="/">Licence Studio</a>${nav}${u && u.mustChange ? html`<form method="post" action="/logout" class="account">${csrfField(ctx.csrf)}<button class="link" type="submit">Sign out</button></form>` : ''}</header>
 <main>
 ${flash}
 ${body}
 </main>
-<footer>NextGen OS Licence Studio · private: for the company's staff only</footer>
+<footer>NextGenOS Licence Studio · private: for the company's staff only</footer>
 </body></html>`.s;
 }
 

@@ -1,6 +1,6 @@
 # The owner's live view
 
-*Smart Retail POS by NextGen OS*
+*Smart Retail POS by NextGenOS*
 
 On the Smart Avenue website this view is **Live shop** in the admin panel (`/admin/live`), with an optional
 authenticator app for signing in; its setup is in that website's README. This folder is the same view as a plain web

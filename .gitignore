@@ -8,10 +8,14 @@
 **/*.suo
 **/packages/
 **/TestResults/
-**/[Dd]ebug/
-**/[Rr]elease/
-**/x64/
-**/x86/
+**/bin/[Dd]ebug/
+**/obj/[Dd]ebug/
+**/bin/[Rr]elease/
+**/obj/[Rr]elease/
+**/bin/x64/
+**/bin/x86/
+**/obj/x64/
+**/obj/x86/
 **/*.pdb
 **/*.idb
 **/*.ilk
@@ -76,3 +80,4 @@ licensing/studio/.env
 licensing/studio/node_modules/
 **/passphrase.txt
 **/*.key.json
+*.tsbuildinfo

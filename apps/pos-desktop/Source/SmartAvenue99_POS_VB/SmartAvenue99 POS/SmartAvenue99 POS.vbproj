@@ -96,9 +96,6 @@
     <Reference Include="DevNetFB">
       <HintPath>..\..\..\Original_Binaries\DevNetFB.dll</HintPath>
     </Reference>
-    <Reference Include="DevNetLM">
-      <HintPath>..\..\..\Original_Binaries\DevNetLM.dll</HintPath>
-    </Reference>
     <Reference Include="DevNetSR">
       <HintPath>..\..\..\Original_Binaries\DevNetSR.dll</HintPath>
     </Reference>
@@ -4531,5 +4528,14 @@
     <EmbeddedResource Include="Assets\Retail\empty-bag-v1.png">
       <LogicalName>SmartRetail.Assets.EmptyBag.png</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The licence manager is built from source (signed licences). Its parts travel with it. -->
+    <ProjectReference Include="..\..\Libraries\DevNetLM\DevNetLM\DevNetLM.csproj">
+      <Name>DevNetLM</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing\NextGenOS.Licensing.csproj">
+      <Name>NextGenOS.Licensing</Name>
+    </ProjectReference>
   </ItemGroup>
 </Project>

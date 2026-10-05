@@ -39,7 +39,7 @@ namespace NextGenOS.Licensing
         /// <summary>True when the app may run: <see cref="LicenceStatus.Valid"/> or <see cref="LicenceStatus.Grace"/>.</summary>
         public bool IsUsable { get { return Status == LicenceStatus.Valid || Status == LicenceStatus.Grace; } }
 
-        /// <summary>The brand to show: the licence's, or NextGen OS's own.</summary>
+        /// <summary>The brand to show: the licence's, or NextGenOS's own.</summary>
         public BrandProfile Brand
         {
             get { return Licence != null && Licence.Brand != null && !string.IsNullOrEmpty(Licence.Brand.Name) ? Licence.Brand : BrandProfile.Default(); }

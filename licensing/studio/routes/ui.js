@@ -172,7 +172,7 @@ function createUi({ studio, auth, db, config, clientIp, isSecure, clock, dataDir
 
   route('GET', '/settings', (c) => c.html(P.settings(c.ctx, { settings: studio.settings(), keys: db.prepare('SELECT kid, public_key AS publicKey, status FROM keys ORDER BY created_at DESC').all() })), { perm: 'settings.manage' });
   route('POST', '/settings', (c) => {
-    for (const k of ['company_name', 'support_email', 'public_url', 'check_in_days', 'grace_days', 'offline_days']) if (c.form[k] !== undefined) studio.setSetting(k, String(c.form[k]).trim().slice(0, 200));
+    for (const k of ['company_name', 'support_email', 'support_phone', 'public_url', 'check_in_days', 'grace_days', 'offline_days']) if (c.form[k] !== undefined) studio.setSetting(k, String(c.form[k]).trim().slice(0, 200));
     studio.audit(c.user, 'settings.save', '', '', c.ip);
     return ok(c.res, '/settings', 'Saved.');
   }, { perm: 'settings.manage' });

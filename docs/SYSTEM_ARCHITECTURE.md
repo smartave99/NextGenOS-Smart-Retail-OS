@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-The **Smart Retail Suite** by **NextGen OS & Smart Avenue** is an end-to-end retail operating system that bridges physical brick-and-mortar store operations with modern cloud services, automated AI marketing, and omnichannel web/mobile commerce.
+The **Smart Retail Suite** by **NextGenOS & Smart Avenue** is an end-to-end retail operating system that bridges physical brick-and-mortar store operations with modern cloud services, automated AI marketing, and omnichannel web/mobile commerce.
 
 It unifies four core pillars:
 1. **Core Desktop POS (`apps/pos-desktop`)**: Low-latency, offline-capable Windows Forms POS workstation with hardware peripherals, GST billing, and local SQL Server database.
@@ -77,7 +77,7 @@ flowchart TB
 
 ## 3. Subsystem Breakdown
 
-### 3.1. `apps/pos-desktop` (Smart Retail OS / SmartAvenue99 POS)
+### 3.1. `apps/pos-desktop` (Smart Retail POS / SmartAvenue99 POS)
 - **Role**: The main in-store billing till and inventory ERP engine.
 - **Tech Stack**: Visual Basic .NET, C#, .NET Framework 4.8 (x86), Windows Forms, Crystal Reports, ADO.NET.
 - **Key Modules**:

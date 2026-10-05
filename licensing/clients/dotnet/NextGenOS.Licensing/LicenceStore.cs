@@ -137,6 +137,13 @@ namespace NextGenOS.Licensing
             catch (JsonException) { }
         }
 
+        /// <summary>After the licence server answered: its signed time is the truth, so the stored time is set to it (this is what ends a "clock tampered" state).</summary>
+        public void ResetState(string[] fingerprint, long serverTime)
+        {
+            var s = new StateFile { LastSeen = serverTime, LastCheckIn = serverTime, Mac = Mac(serverTime, serverTime, fingerprint) };
+            try { Write("state.json", JsonConvert.SerializeObject(s)); } catch (Exception) { }
+        }
+
         /// <summary>Records the time; the stored value only ever moves forward.</summary>
         public void TouchState(string[] fingerprint, long now, bool checkedIn)
         {

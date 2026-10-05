@@ -60,6 +60,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "IVA21",
+      "reduced": "IVA10",
+      "zero": "IVA0",
+      "exempt": "IVAEX"
+    },
     "businessId": {
       "label": "NIF",
       "pattern": "^[A-Z0-9][0-9]{7}[A-Z0-9]$"

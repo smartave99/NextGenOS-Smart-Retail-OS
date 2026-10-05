@@ -8,6 +8,11 @@ export function checks({ root, sh, has, runCmd, repoFiles, read, isText, join, e
       run: () => (has('node') ? runCmd('country-packs', 'node', ['country-packs/tools/cli.mjs', 'check'], { cwd: root }) : { status: 'SKIP', detail: 'node is not installed here' }),
     },
     {
+      name: 'industry-packs',
+      title: 'Industry packs are sound and the storefront copy is in step',
+      run: () => (has('node') ? runCmd('industry-packs', 'node', ['industry-packs/tools/cli.mjs', 'check'], { cwd: root }) : { status: 'SKIP', detail: 'node is not installed here' }),
+    },
+    {
       name: 'no-country-in-code',
       title: "No country's money, language or tax written into the storefront (it all comes from the country pack)",
       run: () => {

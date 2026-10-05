@@ -51,6 +51,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT18",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "VAT number",
       "pattern": null

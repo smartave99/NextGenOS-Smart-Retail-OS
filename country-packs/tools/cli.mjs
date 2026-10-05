@@ -86,6 +86,7 @@ if (command === 'validate') {
   pack.tax.name = flag('tax', 'VAT');
   const key = pack.tax.name.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4) || 'TAX';
   pack.tax.rates = [{ code: `${key}${rate.replace('.', 'P')}`, label: `${pack.tax.name} ${rate}%`, percent: rate }, { code: `${key}0`, label: `${pack.tax.name} 0% (zero-rated)`, zero: true }, { code: `${key}EX`, label: 'Exempt', exempt: true }];
+  pack.tax.classes = { standard: pack.tax.rates[0].code, zero: pack.tax.rates[1].code, exempt: pack.tax.rates[2].code };
   delete pack.tax.businessId;
   pack.tax.rounding = { total: 'none', increment: '1', defaultOn: false };
   pack.invoice = { title: 'Tax Invoice', requiredFields: ['Seller name and address', 'Tax number', 'Invoice number and date', 'Description, quantity and price of each item', 'Tax amount'], eInvoice: null, retentionYears: 5 };

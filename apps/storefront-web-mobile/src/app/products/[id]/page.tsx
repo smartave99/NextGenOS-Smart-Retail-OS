@@ -19,6 +19,7 @@ import BarcodeDisplay from "@/components/BarcodeDisplay";
 import { SITE_URL } from "@/lib/site-url";
 import { CURRENCY, money } from "@/lib/region/lite";
 import { SHOP_PLACE } from "@/lib/region/lite";
+import { TERM } from "@/lib/industry/lite";
 
 export const revalidate = 3600;
 
@@ -233,7 +234,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <nav className="flex items-center text-sm text-slate-500 gap-2">
                         <Link href="/" className="hover:text-brand-dark transition-colors">Home</Link>
                         <ChevronRight className="w-4 h-4 text-slate-400" />
-                        <Link href="/products" className="hover:text-brand-dark transition-colors">Products</Link>
+                        <Link href="/products" className="hover:text-brand-dark transition-colors">{TERM.item.plural}</Link>
                         {category && (
                             <>
                                 <ChevronRight className="w-4 h-4 text-slate-400" />

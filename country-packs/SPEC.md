@@ -58,6 +58,7 @@ country-packs/
     "model": "gst-india",                // "gst-india" | "vat" | "regional" | "none"   (section 5)
     "pricesIncludeTaxDefault": true,     // do shelf prices already include the tax?
     "rates": [ { "code": "GST18", "label": "GST 18%", "percent": "18" } ],   // section 4
+    "classes": { "standard": "GST18", "reduced": "GST5", "zero": "GST0", "exempt": "GSTEX" },   // section 4, "tax classes"
     "regions": { "label": "State", "list": [ { "code": "27", "name": "Maharashtra" } ] },
     "businessId": { "label": "GSTIN", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$" },
     "customerDiscounts": [ ],            // section 6
@@ -86,6 +87,10 @@ country-packs/
 For `model: "regional"` a rate has no percent of its own: it is `"taxable": true` and the percent comes from the region (section 5).
 A region lists `components: [ { "name": "GST", "percent": "5" }, { "name": "PST", "percent": "7" } ]`; a component with `"editable": true`
 is one the shop sets itself (for example a combined sales tax that depends on the street the shop is in).
+
+**Tax classes.** Shop staff should not have to know rate codes. A pack names four everyday classes and the rate code each one means:
+`standard` (the main rate), `reduced` (the usual lower rate, if the country has one), `zero` and `exempt`. Products carry a class or a code; demo data and
+product import use classes. Each class names a code that exists in `rates`; `standard` is required.
 
 ## 5. Models
 

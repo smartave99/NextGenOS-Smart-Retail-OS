@@ -55,6 +55,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "IVA16",
+      "reduced": "IVA8",
+      "zero": "IVA0",
+      "exempt": "IVAEX"
+    },
     "businessId": {
       "label": "RFC",
       "pattern": "^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$"

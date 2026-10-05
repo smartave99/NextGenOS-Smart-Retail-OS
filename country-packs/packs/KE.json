@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT16",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "KRA PIN",
       "pattern": "^[AP][0-9]{9}[A-Z]$"

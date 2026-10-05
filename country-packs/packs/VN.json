@@ -60,6 +60,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT10",
+      "reduced": "VAT8",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "Tax code",
       "pattern": "^[0-9]{10}(-[0-9]{3})?$"

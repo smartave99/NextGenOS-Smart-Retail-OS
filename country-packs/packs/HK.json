@@ -40,6 +40,10 @@
         "percent": "0"
       }
     ],
+    "classes": {
+      "standard": "NONE",
+      "zero": "NONE"
+    },
     "customerDiscounts": [],
     "rounding": {
       "total": "none",

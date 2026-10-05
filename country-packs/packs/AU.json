@@ -49,6 +49,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "GST10",
+      "zero": "GSTFREE",
+      "exempt": "GSTEX"
+    },
     "businessId": {
       "label": "ABN",
       "pattern": "^[0-9]{11}$"

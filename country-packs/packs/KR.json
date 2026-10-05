@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT10",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "Business registration number",
       "pattern": "^[0-9]{3}-?[0-9]{2}-?[0-9]{5}$"

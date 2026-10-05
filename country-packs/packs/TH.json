@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT7",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "Tax ID",
       "pattern": "^[0-9]{13}$"

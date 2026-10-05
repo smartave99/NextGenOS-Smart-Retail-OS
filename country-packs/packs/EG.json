@@ -55,6 +55,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT14",
+      "reduced": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "Tax registration number",
       "pattern": null

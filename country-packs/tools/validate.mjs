@@ -75,6 +75,14 @@ export function validatePack(pack, fileName) {
   for (const d of t.customerDiscounts ?? []) {
     if (!/^[A-Z0-9]{2,12}$/.test(d.code ?? '') || !d.label || !decimal(d.percent, 3) || typeof d.vatExempt !== 'boolean') bad(`customer discount "${d.code}" needs a code, a label, a percent and vatExempt`);
   }
+  if (!isObj(t.classes) || !t.classes.standard) bad('"classes" must at least name the "standard" rate code');
+  else {
+    const codes = new Set((t.rates ?? []).map((r) => r.code));
+    for (const [k, v] of Object.entries(t.classes)) {
+      if (!['standard', 'reduced', 'zero', 'exempt'].includes(k)) bad(`class "${k}" is not one of standard, reduced, zero, exempt`);
+      else if (!codes.has(v)) bad(`class ${k} names the code ${v}, which is not in "rates"`);
+    }
+  }
   const rd = t.rounding;
   if (!isObj(rd) || !['nearest', 'none'].includes(rd.total) || typeof rd.defaultOn !== 'boolean') bad('tax "rounding" needs total (nearest or none) and defaultOn');
   else if (rd.total === 'nearest') {

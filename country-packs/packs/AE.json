@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "TRN",
       "pattern": "^[0-9]{15}$"

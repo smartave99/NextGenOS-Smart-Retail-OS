@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT12",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "TIN",
       "pattern": "^[0-9]{3}-?[0-9]{3}-?[0-9]{3}(-?[0-9]{3,5})?$"

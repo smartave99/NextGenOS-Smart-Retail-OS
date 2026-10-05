@@ -56,6 +56,8 @@ namespace NextGenOS.Tax
         [JsonProperty("model")] public string Model { get; set; }
         [JsonProperty("pricesIncludeTaxDefault")] public bool PricesIncludeTaxDefault { get; set; }
         [JsonProperty("rates")] public List<TaxRate> Rates { get; set; }
+        /// <summary>The four everyday classes (standard, reduced, zero, exempt) and the rate code each one means.</summary>
+        [JsonProperty("classes")] public Dictionary<string, string> Classes { get; set; }
         [JsonProperty("regions")] public RegionList Regions { get; set; }
         [JsonProperty("businessId")] public BusinessIdRule BusinessId { get; set; }
         [JsonProperty("customerDiscounts")] public List<CustomerDiscount> CustomerDiscounts { get; set; }

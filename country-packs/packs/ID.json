@@ -55,6 +55,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "PPN11",
+      "reduced": "PPN12",
+      "zero": "PPN0",
+      "exempt": "PPNEX"
+    },
     "businessId": {
       "label": "NPWP",
       "pattern": null

@@ -47,7 +47,7 @@ async function OffersHero() {
 
             <div className="relative z-10 container mx-auto px-4 md:px-6 text-center">
                 <span className="text-brand-blue font-bold tracking-[0.2em] uppercase text-xs mb-4 block animate-pulse">
-                    Smart Club Exclusives
+                    Exclusive offers
                 </span>
                 <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
                     {heroTitle}

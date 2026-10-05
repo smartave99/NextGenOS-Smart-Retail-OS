@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "GST18",
+      "zero": "GST0",
+      "exempt": "GSTEX"
+    },
     "businessId": {
       "label": "NTN / STRN",
       "pattern": null

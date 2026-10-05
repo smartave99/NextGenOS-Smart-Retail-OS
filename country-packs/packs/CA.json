@@ -50,15 +50,10 @@
         "exempt": true
       }
     ],
-    "businessId": {
-      "label": "GST/HST number",
-      "pattern": "^[0-9]{9}RT[0-9]{4}$"
-    },
-    "customerDiscounts": [],
-    "rounding": {
-      "total": "nearest",
-      "increment": "0.05",
-      "defaultOn": false
+    "classes": {
+      "standard": "TAXABLE",
+      "zero": "ZERO",
+      "exempt": "EXEMPT"
     },
     "regions": {
       "label": "Province",
@@ -210,6 +205,16 @@
           ]
         }
       ]
+    },
+    "businessId": {
+      "label": "GST/HST number",
+      "pattern": "^[0-9]{9}RT[0-9]{4}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.05",
+      "defaultOn": false
     }
   },
   "invoice": {

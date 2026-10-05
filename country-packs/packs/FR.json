@@ -65,6 +65,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "TVA20",
+      "reduced": "TVA10",
+      "zero": "TVA0",
+      "exempt": "TVAEX"
+    },
     "businessId": {
       "label": "N° TVA",
       "pattern": "^FR[0-9A-Z]{2}[0-9]{9}$"

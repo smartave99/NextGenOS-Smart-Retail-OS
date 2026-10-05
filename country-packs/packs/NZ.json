@@ -50,6 +50,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "GST15",
+      "zero": "GST0",
+      "exempt": "GSTEX"
+    },
     "businessId": {
       "label": "GST number",
       "pattern": "^[0-9]{8,9}$"

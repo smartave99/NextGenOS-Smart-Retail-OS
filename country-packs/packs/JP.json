@@ -55,6 +55,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "JCT10",
+      "reduced": "JCT8",
+      "zero": "JCT0",
+      "exempt": "JCTEX"
+    },
     "businessId": {
       "label": "Invoice registration number",
       "pattern": "^T[0-9]{13}$"

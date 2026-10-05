@@ -65,6 +65,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT13",
+      "reduced": "VAT9",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "Unified social credit code",
       "pattern": "^[0-9A-Z]{18}$"

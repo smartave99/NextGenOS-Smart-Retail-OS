@@ -46,6 +46,7 @@ export interface TaxRules {
     model: "gst-india" | "vat" | "regional" | "none";
     pricesIncludeTaxDefault: boolean;
     rates: TaxRate[];
+    classes?: Partial<Record<"standard" | "reduced" | "zero" | "exempt", string>>;
     regions?: { label?: string; list: Region[] };
     businessId?: { label: string; pattern?: string | null };
     customerDiscounts?: CustomerDiscount[];

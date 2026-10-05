@@ -65,6 +65,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "IVA22",
+      "reduced": "IVA10",
+      "zero": "IVA0",
+      "exempt": "IVAEX"
+    },
     "businessId": {
       "label": "Partita IVA",
       "pattern": "^IT[0-9]{11}$"

@@ -55,6 +55,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT15",
+      "reduced": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "BIN",
       "pattern": "^[0-9]{13}$"

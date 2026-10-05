@@ -9,12 +9,13 @@ import { useSiteConfig } from "@/context/SiteConfigContext";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
 import { SHOP_NAME } from "@/lib/shop-name";
+import { TERM } from "@/lib/industry/lite";
 
 const PRODUCT_REQUEST_LINK = { label: "Request a Product", href: "/request-product" };
 
 const DEFAULT_NAV_LINKS = [
     { label: "Home", href: "/" },
-    { label: "Products", href: "/products" },
+    { label: TERM.item.plural, href: "/products" },
     { label: "Offers", href: "/offers" },
     { label: "Departments", href: "/departments" },
     { label: "About Us", href: "/about" },
@@ -186,7 +187,7 @@ export default function Header() {
                         type="button"
                         onClick={openSearch}
                         className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                        aria-label="Search products"
+                        aria-label={`Search ${TERM.item.pluralLower}`}
                     >
                         <Search className="h-5 w-5" aria-hidden="true" />
                     </button>
@@ -214,7 +215,7 @@ export default function Header() {
                     <form onSubmit={handleSearch} className="relative mx-auto mt-20 flex max-w-2xl items-center gap-2 rounded-2xl bg-white p-2 shadow-2xl">
                         <h2 id="site-search-title" className="sr-only">Search {SHOP_NAME} products</h2>
                         <Search className="ml-3 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
-                        <label htmlFor="site-search" className="sr-only">Search products</label>
+                        <label htmlFor="site-search" className="sr-only">{`Search ${TERM.item.pluralLower}`}</label>
                         <input
                             id="site-search"
                             ref={searchInputRef}

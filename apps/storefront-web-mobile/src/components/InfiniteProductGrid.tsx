@@ -8,6 +8,7 @@ import { Product, getProducts, Offer, Category } from "@/app/actions";
 import GenieRequestTrigger from "@/components/GenieRequestTrigger";
 import { SHOP_NAME } from "@/lib/shop-name";
 import { money } from "@/lib/region/lite";
+import { TERM } from "@/lib/industry/lite";
 
 interface InfiniteProductGridProps {
     initialProducts: Product[];
@@ -108,7 +109,7 @@ export default function InfiniteProductGrid({
             <div className="flex flex-col gap-8">
                 <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
                     <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-slate-700">No products found</h3>
+                    <h3 className="text-lg font-bold text-slate-700">{`No ${TERM.item.pluralLower} found`}</h3>
                     <p className="text-slate-500">Try adjusting your filters.</p>
                     <Link href="/products" className="inline-block mt-4 text-brand-blue hover:underline">
                         Clear Filters

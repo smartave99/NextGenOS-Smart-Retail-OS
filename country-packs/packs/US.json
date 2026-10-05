@@ -45,15 +45,9 @@
         "exempt": true
       }
     ],
-    "businessId": {
-      "label": "State tax ID",
-      "pattern": null
-    },
-    "customerDiscounts": [],
-    "rounding": {
-      "total": "none",
-      "increment": "0.01",
-      "defaultOn": false
+    "classes": {
+      "standard": "TAXABLE",
+      "exempt": "EXEMPT"
     },
     "regions": {
       "label": "Shop",
@@ -70,6 +64,16 @@
           ]
         }
       ]
+    },
+    "businessId": {
+      "label": "State tax ID",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "0.01",
+      "defaultOn": false
     }
   },
   "invoice": {

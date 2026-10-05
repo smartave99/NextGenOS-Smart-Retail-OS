@@ -54,6 +54,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT20",
+      "reduced": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "VAT number",
       "pattern": "^(GB)?[0-9]{9}([0-9]{3})?$"

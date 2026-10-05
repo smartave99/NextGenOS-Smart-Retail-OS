@@ -51,6 +51,11 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "VAT15",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
     "businessId": {
       "label": "VAT vendor number",
       "pattern": "^4[0-9]{9}$"

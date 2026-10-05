@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "id": "wholesale",
+  "name": "Wholesale and distribution",
+  "summary": "Trade customers on credit, trade prices, purchase orders, stock receiving and statements; a trade counter too.",
+  "icon": "truck",
+  "vocabulary": {
+    "customer": [
+      "Customer",
+      "Customers"
+    ],
+    "item": [
+      "Product",
+      "Products"
+    ],
+    "sale": [
+      "Order",
+      "Orders"
+    ],
+    "invoice": [
+      "Invoice",
+      "Invoices"
+    ],
+    "staff": [
+      "Staff",
+      "Staff"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Stock",
+      "Stock"
+    ]
+  },
+  "features": {
+    "counterSale": true,
+    "tables": false,
+    "kitchen": false,
+    "lending": false,
+    "projects": false,
+    "appointments": false,
+    "credit": true,
+    "purchases": true,
+    "stockTracking": "always",
+    "weighedItems": true
+  },
+  "itemKinds": [
+    {
+      "id": "stock",
+      "label": "Product",
+      "tracksStock": true
+    },
+    {
+      "id": "service",
+      "label": "Service",
+      "tracksStock": false
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "customer",
+      "label": "Customer"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    }
+  ],
+  "defaults": {
+    "adjustments": [],
+    "paymentMethods": [
+      "bank",
+      "cash",
+      "card",
+      "cheque"
+    ]
+  },
+  "rules": {
+    "creditDays": 30,
+    "tradePriceLabel": "Trade price",
+    "priceLevels": [
+      "retail",
+      "trade"
+    ]
+  },
+  "reports": [
+    "outstanding",
+    "top-customers",
+    "stock-low",
+    "stock-value",
+    "tax-summary",
+    "purchases"
+  ],
+  "demo": {
+    "company": "Demo Wholesale",
+    "tagline": "Food and household distributor",
+    "items": [
+      {
+        "name": "Rice 25 kg",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "1700.00",
+        "class": "reduced",
+        "unit": "bag",
+        "stock": "150",
+        "barcode": "8902000000019",
+        "tradePrice": "1580.00"
+      },
+      {
+        "name": "Cooking oil 15 L",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "2250.00",
+        "class": "reduced",
+        "unit": "tin",
+        "stock": "60",
+        "barcode": "8902000000026",
+        "tradePrice": "2100.00"
+      },
+      {
+        "name": "Sugar 50 kg",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "2300.00",
+        "class": "reduced",
+        "unit": "bag",
+        "stock": "90",
+        "barcode": "8902000000033",
+        "tradePrice": "2180.00"
+      },
+      {
+        "name": "Detergent powder 1 kg (carton of 12)",
+        "kind": "stock",
+        "category": "Household",
+        "price": "1200.00",
+        "class": "standard",
+        "unit": "carton",
+        "stock": "75",
+        "barcode": "8902000000040",
+        "tradePrice": "1100.00"
+      },
+      {
+        "name": "Soap bar (carton of 48)",
+        "kind": "stock",
+        "category": "Household",
+        "price": "1900.00",
+        "class": "standard",
+        "unit": "carton",
+        "stock": "55",
+        "barcode": "8902000000057",
+        "tradePrice": "1750.00"
+      }
+    ],
+    "parties": [
+      {
+        "kind": "customer",
+        "name": "Sharma General Store",
+        "phone": "+910000000041",
+        "priceLevel": "trade",
+        "creditLimit": "200000.00"
+      },
+      {
+        "kind": "customer",
+        "name": "Walk-in trade counter"
+      },
+      {
+        "kind": "supplier",
+        "name": "National Foods Ltd",
+        "phone": "+910000000042"
+      }
+    ]
+  },
+  "aiContext": "a wholesaler: trade customers on credit, trade prices, purchase orders",
+  "coverage": {
+    "works": [
+      "Retail and trade price levels, chosen per customer",
+      "Customer credit limits and terms, with statements and ageing of what is owed",
+      "Orders and invoices at the trade counter or on account; payments received later",
+      "Purchase orders to suppliers and receiving stock into the warehouse",
+      "Stock levels, low-stock and stock value; tax summary"
+    ],
+    "notYet": [
+      "Sales representatives and delivery routes",
+      "Batch and expiry tracking",
+      "Electronic invoicing and transport documents required by some countries",
+      "Several warehouses"
+    ]
+  }
+}

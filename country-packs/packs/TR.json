@@ -60,6 +60,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "KDV20",
+      "reduced": "KDV10",
+      "zero": "KDV0",
+      "exempt": "KDVEX"
+    },
     "businessId": {
       "label": "Tax number",
       "pattern": "^[0-9]{10,11}$"

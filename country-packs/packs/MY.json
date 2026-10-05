@@ -66,6 +66,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "SST10",
+      "reduced": "SST5",
+      "zero": "SST0",
+      "exempt": "SSTEX"
+    },
     "businessId": {
       "label": "SST registration number",
       "pattern": null

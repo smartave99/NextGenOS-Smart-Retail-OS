@@ -1,3 +1,4 @@
+import { TERM } from "@/lib/industry/lite";
 export interface BrandingConfig {
     siteName: string;
     tagline: string;
@@ -267,7 +268,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
                 title: "Shop",
                 links: [
                     { name: "Departments", href: "/departments" },
-                    { name: "All Products", href: "/products" },
+                    { name: `All ${TERM.item.plural}`, href: "/products" },
                     { name: "Weekly Offers", href: "/offers" },
                     { name: "New Arrivals", href: "/new-arrivals" },
                 ]
@@ -293,11 +294,11 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         email: "",
         address: "",
         mapEmbedUrl: "",
-        storeHours: "Monday - Sunday\n10:00 AM - 10:00 PM",
+        storeHours: "",
     },
     headerLinks: [
         { label: "Home", href: "/" },
-        { label: "Products", href: "/products" },
+        { label: TERM.item.plural, href: "/products" },
         { label: "Departments", href: "/departments" },
         { label: "Special Offers", href: "/offers" },
         { label: "About Us", href: "/about" },

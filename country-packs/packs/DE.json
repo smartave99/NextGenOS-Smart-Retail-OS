@@ -55,6 +55,12 @@
         "exempt": true
       }
     ],
+    "classes": {
+      "standard": "MWST19",
+      "reduced": "MWST7",
+      "zero": "MWST0",
+      "exempt": "MWSTEX"
+    },
     "businessId": {
       "label": "USt-IdNr.",
       "pattern": "^DE[0-9]{9}$"

@@ -1,0 +1,30 @@
+name: Release probe (called)
+
+# Part of the throw-away release probe: the same checks, but run the way the Release workflow runs (called from another workflow).
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    name: The same, called from another workflow
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The real script, as the Release workflow runs it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+        run: |
+          set -u
+          node scripts/release-assets.mjs create --tag v0.0.1-probe-k --target "${GITHUB_SHA}" --title "probe k" --prerelease
+          ID=$(grep '^release_id=' "${GITHUB_OUTPUT}" | cut -d= -f2)
+          echo "made number ${ID}"
+          if [ -n "${ID}" ]; then curl -sS -o /dev/null -w 'DELETE -> %{http_code}\n' -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${R}/releases/${ID}"; fi

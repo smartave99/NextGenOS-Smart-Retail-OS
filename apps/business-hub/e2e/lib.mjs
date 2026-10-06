@@ -85,7 +85,13 @@ export async function setUp(page, hub, { name = 'Test Business', country = 'Indi
   const sample = page.getByLabel('Fill with a sample business so I can look around');
   if (demo) await sample.check(); else await sample.uncheck();
   await page.getByRole('button', { name: 'Finish' }).click();
-  await page.waitForURL('**/login', { timeout: 60000 });
+  try {
+    await page.waitForURL('**/login', { timeout: 60000 });
+  } catch (e) {
+    // Say what the screen showed (a refusal from the program is written there), so that a stall is not a mystery.
+    const text = (await page.locator('body').innerText({ timeout: 5000 }).catch(() => '(the page could not be read)')).replace(/\s+/g, ' ').slice(0, 600);
+    throw new Error('The setup did not reach the sign-in page within 60 seconds. The screen says: ' + text + '\n' + e.message);
+  }
 }
 
 export async function signIn(page, hub, user = 'owner', password = 'a-long-test-password') {

@@ -116,11 +116,37 @@ public static class Routing
     }
 }
 
-/// <summary>A second line of defence: a payment card number found in text that is about to leave the computer means the text is payment data, whatever it was called.</summary>
+/// <summary>
+/// A second line of defence: what the text itself shows is taken into account, whatever the caller called it. A payment card number means payment data; an e-mail address or a telephone
+/// number means personal data. It is a net with holes (a name on its own is not found), so the owner's permission stays the real guard for personal data.
+/// </summary>
 public static partial class TextGuard
 {
     [GeneratedRegex(@"(?<![\d])(?:\d[ \-]?){13,19}(?![\d])", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex DigitRuns();
+
+    [GeneratedRegex(@"[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9\-]{1,63}(?:\.[A-Za-z0-9\-]{1,63})+", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
+    private static partial Regex EmailAddress();
+
+    [GeneratedRegex(@"(?<![\w])\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?(?:[\s.\-]?\d{2,4}){2,4}(?![\w])", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
+    private static partial Regex InternationalPhone();
+
+    [GeneratedRegex(@"(?<!\d)\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
+    private static partial Regex GroupedPhone();
+
+    /// <summary>An e-mail address or a telephone number written the usual ways ("+91 98765 43210", "(555) 123-4567"). A bare run of digits is not taken for one: it could be a barcode.</summary>
+    public static bool ContainsContactDetails(string? text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length < 6) return false;
+        try
+        {
+            return EmailAddress().IsMatch(text) || InternationalPhone().IsMatch(text) || GroupedPhone().IsMatch(text);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return true;   // when in doubt, treat it as personal data
+        }
+    }
 
     public static bool ContainsCardNumber(string? text)
     {

@@ -3,7 +3,9 @@ using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
 using NextGenOS.Hub.Documents;
+using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Lending;
+using NextGenOS.Hub.Ontology;
 using NextGenOS.Hub.Printing;
 using NextGenOS.Hub.Projects;
 using NextGenOS.Hub.Purchasing;
@@ -42,6 +44,11 @@ public sealed class HubApp
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit);
         // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
         Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", ai);
+        // The business event history (observations, events, evidence pointers) and its forgetting. Writing waits for the owner's switch; nothing in the shop's own screens writes to it yet.
+        Retention = new RetentionService(db, clock, Audit);
+        Events = new EventStore(db, clock, Audit, Ai.Flags, Retention);
+        // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
+        Ontology = new OntologyService(db, clock, Audit, Ai.Flags);
     }
 
     public HubDb Db { get; }
@@ -63,6 +70,9 @@ public sealed class HubApp
     public PrinterStore PrinterProfiles { get; }
     public HubPrinting Printing { get; }
     public AiFoundation Ai { get; }
+    public RetentionService Retention { get; }
+    public EventStore Events { get; }
+    public OntologyService Ontology { get; }
 
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
     public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null)

@@ -96,4 +96,82 @@ public class AiSettingsWebTests
         Assert.False(NextGenOS.Hub.Web.Auth.LicenceEntitlements.From(expired).Has("ai"));
         Assert.False(NextGenOS.Hub.Web.Auth.LicenceEntitlements.From(missing).Has("ai"));
     }
+
+    [Fact]
+    public async Task The_event_history_screen_is_for_the_owner_and_looking_at_it_records_nothing()
+    {
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        var http = Client(f);
+
+        var anonymous = await Get(http, "/settings/events");
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.Contains("/login", anonymous.Headers.Location!.OriginalString);
+
+        var owner = await SignIn(http, "owner", "correct horse battery");
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/settings/events", owner)).StatusCode);
+        var manager = await SignIn(http, "boss", "manager good password");
+        await Get(http, "/settings/events", manager);
+
+        Assert.False(f.Hub.Events.Recording);
+        Assert.Equal(new NextGenOS.Hub.Events.EventCounts(0, 0, 0, 0, 0, null, null), f.Hub.Events.Counts());
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("events.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_business_map_screen_is_for_the_owner_and_looking_at_it_adds_nothing_to_the_map()
+    {
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        var http = Client(f);
+
+        var anonymous = await Get(http, "/settings/map");
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.Contains("/login", anonymous.Headers.Location!.OriginalString);
+
+        var owner = await SignIn(http, "owner", "correct horse battery");
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/settings/map", owner)).StatusCode);
+        var manager = await SignIn(http, "boss", "manager good password");
+        await Get(http, "/settings/map", manager);
+
+        Assert.False(f.Hub.Ontology.Writable);
+        Assert.Empty(f.Hub.Ontology.Things(NextGenOS.Hub.Ontology.EntityType.Zone));
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("map.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_background_upkeep_forgets_records_past_their_day_without_any_switch()
+    {
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        // An observation that is long past its day, and the history switched off: forgetting does not wait for a switch.
+        f.Hub.Db.InTransaction((c, t) => NextGenOS.Hub.Data.HubDb.Exec(c,
+            "INSERT INTO observations(id, kind, source_type, source_id, confidence, data_class, occurred_at, recorded_at, retain_until) VALUES (1, 'object.detected', 'model', 'cam-1', 1, 'INTERNAL', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z', '2020-01-15T00:00:00Z')", t));
+        Assert.False(f.Hub.Events.Recording);
+        Assert.Equal(1, f.Hub.Events.Counts().Observations);
+
+        // The worker's first round runs as soon as it starts.
+        var log = new CapturingLog();
+        using var worker = new NextGenOS.Hub.Web.Auth.HubWorker(f.Hub, log);
+        await worker.StartAsync(CancellationToken.None);
+        // The first round starts by itself (on its own thread); give it a moment.
+        for (var i = 0; i < 100 && f.Hub.Events.Counts().Observations > 0; i++) await Task.Delay(50);
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.True(log.Problems.Count == 0, string.Join(" | ", log.Problems));
+        Assert.Equal(0, f.Hub.Events.Counts().Observations);
+        Assert.Contains(f.Hub.Audit.Recent(), a => a.Action == "events.forgotten");
+    }
+
+    private sealed class CapturingLog : Microsoft.Extensions.Logging.ILogger<NextGenOS.Hub.Web.Auth.HubWorker>
+    {
+        public List<string> Problems { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Problems.Add(formatter(state, exception) + (exception is null ? "" : ": " + exception.GetType().Name + " " + exception.Message));
+    }
 }

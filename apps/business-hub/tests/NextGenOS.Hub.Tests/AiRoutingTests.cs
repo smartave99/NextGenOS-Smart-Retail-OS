@@ -196,6 +196,22 @@ public class EndpointAndTextGuardTests
     }
 
     [Theory]
+    [InlineData("http://user:secret@127.0.0.1:11434")]
+    [InlineData("https://sk-live-abc123@api.example.com/v1")]
+    [InlineData("https://api.example.com/v1?api_key=abc123")]
+    [InlineData("https://api.example.com/v1#token")]
+    [InlineData("http://192.168.1.5:11434/v1?key=1")]
+    public void A_key_cannot_be_written_into_an_address_where_it_would_be_kept_in_the_open(string url)
+    {
+        foreach (var place in new[] { ProviderLocation.Local, ProviderLocation.Lan, ProviderLocation.Api })
+        {
+            var problem = EndpointClassifier.Mismatch(place, url);
+            Assert.NotNull(problem);
+            Assert.Contains("key", problem);
+        }
+    }
+
+    [Theory]
     [InlineData("Pay with 4111 1111 1111 1111 please", true)]
     [InlineData("card 4111-1111-1111-1111", true)]
     [InlineData("5500005555555559", true)]
@@ -206,6 +222,26 @@ public class EndpointAndTextGuardTests
     [InlineData("The total is 1,250.00 for 3 items", false)]
     [InlineData("", false)]
     public void A_payment_card_number_in_a_text_is_found_and_ordinary_numbers_are_not(string text, bool found) => Assert.Equal(found, TextGuard.ContainsCardNumber(text));
+}
+
+public class ContactDetailsTests
+{
+    [Theory]
+    [InlineData("Write to maria.santos@example.com about the order", true)]
+    [InlineData("a@b.co", true)]
+    [InlineData("Call +91 98765 43210 today", true)]
+    [InlineData("Call +63 917 123 4567", true)]
+    [InlineData("Call (555) 123-4567 now", true)]
+    [InlineData("555-123-4567", true)]
+    [InlineData("555.123.4567", true)]
+    [InlineData("Barcode 8901000000019 is on the shelf", false)]
+    [InlineData("Invoice INV-2026-000012 for 1,250.00", false)]
+    [InlineData("Sold 12 units between 10:30 and 11:45", false)]
+    [InlineData("Version 2.10.3 shipped", false)]
+    [InlineData("the price is 25 @ 3 for 2", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void An_email_address_or_a_phone_number_is_found_and_a_barcode_or_an_invoice_number_is_not(string? text, bool found) => Assert.Equal(found, TextGuard.ContainsContactDetails(text));
 }
 
 public class BudgetTests

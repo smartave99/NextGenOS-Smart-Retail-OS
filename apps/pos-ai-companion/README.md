@@ -132,8 +132,8 @@ The assistant talks to AI through **command-line tools installed on the PC** (pr
 
 **What to do, once for each download.**
 1. Click **More info**, then **Run anyway**.
-2. If Windows blocks the file in another way, right-click `SmartRetailAI-Setup.exe`, choose **Properties**, tick **Unblock** at the bottom, click **OK**, and run it again (or in PowerShell: `Unblock-File .\SmartRetailAI-Setup.exe`). This removes the *came from the internet* mark that starts the check.
-3. To be sure the file is the one that was published, compare its fingerprint with the SHA-256 the Releases page shows beside the file: `Get-FileHash .\SmartRetailAI-Setup.exe -Algorithm SHA256`.
+2. If Windows blocks the file in another way, right-click `SmartRetailAI-Setup.exe`, choose **Properties**, tick **Unblock** at the bottom, click **OK**, and run it again. This removes the *came from the internet* mark that starts the check.
+3. To be sure the file is the one that was published, ask the person who looks after your computers to compare its SHA-256 fingerprint with the one the Releases page shows beside the file.
 
 **Updates made by the app** do not show this box. The app downloads the update itself, checks GitHub's signed statement and the file's fingerprint (see *Automatic updates*), and only then starts the setup. Windows may still ask *Do you want to allow this app to make changes to your device?* when the app is installed for everyone on the PC.
 
@@ -204,7 +204,7 @@ Checked by tests: `dotnet test` (`CodexUpdateTests`: the versions, the release c
 | Symptom | Fix |
 |---|---|
 | Codex: *not signed in* | Open the dashboard's **Get started** page and click **Sign in with ChatGPT**, or paste an API key there. |
-| *Get started* cannot install Codex | It needs the internet for a minute or two, to reach chatgpt.com and releases.openai.com. Try again, or run `irm https://chatgpt.com/codex/install.ps1 \| iex` in PowerShell. |
+| *Get started* cannot install Codex | It needs the internet for a minute or two, to reach chatgpt.com and releases.openai.com. Try again. If it still fails, ask the person who looks after your computers to install Codex by hand (OpenAI's own page: chatgpt.com/codex). |
 | Codex fails with a Windows sandbox error | *Settings → CLI tools → Codex → Sandbox* = `workspace-write`. It still runs only in an empty temporary folder. |
 | A CLI tool is *not installed* although it is | Set its full path in *Settings → CLI tools* (npm tools live in `%APPDATA%\npm`, Claude/agy in `%USERPROFILE%\.local\bin`). |
 | Claude: *Authentication error* | Check the Anthropic API key and that the Console account has credit. |

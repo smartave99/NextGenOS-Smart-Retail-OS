@@ -32,7 +32,7 @@ node tools/brand-studio/brand.mjs serve --open     in this terminal, and a tab i
 
 - It opens in the PC's own Edge (Windows always has it), or Chrome or Chromium, as a window of its own with a profile of its own. On a PC with none of these it opens in your usual browser as a tab, and stops by itself after ten minutes with nobody using it.
 - **One at a time:** opening it again while it is open brings up the same window. To stop it: close the window, or press **Quit** (top right). The page says plainly when it has stopped. A problem at start-up is written in a note, `Brand Studio problem.txt`, which opens by itself.
-- `Brand Studio.bat` and `brand-studio.sh` start it from the source copy with a terminal (for people who work on it).
+- `Brand Studio (with a window, for developers).bat` and `brand-studio.sh` start it from the source copy with a terminal, on purpose (for people who work on it; the words are in the name so that nobody takes it for the normal way). Staff never need them.
 - The address only works on this PC and changes every time.
 
 On the left: the business's name, colours, logo, contact, country and kind of business, website, Android app id, and the words on bills. On the right: **how it will look**, light and dark, updating as you type. Press **Save the kit** (writes `brand-kits/<name>/`) and then **Make the files** (writes `brand-exports/<name>/`).

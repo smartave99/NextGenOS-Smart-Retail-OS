@@ -109,14 +109,10 @@ smart-retail-suite/
 │   ├── DATABASE_GUIDE.md        # SQL Server, SQLite, Supabase, and Prisma guide
 │   └── AI_INTEGRATION_GUIDE.md  # Multi-model routing (Groq, Lightning AI, Gemma, Codex)
 │
-├── scripts/                     # Master automation and launcher scripts
-│   ├── start-suite-menu.bat     # Interactive master control panel launcher
-│   ├── build-all.ps1            # Multi-target build script for .NET and Node.js
-│   ├── start-pos-desktop.bat    # 1-Click launcher for WinForms desktop POS
-│   ├── start-pos-ai.bat         # 1-Click launcher for AI side-panel companion
-│   ├── start-pos-dashboard.bat  # 1-Click launcher for POS web dashboard & services
-│   ├── start-storefront.bat     # 1-Click launcher for Next.js storefront dev server
-│   └── start-storefront-desktop.bat # 1-Click launcher for Electron desktop storefront
+├── scripts/                     # Release gate, package builders and the launcher maker
+│   ├── build-all.ps1            # Multi-target build script for .NET and Node.js (for developers)
+│   ├── launcher/, lib/build-launcher.mjs  # The small Windows programs that open our programs with no black window
+│   └── dev/                     # Helpers for developers that show a window on purpose: "(with a window, for developers)"
 │
 ├── SmartRetailSuite.sln         # Master Visual Studio 2022 Solution uniting all 21 .NET projects
 ├── package.json                 # Monorepo root npm orchestration configuration
@@ -172,56 +168,37 @@ smart-retail-suite/
 
 ---
 
-## 4. Quick Start & Launching
+## 4. Opening the programs
 
-### Interactive Master Menu
-Launch the interactive command center from the root:
+### For the people who use them: every program opens like a program
+
+One icon or Start menu entry opens each program. A window with no address bar appears, and **no black terminal window appears at any time** (`CLAUDE.md`, section 10). Nobody is told to open a terminal or type a command. If something goes wrong, a plain note opens by itself.
+
+| Program | How it is opened | When its window is closed |
+|---|---|---|
+| Business Hub (the shop program) | The setup puts **Smart Retail POS** on the desktop and in the Start menu. The plain zip has **Start Business Hub** (setup is the normal way) | Keeps running in the background, on purpose: it is the shop's service. Opening it again shows the Hub in a window; there is never a second copy of the Hub |
+| Windows POS, AI add-on | The setup's Start menu entry (and its desktop icon, where the setup offers one) opens the program itself: a Windows program, no terminal | As for any Windows program. The AI add-on also has an icon near the clock: right-click it and choose Exit |
+| Dashboard on its own | **Start Smart Retail POS** (the icon in its package) | Keeps running in the background, like the Hub. Opening it again shows a window and does not start a second copy |
+| Website (one customer's online shop) | **Start Website** (Windows) | Stops the website |
+| Setup Studio (for NextGenOS staff) | **Setup Studio** | Stops the Studio |
+
+Each of these also has a file named `... (with a window, for problems)` that shows a window with what the program says, for finding a problem. `docs/CUSTOMER-GUIDE.md` says it again in plain words for the shop owner.
+
+### For developers
+
+The helpers in `scripts/dev` (and `Brand Studio (with a window, for developers).bat`, and the two in `apps/pos-desktop`) start a program from its source and **show a window on purpose**; the words "with a window, for developers" are in their names. They need the .NET SDK or Node.js. A shop or a customer never uses them.
+
 ```cmd
-scripts\start-suite-menu.bat
-```
-This menu lets you launch any of the four applications, run builds, or verify AI keys with a single keystroke.
-
-### Starting Individual Applications
-
-#### 1. Demo Mart Web Storefront (Next.js)
-```cmd
-# Using root npm script
-npm run dev:storefront
-
-# Or using the direct batch launcher
-scripts\start-storefront.bat
-```
-Visit [http://localhost:3000](http://localhost:3000) in your browser.
-
-#### 2. Demo Mart Desktop Shopping Client (Electron)
-```cmd
-# Using root npm script
-npm run desktop:storefront
-
-# Or using the direct batch launcher
-scripts\start-storefront-desktop.bat
-```
-
-#### 3. Core Desktop POS (WinForms & SQL Server)
-```cmd
-scripts\start-pos-desktop.bat
-```
-
-#### 4. Smart Retail AI Companion (WPF .NET 8)
-```cmd
-scripts\start-pos-ai.bat
-```
-
-#### 5. POS Modern Web Dashboard (.NET 8)
-```cmd
-scripts\start-pos-dashboard.bat
+npm run dev:storefront        # the online shop's development server, http://localhost:3000
+npm run desktop:storefront    # the desktop shopping app (Electron)
+scripts\dev\Menu of all programs (with a window, for developers).bat
 ```
 
 ---
 
 ## 5. Building the Suite
 
-### Master Build Script
+### Master Build Script (for developers)
 Run the automated PowerShell build script:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build-all.ps1

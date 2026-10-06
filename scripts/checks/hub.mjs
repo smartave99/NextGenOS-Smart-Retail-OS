@@ -1,5 +1,6 @@
 // Release-gate checks for the Business Hub (apps/business-hub): the licence is wired into its program and cannot be skipped by anything
-// that ships, it builds, its tests pass, and every kind of business works in a real browser.
+// that ships, it builds, its tests pass, and every kind of business works in a real browser. Also here: programs open like programs, with no terminal
+// (CLAUDE.md section 10): the scripts, the setups' shortcuts, the Hub zip's and the dashboard's hidden launcher, and the launcher run under Wine.
 
 import { browserProblem } from '../lib/playwright.mjs';
 
@@ -34,6 +35,36 @@ export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) 
           if (/new ProductLicence\(|E2E:|GetEnvironmentVariable\(\s*"[A-Z_]*LICEN[CS]E/i.test(body)) problems.push(`${rel} builds or switches the licence itself`);
         }
         return problems.length ? { status: 'FAIL', detail: problems.join('\n') } : { status: 'PASS', detail: 'the Hub checks the licence before anything else, and has no switch to skip it' };
+      },
+    },
+    {
+      name: 'no-terminal',
+      title: 'Programs open like programs, with no terminal (CLAUDE.md section 10): every script is a named window helper or an engineer\'s tool; the setups open window programs; the Hub zip and the dashboard get a hidden launcher; the launcher maker and its command line refuse bad input; the guides name no old way in',
+      run: () => {
+        if (!has('makensis')) return { status: 'SKIP', detail: 'makensis (NSIS) is not installed here, so the launchers cannot be made and read (apt-get install nsis): a skipped test is not a passed test' };
+        const r = runCmd('no-terminal', 'node', ['--test', 'scripts/tests/no-terminal.test.mjs', 'scripts/tests/launcher-open.test.mjs', 'scripts/tests/hub-zip-launcher.test.mjs']);
+        if (r.status !== 'PASS') return r;
+        const skipped = /# skipped (\d+)/.exec(r.out);
+        if (skipped && Number(skipped[1]) > 0) return { status: 'SKIP', detail: `${skipped[1]} test(s) were skipped: a skipped test is not a passed test` };
+        const n = /# pass (\d+)/.exec(r.out);
+        return { status: 'PASS', detail: `${n ? n[1] : 'all'} tests passed. NOT VERIFIED here: that no black window flashes on a real Windows PC (a person must look)` };
+      },
+    },
+    {
+      name: 'launcher-wine',
+      title: 'The launcher of a background program (the Hub zip, the dashboard) RUN under Wine: it starts the program once, waits until it answers, opens the window, and does not start a second copy when opened twice',
+      full: true,
+      run: () => {
+        const wine = ['/usr/lib/wine/wine64', '/usr/lib/wine64/wine64', '/usr/bin/wine64'].some((p) => existsSync(p));
+        const missing = [['makensis', has('makensis')], ['wine64', wine], ['Xvfb', has('Xvfb')], ['node', has('node')]].filter(([, ok]) => !ok).map(([n]) => n);
+        if (missing.length) return { status: 'SKIP', detail: `not installed here: ${missing.join(', ')} (apt-get install nsis wine64 xvfb)` };
+        const r = runCmd('launcher-wine', 'node', ['--test', 'scripts/tests/launcher-open-wine.test.mjs'], { timeout: 600_000 });
+        if (r.status !== 'PASS') return r;
+        const skipped = /# skipped (\d+)/.exec(r.out);
+        if (skipped && Number(skipped[1]) > 0) return { status: 'SKIP', detail: `${skipped[1]} test(s) were skipped: a skipped test is not a passed test` };
+        const n = /# pass (\d+)/.exec(r.out);
+        const ran = /LAUNCHERS RUN: ([^\n]+)/.exec(r.out)?.[1] ?? 'the 64-bit build';
+        return { status: 'PASS', detail: `${n ? n[1] : 'all'} runs passed. Launchers run: ${ran}. NOT VERIFIED here: that no black window flashes, and the launcher on a real Windows PC (a person must look)` };
       },
     },
     {

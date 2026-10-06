@@ -14,6 +14,8 @@ This folder is **private**. It makes, hands out and withdraws the licences of **
 
 You need **Node.js 22.5 or newer** (https://nodejs.org) on a PC or server that stays on, and for real use a web address with HTTPS (for example `https://licence.yourcompany.com`) pointing at it.
 
+**What kind of program the Licence Studio is:** a *server* that you run on a machine that stays on and look after yourself, like any web server; it is not a program that opens in a window on a counter PC, so it has no icon and is started from a terminal on purpose (`CLAUDE.md`, section 10 allows this for a server that staff run remotely). Your sales and support people use it only in their browser, at its address. It is never given to a customer.
+
 ```
 cd licensing/studio
 node src/cli.js init --admin-email you@yourcompany.com --admin-name "Your Name"

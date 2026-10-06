@@ -447,14 +447,18 @@ export class Workspace {
     return { info, intake, files, logo: logoName ? { ext: logoName.split('.').pop(), bytes: readFileSync(join(dir, logoName)) } : null };
   }
 
-  recordBuild(actor, id, build) {
+  /**
+   * Writes down what was made for a customer, from an approved release. A pack makes the customer "built"; the website and app made by the build service do not (the customer
+   * is not "built" until its pack is), and write their own line in the activity record (`options.action`, `options.detail`).
+   */
+  recordBuild(actor, id, build, { action = 'build.made', detail = null, keepState = false } = {}) {
     need(actor, 'build', 'make installers');
     const meta = this.#meta(id);
     if (!this.releaseNumbers(id).includes(build.release)) throw new StudioError('Make installers from an approved release.', 409);
     meta.builds = [...(meta.builds ?? []), { ...build, at: stamp(), by: person(actor) }].slice(-50);
-    if (meta.state === 'approved') meta.state = 'built';
+    if (meta.state === 'approved' && !keepState) meta.state = 'built';
     this.#saveMeta(id, meta, actor);
-    this.log(actor, 'build.made', id, `${build.kind ?? 'installer'} from release ${build.release}`);
+    this.log(actor, action, id, detail ?? `${build.kind ?? 'installer'} from release ${build.release}`);
   }
 
   deliver(actor, id, note) {
@@ -469,6 +473,9 @@ export class Workspace {
   }
 
   buildsFolder(id, n) { return inside(this.folder, 'builds', id, String(Number(n))); }
+
+  /** Where the files made for one customer by the build service are kept (the website, the app), beside the numbered folders of its packs. Rebuilt on demand, so not in a backup. */
+  siteBuildsFolder(id) { this.#dir(id); return inside(this.folder, 'builds', id, 'website-app'); }
 
   // ---- safe keeping ---------------------------------------------------------------------------------------------------------------------
 

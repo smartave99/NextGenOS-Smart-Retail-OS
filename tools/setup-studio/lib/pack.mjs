@@ -117,7 +117,8 @@ export function brandKitFor({ intake, logo }) {
   return kit;
 }
 
-const websiteEnv = (intake) => CRLF([
+/** The public settings of a customer's website, as the file website-settings.env (also what the Studio sends the build service). Only public values: no password, no key. */
+export const websiteEnv = (intake) => CRLF([
   `# Public settings for ${intake.business.name}'s website. Put these in the website's environment before it is built.`,
   `NEXT_PUBLIC_SITE_NAME=${intake.business.name}`,
   intake.ecosystem.website.domain ? `NEXT_PUBLIC_SITE_URL=https://${intake.ecosystem.website.domain}` : '# NEXT_PUBLIC_SITE_URL=https://   (the website name was not given)',
@@ -159,12 +160,14 @@ export function planPack({ intake, kit, slug }) {
     // A website is built for one customer (its name, address and country are built in): only the one named for this customer is used, for each system the release has.
     const site = pick(kit, 'website', { kit: slug });
     items.push({ id: 'website', title: 'The website', wanted: true, files: site, status: site.length ? 'ready' : 'missing',
-      note: site.length ? `The website built for this customer (${site.map((f) => f.os === 'windows' ? 'Windows' : 'Linux').join(' and ')}), with its public settings.` : 'The website\'s public settings are in the pack. A website for this customer has not been built yet: each customer has their own build. The pack holds the steps (the release workflow, with these settings).' });
+      note: site.length ? `The website built for this customer (${site.map((f) => f.os === 'windows' ? 'Windows' : 'Linux').join(' and ')}), with its public settings.` : 'The website\'s public settings are in the pack. A website for this customer has not been built yet: each customer has their own build. Make it in this customer\'s "Website and app" step, then make the pack again.' });
   }
   if (eco.android.wanted) {
+    // The app (to put on a phone) and, when there is one, the same app as the file the Play Store takes.
     const apk = pick(kit, 'android-apk', { kit: slug });
-    items.push({ id: 'android', title: 'The Android app', wanted: true, files: apk, status: apk.length ? 'ready' : 'missing',
-      note: apk.length ? 'The signed app made for this customer.' : 'The app for this customer has not been built yet. The pack holds its brand kit and the steps to build it (the release workflow, with this brand kit).' });
+    const aab = pick(kit, 'android-aab', { kit: slug });
+    items.push({ id: 'android', title: 'The Android app', wanted: true, files: [...apk, ...(apk.length ? aab : [])], status: apk.length ? 'ready' : 'missing',
+      note: apk.length ? 'The app made for this customer.' : 'The app for this customer has not been built yet. Make it in this customer\'s "Website and app" step, then make the pack again. The pack holds its brand kit.' });
   }
   return items;
 }
@@ -274,7 +277,9 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
       ] : [
         `The website for ${business} has not been built yet. A website is built for each customer, because its name, address and country are built in.`,
         'website-settings.env holds those public settings. It holds no password.',
-        `To build it: on GitHub, open Actions, "Release", Run workflow. Type ${customerId} as "Website customer"${line ? ' and paste this line as "Website settings":' : ', and give the settings of website-settings.env (the box takes one line; a setting that holds a semicolon needs a brand kit in brand-kits/ instead):'}`,
+        'To have it built: in the NextGenOS Setup Studio, open this customer, go to the step "Website and app" and press the build button. The Studio brings the finished website back; then make the pack again.',
+        '',
+        `Without the Studio's build service, a person who can run the release workflow can build it by hand: on GitHub, open Actions, "Release", Run workflow. Type ${customerId} as "Website customer"${line ? ' and paste this line as "Website settings":' : ', and give the settings of website-settings.env (the box takes one line; a setting that holds a semicolon needs a brand kit in brand-kits/ instead):'}`,
         ...(line ? ['', line, ''] : []),
         `The release makes ${websiteFileName(customerId, 'windows')} and ${websiteFileName(customerId, 'linux')}. Download them into the programs folder of the Setup Studio and make the pack again.`,
         'The website also needs its own accounts (its database and its picture storage). Those are set up by the person who puts the website online.',
@@ -288,10 +293,13 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
       if (logo) put(`${kitFolder}/logo.${logo.ext}`, logo.bytes);
       put(`${folder}/READ ME FIRST.txt`, readme(`${business}: the Android app`, item.files.length ? [
         `The app is in this folder: ${item.files.map((f) => f.name).join(', ')}.`,
-        'Copy it to the phone and open it. If the phone asks, allow installing from this source.',
+        'Copy the .apk file to the phone and open it. If the phone asks, allow installing from this source.',
+        ...(item.files.some((f) => f.role === 'android-aab') ? ['The .aab file is for the Google Play Store (whoever publishes the app there uploads it). It cannot be opened on a phone.'] : []),
       ] : [
         'The app for this business has not been built yet.',
-        `The folder brand-kit holds this business's look (brand.json and the logo). To build the app: put the folder "${customerId}" into brand-kits/ of the NextGenOS repository, then on GitHub run the "Release" workflow by hand with Brand kit = ${customerId}.`,
+        'To have it built: in the NextGenOS Setup Studio, open this customer, go to the step "Website and app" and press the build button. The Studio brings the finished app back; then make the pack again.',
+        '',
+        `The folder brand-kit holds this business's look (brand.json and the logo). Without the Studio's build service, a person who can run the release workflow can build the app by hand: put the folder "${customerId}" into brand-kits/ of the NextGenOS repository, then on GitHub run the "Release" workflow by hand with Brand kit = ${customerId}.`,
         'It makes the signed app. Download it into the programs folder of the Setup Studio and make the pack again.',
       ], help));
     }

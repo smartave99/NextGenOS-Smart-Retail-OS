@@ -284,3 +284,31 @@ test('the website settings the pack writes are exactly what the website builder 
     assert.equal(`${packageName('luzon-fresh-mart', 'linux')}.zip`, websiteFileName('luzon-fresh-mart', 'linux'), 'the Studio and the builder name the file the same way');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('the Android app: the phone file and the store file made for THIS customer go in the pack; without them the steps point to the Studio\'s "Website and app" step', async () => {
+  const root = tmp();
+  const root2 = tmp();
+  try {
+    const apk = randomBytes(2500), aab = randomBytes(2600);
+    const { dir } = await programs(root, { extra: { 'SmartRetailPOS-luzon-fresh-mart-1.0.4.apk': apk, 'SmartRetailPOS-luzon-fresh-mart-1.0.4.aab': aab, 'SmartRetailPOS-someone-else-1.0.1.apk': randomBytes(2000) } });
+    const kit = await readBaseKit(dir);
+    const intake = intakeOf({ ecosystem: { website: { wanted: true, domain: 'luzonfresh.example' }, android: { wanted: true, appId: 'com.luzonfresh.shop' } } });
+    const plan = planPack({ intake, kit, slug: 'luzon-fresh-mart' }).find((i) => i.id === 'android');
+    assert.equal(plan.status, 'ready');
+    assert.deepEqual(plan.files.map((f) => f.name).sort(), ['SmartRetailPOS-luzon-fresh-mart-1.0.4.aab', 'SmartRetailPOS-luzon-fresh-mart-1.0.4.apk']);
+    const r = await buildPack({ customerId: 'luzon-fresh-mart', parts: partsOf(intake), kit, out: join(root, 'out') });
+    const folder = join(r.dir, '4 - Android app');
+    assert.ok(readFileSync(join(folder, 'SmartRetailPOS-luzon-fresh-mart-1.0.4.apk')).equals(apk) && readFileSync(join(folder, 'SmartRetailPOS-luzon-fresh-mart-1.0.4.aab')).equals(aab));
+    assert.ok(!existsSync(join(folder, 'SmartRetailPOS-someone-else-1.0.1.apk')), 'another customer\'s app is never in this pack');
+    assert.match(readFileSync(join(folder, 'READ ME FIRST.txt'), 'utf8'), /\.aab file is for the Google Play Store/);
+    // without the app, and without the website: the pack says where they are made
+    const bare = await programs(root2, {});
+    const kit2 = await readBaseKit(bare.dir);
+    const r2 = await buildPack({ customerId: 'luzon-fresh-mart', parts: partsOf(intake), kit: kit2, out: join(root2, 'out') });
+    assert.match(readFileSync(join(r2.dir, '4 - Android app', 'READ ME FIRST.txt'), 'utf8'), /go to the step "Website and app"/);
+    assert.match(readFileSync(join(r2.dir, '3 - Website', 'READ ME FIRST.txt'), 'utf8'), /go to the step "Website and app"/);
+    const noApp = planPack({ intake, kit: kit2, slug: 'luzon-fresh-mart' });
+    assert.match(noApp.find((i) => i.id === 'android').note, /"Website and app" step/);
+    assert.match(noApp.find((i) => i.id === 'website').note, /"Website and app" step/);
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(root2, { recursive: true, force: true }); }
+});

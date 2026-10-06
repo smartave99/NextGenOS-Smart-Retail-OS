@@ -17,7 +17,7 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
       name: 'package-audit-tests',
       title: 'The package audit catches source, tests, keys, databases, licences and secrets (and passes a clean package), and the history scan finds a secret that was committed and later deleted',
       run: () => {
-        const r = runCmd('package-audit-tests', 'node', ['--test', 'scripts/tests/audit-package.test.mjs', 'scripts/tests/scan-history.test.mjs']);
+        const r = runCmd('package-audit-tests', 'node', ['--test', 'scripts/tests/audit-package.test.mjs', 'scripts/tests/scan-history.test.mjs', 'scripts/tests/release-assets.test.mjs']);
         if (r.status !== 'PASS') return r;
         const n = /# pass (\d+)/.exec(r.out);
         return { status: 'PASS', detail: `${n ? n[1] : 'all'} audit tests passed` };

@@ -175,15 +175,22 @@ namespace SmartRetail.AI.Tests
 
             Assert.Matches(@"(?m)^  gate:\s*\n", workflow);
             Assert.Contains("node scripts/verify-all.mjs --full", workflow);
-            Assert.Matches(@"(?m)^  android:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.Matches(@"(?m)^  android:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // The Windows setup is built after the gate too, and the release is published only when the gate passed (the builds may report their own failure in the notes).
-            Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // So is the Linux package of the Hub; the release waits for all three builds to report.
-            Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // And so is the staff bundle of the Setup Studio.
-            Assert.Matches(@"(?m)^  studio:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, android, windows, linux, studio\]\s*\n", workflow);
+            Assert.Matches(@"(?m)^  studio:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows, linux, studio\]\s*\n", workflow);
+            // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
+            Assert.Matches(@"(?m)^  prepare:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.DoesNotContain("upload-artifact", workflow);
+            Assert.DoesNotContain("download-artifact", workflow);
+            Assert.Contains("node scripts/release-assets.mjs create", workflow);
+            Assert.Contains("node scripts/release-assets.mjs publish", workflow);
             Assert.Contains("needs.gate.result == 'success'", workflow);
+            Assert.Contains("needs.prepare.result == 'success'", workflow);
         }
 
         [Fact]
@@ -215,7 +222,7 @@ namespace SmartRetail.AI.Tests
             {
                 // Typed values (inputs, brand-kit fields) may reach scripts only as environment variables, never inside the script text.
                 var isScriptText = !line.TrimStart().StartsWith("env:") && !line.TrimStart().StartsWith("KIT:") && !line.TrimStart().StartsWith("VERSION_")
-                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:") && !line.TrimStart().StartsWith("TRIAL_")
+                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:") && !line.TrimStart().StartsWith("TRIAL_") && !line.TrimStart().StartsWith("PUBLISH_TRIAL:")
                                    && !line.TrimStart().StartsWith("#") && !line.TrimStart().StartsWith("description:") && !line.TrimStart().StartsWith("default:");
                 if (isScriptText)
                 {

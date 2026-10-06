@@ -576,7 +576,10 @@ jobs:
           Add-Type -AssemblyName System.Web
           $zip = Get-ChildItem dl -Filter 'NextGenOS-Setup-Studio-*-windows.zip' | Select-Object -First 1
           if (-not $zip) { throw 'The Studio zip is not on the draft release.' }
-          Expand-Archive -Path $zip.FullName -DestinationPath studio
+          # Windows' own tar unpacks zip files reliably (it is what the other Windows jobs use).
+          New-Item -ItemType Directory -Force -Path studio | Out-Null
+          tar -xf $zip.FullName -C studio
+          if ($LASTEXITCODE -ne 0) { throw 'The Studio zip could not be unpacked.' }
           $top = Join-Path (Get-Location).Path 'studio\NextGenOS Setup Studio'
           $exe = Join-Path $top 'Setup Studio.exe'
           if (-not (Test-Path $exe)) { throw 'Setup Studio.exe is not in the zip.' }

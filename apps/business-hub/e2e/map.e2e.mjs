@@ -69,6 +69,15 @@ try {
   assert.match(await page.locator('#links-table').innerText(), /Camera 1\s+watches\s+Aisle 3/);
   step('a camera is connected to the area it watches');
 
+  await page.locator('#p-text').fill('Basmati');
+  await page.locator('#p-go').click();
+  await page.locator('#find-list li', { hasText: 'Basmati rice 5 kg' }).waitFor();
+  assert.match(await page.locator('#find-list').innerText(), /product:1\b/);
+  await page.locator('#p-text').fill('zzzz-nothing');
+  await page.locator('#p-go').click();
+  await page.locator('#find-none').waitFor();
+  step('a product is found by part of its name and its reference is shown');
+
   await page.locator('#c-type').selectOption('stocked_on');
   await page.locator('#c-from').fill('product:1');
   await page.locator('#c-to').fill('shelf:top-shelf');

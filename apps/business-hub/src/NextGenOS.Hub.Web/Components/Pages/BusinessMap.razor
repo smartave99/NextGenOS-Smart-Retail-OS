@@ -97,6 +97,21 @@ else if (!App.Ontology.Writable)
     <p class="muted small">Connections that your own records already show (a payment pays a bill, a bill has a line for a product) are not added here: they appear by themselves when you look a thing up.</p>
 </section>
 
+<section class="card" id="map-find">
+    <h2>Find the reference of a product or a person</h2>
+    <p class="muted small">Your products, customers and suppliers are named by a number in the shop's records. Type part of a name to see theirs, then use it above.</p>
+    <div class="field-row"><div><label for="p-text">Name</label><input id="p-text" @bind="findText" maxlength="60" /></div></div>
+    <div class="row"><button type="button" class="btn ghost" id="p-go" @onclick="FindThings">Find</button></div>
+    @if (found is not null)
+    {
+        @if (found.Count == 0) { <p class="muted" id="find-none">Nothing has that name.</p> }
+        else
+        {
+            <ul id="find-list">@foreach (var f in found) { <li>@f.Label <code>@f.Ref</code></li> }</ul>
+        }
+    }
+</section>
+
 <section class="card" id="map-look">
     <h2>Look a thing up</h2>
     <div class="field-row">
@@ -149,6 +164,8 @@ else if (!App.Ontology.Writable)
     private ThingView? looked;
     private IReadOnlyList<Link> lookedLinks = Array.Empty<Link>();
     private string lookRef = "";
+    private string findText = "";
+    private IReadOnlyList<ThingView>? found;
     private readonly Dictionary<ThingRef, string> names = new();
 
     protected override Task LoadAsync()
@@ -208,6 +225,20 @@ else if (!App.Ontology.Writable)
             connect.From = connect.To = "";
         }, "Connected.");
         await Reload();
+    }
+
+    private async Task FindThings()
+    {
+        found = null;
+        await Run(() =>
+        {
+            var text = findText.Trim();
+            if (text.Length < 2) throw new HubException("too-short", "Type at least two letters.");
+            var list = new List<ThingView>();
+            foreach (var item in App.Catalog.Search(text, limit: 10)) if (App.Ontology.Resolve(new ThingRef(EntityType.Product, item.Id.ToString(CultureInfo.InvariantCulture))) is { } p) list.Add(p);
+            foreach (var party in App.Parties.Search(null, text, 10)) if (App.Ontology.Resolve(new ThingRef(EntityType.Party, party.Id.ToString(CultureInfo.InvariantCulture))) is { } p) list.Add(p);
+            found = list;
+        });
     }
 
     private async Task Look()

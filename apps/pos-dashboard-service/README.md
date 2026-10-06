@@ -515,7 +515,11 @@ To run it on its own:
 
 1. Build `dist\SmartRetailPOS.zip` with `build.ps1` (see *Developing*).
 2. Unzip it, e.g. to `C:\Program Files\NextGenOS\Smart Retail POS\`.
-3. Double-click **Start Smart Retail POS.cmd**. It opens `http://127.0.0.1:5080` in its own Microsoft Edge window.
+3. Double-click **Start Smart Retail POS** (the icon). There is no black window: the dashboard starts quietly in the background and opens at `http://127.0.0.1:5080` in a window of its own (Microsoft Edge, no address bar).
+
+**What kind of program it is:** a background program of the shop. Closing its window does **not** stop it (it keeps the owner's live view and the other background jobs going); double-click **Start Smart Retail POS** again to bring a window back, and it does not start a second copy. It stops when the PC restarts or the person signs out. To stop it sooner: Task Manager, *Details*, `SmartRetail.Pos.Web.exe`, *End task*. (When the AI add-on starts the dashboard, it is the add-on's own window and the dashboard stops with the add-on.)
+
+If something goes wrong, open **Start Smart Retail POS (with a window, for problems)** in the same folder: it shows a window with what the program says, and closing that window stops it.
 
 ### Connecting a database by hand
 

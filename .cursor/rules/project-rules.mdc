@@ -1,0 +1,8 @@
+---
+description: The project's rules (one set, for every assistant and every person)
+alwaysApply: true
+---
+
+Read `CLAUDE.md` in the repository root completely before you change anything, then `docs/OPEN-WORK.md`. `CLAUDE.md` is the only set of rules; this file holds none of its own.
+
+Nothing is "complete" until `node scripts/verify-all.mjs --full` exits 0 and its table is quoted (section 2). No secret, licence bypass or source code in what customers or staff receive (section 3). A customer's name, country or look is a setting, never code (sections 1 and 8). Programs open as windows, never a terminal (section 10). The owner must never have to repeat a rule: write it into `CLAUDE.md` in the same session (section 13).

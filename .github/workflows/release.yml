@@ -2,6 +2,8 @@ name: Release
 
 # Builds the release files and publishes them as a GitHub Release.
 #   - push a tag such as v1.0.0 (or v1.0.0-rc1 for a trial release), or
+#   - push a tag such as studio-v1.0.0 (or studio-v1.0.0-rc1): a release of the Setup Studio alone (the gate, the Studio for Windows and Linux, the Studio opened on a Windows PC),
+#     with a page that speaks only of the Studio. It needs no licence keys: the Studio holds none. Or
 #   - run it by hand from the Actions tab and choose the brand kit, or
 #   - change .github/trial-release.json on a claude/* branch: trial-release.yml then calls this workflow and, when the gate passes, makes the tag and the GitHub Release itself
 #     (a trial: built without licence keys, marked, never for a customer). A real release always needs a tag made by the owner.
@@ -10,7 +12,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "studio-v*"]
   workflow_call:
     inputs:
       kit:
@@ -119,7 +121,10 @@ jobs:
           else TAG="v${VERSION_NAME}-manual${RUN_NUMBER}"; fi
           PRE=""
           case "${TAG}" in *-rc*|*-beta*|*-alpha*|*-trial*|*-manual*) PRE="--prerelease";; esac
-          node scripts/release-assets.mjs create --tag "${TAG}" --target "${GITHUB_SHA}" --title "Smart Retail POS ${TAG}" ${PRE} ${MAKE}
+          TITLE="Smart Retail POS ${TAG}"
+          # A Setup Studio release: the tag must name the version the Studio really has, or the page would say one version and the files another.
+          case "${TAG}" in studio-v*) node scripts/check-studio-version.mjs "${TAG}"; TITLE="NextGenOS Setup Studio ${TAG#studio-}";; esac
+          node scripts/release-assets.mjs create --tag "${TAG}" --target "${GITHUB_SHA}" --title "${TITLE}" ${PRE} ${MAKE}
 
   cleanup:
     # When the gate does not pass nothing is built and nothing is released: the draft and the tag this run made are taken away again.
@@ -147,6 +152,7 @@ jobs:
   android:
     name: Android app (APK and AAB)
     needs: [gate, prepare]
+    if: ${{ !startsWith(github.ref_name, 'studio-v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -246,6 +252,7 @@ jobs:
     # ("adequate stub not found"). The program is the same either way: published for Windows (self-contained), its names hidden, audited. The next job tries the result on a real Windows PC.
     name: Windows setup for the Business Hub (built)
     needs: [gate, prepare]
+    if: ${{ !startsWith(github.ref_name, 'studio-v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -295,6 +302,7 @@ jobs:
   windows:
     name: Windows setup for the Business Hub (tried on a Windows PC)
     needs: [gate, prepare, windows-build]
+    if: ${{ !startsWith(github.ref_name, 'studio-v') }}
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -379,6 +387,7 @@ jobs:
   linux:
     name: Linux package for the Business Hub
     needs: [gate, prepare]
+    if: ${{ !startsWith(github.ref_name, 'studio-v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -426,6 +435,7 @@ jobs:
     # (no source, no secret, nothing a factory-new computer lacks), started from its zip, and must refuse to work without a licence. The licence keys are built in like the Hub's.
     name: Website for the customer (${{ matrix.os }})
     needs: [gate, prepare]
+    if: ${{ !startsWith(github.ref_name, 'studio-v') }}
     strategy:
       fail-fast: false
       matrix:
@@ -701,24 +711,38 @@ jobs:
           STUDIO: ${{ needs.studio.result }}
           STUDIO_WINDOWS: ${{ needs.studio-windows.result }}
           WEBSITE: ${{ needs.website.result }}
+          STUDIO_ONLY: ${{ startsWith(github.ref_name, 'studio-v') }}
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
           set -euo pipefail
           test -d dist && [ -n "$(ls -A dist)" ] || { echo "Nothing was built, so there is nothing to release."; exit 1; }
-          {
-            echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
-            echo "Windows setup for the Business Hub: built ${WINDOWS_BUILD}, tried on a Windows PC ${WINDOWS}"
-            echo "Linux packages for the Business Hub: ${LINUX}"
-            echo "Android app: ${ANDROID}"
-            echo "Setup Studio for staff: ${STUDIO}"
-            echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
-            echo "Website for the customer (Linux and Windows): ${WEBSITE}"
-          } > dist/BUILD-STATUS.txt
-          cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
+          if [ "${STUDIO_ONLY}" = "true" ]; then
+            # A release of the Studio alone is the Studio: if it was not built, or not opened on a Windows PC, there is no release.
+            if [ "${STUDIO}" != "success" ] || [ "${STUDIO_WINDOWS}" != "success" ]; then
+              echo "The Setup Studio was not built and opened on a Windows PC (built: ${STUDIO}, opened: ${STUDIO_WINDOWS}), so there is nothing to release."; exit 1
+            fi
+            {
+              echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
+              echo "Setup Studio for staff: ${STUDIO}"
+              echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
+            } > dist/BUILD-STATUS.txt
+          else
+            {
+              echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
+              echo "Windows setup for the Business Hub: built ${WINDOWS_BUILD}, tried on a Windows PC ${WINDOWS}"
+              echo "Linux packages for the Business Hub: ${LINUX}"
+              echo "Android app: ${ANDROID}"
+              echo "Setup Studio for staff: ${STUDIO}"
+              echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
+              echo "Website for the customer (Linux and Windows): ${WEBSITE}"
+            } > dist/BUILD-STATUS.txt
+            cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
+          fi
           cat dist/BUILD-STATUS.txt
           # A build made without the licence keys is marked so that nothing downstream (the Setup Studio included) can mistake it for a real one.
           if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the installing. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
       - name: The list of release files for the Setup Studio (what each file is, and its fingerprint)
+        if: ${{ !startsWith(github.ref_name, 'studio-v') }}
         run: node scripts/make-base-kit.mjs dist
       - name: Checksums
         run: cd dist && sha256sum * | grep -v SHA256SUMS > SHA256SUMS.txt && cat SHA256SUMS.txt
@@ -727,10 +751,13 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          STUDIO_ONLY: ${{ startsWith(github.ref_name, 'studio-v') }}
         run: |
           set -euo pipefail
           # The release page is written from the files that were really built: what to download for each thing a person may try, the steps, and what is not in this release.
-          node scripts/make-release-notes.mjs --dist dist --commit "${GITHUB_SHA}" --tag "${TAG}" --version "${VERSION_NAME}" --out "${RUNNER_TEMP}/notes.md"
+          # A Studio release has a page of its own, with the version of the Studio itself (never the Hub's default).
+          if [ "${STUDIO_ONLY}" = "true" ]; then SHAPE=(--only studio); else SHAPE=(--version "${VERSION_NAME}"); fi
+          node scripts/make-release-notes.mjs --dist dist --commit "${GITHUB_SHA}" --tag "${TAG}" "${SHAPE[@]}" --out "${RUNNER_TEMP}/notes.md"
           LAST=()
           for f in BUILD-STATUS.txt HOW-TO-TRY.txt NO-LICENCE-KEYS-TRIAL-ONLY.txt base-kit.json SHA256SUMS.txt; do [ -f "dist/${f}" ] && LAST+=("dist/${f}"); done
           node scripts/release-assets.mjs upload --release "${RELEASE_ID}" "${LAST[@]}"

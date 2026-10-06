@@ -214,6 +214,34 @@ namespace SmartRetail.AI.Tests
         }
 
         [Fact]
+        public void A_Studio_release_runs_the_gate_and_the_Studio_alone_and_checks_that_its_tag_names_the_Studios_version()
+        {
+            var workflow = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "release.yml"));
+            string Job(string name) => System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  " + name + @":\s*\n(.*?)(?=^  [a-z-]+:\s*$|\z)").Groups[1].Value;
+            const string skipForStudio = "if: ${{ !startsWith(github.ref_name, 'studio-v') }}";
+
+            // A tag such as studio-v1.0.0 starts it, next to the tags of a full release.
+            Assert.Contains("tags: [\"v*\", \"studio-v*\"]", workflow);
+            // The shop program, the website and the app are not built for it ...
+            foreach (var job in new[] { "android", "windows-build", "windows", "linux", "website" })
+            {
+                Assert.Contains(skipForStudio, Job(job));
+            }
+
+            // ... but the gate, the draft release, the Studio itself and its try-out on a Windows PC always run.
+            foreach (var job in new[] { "gate", "prepare", "studio", "studio-windows" })
+            {
+                Assert.DoesNotContain("studio-v", Job(job).Replace("check-studio-version.mjs \"${TAG}\"; TITLE=\"NextGenOS Setup Studio ${TAG#studio-}\";; esac", "").Replace("case \"${TAG}\" in studio-v*)", ""));
+            }
+
+            // The tag must name the version the Studio really has, and the page is the Studio's own.
+            Assert.Contains("node scripts/check-studio-version.mjs", Job("prepare"));
+            Assert.Contains("--only studio", Job("publish"));
+            // A Studio release is the Studio: without it built and opened on a Windows PC there is nothing to publish.
+            Assert.Contains("[ \"${STUDIO_WINDOWS}\" != \"success\" ]", Job("publish"));
+        }
+
+        [Fact]
         public void A_trial_release_started_from_a_branch_is_always_built_without_keys_and_never_from_main_or_a_tag()
         {
             var trial = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "trial-release.yml"));

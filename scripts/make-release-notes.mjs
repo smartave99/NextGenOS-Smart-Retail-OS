@@ -2,7 +2,9 @@
 /**
  * Writes the text of the GitHub Release page from the files that were really built, so that the page tells a person what to download and what to do with it.
  *
- *   node scripts/make-release-notes.mjs --dist dist --commit <sha> [--tag v1.0.0] [--version 1.0.0] [--template .github/release-notes.md] [--out notes.md]
+ *   node scripts/make-release-notes.mjs --dist dist --commit <sha> [--tag v1.0.0] [--version 1.0.0] [--only studio] [--template .github/release-notes.md] [--out notes.md]
+ *
+ * --only studio is the page of a release of the Setup Studio alone (a tag such as studio-v1.0.0): it uses .github/release-notes-studio.md and speaks only of the Studio.
  *
  * The frame of the page (what to read before testing, support) is the template .github/release-notes.md; it has these places, each written as two curly brackets around a name:
  * TRIAL_BANNER, VERSION, START_HERE (one section for each thing a person can try, with its steps), MISSING (what is not in this release, and why), ALL_FILES,
@@ -69,7 +71,8 @@ function startHere(files, ctx) {
     ? 'This is a trial build, so it says the program **needs a licence**. That is the correct result: nothing more opens without a licence key.'
     : 'When it asks for a licence key, type the key NextGenOS gave you.';
 
-  const [setup] = by('hub-windows-setup');
+  const studioOnly = ctx.only === 'studio';
+  const [setup] = studioOnly ? [] : by('hub-windows-setup');
   if (setup) {
     sections.push([
       '#### The shop program on a Windows PC (Windows 10 or 11, 64-bit)',
@@ -84,7 +87,7 @@ function startHere(files, ctx) {
     ]);
   }
 
-  const debs = by('hub-linux-deb');
+  const debs = studioOnly ? [] : by('hub-linux-deb');
   if (debs.length) {
     const first = debs.find((d) => d.arch === 'x64') ?? debs[0];
     sections.push([
@@ -98,7 +101,7 @@ function startHere(files, ctx) {
     ]);
   }
 
-  const sites = by('website');
+  const sites = studioOnly ? [] : by('website');
   if (sites.length) {
     const win = sites.find((s) => s.os === 'windows');
     const lin = sites.find((s) => s.os === 'linux');
@@ -116,8 +119,8 @@ function startHere(files, ctx) {
     sections.push(lines);
   }
 
-  const [apk] = by('android-apk');
-  const [aab] = by('android-aab');
+  const [apk] = studioOnly ? [] : by('android-apk');
+  const [aab] = studioOnly ? [] : by('android-aab');
   if (apk || aab) {
     const lines = ['#### The Android app'];
     if (apk) {
@@ -145,8 +148,10 @@ function startHere(files, ctx) {
       win ? '   Windows may say "Windows protected your PC", because the program is not signed yet. Click **More info**, then **Run anyway**.' : '',
       '3. The first time, make the administrator account (a name and a password of at least 8 characters).',
       '4. To stop the Studio, close its window, or press the power button at the bottom left of the Studio. Opening it again while it is open just brings up its window.',
-      '5. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
-      `6. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.`,
+      studioOnly
+        ? '5. To make a customer\'s setup the Studio needs the programs of a full release (the shop program, the website and the Android app): download every file of that release into one folder and give that folder to the Studio (Settings, "The programs folder"). This release holds only the Studio.'
+        : '5. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
+      files.some((f) => f.name === 'HOW-TO-TRY.txt') ? `6. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.` : '',
     ];
     sections.push(lines.filter((l) => l !== ''));
   }
@@ -163,10 +168,10 @@ function startHere(files, ctx) {
     '| I want to try | Download |',
     '|---|---|',
     ...[
-      ['The shop program on Windows', by('hub-windows-setup').map((f) => f.name)],
-      ['The shop program on Linux', by('hub-linux-deb').map((f) => f.name)],
-      ['The online shop (website)', by('website').map((f) => f.name)],
-      ['The Android app', by('android-apk').map((f) => f.name)],
+      ['The shop program on Windows', studioOnly ? [] : by('hub-windows-setup').map((f) => f.name)],
+      ['The shop program on Linux', studioOnly ? [] : by('hub-linux-deb').map((f) => f.name)],
+      ['The online shop (website)', studioOnly ? [] : by('website').map((f) => f.name)],
+      ['The Android app', studioOnly ? [] : by('android-apk').map((f) => f.name)],
       ['The Setup Studio (NextGenOS staff only)', files.filter((f) => f.role === 'studio').map((f) => f.name)],
     ].filter(([, names]) => names.length).map(([what, names]) => `| ${what} | ${names.map(code).join('<br>')} |`),
   ].join('\n');
@@ -176,7 +181,7 @@ function startHere(files, ctx) {
 }
 
 /** The parts that are not in the folder, each with the line of the status that says what happened to it. */
-function missing(files, status) {
+function missing(files, status, only = '') {
   const has = (role, os, arch) => files.some((f) => f.role === role && (!os || f.os === os) && (!arch || f.arch === arch));
   const line = (re) => status.split('\n').find((l) => re.test(l)) ?? '';
   const parts = [
@@ -188,7 +193,7 @@ function missing(files, status) {
     ['The Android app', !has('android-apk'), /^Android/],
     ['The Setup Studio for Windows', !has('studio', 'windows'), /^Setup Studio/],
     ['The Setup Studio for Linux', !has('studio', 'linux'), /^Setup Studio/],
-  ].filter(([, absent]) => absent);
+  ].filter(([what, absent]) => absent && (only !== 'studio' || /Setup Studio/.test(what)));
   if (!parts.length) return '';
   return ['### Not in this release', '', 'These were not built in this run, so there is nothing to download for them. `BUILD-STATUS.txt` has the result of each step.', '',
     ...parts.map(([what, , re]) => `- **${what}.**${line(re) ? ` Status: ${line(re)}` : ''}`), ''].join('\n');
@@ -199,14 +204,17 @@ function allFiles(files) {
   return ['<details>', '<summary><b>All files in this release</b></summary>', '', '| File | Size | What it is |', '|---|---|---|', ...rows, '', '</details>', ''].join('\n');
 }
 
-export function makeNotes({ dist, template, commit, tag = '', version = '' }) {
+export function makeNotes({ dist, template, commit, tag = '', version = '', only = '' }) {
+  if (only && only !== 'studio') throw new Error(`--only can be "studio", not "${only}".`);
   const files = inventory(dist);
   const hub = files.find((f) => f.role?.startsWith('hub-'));
   const fromName = hub ? /(\d+\.\d+\.\d+)/.exec(hub.name)?.[1] : '';
-  const fromTag = /^v?(\d+\.\d+\.\d+)/.exec(tag)?.[1] ?? '';
+  const fromStudio = /(\d+\.\d+\.\d+)/.exec(files.find((f) => f.role === 'studio')?.name ?? '')?.[1] ?? '';
+  const fromTag = /^(?:studio-)?v?(\d+\.\d+\.\d+)/.exec(tag)?.[1] ?? '';
   const status = readText(dist, 'BUILD-STATUS.txt');
   const trial = existsSync(join(dist, 'NO-LICENCE-KEYS-TRIAL-ONLY.txt'));
   const ctx = {
+    only,
     trial,
     windowsSigned: /^signed/i.test(readText(dist, 'WINDOWS-SIGNING.txt')),
     androidSigning: readText(dist, 'ANDROID-SIGNING.txt').replace(/^Signed with:\s*/i, ''),
@@ -215,9 +223,9 @@ export function makeNotes({ dist, template, commit, tag = '', version = '' }) {
     TRIAL_BANNER: trial
       ? '> **TRIAL BUILD, NO LICENCE KEYS.** The programs in this release can never be activated. They are only for trying the install, the service and the uninstall. Never give them to a customer.\n\n'
       : '',
-    VERSION: version || fromName || fromTag || 'unknown',
+    VERSION: version || (only === 'studio' ? fromStudio : fromName) || fromTag || 'unknown',
     START_HERE: startHere(files, ctx),
-    MISSING: missing(files, status),
+    MISSING: missing(files, status, only),
     ALL_FILES: allFiles(files),
     STATUS: status || 'No status was written.',
     COMMIT: commit || 'an unknown commit',
@@ -234,9 +242,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = process.argv.slice(2);
   const flag = (name, fallback = '') => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : fallback; };
   const dist = flag('--dist');
-  if (!dist || !existsSync(dist)) { console.error('Usage: node scripts/make-release-notes.mjs --dist <folder of release files> --commit <sha> [--tag v1.0.0] [--version 1.0.0] [--template file] [--out file]'); process.exit(2); }
+  if (!dist || !existsSync(dist)) { console.error('Usage: node scripts/make-release-notes.mjs --dist <folder of release files> --commit <sha> [--tag v1.0.0] [--version 1.0.0] [--only studio] [--template file] [--out file]'); process.exit(2); }
   try {
-    const text = makeNotes({ dist: resolve(dist), template: resolve(flag('--template', join(here, '..', '.github', 'release-notes.md'))), commit: flag('--commit'), tag: flag('--tag'), version: flag('--version') });
+    const only = flag('--only');
+    const text = makeNotes({ dist: resolve(dist), template: resolve(flag('--template', join(here, '..', '.github', only === 'studio' ? 'release-notes-studio.md' : 'release-notes.md'))), commit: flag('--commit'), tag: flag('--tag'), version: flag('--version'), only });
     if (flag('--out')) writeFileSync(resolve(flag('--out')), text);
     else process.stdout.write(text);
   } catch (e) { console.error(String(e.message || e)); process.exit(1); }

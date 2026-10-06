@@ -44,7 +44,10 @@ jobs:
             code=$(curl -sS -o /tmp/out -w '%{http_code}' -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${R}/releases" -d "{\"tag_name\":\"v0.0.1-probe-c\",\"target_commitish\":\"${C}\",\"draft\":true,\"name\":\"probe c\"}")
             ID=$(jq -r '.id // empty' /tmp/out)
             if [ -n "${ID}" ]; then curl -sS -o /dev/null -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${R}/releases/${ID}"; fi
-            echo "${C:0:7} -> ${code}  files: $(git diff-tree --no-commit-id --name-only -r "${C}" 2>/dev/null | tr '\n' ' ' | cut -c1-230)"
+            curl -sS -o /tmp/c -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${R}/git/commits/${C}"
+            tcode=$(curl -sS -o /tmp/t -w '%{http_code}' -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${R}/git/refs" -d "{\"ref\":\"refs/tags/probe-t\",\"sha\":\"${C}\"}")
+            if [ "${tcode}" = "201" ]; then curl -sS -o /dev/null -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${R}/git/refs/tags/probe-t"; fi
+            echo "${C:0:7} release=${code} tag=${tcode} $(jq -c '{a: .author.name, c: .committer.name, date: .committer.date, v: .verification.reason, parents: (.parents|length)}' /tmp/c)"
           done
       - name: Try it
         env:

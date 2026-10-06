@@ -40,6 +40,15 @@ If the Windows job stops with *"The licence keys are not built in yet"*, step 2 
 
 **Making the tag.** Pushing a tag needs permission to create tags. If your tools cannot push one, make it on GitHub: *Releases → Draft a new release → Choose a tag → type `v1.0.0-rc1` → Create new tag*, set **Target** to the branch `claude/happy-fermat-jv4lg8` (or `main` once merged), tick *Set as a pre-release*, and *Publish release*. Publishing makes the tag, and the workflow starts; it then adds its files to that release.
 
+## Removing old trial pages
+
+Every trial leaves a page on the Releases list and a tag. When you no longer need old ones, the *Remove old trial releases* workflow (`.github/workflows/remove-trial-releases.yml`) takes them away. There are two ways to ask for it:
+
+- **From a `claude/*` branch.** Put the tags in the list in `.github/remove-trial-releases.json`, for example `{"tags": ["v1.0.0-trial5", "v1.0.0-trial6"]}`, and push. The workflow starts by itself, removes those pages and their tags, and shows one line for each thing it removed in its log. Afterwards put the list back to `{"tags": []}`; an empty list does nothing.
+- **By hand.** *Actions → Remove old trial releases → Run workflow*, and type the tags with a space between them. GitHub only shows the *Run workflow* button once the workflow is on the `main` branch.
+
+**Only trial pre-releases can be removed this way.** A tag must look like `v1.0.0-trial5`, and its release must be marked as a pre-release (a draft that is marked as a pre-release counts too). Anything else, such as `v1.0.0`, `v1.0.0-rc1`, or a trial page that is not marked as a pre-release, is refused with a plain message, and **then nothing at all is removed for any tag of that request**, so fix the list and ask again. A tag that has no page, or a page whose tag is already gone, is not an error. A removed page and its files cannot be brought back; make a new trial instead.
+
 ## Test it yourself (about 30 minutes)
 
 1. On a Windows 10/11 PC, download `SmartRetailPOS-Hub-Setup-<version>.exe` from the release and run it. (Windows will warn about an unknown publisher unless the setup is signed: *More info → Run anyway*.)

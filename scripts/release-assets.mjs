@@ -10,6 +10,9 @@
  *       branch, so this is done in the first seconds of a run, while its commit is that commit, and not after the long build.
  *   node scripts/release-assets.mjs discard  --release <number> [--tag v1.0.0-trial3]
  *       removes a draft that is not wanted (never a published release) and the tag named, but only a tag that points at no other release
+ *   node scripts/release-assets.mjs remove   --tag v1.0.0-trial5 [--tag v1.0.0-trial6 ...]
+ *       takes old TRIAL release pages away, with their tags. Only a tag that looks like v1.0.0-trial5 whose release is marked as a pre-release (a draft too) is removed;
+ *       anything else is refused, and when one tag of the call is refused, nothing at all is removed for any of them
  *   node scripts/release-assets.mjs upload   --release <number> <file>...      a file with the same name on the release is replaced
  *   node scripts/release-assets.mjs download --release <number> --out <folder> [--match <regular expression on the file name>]
  *   node scripts/release-assets.mjs publish  --release <number> [--notes-file file]    the draft becomes a published release
@@ -143,6 +146,41 @@ async function discard(args) {
   }
 }
 
+/** The name of a trial: the only tags `remove` will touch (the Release workflow makes them as v<version>-trial<run number>). */
+const TRIAL_TAG = /^v\d+\.\d+\.\d+-trial\d+$/;
+
+/** Takes old trial release pages away, with their tags. Every tag is checked first; nothing is removed unless all of them are allowed. */
+async function remove(args) {
+  const tags = [];
+  for (let i = 0; i < args.length; i += 2) {
+    if (args[i] !== '--tag' || !args[i + 1]) fail('Say the tags like this: --tag v1.0.0-trial5 --tag v1.0.0-trial6');
+    if (!tags.includes(args[i + 1])) tags.push(args[i + 1]);
+  }
+  if (!tags.length) fail('Say the tags to remove: --tag v1.0.0-trial5');
+
+  const refused = [];
+  for (const tag of tags) if (!TRIAL_TAG.test(tag)) refused.push(`"${tag}" is not the name of a trial (a trial is named like v1.0.0-trial5), so it is not removed.`);
+  if (refused.length) fail(`${refused.join('\n')}\nNothing was removed.`);
+
+  const all = await listAll(`/repos/${repo}/releases`);
+  const plan = tags.map((tag) => ({ tag, releases: all.filter((r) => r.tag_name === tag) }));
+  for (const { tag, releases } of plan) for (const r of releases) {
+    if (!r.prerelease) refused.push(`The release for ${tag} is not marked as a pre-release, so it is not removed.`);
+  }
+  if (refused.length) fail(`${refused.join('\n')}\nNothing was removed.`);
+
+  for (const { tag, releases } of plan) {
+    for (const r of releases) {
+      await call('DELETE', `/repos/${repo}/releases/${r.id}`);
+      console.log(`Removed the ${r.draft ? 'draft ' : ''}release ${tag} (number ${r.id}).`);
+    }
+    let tagRemoved = true;
+    await call('DELETE', `/repos/${repo}/git/refs/tags/${encodeURIComponent(tag)}`).catch((e) => { if (e.status !== 404 && e.status !== 422) throw e; tagRemoved = false; });
+    if (tagRemoved) console.log(`Removed the tag ${tag}${releases.length ? '' : ' (it had no release page)'}.`);
+    else console.log(releases.length ? `The tag ${tag} was already gone.` : `Nothing to remove for ${tag}: it has no release page and no tag.`);
+  }
+}
+
 async function publish(args) {
   const id = flag(args, '--release');
   if (!id) fail('Say the release: --release <number>');
@@ -155,6 +193,6 @@ async function publish(args) {
 const [command, ...args] = process.argv.slice(2);
 if (!token) fail('There is no GITHUB_TOKEN, so nothing can be put on a release.');
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) fail('GITHUB_REPOSITORY must look like owner/name.');
-const commands = { create, upload, download, publish, discard };
-if (!commands[command]) fail('Use one of: create, upload, download, publish, discard.');
+const commands = { create, upload, download, publish, discard, remove };
+if (!commands[command]) fail('Use one of: create, upload, download, publish, discard, remove.');
 await commands[command](args).catch((e) => fail(String(e.message || e)));

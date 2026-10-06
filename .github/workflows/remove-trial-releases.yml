@@ -1,0 +1,60 @@
+name: Remove old trial releases
+
+# Takes old TRIAL pages off the Releases page, with their tags. Nothing else can be removed this way: a tag must look like v1.0.0-trial5 and its release must be
+# marked as a pre-release, or the whole request is refused and nothing is removed (scripts/release-assets.mjs, the "remove" command).
+#   - change .github/remove-trial-releases.json on a claude/* branch (put the tags in its "tags" list), or
+#   - run it by hand from the Actions tab and type the tags with a space between them (GitHub only shows the Run workflow button once this file is on the main branch).
+# The token is the one GitHub gives to the run; it needs no other secret.
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/remove-trial-releases.json"]
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "The trial tags to remove, with a space between them, for example: v1.0.0-trial5 v1.0.0-trial6"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remove-trial-releases
+  cancel-in-progress: false
+
+jobs:
+  remove:
+    name: Remove the trial pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Remove the trial pages and their tags
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          TAGS_TYPED: ${{ inputs.tags }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            LIST="${TAGS_TYPED}"
+          elif [ -f .github/remove-trial-releases.json ]; then
+            LIST="$(node -e 'const t = JSON.parse(require("fs").readFileSync(".github/remove-trial-releases.json", "utf8")).tags; if (!Array.isArray(t) || t.some((x) => typeof x !== "string")) { console.error("The \"tags\" in .github/remove-trial-releases.json must be a list of tag names."); process.exit(1); } console.log(t.join(" "));')"
+          else
+            LIST=""
+          fi
+          # One space between names, whatever was typed (also new lines); no pattern in a name is ever expanded.
+          LIST="$(printf '%s' "${LIST}" | tr -s '[:space:]' ' ')"
+          read -r -a TAGS <<< "${LIST}"
+          if [ "${#TAGS[@]}" -eq 0 ]; then
+            echo "Nothing to remove: the list of tags is empty."
+            exit 0
+          fi
+          ARGS=()
+          for TAG in "${TAGS[@]}"; do ARGS+=(--tag "${TAG}"); done
+          node scripts/release-assets.mjs remove "${ARGS[@]}"

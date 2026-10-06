@@ -221,6 +221,139 @@ test('an unwanted draft and the tag made for it are removed, a published release
   assert.equal(refs.has('v1.0.0-trial8'), true);
 });
 
+// An old trial page: a release with its tag; `prerelease` and `published` say what it looks like on GitHub.
+async function trial(tag, { prerelease = true, published = true } = {}) {
+  const made = await run('create', '--tag', tag, '--target', 'abc', '--make-tag', ...(prerelease ? ['--prerelease'] : []));
+  assert.equal(made.status, 0, made.stderr);
+  if (published) assert.equal((await run('publish', '--release', String(nextId - 1))).status, 0);
+}
+const deletes = () => calls.filter((c) => c.startsWith('DELETE'));
+
+test('an old trial page that is published and its tag are removed', async () => {
+  reset();
+  await trial('v1.0.0-trial5');
+  await trial('v1.0.0-trial6');
+  const r = await run('remove', '--tag', 'v1.0.0-trial5');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Removed the release v1.0.0-trial5 \(number 100\)\./);
+  assert.match(r.stdout, /Removed the tag v1.0.0-trial5\./);
+  assert.deepEqual(releases.map((x) => x.tag_name), ['v1.0.0-trial6']);
+  assert.equal(refs.has('v1.0.0-trial5'), false);
+  assert.equal(refs.has('v1.0.0-trial6'), true);
+});
+
+test('several trial pages can be removed in one call, and a tag named twice is handled once', async () => {
+  reset();
+  await trial('v1.0.0-trial5');
+  await trial('v1.0.0-trial6');
+  await trial('v1.0.0-trial7');
+  const r = await run('remove', '--tag', 'v1.0.0-trial5', '--tag', 'v1.0.0-trial7', '--tag', 'v1.0.0-trial5');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(releases.map((x) => x.tag_name), ['v1.0.0-trial6']);
+  assert.deepEqual([...refs.keys()], ['v1.0.0-trial6']);
+  assert.equal(r.stdout.match(/Removed the release/g).length, 2);
+});
+
+test('a trial draft is removed too, with its tag', async () => {
+  reset();
+  await trial('v1.0.0-trial8', { published: false });
+  assert.equal(releases[0].draft, true);
+  const r = await run('remove', '--tag', 'v1.0.0-trial8');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Removed the draft release v1.0.0-trial8/);
+  assert.equal(releases.length, 0);
+  assert.equal(refs.has('v1.0.0-trial8'), false);
+});
+
+test('a tag that is not a trial name is refused and nothing is touched', async () => {
+  reset();
+  await trial('v1.0.0', { prerelease: false });
+  await trial('v1.0.0-rc1');
+  await trial('v1.0.0-trial5');
+  calls = [];
+  for (const tag of ['v1.0.0', 'v1.0.0-rc1', 'v1.0.0-trial', 'v1.0.0-trial5x', 'main', 'v1.0.0-trial5\nx']) {
+    const r = await run('remove', '--tag', tag);
+    assert.notEqual(r.status, 0, tag);
+    assert.match(r.stderr, /is not the name of a trial/, tag);
+    assert.match(r.stderr, /Nothing was removed/, tag);
+  }
+  assert.equal(releases.length, 3);
+  assert.equal(refs.size, 3);
+  assert.deepEqual(deletes(), []);
+});
+
+test('a trial-named release that is not marked as a pre-release is refused', async () => {
+  reset();
+  await trial('v1.0.0-trial9', { prerelease: false });
+  const r = await run('remove', '--tag', 'v1.0.0-trial9');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /release for v1.0.0-trial9 is not marked as a pre-release/);
+  assert.match(r.stderr, /Nothing was removed/);
+  assert.equal(releases.length, 1);
+  assert.equal(refs.has('v1.0.0-trial9'), true);
+  assert.deepEqual(deletes(), []);
+});
+
+test('when one tag of the call is refused, nothing is removed for the others either', async () => {
+  reset();
+  await trial('v1.0.0-trial5');
+  await trial('v1.0.0-trial6');
+  await trial('v1.0.0-trial7', { prerelease: false });
+  calls = [];
+  const r = await run('remove', '--tag', 'v1.0.0-trial5', '--tag', 'v1.0.0-trial7', '--tag', 'v1.0.0-trial6');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /v1.0.0-trial7 is not marked as a pre-release/);
+  assert.doesNotMatch(r.stderr, /trial5|trial6/);
+  assert.equal(releases.length, 3);
+  assert.equal(refs.size, 3);
+  assert.deepEqual(deletes(), []);
+
+  // The same when the refused one is a name that is not a trial name at all.
+  const other = await run('remove', '--tag', 'v1.0.0-trial5', '--tag', 'v2.0.0');
+  assert.notEqual(other.status, 0);
+  assert.match(other.stderr, /"v2.0.0" is not the name of a trial/);
+  assert.equal(releases.length, 3);
+  assert.deepEqual(deletes(), []);
+});
+
+test('a trial tag with no release page is removed alone, and a tag that is not there at all is not an error', async () => {
+  reset();
+  refs.set('v1.0.0-trial3', 'abc');
+  const r = await run('remove', '--tag', 'v1.0.0-trial3');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Removed the tag v1.0.0-trial3 \(it had no release page\)\./);
+  assert.equal(refs.has('v1.0.0-trial3'), false);
+
+  const missing = await run('remove', '--tag', 'v1.0.0-trial4');
+  assert.equal(missing.status, 0, missing.stderr);
+  assert.match(missing.stdout, /Nothing to remove for v1.0.0-trial4: it has no release page and no tag\./);
+});
+
+test('a release whose tag is already gone is removed and says so', async () => {
+  reset();
+  await trial('v1.0.0-trial2');
+  refs.delete('v1.0.0-trial2');
+  const r = await run('remove', '--tag', 'v1.0.0-trial2');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Removed the release v1.0.0-trial2/);
+  assert.match(r.stdout, /The tag v1.0.0-trial2 was already gone\./);
+  assert.equal(releases.length, 0);
+});
+
+test('removing without a tag, or with something else on the line, says what to type and does nothing', async () => {
+  reset();
+  await trial('v1.0.0-trial5');
+  calls = [];
+  const none = await run('remove');
+  assert.notEqual(none.status, 0);
+  assert.match(none.stderr, /Say the tags to remove/);
+  const typo = await run('remove', '--tags', 'v1.0.0-trial5');
+  assert.notEqual(typo.status, 0);
+  assert.match(typo.stderr, /--tag v1.0.0-trial5/);
+  assert.equal(releases.length, 1);
+  assert.deepEqual(deletes(), []);
+});
+
 test('without a token or a repository it says so in plain words and does nothing', async () => {
   const r = await exec(['create', '--tag', 'v1', '--target', 'a'], { GITHUB_TOKEN: '', GH_TOKEN: '' });
   assert.notEqual(r.status, 0);

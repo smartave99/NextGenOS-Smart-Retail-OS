@@ -23,6 +23,12 @@ Money and tax come from the **country packs** (`country-packs/`, 34 countries) t
 - The tax rules of any country have **not been checked by a local tax adviser**: the Hub says so on the setup, tax and report screens.
 - The Windows POS desktop program and the dashboard are separate programs and remain India-GST editions.
 
+## AI helpers (optional, off until the owner switches them on)
+
+*Settings → AI helpers* (owner only; needs the `ai` part in the licence) is the start of Version 2 (`docs/VERSION-2.md`). The shop **works in full without any of it**: the shop's own screens never call an AI service, and nothing is downloaded, started or sent anywhere until the owner connects a service and allows it.
+
+What is there: eight switches (all off); a description of the computer and what it can run; AI services (on this computer, on the shop's network, or an online account) with a **Test** button, limits (requests a day, tokens and spending a month) and a record of every use; the kinds of data each service may receive (card details and biometric data **never** leave this computer, whatever is allowed); keys kept in the Windows Credential Manager or an encrypted file, never in the database; a list of models that move from candidate through testing to in use, with a way back. What is not there yet, and the details: `docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 6.
+
 ## Devices
 
 `libs/dotnet/NextGenOS.Devices` speaks the languages of shop printers: **ESC/POS** (nearly every receipt printer), **ZPL**, **TSPL**, **EPL** and **CPCL** (label printers), and reaches them over the **network** (port 9100), a **serial or Bluetooth port**, a **USB device file**, the **system print queue (CUPS)** or the **Windows spooler** (raw). Letters a printer's character set lacks (other alphabets, Chinese, Japanese, Korean) are printed as pictures; receipt currency signs it cannot write are spelled (₹ as Rs). Scanners: USB and Bluetooth scanners that type like a keyboard work in every box; any camera (phone, tablet, webcam) reads barcodes through the browser or, where the browser cannot, through the Hub. Price tags and posters (shelf labels, A4 and A3) print from the browser to any printer. Set it all up in **Settings → Printers**.

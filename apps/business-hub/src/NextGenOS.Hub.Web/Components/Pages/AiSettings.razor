@@ -1,0 +1,371 @@
+@page "/settings/ai"
+@attribute [Authorize(Policy = Perm.Ai)]
+@inherits HubPage
+@using System.Globalization
+@using NextGenOS.Hub.Ai
+
+<PageTitle>AI helpers</PageTitle>
+<h1>AI helpers</h1>
+<p class="sub">Optional helpers that use artificial intelligence. The shop works in full without them, and everything here is off until you switch it on. <a href="settings">Back to settings</a></p>
+<Notice Error="@Error" Info="@Info" />
+
+@if (!licensed)
+{
+    <div class="notice warn" id="ai-unlicensed">The AI helpers are not part of this shop's licence. Ask your supplier to add them. Nothing here can be switched on until then.</div>
+}
+
+<section class="card" id="ai-computer">
+    <h2>This computer</h2>
+    @if (caps is null) { <p class="muted">Looking at this computer…</p> }
+    else
+    {
+        <p><strong>@HardwareProfile.Label(caps.Profile)</strong>. @HardwareProfile.WhatItCanDo(caps.Profile)</p>
+        <ul class="muted small">
+            <li>Memory: @caps.Hardware.RamTotalGb.ToString("0.#", CultureInfo.InvariantCulture) GB. Processor: @caps.Hardware.LogicalCores threads (@caps.Hardware.CpuArch).</li>
+            <li>Graphics: @(caps.Hardware.Gpus.Count == 0 ? "none found" : string.Join("; ", caps.Hardware.Gpus.Select(g => g.Model + (g.VramGb is { } v ? " (" + v.ToString("0.#", CultureInfo.InvariantCulture) + " GB)" : ""))))</li>
+            <li>Free disk space: @(caps.Hardware.DiskFreeGb is { } d ? d.ToString("0.#", CultureInfo.InvariantCulture) + " GB" : "not known")</li>
+        </ul>
+        @foreach (var w in caps.Warnings) { <div class="notice warn">@w</div> }
+    }
+    <div class="row"><button type="button" class="btn ghost small" id="ai-recheck" @onclick="Recheck">Look again</button></div>
+</section>
+
+<section class="card" id="ai-switches">
+    <h2>Switches</h2>
+    <p class="muted small">Each one is off until you switch it on, and you can switch it off again at any time. Switching one on does not start anything by itself: it only allows it.</p>
+    <div class="stack">
+        @foreach (var f in flags)
+        {
+            var key = f.Key;
+            <label class="check" title="@f.Description">
+                <input type="checkbox" id="@("flag-" + key)" checked="@f.Chosen" disabled="@(!licensed)" @onchange="e => SetFlag(key, (bool)(e.Value ?? false))" />
+                <strong>@f.Label</strong> <span class="muted small">@f.Description</span>
+            </label>
+        }
+    </div>
+</section>
+
+<section class="card" id="ai-services">
+    <h2>AI services</h2>
+    <p class="muted small">A service is a program that does the AI work: one on this computer (best for privacy), one on another computer in your shop, or an online one you have an account with. Card details and fingerprints or faces are never sent outside this computer, whatever you allow. A key you type here is kept in a safe place (@App.Ai.Secrets.Description) and is never shown again.</p>
+
+    @if (providers.Count == 0) { <div class="empty">No AI service is connected.</div> }
+    @foreach (var p in providers)
+    {
+        var id = p.Id;
+        var consent = consents.GetValueOrDefault(id) ?? Array.Empty<ConsentRecord>();
+        <div class="card inner" id="@("svc-" + id)">
+            <div class="head">
+                <h3>@p.Name <span class="muted small">(@ProviderLocation.Label(p.Location))</span></h3>
+                <label class="check"><input type="checkbox" id="@("on-" + id)" checked="@p.Enabled" disabled="@(!licensed)" @onchange="e => SetOn(id, (bool)(e.Value ?? false))" /> Switched on</label>
+            </div>
+            <p class="muted small">Address: @p.BaseUrl · Model: @(p.DefaultModel ?? "not chosen") · Used for: @string.Join(", ", p.Tasks.Select(t => AiTask.Label(t).ToLowerInvariant()))</p>
+
+            <div class="field-row">
+                <div>
+                    <label for="@("key-" + id)">Key @(hasKey.GetValueOrDefault(id) ? "(one is kept)" : "(none kept)")</label>
+                    <input id="@("key-" + id)" type="password" autocomplete="off" placeholder="Type a new key to keep it" @bind="keyText[id]" maxlength="@ProviderService.MaxKeyLength" />
+                </div>
+                <div class="row">
+                    <button type="button" class="btn ghost small" @onclick="() => SaveKey(id)">Keep key</button>
+                    @if (hasKey.GetValueOrDefault(id)) { <button type="button" class="btn ghost small" @onclick="() => RemoveKey(id)">Remove key</button> }
+                    <button type="button" class="btn ghost small" id="@("test-" + id)" @onclick="() => Test(id)">Test</button>
+                </div>
+            </div>
+            @if (health.TryGetValue(id, out var h)) { <div class="@(h.Reachable ? "notice ok" : "notice warn")">@h.Message@(h.Reachable ? "" : " Nothing was sent except the test.")</div> }
+
+            <h4>What it may receive</h4>
+            @if (ProviderLocation.StaysOnThisComputer(p.Location)) { <p class="muted small">It runs on this computer, so nothing leaves it and no permission is needed.</p> }
+            else
+            {
+                <div class="stack">
+                    @foreach (var c in DataClass.All)
+                    {
+                        var cls = c;
+                        if (Routing.NeverLeavesTheComputer(cls)) { <p class="muted small">@DataClass.Label(cls): never leaves this computer.</p> continue; }
+                        if (!Routing.NeedsConsent(cls, p.Location)) { <p class="muted small">@DataClass.Label(cls): may go there without asking.</p> continue; }
+                        <label class="check"><input type="checkbox" id="@("allow-" + id + "-" + cls)" checked="@consent.Any(x => x.DataClass == cls)" @onchange="e => SetConsent(id, cls, (bool)(e.Value ?? false))" /> It may receive: @DataClass.Label(cls).ToLowerInvariant()</label>
+                    }
+                </div>
+            }
+
+            <h4>Limits</h4>
+            <div class="field-row">
+                <div><label for="@("lr-" + id)">Most requests a day</label><input id="@("lr-" + id)" inputmode="numeric" @bind="limits[id].Requests" maxlength="9" /></div>
+                <div><label for="@("lt-" + id)">Most tokens a month</label><input id="@("lt-" + id)" inputmode="numeric" @bind="limits[id].TokensMonth" maxlength="12" /></div>
+                <div><label for="@("ls-" + id)">Most spending a month (@Shop.CurrencyCode)</label><input id="@("ls-" + id)" inputmode="decimal" @bind="limits[id].Spend" maxlength="12" /></div>
+            </div>
+            <div class="field-row">
+                <div><label for="@("pi-" + id)">Price of 1,000 tokens sent (@Shop.CurrencyCode)</label><input id="@("pi-" + id)" inputmode="decimal" @bind="limits[id].PriceIn" maxlength="12" /></div>
+                <div><label for="@("po-" + id)">Price of 1,000 tokens received (@Shop.CurrencyCode)</label><input id="@("po-" + id)" inputmode="decimal" @bind="limits[id].PriceOut" maxlength="12" /></div>
+            </div>
+            <div class="row">
+                <button type="button" class="btn ghost small" @onclick="() => SaveLimits(id)">Save limits</button>
+                <button type="button" class="btn ghost small" @onclick="() => Remove(id)">Remove this service</button>
+            </div>
+        </div>
+    }
+
+    <h3>Connect a service</h3>
+    <div class="stack">
+        <label for="n-name">Name</label><input id="n-name" @bind="form.Name" maxlength="80" placeholder="For example: Ollama in the back office" />
+        <label for="n-where">Where it runs</label>
+        <select id="n-where" @bind="form.Where">
+            <option value="@ProviderLocation.Local">On this computer</option>
+            <option value="@ProviderLocation.Lan">On another computer in my shop's network</option>
+            <option value="@ProviderLocation.Api">An online service I have an account with</option>
+        </select>
+        <label for="n-url">Address</label><input id="n-url" @bind="form.Address" maxlength="300" placeholder="http://127.0.0.1:11434" />
+        <label for="n-model">Model to use</label><input id="n-model" @bind="form.Model" maxlength="200" />
+        <label class="check"><input type="checkbox" @bind="form.Generate" /> For writing and answering</label>
+        <label class="check"><input type="checkbox" @bind="form.Embed" /> For finding things by meaning (embeddings)</label>
+        <label for="n-key">Key (only if the service needs one)</label><input id="n-key" type="password" autocomplete="off" @bind="form.Key" maxlength="@ProviderService.MaxKeyLength" />
+    </div>
+    <p class="muted small">It starts switched off and may receive nothing. Press Test, then switch it on.</p>
+    <div class="row"><button type="button" class="btn primary" id="n-add" disabled="@(!licensed)" @onclick="Add">Connect</button></div>
+</section>
+
+<section class="card" id="ai-models">
+    <h2>Models</h2>
+    <p class="muted small">A model is never used just because it is new. Add it, test it, let it run beside the one in use, and only then put it in use. The one before it is kept, so you can go back. Nothing is downloaded by this program.</p>
+    @if (models.Count == 0) { <div class="empty">No model is listed.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Model</th><th>Work</th><th>Stage</th><th>Licence for business</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var m in models)
+            {
+                var mid = m.Id;
+                <tr>
+                    <td>@m.ModelId@(m.Version is null ? "" : " " + m.Version)<div class="muted small">@(m.ProviderId ?? "any service")</div></td>
+                    <td>@AiTask.Label(m.Task)</td>
+                    <td>@ModelStatus.Label(m.Status)</td>
+                    <td>@(m.CommercialUse switch { "yes" => "Allowed", "no" => "Not allowed", _ => "Not checked" })</td>
+                    <td class="row">
+                        @foreach (var to in ModelStatus.All.Where(t => ModelStatus.CanMove(m.Status, t)))
+                        {
+                            var target = to;
+                            <button type="button" class="btn ghost small" @onclick="() => MoveModel(mid, target)">@MoveLabel(target)</button>
+                        }
+                        @if (m.Status == ModelStatus.Active) { <button type="button" class="btn ghost small" @onclick="() => RollBack(mid)">Go back to the one before</button> }
+                        @if (m.Status != ModelStatus.Active) { <button type="button" class="btn ghost small" @onclick="() => RemoveModel(mid)">Remove</button> }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+    <h3>Add a model to the list</h3>
+    <div class="field-row">
+        <div><label for="m-name">Model name</label><input id="m-name" @bind="modelForm.Name" maxlength="200" /></div>
+        <div>
+            <label for="m-task">Used for</label>
+            <select id="m-task" @bind="modelForm.Task">@foreach (var t in AiTask.All) { <option value="@t">@AiTask.Label(t)</option> }</select>
+        </div>
+        <div>
+            <label for="m-lic">Does its licence allow use in a business?</label>
+            <select id="m-lic" @bind="modelForm.Commercial"><option value="unknown">I have not checked</option><option value="yes">Yes</option><option value="no">No</option></select>
+        </div>
+    </div>
+    <div class="row"><button type="button" class="btn ghost" id="m-add" @onclick="AddModel">Add to the list</button></div>
+</section>
+
+<section class="card" id="ai-usage">
+    <h2>What was used</h2>
+    @if (summary.Count == 0) { <div class="empty">Nothing yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Service</th><th class="num">Requests</th><th class="num">Tokens</th><th class="num">Cost</th><th class="num">Not allowed</th><th class="num">Failed</th><th class="num">Over a limit</th></tr></thead>
+            <tbody>
+            @foreach (var u in summary)
+            {
+                <tr><td>@(u.ProviderId ?? "(before a service was chosen)")</td><td class="num">@u.Used.Requests</td><td class="num">@u.Used.Tokens</td><td class="num">@Cost(u.Used.CostMicros)</td><td class="num">@u.Refused</td><td class="num">@u.Failed</td><td class="num">@u.OverBudget</td></tr>
+            }
+            </tbody>
+        </table>
+        </div>
+        <p class="muted small">This month, from the 1st (universal time).</p>
+    }
+    @if (recent.Count > 0)
+    {
+        <h3>Latest</h3>
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>When</th><th>Feature</th><th>Data</th><th>Service</th><th>Result</th></tr></thead>
+            <tbody>
+            @foreach (var r in recent)
+            {
+                <tr><td>@When(r.At)</td><td>@r.Feature</td><td>@DataClass.Label(r.DataClass)</td><td>@(r.ProviderId ?? "–")</td><td>@OutcomeLabel(r.Outcome)@(r.Detail is null ? "" : ": " + r.Detail)</td></tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</section>
+
+@code {
+    private sealed class LimitForm { public string Requests = "", TokensMonth = "", Spend = "", PriceIn = "", PriceOut = ""; }
+    private sealed class ServiceForm { public string Name = "", Where = ProviderLocation.Local, Address = "", Model = "", Key = ""; public bool Generate = true, Embed; }
+    private sealed class ModelForm { public string Name = "", Task = AiTask.Generate, Commercial = "unknown"; }
+
+    private bool licensed;
+    private CapabilityProfile? caps;
+    private IReadOnlyList<FlagState> flags = Array.Empty<FlagState>();
+    private IReadOnlyList<ProviderRecord> providers = Array.Empty<ProviderRecord>();
+    private IReadOnlyList<ModelRecord> models = Array.Empty<ModelRecord>();
+    private IReadOnlyList<ProviderUsage> summary = Array.Empty<ProviderUsage>();
+    private IReadOnlyList<UsageRow> recent = Array.Empty<UsageRow>();
+    private readonly Dictionary<string, IReadOnlyList<ConsentRecord>> consents = new();
+    private readonly Dictionary<string, bool> hasKey = new();
+    private readonly Dictionary<string, string> keyText = new();
+    private readonly Dictionary<string, LimitForm> limits = new();
+    private readonly Dictionary<string, ProviderHealth> health = new();
+    private readonly ServiceForm form = new();
+    private readonly ModelForm modelForm = new();
+
+    protected override async Task LoadAsync()
+    {
+        var ai = App.Ai;
+        licensed = ai.Flags.Licensed;
+        flags = ai.Flags.All();
+        providers = ai.Providers.List();
+        models = ai.Models.List();
+        var now = App.Clock.UtcNow.UtcDateTime;
+        summary = ai.Usage.Summary(new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero));
+        recent = ai.Usage.Recent(20);
+        consents.Clear();
+        hasKey.Clear();
+        foreach (var p in providers)
+        {
+            consents[p.Id] = ai.Providers.Consents(p.Id);
+            hasKey[p.Id] = ai.Providers.HasSecret(p.Id);
+            if (!keyText.ContainsKey(p.Id)) keyText[p.Id] = "";
+            limits[p.Id] = new LimitForm
+            {
+                Requests = p.Limits.RequestsPerDay?.ToString(CultureInfo.InvariantCulture) ?? "", TokensMonth = p.Limits.TokensPerMonth?.ToString(CultureInfo.InvariantCulture) ?? "",
+                Spend = Units(p.Limits.CostMicrosPerMonth), PriceIn = Units(p.PriceInMicrosPer1k), PriceOut = Units(p.PriceOutMicrosPer1k),
+            };
+        }
+
+        // Looking at the computer can take a moment the first time (it asks the graphics driver), so it is done off the screen's own thread.
+        caps = await Task.Run(() => ai.Hardware.Capabilities());
+    }
+
+    private async Task Recheck() => await Run(async () => { caps = await Task.Run(() => App.Ai.Hardware.Refresh()); });
+
+    private async Task SetFlag(string key, bool on) { await Run(() => App.Ai.Flags.Set(key, on, Me.Id)); await Reload(); }
+
+    private async Task SetOn(string id, bool on) { await Run(() => App.Ai.Providers.SetEnabled(id, on, Me.Id)); await Reload(); }
+
+    private async Task SetConsent(string id, string cls, bool allow)
+    {
+        await Run(() => { if (allow) App.Ai.Providers.Grant(id, cls, null, Me.Id); else App.Ai.Providers.Revoke(id, cls, Me.Id); });
+        await Reload();
+    }
+
+    private async Task SaveKey(string id)
+    {
+        await Run(() => { App.Ai.Providers.SetSecret(id, keyText[id], Me.Id); keyText[id] = ""; }, "The key is kept.");
+        await Reload();
+    }
+
+    private async Task RemoveKey(string id) { await Run(() => App.Ai.Providers.ClearSecret(id, Me.Id), "The key was removed."); await Reload(); }
+
+    private async Task Test(string id)
+    {
+        await Run(async () => health[id] = await App.Ai.Gateway.CheckAsync(id, CancellationToken.None));
+    }
+
+    private async Task Remove(string id) { await Run(() => App.Ai.Providers.Delete(id, Me.Id), "The service was removed."); await Reload(); }
+
+    private async Task SaveLimits(string id)
+    {
+        await Run(() =>
+        {
+            var current = App.Ai.Providers.Get(id);
+            var f = limits[id];
+            App.Ai.Providers.Save(new ProviderInput(current.Id, current.Name, current.Adapter, current.Location, current.BaseUrl, current.DefaultModel, current.Tasks,
+                Micros(f.PriceIn), Micros(f.PriceOut), new ProviderLimits(Whole(f.Requests), null, Whole(f.TokensMonth), Micros(f.Spend))), Me.Id);
+        }, "Saved.");
+        await Reload();
+    }
+
+    private async Task Add()
+    {
+        await Run(() =>
+        {
+            var tasks = new List<string>();
+            if (form.Generate) tasks.Add(AiTask.Generate);
+            if (form.Embed) tasks.Add(AiTask.Embed);
+            var id = NewId(form.Name);
+            App.Ai.Providers.Save(new ProviderInput(id, form.Name, OpenAiCompatibleProvider.AdapterId, form.Where, form.Address, form.Model, tasks), Me.Id);
+            if (!string.IsNullOrWhiteSpace(form.Key)) App.Ai.Providers.SetSecret(id, form.Key, Me.Id);
+            form.Name = form.Address = form.Model = form.Key = "";
+        }, "Connected. It is switched off: press Test, then switch it on.");
+        await Reload();
+    }
+
+    private async Task MoveModel(long id, string to) { await Run(() => App.Ai.Models.Move(id, to, Me.Id)); await Reload(); }
+
+    private async Task RollBack(long id) { await Run(() => App.Ai.Models.RollBack(id, Me.Id), "Went back to the model before."); await Reload(); }
+
+    private async Task RemoveModel(long id) { await Run(() => App.Ai.Models.Remove(id, Me.Id)); await Reload(); }
+
+    private async Task AddModel()
+    {
+        await Run(() =>
+        {
+            App.Ai.Models.Add(new ModelInput(modelForm.Name, modelForm.Task, CommercialUse: modelForm.Commercial), Me.Id);
+            modelForm.Name = "";
+        }, "Added to the list.");
+        await Reload();
+    }
+
+    private string NewId(string name)
+    {
+        var slug = new string((name ?? "").ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        while (slug.Contains("--")) slug = slug.Replace("--", "-");
+        if (slug.Length == 0) throw new HubException("bad-name", "Give the service a name.");
+        if (slug.Length > 30) slug = slug[..30].TrimEnd('-');
+        var id = slug;
+        for (var n = 2; App.Ai.Providers.Find(id) is not null; n++) id = slug + "-" + n;
+        return id;
+    }
+
+    private static string MoveLabel(string to) => to switch
+    {
+        ModelStatus.Testing => "Start testing", ModelStatus.Shadow => "Run beside the one in use", ModelStatus.Active => "Put in use", ModelStatus.Deprecated => "Retire",
+        ModelStatus.RolledBack => "Mark as rolled back", ModelStatus.Candidate => "Try again", _ => to,
+    };
+
+    private static string OutcomeLabel(string outcome) => outcome switch
+    {
+        Outcome.Ok => "Done", Outcome.Failed => "Did not work", Outcome.Refused => "Not allowed", Outcome.OverBudget => "Over a limit", _ => outcome,
+    };
+
+    private string Cost(long micros) => (micros / 1_000_000m).ToString("0.####", CultureInfo.InvariantCulture) + " " + Shop.CurrencyCode;
+
+    /// <summary>What the owner types is money in the shop's own currency; what is kept is millionths of it.</summary>
+    private static string Units(long? micros) => micros is null ? "" : (micros.Value / 1_000_000m).ToString("0.######", CultureInfo.InvariantCulture);
+
+    private static long? Micros(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (!decimal.TryParse(text.Trim().Replace(",", ""), NumberStyles.Number, CultureInfo.InvariantCulture, out var value) || value < 0 || value > 1_000_000_000m)
+            throw new HubException("bad-number", "'" + text.Trim() + "' is not an amount.");
+        return (long)Math.Round(value * 1_000_000m);
+    }
+
+    private static long? Whole(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (!long.TryParse(text.Trim().Replace(",", ""), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < 0)
+            throw new HubException("bad-number", "'" + text.Trim() + "' is not a whole number.");
+        return value;
+    }
+}

@@ -45,7 +45,7 @@ physical world + digital systems
 | Phase | Content | State |
 |---|---|---|
 | 0 | Repository understanding | **Done**: `docs/V2-ARCHITECTURE-ASSESSMENT.md` |
-| 1 | AI foundation: hardware detection, provider interfaces and registry, model configuration, secure key storage, feature flags, privacy routing policy, consent, the AI settings tab | In progress |
+| 1 | AI foundation: hardware detection, provider interfaces and registry, model configuration, secure key storage, feature flags, privacy routing policy, consent, the AI settings tab | **Built and tested in a cloud session** (what is in it, and what is not: `docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 6). Not yet tried on a real Windows PC. |
 | 2 | Event foundation: universal event schema, event store, provenance, event APIs and viewer | Not started |
 | 3 | Ontology foundation: entities, relationships, mapping of the existing POS objects, APIs | Not started |
 | 4 | Business intelligence: projections, current state, rules engine, analytics | Not started |

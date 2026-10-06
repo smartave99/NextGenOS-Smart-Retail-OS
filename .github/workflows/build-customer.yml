@@ -1,0 +1,438 @@
+name: Build for one customer
+
+# Builds ONE customer's website (Linux and Windows) and Android app from that customer's own settings, and puts the finished files where the Setup Studio picks them up.
+# Nobody starts this by hand: the Setup Studio starts it, with a token that can only run workflows in this repository (docs/CUSTOMER-BUILDS.md has the whole picture).
+#
+#   1. The Setup Studio puts the customer's settings (inputs.zip) on a DRAFT release called customer-<name>-<number> in the RESULTS repository,
+#      then starts this workflow with three small inputs: the customer's short name, the build number, and the results repository (owner/name).
+#   2. This workflow reads inputs.zip from there, checks it (scripts/customer-build/validate-inputs.mjs), builds the parts that were asked for,
+#      and puts the files on the same release. The last job writes result.json (also when a part failed, with plain words) and PUBLISHES the release, last of all.
+#      A published release that has result.json means "finished".
+#
+# What it needs, once (the owner does it; docs/CUSTOMER-BUILDS.md says how, click by click):
+#   - the repository secret RESULTS_TOKEN: a fine-grained token for the RESULTS repository only, with Contents read and write. It is read only by the steps that call
+#     scripts/customer-build/results.mjs, never by a step that builds anything;
+#   - the repository variables NGOS_PUBLIC_KEYS and NGOS_LICENCE_URL (public values, as the Release workflow reads them). Without them the build is a TRIAL: marked, and never for a customer;
+#   - optional, as in the Release workflow: the Android signing secrets. Without them the app is signed with a one-off TEST key.
+# Nothing about a customer is written in this file: the customer, the settings and the brand all arrive in the bundle. Typed values reach scripts only as environment variables.
+
+on:
+  workflow_dispatch:
+    inputs:
+      customer:
+        description: "The customer's short name: small letters, digits and hyphens. The Setup Studio fills this in."
+        type: string
+        required: true
+      build:
+        description: "The build number the Setup Studio counts for this customer."
+        type: string
+        required: true
+      results_repo:
+        description: "Where the settings wait and the finished files go, written owner/name. The Setup Studio fills this in."
+        type: string
+        required: true
+
+# The token GitHub gives to this run can read this repository and nothing more. The results repository is reached with RESULTS_TOKEN.
+permissions:
+  contents: read
+
+# One build per customer at a time, and a running build is never cancelled by a newer one.
+concurrency:
+  group: customer-${{ inputs.customer }}
+  cancel-in-progress: false
+
+env:
+  # The first two numbers of the version every part of a build carries; the build number is the third (1.0.7). A phone takes a higher build number as an update.
+  PROGRAM_VERSION_BASE: "1.0"
+
+jobs:
+  inputs:
+    name: Reading the customer's settings
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ok: ${{ steps.check.outputs.ok }}
+      website: ${{ steps.check.outputs.website }}
+      android: ${{ steps.check.outputs.android }}
+      version: ${{ steps.check.outputs.version }}
+      message: ${{ steps.check.outputs.message || steps.download.outputs.message || steps.keys.outputs.keys_problem }}
+      trial: ${{ steps.keys.outputs.trial }}
+      started_at: ${{ steps.start.outputs.started_at }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Note the time
+        id: start
+        run: echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Are the licence keys there? (without them this build is a trial)
+        id: keys
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: node scripts/customer-build/validate-inputs.mjs keys --report-only
+      - name: Stop when the licence values are not right
+        if: ${{ steps.keys.outputs.keys_problem != '' }}
+        run: exit 1
+      - name: Take the settings from the results place
+        id: download
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+          CUSTOMER: ${{ inputs.customer }}
+          BUILD: ${{ inputs.build }}
+          RESULTS_REPO: ${{ inputs.results_repo }}
+        run: node scripts/customer-build/results.mjs download-inputs --out "${RUNNER_TEMP}/inputs.zip"
+      - name: Check them (names, sizes, the files, nothing that looks like a secret)
+        id: check
+        env:
+          CUSTOMER: ${{ inputs.customer }}
+          BUILD: ${{ inputs.build }}
+          RESULTS_REPO: ${{ inputs.results_repo }}
+        run: node scripts/customer-build/validate-inputs.mjs check --zip "${RUNNER_TEMP}/inputs.zip" --out "${RUNNER_TEMP}/inputs" --report-only
+      - name: Stop when they were not accepted
+        if: ${{ steps.check.outputs.ok != 'true' }}
+        run: exit 1
+
+  website:
+    # One website for ONE customer, built on the system it is for (the database engine and the picture library are different files for each system), as the Release
+    # workflow builds it. The package carries its own Node.js and is checked (no source, no secret, nothing a factory-new computer lacks), started from its zip, and must
+    # refuse to work without a licence; the Windows one is also opened the way a person opens it. Only then is it put in the results place.
+    name: Building the website for ${{ matrix.label }}
+    needs: [inputs]
+    if: ${{ needs.inputs.outputs.website == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            label: Linux
+            runner: ubuntu-latest
+          - os: windows
+            label: Windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      OS: ${{ matrix.os }}
+      CUSTOMER: ${{ inputs.customer }}
+      BUILD: ${{ inputs.build }}
+      RESULTS_REPO: ${{ inputs.results_repo }}
+      TRIAL: ${{ needs.inputs.outputs.trial }}
+      VERSION_NAME: ${{ needs.inputs.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the customer's settings from the results place and check them
+        id: settings
+        shell: bash
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/customer-build/results.mjs download-inputs --out "${RUNNER_TEMP}/inputs.zip"
+          node scripts/customer-build/validate-inputs.mjs check --zip "${RUNNER_TEMP}/inputs.zip" --out "${RUNNER_TEMP}/inputs"
+      - name: Build the licence keys in (public keys only)
+        id: keys
+        if: ${{ needs.inputs.outputs.trial != 'true' }}
+        shell: bash
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+          node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+      - name: Tool for the Windows launcher (NSIS, a build tool, never shipped)
+        id: launcher
+        if: ${{ matrix.os == 'windows' }}
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS could not be installed.' }
+      - name: Build the website package (build, check prerequisites, audit, write the zip)
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Without the licence keys (a trial) the website refuses every licence, and the package says so on its face.
+          EXTRA=""
+          if [ "${TRIAL}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          LOGO=()
+          if [ -f "${RUNNER_TEMP}/inputs/logo.png" ]; then LOGO=(--logo "${RUNNER_TEMP}/inputs/logo.png"); fi
+          node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --customer "${CUSTOMER}" --settings "${RUNNER_TEMP}/inputs/website-settings.env" ${LOGO[@]+"${LOGO[@]}"} --download-node 22.22.0 --out "${RUNNER_TEMP}/website-out" ${EXTRA}
+      - name: Run the two audits again on the folder and the zip
+        id: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/website-out"
+          node scripts/audit-package.mjs "${OUT}/website-${CUSTOMER}-${OS}" "${OUT}/website-${CUSTOMER}-${OS}.zip" --node-app
+          node scripts/audit-prerequisites.mjs "${OUT}/website-${CUSTOMER}-${OS}" --os "${OS}"
+      - name: Start the website from the zip and check it refuses to work without a licence (Linux)
+        id: smoke
+        if: ${{ matrix.os == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "${RUNNER_TEMP}/website-zip"
+          unzip -q "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-linux.zip" -d "${RUNNER_TEMP}/website-zip"
+          node scripts/smoke-website.mjs "${RUNNER_TEMP}/website-zip/website-${CUSTOMER}-linux" --os linux
+      - name: Start the website from the zip and check it refuses to work without a licence (Windows)
+        id: smoke_windows
+        if: ${{ matrix.os == 'windows' }}
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'website-zip'
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          & "$env:SystemRoot\System32\tar.exe" -xf (Join-Path $env:RUNNER_TEMP "website-out\website-$($env:CUSTOMER)-windows.zip") -C $dir
+          if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
+          node scripts/smoke-website.mjs (Join-Path $dir "website-$($env:CUSTOMER)-windows") --os windows
+          if ($LASTEXITCODE -ne 0) { throw 'The website package did not behave.' }
+      - name: Open Start Website.exe the way a person does (double-click), check the window, open it again, close the window (Windows)
+        id: window
+        if: ${{ matrix.os == 'windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pkg = Join-Path (Join-Path $env:RUNNER_TEMP 'website-zip') "website-$($env:CUSTOMER)-windows"
+          $exe = Join-Path $pkg 'Start Website.exe'
+          if (-not (Test-Path $exe)) { throw 'Start Website.exe is not in the package.' }
+          $note = Join-Path (Join-Path (Join-Path $env:APPDATA 'NextGenOS Website') $env:CUSTOMER) 'running.json'
+          Remove-Item $note -ErrorAction SilentlyContinue
+
+          # 1. Opened like a double-click: it must start and answer (a website with no licence answers "not available").
+          Start-Process -FilePath $exe | Out-Null
+          for ($i = 0; $i -lt 120 -and -not (Test-Path $note); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $note)) { throw 'The website did not start within 120 seconds.' }
+          $info = Get-Content $note -Raw | ConvertFrom-Json
+          $status = 0
+          try { $status = (Invoke-WebRequest -Uri $info.url -UseBasicParsing -SkipHttpErrorCheck).StatusCode } catch { throw "The website does not answer at $($info.url)." }
+          Write-Host "The website answers at $($info.url) with status $status."
+          $program = Get-CimInstance Win32_Process -Filter "ProcessId = $($info.pid)"
+          Write-Host $program.CommandLine
+          if ($program.CommandLine -notlike '*start-website.js --app*' -or $program.ExecutablePath -notlike "$pkg*") { throw 'The website is not running from its own folder with its own Node.js.' }
+
+          # 2. A window of its own was opened for it (Edge, in app mode: no address bar).
+          $window = $null
+          for ($i = 0; $i -lt 30 -and -not $window; $i++) {
+            $window = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like "*--app=$($info.url)*" } | Select-Object -First 1
+            if (-not $window) { Start-Sleep -Seconds 1 }
+          }
+          if (-not $window) { throw 'No app window was opened for the website.' }
+          Write-Host 'An Edge app window is open for it.'
+
+          # 3. Opened a second time: still one website.
+          Start-Process -FilePath $exe | Out-Null
+          Start-Sleep -Seconds 15
+          $running = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*start-website.js*' })
+          if ($running.Count -ne 1) { throw "There are $($running.Count) websites running; there must be one." }
+
+          # 4. The window is closed: the website stops and its note is removed.
+          Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*NextGenOS Website*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          for ($i = 0; $i -lt 40 -and (Get-Process -Id $info.pid -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+          if (Get-Process -Id $info.pid -ErrorAction SilentlyContinue) { throw 'The website did not stop when its window was closed.' }
+          if (Test-Path $note) { throw 'The note that the website is running was not removed.' }
+          Write-Host 'The website opened in a window of its own, ran once, and stopped when the window was closed.'
+      - name: Put the website zip in the results place
+        id: put
+        shell: bash
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/customer-build/results.mjs upload --files "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-${OS}.zip"
+      - name: Write what happened to this part
+        if: ${{ always() }}
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+          STEPS: settings=${{ steps.settings.outcome }},keys=${{ steps.keys.outcome }},launcher=${{ steps.launcher.outcome }},build=${{ steps.build.outcome }},audit=${{ steps.audit.outcome }},smoke=${{ steps.smoke.outcome }},smoke=${{ steps.smoke_windows.outcome }},window=${{ steps.window.outcome }},put=${{ steps.put.outcome }}
+        run: |
+          set -euo pipefail
+          node scripts/customer-build/result.mjs part --part "website-${OS}" --job-status "${JOB_STATUS}" --steps "${STEPS}" --files "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-${OS}.zip" --out "${RUNNER_TEMP}/part"
+      # The report is a few lines of text; the files themselves never go through the workflow's storage, only through the results place.
+      - name: Hand the report of this part to the last job
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: part-website-${{ matrix.os }}
+          path: ${{ runner.temp }}/part/part-website-${{ matrix.os }}.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  android:
+    # The app is a shell around the customer's website: it takes its name, colour, logo and address from the customer's brand, and is signed with the owner's Android key
+    # (repository secrets, as in the Release workflow) or, without them, with a one-off TEST key.
+    name: Building the Android app
+    needs: [inputs]
+    if: ${{ needs.inputs.outputs.android == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CUSTOMER: ${{ inputs.customer }}
+      BUILD: ${{ inputs.build }}
+      RESULTS_REPO: ${{ inputs.results_repo }}
+      VERSION_NAME: ${{ needs.inputs.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        with:
+          # Its default also asks for the old package "tools", which the current command-line tools no longer have ("Failed to find package 'tools'").
+          packages: platform-tools
+      - name: Take the customer's settings from the results place and check them
+        id: settings
+        shell: bash
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/customer-build/results.mjs download-inputs --out "${RUNNER_TEMP}/inputs.zip"
+          node scripts/customer-build/validate-inputs.mjs check --zip "${RUNNER_TEMP}/inputs.zip" --out "${RUNNER_TEMP}/inputs"
+      - name: Install packages
+        id: install
+        working-directory: apps/storefront-web-mobile
+        run: npm ci
+      - name: Set the app up for this customer (name, colour, address, icons and screens from the customer's brand)
+        id: configure
+        working-directory: apps/storefront-web-mobile
+        run: |
+          set -euo pipefail
+          BRAND="${RUNNER_TEMP}/inputs/brand.json"
+          APP_ID="$(jq -r '.android.appId' "${BRAND}")"
+          APP_NAME="$(jq -r '.name' "${BRAND}")"
+          STOREFRONT_URL="$(jq -r '.android.storefrontUrl' "${BRAND}")"
+          BRAND_COLOUR="$(jq -r '.primaryColor' "${BRAND}")"
+          # The build number is the app's version code, so a phone takes each new build as an update.
+          node scripts/android-config.mjs --app-id "${APP_ID}" --app-name "${APP_NAME}" --url "${STOREFRONT_URL}" --version-name "${VERSION_NAME}" --version-code "${BUILD}"
+          LOGO=()
+          if [ -f "${RUNNER_TEMP}/inputs/logo.png" ]; then LOGO=(--logo "${RUNNER_TEMP}/inputs/logo.png"); fi
+          node scripts/make-icons.mjs ${LOGO[@]+"${LOGO[@]}"} --colour "${BRAND_COLOUR}" --android
+      - name: Sync Capacitor
+        id: sync
+        working-directory: apps/storefront-web-mobile
+        run: npx cap sync android
+      - name: Signing key
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_B64}" ]; then
+            echo "${KEYSTORE_B64}" | base64 -d > "${RUNNER_TEMP}/release.keystore"
+            echo "ANDROID_KEYSTORE_FILE=${RUNNER_TEMP}/release.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${KEY_ALIAS}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${KEY_PASSWORD}" >> "$GITHUB_ENV"
+            echo "SIGNING=release key" >> "$GITHUB_ENV"
+          else
+            PW="$(openssl rand -hex 16)"
+            keytool -genkeypair -v -keystore "${RUNNER_TEMP}/test.keystore" -storepass "${PW}" -keypass "${PW}" -alias test -keyalg RSA -keysize 3072 -validity 3650 -dname "CN=Test build, O=NextGenOS" >/dev/null 2>&1
+            echo "ANDROID_KEYSTORE_FILE=${RUNNER_TEMP}/test.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${PW}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=test" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${PW}" >> "$GITHUB_ENV"
+            echo "SIGNING=one-off TEST key" >> "$GITHUB_ENV"
+          fi
+      - name: Build
+        id: build
+        working-directory: apps/storefront-web-mobile/android
+        run: chmod +x gradlew && ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+      - name: Check the package
+        id: check
+        working-directory: apps/storefront-web-mobile
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          BT="$(ls -d ${ANDROID_HOME}/build-tools/* | sort -V | tail -1)"
+          "${BT}/apksigner" verify --print-certs "${APK}"
+          # No source files or source maps inside the package.
+          if unzip -l "${APK}" | grep -Ei '\.(ts|tsx|map|java|kt|pdb)$'; then echo "Source files found in the APK"; exit 1; fi
+          # The app must refuse unencrypted traffic.
+          "${BT}/aapt2" dump xmltree --file AndroidManifest.xml "${APK}" | grep -Eq 'usesCleartextTraffic.*(=false|0x0)' || { echo "Cleartext traffic is not disabled"; exit 1; }
+      - name: Name the files
+        id: name
+        working-directory: apps/storefront-web-mobile
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/android-out"
+          mkdir -p "${OUT}"
+          cp android/app/build/outputs/apk/release/app-release.apk "${OUT}/SmartRetailPOS-${CUSTOMER}-${VERSION_NAME}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "${OUT}/SmartRetailPOS-${CUSTOMER}-${VERSION_NAME}.aab"
+          echo "Signed with: ${SIGNING}" > "${OUT}/ANDROID-SIGNING.txt"
+      - name: Put the app in the results place
+        id: put
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/android-out"
+          node scripts/customer-build/results.mjs upload --files "${OUT}/SmartRetailPOS-${CUSTOMER}-${VERSION_NAME}.apk,${OUT}/SmartRetailPOS-${CUSTOMER}-${VERSION_NAME}.aab,${OUT}/ANDROID-SIGNING.txt"
+      - name: Write what happened to this part
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+          STEPS: settings=${{ steps.settings.outcome }},install=${{ steps.install.outcome }},configure=${{ steps.configure.outcome }},sync=${{ steps.sync.outcome }},signing=${{ steps.signing.outcome }},build=${{ steps.build.outcome }},check=${{ steps.check.outcome }},name=${{ steps.name.outcome }},put=${{ steps.put.outcome }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/android-out"
+          node scripts/customer-build/result.mjs part --part android --job-status "${JOB_STATUS}" --steps "${STEPS}" --files "${OUT}/SmartRetailPOS-${CUSTOMER}-${VERSION_NAME}.apk,${OUT}/SmartRetailPOS-${CUSTOMER}-${VERSION_NAME}.aab,${OUT}/ANDROID-SIGNING.txt" --out "${RUNNER_TEMP}/part"
+      - name: Hand the report of this part to the last job
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: part-android
+          path: ${{ runner.temp }}/part/part-android.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  publish:
+    # Always runs, also when a part failed or was stopped: the Setup Studio must be told what happened. It writes result.json and SHA256SUMS.txt, takes away any file that no
+    # part which worked claims, and publishes the release LAST (a published release that has result.json means "finished").
+    name: Writing the result and publishing it
+    needs: [inputs, website, android]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the reports of the parts
+        # When no part ran there is nothing to take; the result then says so.
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          path: parts
+          merge-multiple: true
+      - name: Write result.json and the fingerprints, then publish the release
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+          CUSTOMER: ${{ inputs.customer }}
+          BUILD: ${{ inputs.build }}
+          RESULTS_REPO: ${{ inputs.results_repo }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          STARTED_AT: ${{ needs.inputs.outputs.started_at }}
+          TRIAL: ${{ needs.inputs.outputs.trial }}
+          WEBSITE_REQUESTED: ${{ needs.inputs.outputs.website }}
+          ANDROID_REQUESTED: ${{ needs.inputs.outputs.android }}
+          INPUTS_RESULT: ${{ needs.inputs.result }}
+          INPUTS_MESSAGE: ${{ needs.inputs.outputs.message }}
+          WEBSITE_RESULT: ${{ needs.website.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+        run: node scripts/customer-build/results.mjs finish --parts parts

@@ -1,0 +1,46 @@
+name: Release probe
+
+# A throw-away check of what the workflow's token may do with releases and tags. It deletes everything it makes. It starts when
+# .github/release-probe.json changes on a claude/* branch (to find out why GitHub refused to make a release; remove it when that is known).
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/release-probe.json"]
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    name: What the token may do with releases and tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Try it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -u
+          call() { code=$(curl -sS -o /tmp/out -w '%{http_code}' -X "$1" -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com$2" ${3:+-d "$3"}); echo "$1 $2 -> ${code}"; }
+          call GET "/repos/${R}"
+          jq '{private, fork, archived, visibility, default_branch, permissions, owner: .owner.type}' /tmp/out
+          try() {
+            call POST "/repos/${R}/releases" "$2"
+            echo "  ($1) $(jq -c '{id, message, errors}' /tmp/out)"
+            ID=$(jq -r '.id // empty' /tmp/out)
+            if [ -n "${ID}" ]; then call DELETE "/repos/${R}/releases/${ID}"; fi
+          }
+          try "A: a draft, target = the commit" "{\"tag_name\":\"probe-a\",\"target_commitish\":\"${SHA}\",\"draft\":true,\"name\":\"probe a\"}"
+          try "B: a draft, target = this branch" "{\"tag_name\":\"probe-b\",\"target_commitish\":\"${BRANCH}\",\"draft\":true,\"name\":\"probe b\"}"
+          try "C: a draft, target = main" "{\"tag_name\":\"probe-c\",\"target_commitish\":\"main\",\"draft\":true,\"name\":\"probe c\"}"
+          try "D: a draft, no target" "{\"tag_name\":\"probe-d\",\"draft\":true,\"name\":\"probe d\"}"
+          call POST "/repos/${R}/git/refs" "{\"ref\":\"refs/tags/probe-f\",\"sha\":\"${SHA}\"}"
+          echo "  (F: a tag at the commit) $(jq -c '{ref, message}' /tmp/out)"
+          call DELETE "/repos/${R}/git/refs/tags/probe-f"
+          call GET "/repos/${R}/actions/permissions/workflow"
+          cat /tmp/out; echo
+          call GET "/repos/${R}/rulesets"
+          jq -c '.' /tmp/out | head -c 600; echo

@@ -143,7 +143,7 @@ if (prompt.includes('PRODUCTS TO CHOOSE FROM')) {
   const answer = {
     products: picks.map((ref, i) => ({ ref, offer_percent: !clearance ? 0 : i === 0 ? 45 : 15 })),
     headline: clearance ? 'Stock clearance' : 'Fresh picks',
-    hindi_line: clearance ? 'भारी छूट, जल्दी करें' : 'नया माल आ गया है',
+    local_line: clearance ? 'भारी छूट, जल्दी करें' : 'नया माल आ गया है',
     subline: 'Now 50% off',
   };
   setTimeout(() => fs.writeFileSync(after('--output-last-message'), '```json\n' + JSON.stringify(answer, null, 2) + '\n```'), delay);
@@ -385,7 +385,7 @@ setTimeout(() => {
     material: 'plastic bottle',
     size_or_quantity: '1 L',
     keywords: ['sunflower oil', 'cooking oil', 'refined oil', '1 litre oil'],
-    hindi_name: 'सूरजमुखी का तेल',
+    local_name: 'सूरजमुखी का तेल',
     use_case_scene: 'a sunny kitchen counter while cooking',
     model_person: 'a woman in her early 30s',
     notes: 'The brand name on the label is too small to read.',

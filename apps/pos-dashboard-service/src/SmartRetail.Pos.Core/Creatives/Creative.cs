@@ -26,7 +26,7 @@ public sealed record CreativeStyle(string Id, string Name, string Brief)
 {
     public static CreativeStyle Clean { get; } = new("clean", "Clean and modern", "clean and modern, with plenty of space, one bold accent colour and crisp product shots");
 
-    public static CreativeStyle Festive { get; } = new("festive", "Festive", "festive, for an Indian festival: rich colours, marigolds, diyas and warm lights");
+    public static CreativeStyle Festive { get; } = new("festive", "Festive", "festive, for a festival: rich, warm colours, decorations and lights");
 
     public static CreativeStyle Sale { get; } = new("sale", "Big sale", "a bold sale: energetic colours, strong shapes and big, confident type");
 

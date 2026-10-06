@@ -89,7 +89,8 @@ public sealed class PosterService
         }
 
         var items = PosterPicker.DefaultPicks(kind, candidates, count);
-        var words = kind.DefaultWords(festival);
+        var locale = _ai.PosterLocale;
+        var words = kind.DefaultWords(festival, locale);
         string? pickedBy = null;
         string? note = null;
 
@@ -101,11 +102,11 @@ public sealed class PosterService
                 var router = _ai.CreateRouter(AiJob.PosterWords);
                 var request = new AiRequest
                 {
-                    SystemPrompt = PosterPrompt.SystemPrompt,
-                    UserPrompt = PosterPrompt.UserPrompt(kind, count, candidates, Today, Rules, festival),
+                    SystemPrompt = PosterPrompt.SystemPrompt(locale),
+                    UserPrompt = PosterPrompt.UserPrompt(kind, count, candidates, Today, Rules, festival, locale),
                 };
                 var response = await router.CompleteAsync(request, ProviderIds.Auto, ct, progress);
-                if (PosterPrompt.ReadAnswer(response.Text, kind, count, candidates, festival) is { } plan)
+                if (PosterPrompt.ReadAnswer(response.Text, kind, count, candidates, festival, locale) is { } plan)
                 {
                     items = plan.Items;
                     words = plan.Words;

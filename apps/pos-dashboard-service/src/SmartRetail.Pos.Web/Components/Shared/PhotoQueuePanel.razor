@@ -2,6 +2,7 @@
 @using SmartRetail.AI.Products
 @using SmartRetail.AI.Providers
 @inject ProductPhotoService Photos
+@inject AiEnvironment Ai
 
 @* Which photo of which product is being made now, what comes next for it, and which products wait: the AI makes the photos one at
    a time in the background, so this says where the work stands. It redraws by itself as each photo is done. *@
@@ -33,7 +34,7 @@
         {
             <p class="pq-now">
                 <strong><a href="@($"photos/{now.ProductId}")">@queue.NowName</a></strong>:
-                @(now.IsListing ? "writing the listings for Amazon and your website" : $"photo {now.Kind.Number()} of {PhotoKinds.All.Count}, {now.Kind.Title()}")
+                @(now.IsListing ? "writing the listings for Amazon and your website" : $"photo {now.Kind.Number()} of {PhotoKinds.All.Count}, {now.Kind.Title(Ai.Shop)}")
                 <span class="muted">· started @now.Started.ToString("h:mm tt", India)</span>
             </p>
             @if (queue.NextKinds.Count > 0 || queue.ListingNext)
@@ -74,8 +75,8 @@
         Photos.Changed += OnChanged;
     }
 
-    private static string Next(PhotoQueue queue) =>
-        string.Join(", then ", queue.NextKinds.Select(kind => kind.Title()).Concat(queue.ListingNext ? new[] { "the listings" } : Array.Empty<string>()));
+    private string Next(PhotoQueue queue) =>
+        string.Join(", then ", queue.NextKinds.Select(kind => kind.Title(Ai.Shop)).Concat(queue.ListingNext ? new[] { "the listings" } : Array.Empty<string>()));
 
     private void OnChanged(int productId) => _ = InvokeAsync(() =>
     {

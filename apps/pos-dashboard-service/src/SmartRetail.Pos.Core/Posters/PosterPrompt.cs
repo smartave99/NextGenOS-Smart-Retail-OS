@@ -15,20 +15,27 @@ public sealed record PosterPlan(IReadOnlyList<PosterItem> Items, PosterWords Wor
 /// </summary>
 public static class PosterPrompt
 {
-    public const string SystemPrompt =
-        "You plan A4 posters for a small shop in India. You are given the kind of poster, how many products it shows, "
-        + "and the shop's products that suit it, with figures from its billing software.\n"
-        + "Rules:\n"
-        + "- Choose products only from the list, by their ref (P1, P2, ...). Never invent products.\n"
-        + "- For each product choose an offer in whole percent, from 0 (no offer) up to its max_offer. Never more.\n"
-        + "- Write a short English headline, one line in Hindi (Devanagari script) and a short English line to go under them.\n"
-        + "- The words must not contain prices, numbers, percentages, ₹, dates or product names: the shop prints those itself.\n"
-        + "- Reply with JSON only, no other text.";
+    /// <summary>The AI's standing instructions, for this customer: its kind of shop and country, and the second language of its posters when it has one.</summary>
+    public static string SystemPrompt(PosterLocale? locale = null)
+    {
+        locale ??= PosterLocale.Neutral;
+        return "You plan A4 posters for " + locale.Shop + ". You are given the kind of poster, how many products it shows, "
+            + "and the shop's products that suit it, with figures from its billing software.\n"
+            + "Rules:\n"
+            + "- Choose products only from the list, by their ref (P1, P2, ...). Never invent products.\n"
+            + "- For each product choose an offer in whole percent, from 0 (no offer) up to its max_offer. Never more.\n"
+            + (locale.HasLocalLanguage
+                ? "- Write a short English headline, one line in " + locale.LocalLanguage + " and a short English line to go under them.\n"
+                : "- Write a short English headline and a short English line to go under it.\n")
+            + "- The words must not contain prices, numbers, percentages, currency signs, dates or product names: the shop prints those itself.\n"
+            + "- Reply with JSON only, no other text.";
+    }
 
-    public static string UserPrompt(PosterKind kind, int count, IReadOnlyList<PosterCandidate> candidates, DateOnly today, PosterRules rules, string? festival = null)
+    public static string UserPrompt(PosterKind kind, int count, IReadOnlyList<PosterCandidate> candidates, DateOnly today, PosterRules rules, string? festival = null, PosterLocale? locale = null)
     {
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(rules);
+        locale ??= PosterLocale.Neutral;
         var culture = CultureInfo.InvariantCulture;
         var text = new StringBuilder();
         text.Append("THE POSTER\n");
@@ -54,13 +61,20 @@ public static class PosterPrompt
                 .Append(c.HasPhoto ? "yes" : "no").Append('\n');
         }
 
-        text.Append("\nHOW TO CHOOSE\n").Append(Guidance(kind, festival)).Append("\n\n");
+        text.Append("\nHOW TO CHOOSE\n").Append(Guidance(kind, festival, locale)).Append("\n\n");
         text.Append("ANSWER\nReply with this JSON and nothing else:\n");
-        text.Append("{\"products\": [{\"ref\": \"P1\", \"offer_percent\": 0}], \"headline\": \"\", \"hindi_line\": \"\", \"subline\": \"\"}\n");
+        text.Append(locale.HasLocalLanguage
+            ? "{\"products\": [{\"ref\": \"P1\", \"offer_percent\": 0}], \"headline\": \"\", \"local_line\": \"\", \"subline\": \"\"}\n"
+            : "{\"products\": [{\"ref\": \"P1\", \"offer_percent\": 0}], \"headline\": \"\", \"subline\": \"\"}\n");
         text.Append("- products: exactly ").Append(Math.Min(count, candidates.Count).ToString(culture))
             .Append(", the most eye-catching first. Prefer products with a photo.\n");
         text.Append("- headline: English, at most ").Append(PosterWords.MaxHeadlineLength.ToString(culture)).Append(" characters.\n");
-        text.Append("- hindi_line: Hindi in Devanagari script, at most ").Append(PosterWords.MaxHindiLineLength.ToString(culture)).Append(" characters.\n");
+        if (locale.HasLocalLanguage)
+        {
+            text.Append("- local_line: ").Append(locale.LocalLanguage).Append(Scripts.Of(locale.LocalLanguageTag) is null ? "" : " (in its own script)")
+                .Append(", at most ").Append(PosterWords.MaxLocalLineLength.ToString(culture)).Append(" characters.\n");
+        }
+
         text.Append("- subline: English, at most ").Append(PosterWords.MaxSublineLength.ToString(culture)).Append(" characters.");
         return text.ToString();
     }
@@ -70,9 +84,10 @@ public static class PosterPrompt
     /// to each product's limit, words are checked (<see cref="PosterWords.FromAi"/>), and the app adds products
     /// from its own list when the AI chose too few. Null when the answer has no JSON the app can read.
     /// </summary>
-    public static PosterPlan? ReadAnswer(string? answer, PosterKind kind, int count, IReadOnlyList<PosterCandidate> candidates, string? festival = null)
+    public static PosterPlan? ReadAnswer(string? answer, PosterKind kind, int count, IReadOnlyList<PosterCandidate> candidates, string? festival = null, PosterLocale? locale = null)
     {
         ArgumentNullException.ThrowIfNull(candidates);
+        locale ??= PosterLocale.Neutral;
         var json = JsonPart(answer);
         if (json is null)
         {
@@ -133,7 +148,7 @@ public static class PosterPrompt
                 }
             }
 
-            var words = PosterWords.FromAi(Text(root, "headline"), Text(root, "hindi_line"), Text(root, "subline"), kind.DefaultWords(festival));
+            var words = PosterWords.FromAi(Text(root, "headline"), Text(root, "local_line") ?? Text(root, "hindi_line"), Text(root, "subline"), kind.DefaultWords(festival, locale), locale);
             return new PosterPlan(chosen.Select(c => c.Candidate.ToItem(c.Percent)).ToList(), words, byAi);
         }
     }
@@ -149,7 +164,7 @@ public static class PosterPrompt
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
-    private static string Guidance(PosterKind kind, string? festival) => kind switch
+    private static string Guidance(PosterKind kind, string? festival, PosterLocale locale) => kind switch
     {
         PosterKind.Clearance => "Choose the products most worth clearing: more stock and longer without a sale first. "
             + "Suggest offers big enough for customers to notice, usually 10 to 25 percent, within each max_offer.",
@@ -158,7 +173,7 @@ public static class PosterPrompt
         PosterKind.BestSellers => "Choose the products customers buy most. Usually no offer (0).",
         PosterKind.FestivalOffer => "Choose products people buy for "
             + (string.IsNullOrWhiteSpace(festival) ? "festivals" : OneLine(festival))
-            + " (gifts, sweets, pooja items, decorations, household needs for guests) and popular products. Offers usually 5 to 15 percent.",
+            + " (gifts, treats, decorations, household needs for guests) and popular products. Offers usually 5 to 15 percent.",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 

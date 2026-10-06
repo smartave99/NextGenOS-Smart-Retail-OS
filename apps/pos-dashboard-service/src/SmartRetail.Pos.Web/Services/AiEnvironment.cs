@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using SmartRetail.AI.Cli;
 using SmartRetail.AI.Providers;
 using SmartRetail.AI.Settings;
+using SmartRetail.Pos.Core.Posters;
 
 namespace SmartRetail.Pos.Web.Services;
 
@@ -20,6 +21,7 @@ public sealed class AiEnvironment : IDisposable
     {
         _options = options.Value;
         _gate = gate;
+        _shop = new Lazy<ShopProfile>(() => ShopProfile.LoadNear(ProfileFolder ?? AppContext.BaseDirectory));
     }
 
     public string SettingsFile => _options.SettingsFilePath;
@@ -30,7 +32,20 @@ public sealed class AiEnvironment : IDisposable
     /// </summary>
     public UsageLimitPause LimitPause { get; } = new();
 
-    public AssistantSettings LoadSettings() => new SettingsStore(SettingsFile).Load();
+    private string? ProfileFolder => string.IsNullOrWhiteSpace(_options.ProfileFolder) ? null : _options.ProfileFolder;
+
+    public AssistantSettings LoadSettings() => new SettingsStore(SettingsFile, ProfileFolder).Load();
+
+    private readonly Lazy<ShopProfile> _shop;
+
+    /// <summary>
+    /// What the customer's profile says about its pictures and posters (country, kind of business, who the model photos show, festivals, second language).
+    /// Read once: it is installed with the program, and the owner's settings cannot change it. Neutral when the customer has none.
+    /// </summary>
+    public ShopProfile Shop => _shop.Value;
+
+    /// <summary>The same, as the poster code needs it.</summary>
+    public PosterLocale PosterLocale => PosterLocales.From(Shop);
 
     /// <summary>Raised when Codex finished a task well, which proves it is installed and signed in.</summary>
     public event Action? CodexAnswered;

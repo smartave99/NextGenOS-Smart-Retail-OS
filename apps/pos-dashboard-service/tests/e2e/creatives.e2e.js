@@ -159,7 +159,7 @@ async function noSidewaysScroll(page, url) {
     const said = await tag.innerText();
     for (const part of ['Sunflower Oil 1 L', '₹148', '₹155', '4% off']) assert.ok(said.includes(part), `the tag does not say ${part}: ${said}`);
     const prompt = fs.readFileSync(path.join(folder, 'generations', '1', 'prompt.txt'), 'utf8');
-    assert.ok(prompt.includes('"Diwali Dhamaka"') && prompt.includes('festive, for an Indian festival'), prompt);
+    assert.ok(prompt.includes('"Diwali Dhamaka"') && prompt.includes('festive, for a festival'), prompt);
     assert.ok(!/₹\s*\d|148|155/.test(prompt), 'the prompt holds a price');
     const made = project().Generations[0];
     assert.deepStrictEqual([made.HasImage, made.Tags[0].X, made.Tags[0].Y], [true, 0.07, 0.735]);

@@ -12,6 +12,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { writeShopProfile } = require('./shop-profile');
 const { png, phonePhoto, photoNumber, changed } = require('./png');
 
 const BASE = 'http://127.0.0.1:5080';
@@ -53,7 +54,7 @@ async function startApp() {
       ...process.env,
       ASPNETCORE_ENVIRONMENT: 'Development',
       Pos__Mode: 'Demo',
-      Ai__SettingsFile: settingsFile,
+      Ai__SettingsFile: settingsFile, ...writeShopProfile(work),
       STAND_IN_CODEX_DELAY_MS: '1500',
       STAND_IN_CODEX_STATE: path.join(work, 'codex-listings'),
       STAND_IN_CODEX_PHOTOS_LOG: asked,

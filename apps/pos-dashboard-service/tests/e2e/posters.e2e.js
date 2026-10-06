@@ -10,6 +10,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { png } = require('./png');
+const { writeShopProfile } = require('./shop-profile');
 
 const BASE = 'http://127.0.0.1:5080';
 const OUT = process.argv[2] || 'screenshots';
@@ -49,7 +50,7 @@ fs.writeFileSync(path.join(penFolder, 'product.json'), JSON.stringify({
 
 async function startApp() {
   const app = spawn('dotnet', ['run', '--project', path.join(__dirname, '../../src/SmartRetail.Pos.Web'), '--no-launch-profile'], {
-    env: { ...process.env, ASPNETCORE_ENVIRONMENT: 'Development', Pos__Mode: 'Demo', Ai__SettingsFile: settingsFile, STAND_IN_CODEX_DELAY_MS: '1500', STAND_IN_CODEX_LIMIT_FILE: limitFile },
+    env: { ...process.env, ASPNETCORE_ENVIRONMENT: 'Development', Pos__Mode: 'Demo', Ai__SettingsFile: settingsFile, ...writeShopProfile(work), STAND_IN_CODEX_DELAY_MS: '1500', STAND_IN_CODEX_LIMIT_FILE: limitFile },
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
@@ -110,7 +111,7 @@ function pdfPages(pdf) {
     assert.deepStrictEqual(await sheet.locator('.sheet-prices b').allTextContents(), ['₹40', '₹39']);
     assert.strictEqual((await sheet.locator('.sheet-badge').innerText()).replace(/\s+/g, ' '), 'UP TO 27% OFF');
     assert.strictEqual(await sheet.locator('.sheet-headline').innerText(), 'STOCK CLEARANCE');
-    assert.strictEqual(await sheet.locator('.sheet-hindi').innerText(), 'भारी छूट, जल्दी करें');
+    assert.strictEqual(await sheet.locator('.sheet-local').innerText(), 'भारी छूट, जल्दी करें');
     // "Now 50% off" had a figure in it, so the app used its own line.
     assert.strictEqual(await sheet.locator('.sheet-sub').innerText(), "Grab them before they're gone");
     assert.strictEqual(await sheet.locator('.sheet-shop').innerText(), 'DEMO STORE');

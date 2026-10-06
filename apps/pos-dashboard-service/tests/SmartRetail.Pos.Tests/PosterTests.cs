@@ -93,14 +93,34 @@ public class PosterPricingTests
         Assert.Equal(expected, (int?)PosterPricing.CheckedOffer(55m, 42m, chosen));
 }
 
+/// <summary>Customers' profiles as the poster code reads them: one with a second language in its own script, one in a Latin-script language, one with nothing.</summary>
+public static class Locales
+{
+    public static PosterLocale Hindi { get; } = new()
+    {
+        CountryName = "India", LocalLanguage = "Hindi", LocalLanguageTag = "hi",
+        Festivals = new[] { "Diwali", "Holi" },
+        LocalLines = new Dictionary<string, string> { ["clearance"] = "भारी छूट · सीमित स्टॉक", ["best-sellers"] = "सबकी पसंद" },
+    };
+
+    public static PosterLocale Filipino { get; } = new()
+    {
+        CountryName = "the Philippines", ShopKind = "a small grocery", LocalLanguage = "Filipino", LocalLanguageTag = "fil",
+        Festivals = new[] { "Christmas", "Sinulog" },
+        LocalLines = new Dictionary<string, string> { ["clearance"] = "Malaking tawad" },
+    };
+
+    public static PosterLocale Thai { get; } = new() { CountryName = "Thailand", LocalLanguage = "Thai", LocalLanguageTag = "th" };
+}
+
 public class PosterWordsTests
 {
-    private static readonly PosterWords Fallback = PosterKind.Clearance.DefaultWords();
+    private static readonly PosterWords Fallback = PosterKind.Clearance.DefaultWords(null, Locales.Hindi);
 
     [Fact]
     public void An_ais_words_are_used_when_they_follow_the_rules()
     {
-        var words = PosterWords.FromAi("  Big Clearance\nSale ", "बड़ी बचत, सीमित स्टॉक", "\"Grab a bargain today\"", Fallback);
+        var words = PosterWords.FromAi("  Big Clearance\nSale ", "बड़ी बचत, सीमित स्टॉक", "\"Grab a bargain today\"", Fallback, Locales.Hindi);
 
         Assert.Equal(new PosterWords("Big Clearance Sale", "बड़ी बचत, सीमित स्टॉक", "Grab a bargain today"), words);
     }
@@ -108,18 +128,61 @@ public class PosterWordsTests
     [Theory]
     [InlineData("50% off everything")]
     [InlineData("Everything under ₹99")]
+    [InlineData("Everything under $9")]
     [InlineData("Save Rs 20")]
     [InlineData("भारी छूट")]
     [InlineData("")]
-    public void A_headline_with_figures_or_in_hindi_is_replaced(string headline) =>
-        Assert.Equal(Fallback.Headline, PosterWords.FromAi(headline, "भारी छूट", "While stock lasts", Fallback).Headline);
+    public void A_headline_with_figures_or_in_the_second_script_is_replaced(string headline) =>
+        Assert.Equal(Fallback.Headline, PosterWords.FromAi(headline, "भारी छूट", "While stock lasts", Fallback, Locales.Hindi).Headline);
 
     [Theory]
     [InlineData("Big discount")]
     [InlineData("२०% छूट")]
     [InlineData("20% छूट")]
-    public void A_hindi_line_must_be_hindi_without_figures(string hindi) =>
-        Assert.Equal(Fallback.HindiLine, PosterWords.FromAi("Sale", hindi, "While stock lasts", Fallback).HindiLine);
+    public void A_second_language_line_must_be_in_its_script_without_figures(string line) =>
+        Assert.Equal(Fallback.LocalLine, PosterWords.FromAi("Sale", line, "While stock lasts", Fallback, Locales.Hindi).LocalLine);
+
+    [Fact]
+    public void The_script_check_follows_the_language_of_the_profile()
+    {
+        var thai = PosterKind.Clearance.DefaultWords(null, Locales.Thai);
+
+        Assert.Equal("ลดราคาใหญ่", PosterWords.FromAi("Sale", "ลดราคาใหญ่", "While stock lasts", thai, Locales.Thai).LocalLine);
+        // A Hindi line is not Thai, and a Thai headline is not English.
+        Assert.Equal(thai.LocalLine, PosterWords.FromAi("Sale", "भारी छूट", "While stock lasts", thai, Locales.Thai).LocalLine);
+        Assert.Equal(thai.Headline, PosterWords.FromAi("ลดราคา", "ลดราคาใหญ่", "While stock lasts", thai, Locales.Thai).Headline);
+    }
+
+    [Fact]
+    public void A_language_in_the_latin_script_has_no_script_check_but_still_no_figures()
+    {
+        var fallback = PosterKind.Clearance.DefaultWords(null, Locales.Filipino);
+
+        Assert.Equal("Malaking tawad ngayon", PosterWords.FromAi("Sale", "Malaking tawad ngayon", "While stock lasts", fallback, Locales.Filipino).LocalLine);
+        Assert.Equal("Malaking tawad", PosterWords.FromAi("Sale", "Tawad na 50%", "While stock lasts", fallback, Locales.Filipino).LocalLine);
+    }
+
+    [Fact]
+    public void Without_a_second_language_the_poster_has_one_language_only()
+    {
+        var fallback = PosterKind.Clearance.DefaultWords();
+
+        Assert.Equal("", fallback.LocalLine);
+        Assert.Equal("", PosterWords.FromAi("Sale", "भारी छूट", "While stock lasts", fallback, PosterLocale.Neutral).LocalLine);
+        Assert.Equal("", PosterWords.FromAi("Sale", "भारी छूट", "While stock lasts", fallback).LocalLine);
+    }
+
+    [Fact]
+    public void Posters_saved_before_the_second_language_was_a_setting_are_still_read()
+    {
+        var old = System.Text.Json.JsonSerializer.Deserialize<PosterWords>("{\"Headline\":\"Sale\",\"HindiLine\":\"भारी छूट\",\"Subline\":\"Now\"}")!;
+        var current = System.Text.Json.JsonSerializer.Deserialize<PosterWords>("{\"headline\":\"Sale\",\"localLine\":\"Malaking tawad\",\"subline\":\"Now\"}")!;
+
+        Assert.Equal(new PosterWords("Sale", "भारी छूट", "Now"), old);
+        Assert.Equal(new PosterWords("Sale", "Malaking tawad", "Now"), current);
+        var written = System.Text.Json.JsonSerializer.Serialize(current, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        Assert.Equal("{\"headline\":\"Sale\",\"localLine\":\"Malaking tawad\",\"subline\":\"Now\"}", written);
+    }
 
     [Fact]
     public void Long_lines_are_cut_at_a_word()
@@ -143,7 +206,21 @@ public class PosterWordsTests
 
         Assert.Equal(themes.Count, themes.Distinct().Count());
         Assert.Contains("Holi", PosterKind.FestivalOffer.ArtworkTheme(" Holi\n"));
-        Assert.Contains("diyas", PosterKind.FestivalOffer.ArtworkTheme());
+    }
+
+    [Fact]
+    public void The_artwork_place_and_festival_come_from_the_profile_and_nothing_is_assumed()
+    {
+        var plain = PosterKind.FestivalOffer.ArtworkTheme();
+        var philippines = PosterKind.FestivalOffer.ArtworkTheme(null, Locales.Filipino);
+        var named = PosterKind.FestivalOffer.ArtworkTheme("Sinulog", Locales.Filipino);
+
+        Assert.DoesNotContain("India", plain);
+        Assert.DoesNotContain("diya", plain, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rangoli", plain, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("the festive season in the Philippines", philippines);
+        Assert.Contains("the festival of Sinulog in the Philippines", named);
+        Assert.NotEqual(plain, philippines);
     }
 
     [Fact]
@@ -333,11 +410,11 @@ public class PosterPromptTests
             Here is the plan:
             ```json
             {"products": [{"ref": "P9", "offer_percent": 10}, {"ref": "P2", "offer_percent": 45}, {"ref": "P2", "offer_percent": 5}, {"ref": "p3", "offer_percent": "15%"}],
-             "headline": "Clearance Bonanza", "hindi_line": "जल्दी करें, स्टॉक सीमित", "subline": "Everything at 50% off"}
+             "headline": "Clearance Bonanza", "local_line": "जल्दी करें, स्टॉक सीमित", "subline": "Everything at 50% off"}
             ```
             """;
 
-        var plan = PosterPrompt.ReadAnswer(answer, PosterKind.Clearance, 3, Candidates);
+        var plan = PosterPrompt.ReadAnswer(answer, PosterKind.Clearance, 3, Candidates, null, Locales.Hindi);
 
         Assert.NotNull(plan);
         // P9 does not exist and P2 comes once; its 45% is held to its 20% limit (₹140). P3 cannot have an offer.
@@ -350,6 +427,14 @@ public class PosterPromptTests
         Assert.Equal(new PosterWords("Clearance Bonanza", "जल्दी करें, स्टॉक सीमित", PosterKind.Clearance.DefaultWords().Subline), plan.Words);
     }
 
+    [Fact]
+    public void An_answer_that_still_uses_the_older_key_for_the_second_line_is_read()
+    {
+        const string answer = "{\"products\": [], \"headline\": \"Big sale\", \"hindi_line\": \"बड़ी बचत\", \"subline\": \"Come in\"}";
+
+        Assert.Equal("बड़ी बचत", PosterPrompt.ReadAnswer(answer, PosterKind.Clearance, 2, Candidates, null, Locales.Hindi)!.Words.LocalLine);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("I could not decide.")]
@@ -359,14 +444,47 @@ public class PosterPromptTests
         Assert.Null(PosterPrompt.ReadAnswer(answer, PosterKind.Clearance, 2, Candidates));
 
     [Fact]
+    public void The_task_names_the_shop_and_the_second_language_from_the_profile_and_nothing_else()
+    {
+        var neutral = PosterPrompt.SystemPrompt();
+        var filipino = PosterPrompt.SystemPrompt(Locales.Filipino);
+        var hindi = PosterPrompt.SystemPrompt(Locales.Hindi);
+
+        Assert.Contains("for a small shop.", neutral);
+        Assert.DoesNotContain("India", neutral);
+        Assert.DoesNotContain("Hindi", neutral);
+        Assert.DoesNotContain("Devanagari", neutral);
+        Assert.Contains("for a small grocery in the Philippines.", filipino);
+        Assert.Contains("one line in Filipino", filipino);
+        Assert.Contains("for a small shop in India.", hindi);
+        Assert.Contains("one line in Hindi", hindi);
+    }
+
+    [Fact]
+    public void The_answer_form_asks_for_a_second_line_only_when_the_profile_has_a_second_language()
+    {
+        var plain = PosterPrompt.UserPrompt(PosterKind.Clearance, 2, Candidates, Today, PosterRules.Default);
+        var hindi = PosterPrompt.UserPrompt(PosterKind.Clearance, 2, Candidates, Today, PosterRules.Default, null, Locales.Hindi);
+        var thai = PosterPrompt.UserPrompt(PosterKind.Clearance, 2, Candidates, Today, PosterRules.Default, null, Locales.Thai);
+        var filipino = PosterPrompt.UserPrompt(PosterKind.Clearance, 2, Candidates, Today, PosterRules.Default, null, Locales.Filipino);
+
+        Assert.DoesNotContain("local_line", plain);
+        Assert.DoesNotContain("pooja", plain);
+        Assert.Contains("\"local_line\"", hindi);
+        Assert.Contains("local_line: Hindi (in its own script)", hindi);
+        Assert.Contains("local_line: Thai (in its own script)", thai);
+        Assert.Contains("local_line: Filipino, at most", filipino);
+    }
+
+    [Fact]
     public void A_poster_never_asks_for_more_products_than_there_are()
     {
-        var plan = PosterPrompt.ReadAnswer("{\"products\": []}", PosterKind.BestSellers, 6, Candidates);
+        var plan = PosterPrompt.ReadAnswer("{\"products\": []}", PosterKind.BestSellers, 6, Candidates, null, Locales.Hindi);
 
         Assert.Equal(3, plan!.Items.Count);
         Assert.Equal(0, plan.ChosenByAi);
         Assert.All(plan.Items, item => Assert.False(item.HasOffer));
-        Assert.Equal(PosterKind.BestSellers.DefaultWords(), plan.Words);
+        Assert.Equal(PosterKind.BestSellers.DefaultWords(null, Locales.Hindi), plan.Words);
     }
 }
 

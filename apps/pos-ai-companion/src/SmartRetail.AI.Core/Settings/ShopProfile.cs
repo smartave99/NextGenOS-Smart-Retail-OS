@@ -48,6 +48,12 @@ namespace SmartRetail.AI.Settings
         /// <summary>The language's tag for the screen and the print, e.g. "hi" or "fil".</summary>
         public string LocalLanguageTag { get; set; } = "";
 
+        /// <summary>The kinds of poster a ready-made second-language line can be given for (the dashboard's poster kinds).</summary>
+        public static readonly string[] PosterLineKinds = { "clearance", "new-arrivals", "best-sellers", "festival-offer" };
+
+        /// <summary>The poster's second-language line when no AI writes one, by kind (e.g. "clearance"). Empty: such a poster has no second-language line until an AI or a person writes it.</summary>
+        public Dictionary<string, string> PosterLines { get; set; } = new Dictionary<string, string>();
+
         public static ShopProfile Neutral => new ShopProfile();
 
         /// <summary>" in the Philippines", or nothing.</summary>
@@ -145,6 +151,17 @@ namespace SmartRetail.AI.Settings
                 {
                     profile.LocalLanguage = name;
                     profile.LocalLanguageTag = tag;
+                    if (language["lines"] is JObject lines)
+                    {
+                        foreach (var posterKind in PosterLineKinds)
+                        {
+                            var line = Words(lines[posterKind], 40, "a poster line", problems);
+                            if (line.Length > 0)
+                            {
+                                profile.PosterLines[posterKind] = line;
+                            }
+                        }
+                    }
                 }
                 else if (name.Length > 0 || tag.Length > 0)
                 {

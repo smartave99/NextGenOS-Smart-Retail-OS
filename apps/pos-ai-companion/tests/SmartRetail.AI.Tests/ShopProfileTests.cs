@@ -160,6 +160,22 @@ namespace SmartRetail.AI.Tests
         }
 
         [Fact]
+        public void Ready_made_second_language_lines_are_read_for_the_poster_kinds_and_only_with_a_second_language()
+        {
+            var withLines = ShopProfile.Parse(@"{ ""schema"": 1, ""images"": { ""localLanguage"": { ""name"": ""Hindi"", ""tag"": ""hi"",
+                ""lines"": { ""clearance"": ""भारी छूट"", ""best-sellers"": ""सबकी पसंद"", ""diwali"": ""x"", ""new-arrivals"": ""<b>नया</b>"" } } } }");
+            var noLanguage = ShopProfile.Parse(@"{ ""schema"": 1, ""images"": { ""localLanguage"": { ""lines"": { ""clearance"": ""भारी छूट"" } } } }");
+
+            Assert.Equal(2, withLines.PosterLines.Count);
+            Assert.Equal("भारी छूट", withLines.PosterLines["clearance"]);
+            Assert.Equal("सबकी पसंद", withLines.PosterLines["best-sellers"]);
+            Assert.DoesNotContain("diwali", withLines.PosterLines.Keys);
+            Assert.DoesNotContain("new-arrivals", withLines.PosterLines.Keys);
+            Assert.Empty(noLanguage.PosterLines);
+            Assert.Empty(ShopProfile.Neutral.PosterLines);
+        }
+
+        [Fact]
         public void The_profile_is_found_beside_the_program_or_in_the_folder_above_it_and_a_missing_or_huge_one_is_ignored()
         {
             var dashboard = Path.Combine(_folder, "Dashboard");

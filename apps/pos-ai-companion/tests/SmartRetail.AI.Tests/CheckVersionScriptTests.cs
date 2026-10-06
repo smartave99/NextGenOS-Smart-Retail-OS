@@ -177,7 +177,10 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("node scripts/verify-all.mjs --full", workflow);
             Assert.Matches(@"(?m)^  android:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // The Windows setup is built after the gate too, and the release is published only when the gate passed (the builds may report their own failure in the notes).
-            Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            // The setup is built on Linux (the Windows setup compiler of Chocolatey has no 64-bit stub) and then tried on a real Windows PC.
+            Assert.Matches(@"(?m)^  windows-build:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n(    .*\n)*?    runs-on: ubuntu-latest\s*\n", workflow);
+            Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: \[gate, prepare, windows-build\]\s*\n(    .*\n)*?    runs-on: windows-latest\s*\n", workflow);
+            Assert.DoesNotContain("choco install nsis", workflow);
             // So is the Linux package of the Hub; the release waits for all three builds to report.
             Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // And so is the staff bundle of the Setup Studio.
@@ -187,7 +190,7 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("node scripts/make-website-package.mjs", workflow);
             Assert.Contains("node scripts/smoke-website.mjs", workflow);
             Assert.Contains("--node-app", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows, linux, studio, website\]\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, website\]\s*\n", workflow);
             // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
             // The draft and the tag are made at the very start, beside the gate (GitHub lets the token make them only at the newest commit of the branch), and taken away when the gate fails.
             var prepare = System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  prepare:\s*\n(.*?)^  cleanup:").Groups[1].Value;

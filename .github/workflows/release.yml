@@ -162,6 +162,9 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
+        with:
+          # Its default also asks for the old package "tools", which the current command-line tools no longer have ("Failed to find package 'tools'").
+          packages: platform-tools
       - name: Install packages
         run: npm ci
       - name: Read the brand kit
@@ -238,10 +241,12 @@ jobs:
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
         run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
 
-  windows:
-    name: Windows setup for the Business Hub
+  windows-build:
+    # The setup is compiled on Linux: the setup compiler there (the Ubuntu package of NSIS) can make a 64-bit setup, and the one for Windows that Chocolatey installs cannot
+    # ("adequate stub not found"). The program is the same either way: published for Windows (self-contained), its names hidden, audited. The next job tries the result on a real Windows PC.
+    name: Windows setup for the Business Hub (built)
     needs: [gate, prepare]
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -254,7 +259,6 @@ jobs:
       - name: Build the licence keys in (public keys only)
         # The owner's public keys are public data: repository variables NGOS_PUBLIC_KEYS (the text "export-public-keys" prints) and
         # NGOS_LICENCE_URL (the Studio's address). Or they were already built in and committed with "sync-clients". With neither, the build stops.
-        shell: bash
         env:
           NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
           NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
@@ -265,13 +269,12 @@ jobs:
             node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
           fi
       - name: Tools (code obfuscator and setup compiler; build tools, never shipped)
-        shell: bash
         run: |
           set -euo pipefail
           dotnet tool install --global Obfuscar.GlobalTool --version 2.2.50
-          choco install nsis -y --no-progress
+          sudo apt-get update -q
+          sudo apt-get install -y -q nsis
       - name: Build the setup (publish, hide the names, audit, write the setup and the zip)
-        shell: bash
         env:
           # A tag with -trial in its name (v1.0.0-trial1) does the same as the manual tick: a setup with no keys, to try installing only.
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
@@ -281,6 +284,30 @@ jobs:
           if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
           node apps/business-hub/installer/build.mjs --version "${VERSION_NAME}" --out dist ${EXTRA}
           if [ -n "${EXTRA}" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the Windows setup. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
+          ls -la dist
+      - name: Put the files on the draft release
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
+  windows:
+    name: Windows setup for the Business Hub (tried on a Windows PC)
+    needs: [gate, prepare, windows-build]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the setup and the zip from the draft release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs download --release "${RELEASE_ID}" --out dist --match '^(SmartRetailPOS-Hub-|NO-LICENCE-KEYS)'
       - name: Start the program from the zip and check it refuses to work without a licence
         shell: pwsh
         run: |
@@ -337,13 +364,17 @@ jobs:
           Get-ChildItem dist -Filter '*Setup*.exe' | ForEach-Object { & $tool.FullName sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName; if ($LASTEXITCODE -ne 0) { throw 'Signing failed.' } }
           Remove-Item $pfx
           'Signed with the owner certificate' | Out-File dist\WINDOWS-SIGNING.txt
-      - name: Put the files on the draft release
+      - name: Put the signing note (and the signed setup, when it was signed) on the draft release
         shell: bash
         working-directory: ${{ github.workspace }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
-        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+        run: |
+          set -euo pipefail
+          FILES=(dist/WINDOWS-SIGNING.txt)
+          if grep -qi '^Signed' dist/WINDOWS-SIGNING.txt; then FILES+=(dist/SmartRetailPOS-Hub-Setup-*.exe); fi
+          node scripts/release-assets.mjs upload --release "${RELEASE_ID}" "${FILES[@]}"
 
   linux:
     name: Linux package for the Business Hub
@@ -519,7 +550,7 @@ jobs:
 
   publish:
     name: Publish the GitHub Release
-    needs: [gate, prepare, android, windows, linux, studio, website]
+    needs: [gate, prepare, android, windows-build, windows, linux, studio, website]
     # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
     if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
@@ -536,6 +567,7 @@ jobs:
       - name: What was built
         env:
           ANDROID: ${{ needs.android.result }}
+          WINDOWS_BUILD: ${{ needs.windows-build.result }}
           WINDOWS: ${{ needs.windows.result }}
           LINUX: ${{ needs.linux.result }}
           STUDIO: ${{ needs.studio.result }}
@@ -546,7 +578,7 @@ jobs:
           test -d dist && [ -n "$(ls -A dist)" ] || { echo "Nothing was built, so there is nothing to release."; exit 1; }
           {
             echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
-            echo "Windows setup for the Business Hub: ${WINDOWS}"
+            echo "Windows setup for the Business Hub: built ${WINDOWS_BUILD}, tried on a Windows PC ${WINDOWS}"
             echo "Linux packages for the Business Hub: ${LINUX}"
             echo "Android app: ${ANDROID}"
             echo "Setup Studio for staff: ${STUDIO}"

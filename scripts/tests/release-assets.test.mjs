@@ -134,6 +134,19 @@ test('files go up, a file with the same name is replaced, and they come down the
   assert.equal(readFileSync(join(out, 'b.txt'), 'utf8'), 'bee');
 });
 
+test('only the files whose names match are taken when asked', async () => {
+  reset();
+  await run('create', '--tag', 'v1.0.0', '--target', 'abc');
+  await run('upload', '--release', '100', file('SmartRetailPOS-Hub-Setup-1.0.0.exe', 'setup'), file('SmartRetailPOS-Hub-1.0.0-win-x64.zip', 'zip'), file('other-thing.zip', 'no'));
+  const out = join(work, 'down-match');
+  const r = await run('download', '--release', '100', '--out', out, '--match', '^SmartRetailPOS-Hub-');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(readdirSync(out).sort(), ['SmartRetailPOS-Hub-1.0.0-win-x64.zip', 'SmartRetailPOS-Hub-Setup-1.0.0.exe']);
+  const none = await run('download', '--release', '100', '--out', join(work, 'down-none'), '--match', '^nothing-like-this$');
+  assert.notEqual(none.status, 0);
+  assert.match(none.stderr, /no file whose name matches/);
+});
+
 test('a passing problem at GitHub is tried again', async () => {
   reset();
   await run('create', '--tag', 'v1.0.0', '--target', 'abc');

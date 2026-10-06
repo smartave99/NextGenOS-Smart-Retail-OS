@@ -11,7 +11,7 @@
  *   node scripts/release-assets.mjs discard  --release <number> [--tag v1.0.0-trial3]
  *       removes a draft that is not wanted (never a published release) and the tag named, but only a tag that points at no other release
  *   node scripts/release-assets.mjs upload   --release <number> <file>...      a file with the same name on the release is replaced
- *   node scripts/release-assets.mjs download --release <number> --out <folder>
+ *   node scripts/release-assets.mjs download --release <number> --out <folder> [--match <regular expression on the file name>]
  *   node scripts/release-assets.mjs publish  --release <number> [--notes-file file]    the draft becomes a published release
  *
  * It needs GITHUB_TOKEN (or GH_TOKEN) with write access to the repository's contents, and GITHUB_REPOSITORY (owner/name). GITHUB_API_URL is the usual
@@ -116,8 +116,10 @@ async function download(args) {
   const id = flag(args, '--release'); const out = flag(args, '--out');
   if (!id || !out) fail('Say the release and the folder: --release <number> --out <folder>');
   mkdirSync(out, { recursive: true });
-  const assets = await listAll(`/repos/${repo}/releases/${id}/assets`);
-  if (!assets.length) fail('The release has no files.');
+  const match = flag(args, '--match');
+  const wanted = match ? new RegExp(match) : null;
+  const assets = (await listAll(`/repos/${repo}/releases/${id}/assets`)).filter((a) => !wanted || wanted.test(a.name));
+  if (!assets.length) fail(wanted ? `The release has no file whose name matches ${match}.` : 'The release has no files.');
   for (const asset of assets) {
     // A name is a file name and nothing more.
     if (asset.name !== basename(asset.name) || asset.name.includes('..') || /[\\/]/.test(asset.name)) fail(`The release has a file with a name that is not allowed: ${asset.name}`);

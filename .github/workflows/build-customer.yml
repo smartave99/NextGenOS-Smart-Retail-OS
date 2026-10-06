@@ -1,5 +1,8 @@
 name: Build for one customer
 
+# The title of every run carries the customer and the build number: the Setup Studio finds its own run by it and shows its steps in plain words.
+run-name: customer-${{ inputs.customer }}-${{ inputs.build }}
+
 # Builds ONE customer's website (Linux and Windows) and Android app from that customer's own settings, and puts the finished files where the Setup Studio picks them up.
 # Nobody starts this by hand: the Setup Studio starts it, with a token that can only run workflows in this repository (docs/CUSTOMER-BUILDS.md has the whole picture).
 #

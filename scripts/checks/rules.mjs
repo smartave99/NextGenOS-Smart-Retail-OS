@@ -17,6 +17,7 @@ export const REQUIRED_SECTIONS = [
   [12, 'Releases', 'never lags behind'],
   [13, 'Working with the owner', 'never have to repeat'],
   [14, 'Everyone reads the same rules', 'AGENTS.md'],
+  [15, 'Version 2', 'never depends on AI'],
 ];
 
 /** The files that only point to CLAUDE.md, so that an assistant that does not read CLAUDE.md by name still finds the rules. */

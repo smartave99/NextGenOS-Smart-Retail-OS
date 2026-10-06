@@ -2,7 +2,7 @@
 
 Read this before you answer "what is left?", and keep it true: update it in the same commit whenever you finish, find or put off a piece of work (`CLAUDE.md`, section 13).
 
-Last updated: 6 October 2026.
+Last updated: 7 October 2026.
 
 ## Needs the owner (an assistant cannot do these)
 
@@ -29,18 +29,23 @@ Each one needs the owner's own accounts, machines or decisions. They are listed 
 4. **Things still fixed in code that a customer could want different:** `docs/WHITE-LABEL-AUDIT.md` (the list only shrinks).
 5. **Several shops in one database, and sync between PCs** are not built. Fonts and a light/dark default from a brand kit are allowed by the licence but not applied by the Hub.
 
-6. **Version 2 (the Business Operating System):** `docs/VERSION-2.md` is the direction, `docs/V2-ARCHITECTURE-ASSESSMENT.md` the inspection and the plan. Phase 1 (AI foundation in the Business Hub) is in progress; Phases 2 to 8 (events, ontology, business intelligence, embeddings and knowledge, the assistant, cameras, advanced) are not started.
+6. **Version 2 (the Business Operating System):** `docs/VERSION-2.md` is the direction, `docs/V2-ARCHITECTURE-ASSESSMENT.md` the inspection, the plan and (section 6) exactly what Phase 1 built. **Phase 1 (AI foundation in the Business Hub) is built and tested** (switches, computer profile, privacy routing, secret store, first adapter, services and permissions, models, usage and limits, the owner's AI screen, safer updates). Left inside Phase 1's area: an AI job queue with priorities; hiding names and numbers before text goes to an online service the owner allowed; downloading and checking model files; the command-line assistants and the AI add-on's adapters as Hub adapters; clearing old rows of the use record; the owner's choice of a service per feature. **Phases 2 to 8** (events, ontology, business intelligence, embeddings and knowledge, the assistant, cameras, advanced) are not started.
 7. **Privacy and security findings in the existing AI code** (from the Version 2 inspection; each needs fixing and a test):
    - The AI add-on's "Ask AI" sends hosted providers customer **names, cities, states and remarks** (not covered by the masking), the table and column layout, photos and the typed question unmasked; masking can be switched off. The README's "personal data hidden" is not true for names.
    - The Setup Studio keeps API keys in a **plaintext file** (mode 0600).
-   - DPAPI-protected secrets cannot be saved on Linux; the Hub has no secret store at all (Phase 1 adds one).
+   - DPAPI-protected secrets cannot be saved on Linux. The Hub now has a secret store (Phase 1); the AI add-on, the Setup Studio and the storefront still use their own mechanisms.
    - The add-on's prompts and `PiiMasker` assume India, rupees and Hindi (`CLAUDE.md` section 8).
    - No AI audit trail and no cost tracking anywhere; three separate provider stacks (C#, Node, TypeScript) with different default models and four secret mechanisms.
-8. **Business Hub debt:** migrations are forward-only with no backup and have never been run on a real old database; `audit_log` is append-only by convention only; roles are fixed in code and services do not check permissions themselves; the licence limits (devices, stores, users) are not enforced.
+8. **Business Hub debt:** migrations now copy the database first and have a tested way back for the newest step, but have never been run on a real old shop database (the first step, the shop's own tables, has no way back); `audit_log` is append-only by convention only; roles are fixed in code and services do not check permissions themselves; the licence limits (devices, stores, users) are not enforced.
 
 ## What cannot be verified from a cloud session
 
-The gate prints the list every time (`node scripts/verify-all.mjs`, "NOT VERIFIED"). Say it whenever you report on the work.
+The gate prints the list every time (`node scripts/verify-all.mjs`, "NOT VERIFIED"). Say it whenever you report on the work. For the AI helpers (Phase 1) in particular:
+
+- **The Windows Credential Manager store** (`Ai/Secrets.cs`) has not run: there is no Windows here. On a real PC: connect a service with a key in *Settings, AI helpers*, restart the Hub's service, press Test, and look in Windows' Credential Manager for an entry starting `NextGenOS.Hub/`.
+- **The computer description on real hardware**: graphics cards (NVIDIA tool, Apple, Jetson) and Windows were not seen; the profile on the owner's own PC should be looked at once.
+- **A real AI service**: only a stand-in web server was used. Try Ollama or LM Studio on the shop PC, and one online account, once each.
+- **An update of a real old shop database**: the copy made before an update and the way back were tried on test databases only.
 
 ## Where things are
 

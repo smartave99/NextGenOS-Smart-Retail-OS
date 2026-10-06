@@ -1,3 +1,4 @@
+using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
@@ -19,7 +20,7 @@ namespace NextGenOS.Hub;
 /// </summary>
 public sealed class HubApp
 {
-    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print)
+    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai)
     {
         Db = db;
         Clock = clock;
@@ -39,6 +40,8 @@ public sealed class HubApp
         Reports = new ReportService(db, Shop, clock, Catalog);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit);
+        // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
+        Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", ai);
     }
 
     public HubDb Db { get; }
@@ -59,12 +62,13 @@ public sealed class HubApp
     public ReportService Reports { get; }
     public PrinterStore PrinterProfiles { get; }
     public HubPrinting Printing { get; }
+    public AiFoundation Ai { get; }
 
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
-    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null)
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null)
     {
         var db = new HubDb(path);
         db.Migrate();
-        return new HubApp(db, clock ?? new SystemClock(), print);
+        return new HubApp(db, clock ?? new SystemClock(), print, ai);
     }
 }

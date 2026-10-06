@@ -495,6 +495,7 @@ else if (tab == "activity")
         yield return ("look", "Look");
         yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
+        if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
         yield return ("licence", "Licence");
         yield return ("activity", "Activity");
     }
@@ -527,6 +528,8 @@ else if (tab == "activity")
 
     private void OpenTab(string key)
     {
+        // The AI helpers have a screen of their own (they are optional, and there is a lot to it).
+        if (key == "ai") { Nav.NavigateTo("settings/ai"); return; }
         tab = key;
         Error = Info = null;
         _ = Reload();

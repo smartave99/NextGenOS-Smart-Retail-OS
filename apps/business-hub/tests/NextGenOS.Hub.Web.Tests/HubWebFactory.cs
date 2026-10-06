@@ -14,6 +14,9 @@ public sealed class HubWebFactory : WebApplicationFactory<Program>
 
     public bool Licensed { get; set; } = true;
 
+    /// <summary>The parts of the program the stand-in licence includes. The Hub needs "hub"; the AI parts need "ai" as well.</summary>
+    public string[] Modules { get; set; } = ["hub"];
+
     public string Folder => _folder;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -23,7 +26,7 @@ public sealed class HubWebFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton(new ProductLicence(() => Licensed
-                ? new LicenceState { Status = LicenceStatus.Valid, Licence = new LicenceClaims { Modules = ["hub"] } }
+                ? new LicenceState { Status = LicenceStatus.Valid, Licence = new LicenceClaims { Modules = [.. Modules] } }
                 : new LicenceState { Status = LicenceStatus.Missing }));
         });
     }

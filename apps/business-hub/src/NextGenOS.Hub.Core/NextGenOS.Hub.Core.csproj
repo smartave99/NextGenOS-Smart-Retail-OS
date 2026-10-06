@@ -20,6 +20,8 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\..\industry-packs\packs\*.json" LogicalName="NextGenOS.Hub.industries.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Data\Migrations\*.sql" LogicalName="NextGenOS.Hub.migrations.%(Filename)%(Extension)" />
+    <!-- The way back from each migration, for HubDb.Rollback (a different name prefix, so that the migrations loader never sees them). -->
+    <EmbeddedResource Include="Data\Rollbacks\*.sql" LogicalName="NextGenOS.Hub.rollbacks.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

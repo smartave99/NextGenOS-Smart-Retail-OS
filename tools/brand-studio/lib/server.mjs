@@ -15,7 +15,7 @@ function dataUriBytes(uri) {
 }
 
 /** Starts the wizard. Returns { server, url, token, close }. */
-export function startServer({ root = repoRoot, port = 0 } = {}) {
+export function startServer({ root = repoRoot, port = 0, onBeat = null, onQuit = null } = {}) {
   const token = randomBytes(18).toString('base64url');
   const tokenBuf = Buffer.from(token);
 
@@ -60,6 +60,14 @@ export function startServer({ root = repoRoot, port = 0 } = {}) {
       const port = server.address().port;
       if (req.headers.origin && req.headers.origin !== `http://127.0.0.1:${port}` && req.headers.origin !== `http://localhost:${port}`) return fail(res, 403, 'Not allowed.');
 
+      // The page says it is still open (so a Brand Studio that nobody is looking at can stop by itself), and the person can quit it from the page.
+      if (req.method === 'GET' && path === '/api/alive') { if (onBeat) onBeat(); return send(res, 200, { ok: true }); }
+      if (req.method === 'POST' && path === '/api/quit') {
+        if (!onQuit) return fail(res, 409, 'This Brand Studio is stopped by closing the window or the terminal it was started from.');
+        send(res, 200, { ok: true });
+        setTimeout(onQuit, 200);
+        return undefined;
+      }
       if (req.method === 'GET' && path === '/api/options') return send(res, 200, { kits: listKits(root), countries: countryCodes(root) || countryCodes(repoRoot) || [], industries: industryIds(root) || industryIds(repoRoot) || [] });
 
       let m = /^\/api\/kit\/([^/]+)$/.exec(path);

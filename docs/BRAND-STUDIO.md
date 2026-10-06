@@ -23,7 +23,17 @@ A colour that white words cannot be read on is refused, a logo must be a real sm
 
 ## Open the Brand Studio
 
-You need **Node.js 22 or newer** (https://nodejs.org). Then double-click **`tools/brand-studio/Brand Studio.bat`** (Windows) or run `tools/brand-studio/brand-studio.sh` (Mac, Linux). Your web browser opens the Studio at an address that only works on this PC and changes every time (it ends with `?k=...`).
+**For NextGenOS staff, the look of a customer is made inside the Setup Studio** (its "look" step, with a live preview): that program carries everything it needs and opens as a program of its own. This stand-alone Brand Studio is for people who work from the source copy of the repository: it needs **Node.js 22 or newer** (https://nodejs.org), which is why it is not part of the staff bundle.
+
+```
+node tools/brand-studio/brand.mjs serve --app      a window of its own (no address bar, no terminal behind it); closing the window stops it
+node tools/brand-studio/brand.mjs serve --open     in this terminal, and a tab in your usual browser
+```
+
+- It opens in the PC's own Edge (Windows always has it), or Chrome or Chromium, as a window of its own with a profile of its own. On a PC with none of these it opens in your usual browser as a tab, and stops by itself after ten minutes with nobody using it.
+- **One at a time:** opening it again while it is open brings up the same window. To stop it: close the window, or press **Quit** (top right). The page says plainly when it has stopped. A problem at start-up is written in a note, `Brand Studio problem.txt`, which opens by itself.
+- `Brand Studio.bat` and `brand-studio.sh` start it from the source copy with a terminal (for people who work on it).
+- The address only works on this PC and changes every time.
 
 On the left: the business's name, colours, logo, contact, country and kind of business, website, Android app id, and the words on bills. On the right: **how it will look**, light and dark, updating as you type. Press **Save the kit** (writes `brand-kits/<name>/`) and then **Make the files** (writes `brand-exports/<name>/`).
 

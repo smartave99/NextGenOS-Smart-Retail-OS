@@ -4,7 +4,7 @@ export const WIZARD_HTML = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Brand Studio</title><link rel="stylesheet" href="/wizard.css"></head>
 <body>
-<header class="top"><div><strong>Brand Studio</strong> <span class="muted">by NextGenOS</span></div><div id="kits" class="kits"></div></header>
+<header class="top"><div><strong>Brand Studio</strong> <span class="muted">by NextGenOS</span></div><div id="kits" class="kits"></div><button type="button" class="btn" id="quit" title="Close the Brand Studio">Quit</button></header>
 <main class="grid">
   <form id="form" class="card" autocomplete="off" novalidate>
     <div id="msg" role="status" aria-live="polite"></div>
@@ -44,6 +44,7 @@ export const WIZARD_CSS = `
 body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f5f7;color:#1d1d1f}
 .top{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#fff;border-bottom:1px solid #e2e4e8}
 .muted{color:#6e6e73}.small{font-size:.82rem}
+#stopped{padding:80px 24px;text-align:center}#stopped h1{font-size:1.4rem}.top .btn{padding:5px 14px}
 .kits{display:flex;gap:8px;flex-wrap:wrap}.kits button{border:1px solid #d5d8de;background:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit}
 .grid{display:grid;grid-template-columns:minmax(360px,520px) 1fr;gap:20px;padding:20px 24px;align-items:start}
 @media (max-width:900px){.grid{grid-template-columns:1fr}}
@@ -155,4 +156,21 @@ $('export').onclick = async () => {
   try { const r = await api('/api/export/' + encodeURIComponent($('slug').value.trim()), 'POST'); $('files').textContent = 'Made in ' + r.dir + ': ' + r.files.join(', '); say('The files are ready. Open preview.html in that folder to see them.' + (r.warnings.length ? '\\n' + r.warnings.join('\\n') : ''), true); } catch (e) { say(e.message, false); }
 };
 start();
+
+// The Brand Studio is a program on this PC: say so when it has stopped, and let the person quit it.
+let stoppedShown = false;
+function stopped(text) {
+  if (stoppedShown) return;
+  stoppedShown = true;
+  document.body.innerHTML = '<div id="stopped"><h1>The Brand Studio has stopped</h1><p class="muted"></p></div>';
+  document.querySelector('#stopped p').textContent = text || 'It is not running any more. You can close this window. To use it again, open it from its icon.';
+}
+$('quit').addEventListener('click', async () => {
+  try { await api('/api/quit', 'POST', {}); stopped('The Brand Studio is closed. You can close this window.'); } catch (e) { say(e.message, false); }
+});
+let misses = 0;
+setInterval(async () => {
+  if (stoppedShown) return;
+  try { await fetch('/api/alive', { headers: { 'X-Brand-Studio': token } }); misses = 0; } catch (e) { misses += 1; if (misses >= 2) stopped(); }
+}, 15000);
 `;

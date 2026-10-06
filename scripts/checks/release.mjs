@@ -27,7 +27,7 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
       name: 'brand-studio',
       title: 'The Brand Studio makes, checks and exports brand kits (rules, command line, files for the Hub, licence, website and app, the local wizard\'s safety)',
       run: () => {
-        const r = runCmd('brand-studio', 'node', ['--test', 'tools/brand-studio/tests/brand-studio.test.mjs']);
+        const r = runCmd('brand-studio', 'node', ['--test', 'tools/brand-studio/tests/brand-studio.test.mjs', 'tools/brand-studio/tests/app-mode.test.mjs']);
         if (r.status !== 'PASS') return r;
         const n = /# pass (\d+)/.exec(r.out);
         return { status: 'PASS', detail: `${n ? n[1] : 'all'} tests passed` };

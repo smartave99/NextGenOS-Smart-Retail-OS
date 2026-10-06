@@ -160,6 +160,19 @@ namespace SmartRetail.AI.Tests
         }
 
         [Fact]
+        public void A_schema_number_that_is_not_1_or_is_too_big_to_be_a_number_gives_the_neutral_profile_and_never_a_crash()
+        {
+            foreach (var text in new[] { "99999999999", "99999999999999999999999999", "2", "-1", "1.5", "\"1\"", "null", "true" })
+            {
+                var problems = new List<string>();
+                var profile = ShopProfile.Parse("{ \"schema\": " + text + ", \"country\": { \"name\": \"Peru\" } }", problems);
+
+                Assert.Equal("", profile.CountryName);
+                Assert.NotEmpty(problems);
+            }
+        }
+
+        [Fact]
         public void Ready_made_second_language_lines_are_read_for_the_poster_kinds_and_only_with_a_second_language()
         {
             var withLines = ShopProfile.Parse(@"{ ""schema"": 1, ""images"": { ""localLanguage"": { ""name"": ""Hindi"", ""tag"": ""hi"",

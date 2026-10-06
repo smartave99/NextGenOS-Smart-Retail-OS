@@ -107,7 +107,7 @@ namespace SmartRetail.AI.Settings
                 return profile;
             }
 
-            if (root["schema"]?.Type != JTokenType.Integer || (int)root["schema"] != 1)
+            if (!(root["schema"] is JValue schema && schema.Type == JTokenType.Integer && schema.Value is long number && number == 1))
             {
                 problems.Add("The AI profile does not say \"schema\": 1; the neutral one is used.");
                 return profile;

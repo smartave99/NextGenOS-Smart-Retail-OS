@@ -48,6 +48,10 @@ public static class EndpointClassifier
         if (location == ProviderLocation.Cli) return null;
         var where = Classify(url);
         if (where == Invalid) return "That address is not a web address (it must start with http:// or https://).";
+        // A name, a password or a token written into the address would be kept in the database and shown on screens. The key has its own box, which keeps it in the safe.
+        var parsed = new Uri(url.Trim());
+        if (!string.IsNullOrEmpty(parsed.UserInfo)) return "Do not put a name or password in the address. Type the key in the key box: it is kept safely there.";
+        if (!string.IsNullOrEmpty(parsed.Query) || !string.IsNullOrEmpty(parsed.Fragment)) return "The address must not have a '?' or '#' part. If the service wants a key, type it in the key box.";
         switch (location)
         {
             case ProviderLocation.Local or ProviderLocation.LocalOptimized:

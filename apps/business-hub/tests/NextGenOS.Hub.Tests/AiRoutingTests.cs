@@ -196,6 +196,22 @@ public class EndpointAndTextGuardTests
     }
 
     [Theory]
+    [InlineData("http://user:secret@127.0.0.1:11434")]
+    [InlineData("https://sk-live-abc123@api.example.com/v1")]
+    [InlineData("https://api.example.com/v1?api_key=abc123")]
+    [InlineData("https://api.example.com/v1#token")]
+    [InlineData("http://192.168.1.5:11434/v1?key=1")]
+    public void A_key_cannot_be_written_into_an_address_where_it_would_be_kept_in_the_open(string url)
+    {
+        foreach (var place in new[] { ProviderLocation.Local, ProviderLocation.Lan, ProviderLocation.Api })
+        {
+            var problem = EndpointClassifier.Mismatch(place, url);
+            Assert.NotNull(problem);
+            Assert.Contains("key", problem);
+        }
+    }
+
+    [Theory]
     [InlineData("Pay with 4111 1111 1111 1111 please", true)]
     [InlineData("card 4111-1111-1111-1111", true)]
     [InlineData("5500005555555559", true)]

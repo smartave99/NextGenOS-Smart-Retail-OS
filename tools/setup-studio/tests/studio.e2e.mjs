@@ -32,6 +32,8 @@ const browser = await chromium.launch();
 const problems = [];
 const step = (s) => console.log('✓ ' + s);
 const shot = (page, name) => page.screenshot({ path: join(shots, `studio-${name}.png`), fullPage: true });
+// A message appears when the page has its answer (a wrong password is answered by the Studio, not by the page itself), so the test waits for it to show: reading the line at once reads it before the answer.
+const sees = async (page, pattern) => { await page.locator('.err', { hasText: pattern }).first().waitFor({ state: 'visible', timeout: 10000 }); };
 const newPage = async (width = 1360, height = 900) => {
   const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' })).newPage();
   page.on('console', (m) => { if (m.type() === 'error' && !/status of (400|401|403|409)/.test(m.text())) problems.push('console: ' + m.text()); });
@@ -57,7 +59,7 @@ try {
   await page.locator('#w-pass').fill('a-long-password');
   await page.locator('#w-pass2').fill('different-password');
   await page.locator('#w-go').click();
-  assert.match(await page.locator('.err').innerText(), /not the same/);
+  await sees(page, /not the same/);
   await page.locator('#w-pass2').fill('a-long-password');
   await page.locator('#w-go').click();
   await page.locator('nav[aria-label="Main"]').waitFor();
@@ -84,17 +86,17 @@ try {
   // ---- a salesperson adds a customer ------------------------------------------------------------------------------------------------------
   await page.locator('[data-person="Sam Sales"]').click();
   await page.locator('#s-pass').fill('wrong-password'); await page.locator('#s-go').click();
-  assert.match(await page.locator('.err').innerText(), /not right/);
+  await sees(page, /not right/);
   await page.locator('#s-pass').fill('sam-long-password'); await page.locator('#s-go').click();
   await page.locator('[data-nav="customers"]').click();
   await page.locator('#new-customer').waitFor();
   await page.locator('#new-customer').click();
   await page.locator('#nc-name').fill('Luzon Fresh Mart');
   await page.locator('#nc-create').click();
-  assert.match(await page.locator('.err').innerText(), /choose the country/);
+  await sees(page, /choose the country/);
   await page.locator('#nc-country').selectOption({ label: 'Philippines' });
   await page.locator('#nc-create').click();
-  assert.match(await page.locator('.err').innerText(), /kind of business/);
+  await sees(page, /kind of business/);
   await page.locator('#nc-kind').selectOption({ label: 'Retail store' });
   await page.locator('#nc-create').click();
   await page.waitForURL(/#\/customers\/luzon-fresh-mart\/details/);

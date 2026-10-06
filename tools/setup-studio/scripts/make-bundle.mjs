@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeZipFile } from '../lib/zip.mjs';
+import { buildLauncher } from '../../../scripts/lib/build-launcher.mjs';
 import { SECRET_PATTERNS, SECRET_ALLOW } from '../../../scripts/lib/secret-patterns.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -81,8 +82,9 @@ try {
   // The launchers sit at the top of the bundle; they start the Studio from its own folder, with the Node.js beside it, and show it in a window of its own (no terminal).
   if (os === 'windows') {
     // "Setup Studio.exe" is a small program with the Studio's icon that starts the Studio's Node.js with no console window. It is made here with NSIS (makensis).
-    const made = spawnSync('makensis', ['-V2', `-DOUTFILE=${join(top, 'Setup Studio.exe')}`, `-DICON=${join(studio, 'launcher', 'studio.ico')}`, `-DVERSION=${version}`, join(studio, 'launcher', 'SetupStudio.nsi')], { encoding: 'utf8' });
-    if (made.error || made.status !== 0) { console.error(`\nThe Windows launcher could not be made. It needs NSIS (makensis): on Linux, apt-get install nsis.\n${made.error?.message ?? ''}${(made.stdout || '').slice(-1500)}${(made.stderr || '').slice(-1500)}`); process.exit(1); }
+    try {
+      buildLauncher({ outFile: join(top, 'Setup Studio.exe'), name: 'NextGenOS Setup Studio', program: 'tools\\setup-studio\\node\\node.exe', workdir: 'tools\\setup-studio', check: 'tools\\setup-studio\\studio.mjs', args: 'studio.mjs serve --app', icon: join(studio, 'launcher', 'studio.ico'), version });
+    } catch (e) { console.error(`\n${e.message}`); process.exit(1); }
     cpSync(join(studio, 'launcher', 'Setup Studio (with a window, for problems).bat'), join(top, 'Setup Studio (with a window, for problems).bat'));
   } else {
     cpSync(join(studio, 'launcher', 'setup-studio.sh'), join(top, 'setup-studio.sh'));

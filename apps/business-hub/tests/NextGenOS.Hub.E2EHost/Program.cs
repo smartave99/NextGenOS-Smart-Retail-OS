@@ -25,4 +25,23 @@ builder.Services.AddSingleton(new ProductLicence(() => licensed
     : new LicenceState { Status = LicenceStatus.Missing }));
 var app = builder.Build();
 HubHost.UseHub(app);
+// Only for the browser test of the event history screen (--E2E:Seed=true): this test program is not shipped. There is nothing yet that records business events by itself, so the
+// test records a few the way a camera service later will: through the event store.
+if (builder.Configuration.GetValue("E2E:Seed", false))
+{
+    app.MapPost("/__e2e/seed-events", (NextGenOS.Hub.HubApp hub) =>
+    {
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.EventEngine, true, null);
+        var now = DateTimeOffset.UtcNow;
+        var a = hub.Events.Observe(new NextGenOS.Hub.Events.ObservationInput("object.detected", "model", "cam-1", "INTERNAL", now.AddMinutes(-4), 0.81, "detector", "2.1", "zone:aisle-3", "track:cam1:17", "hand", "{\"box\":[0.1,0.2,0.3,0.4]}"));
+        var b = hub.Events.Observe(new NextGenOS.Hub.Events.ObservationInput("object.tracked", "model", "cam-1", "INTERNAL", now.AddMinutes(-4), 0.77, "tracker", "1.4", "zone:aisle-3", "track:cam1:17"));
+        hub.Events.Append(new NextGenOS.Hub.Events.EventInput("customer_session.picked_up_product", "rule", "pickup-rule", "INTERNAL", now.AddMinutes(-3), 0.9, "1.0", "track:cam1:17", "track:cam1:17", "product:8901000000019", "zone:aisle-3",
+            Explanation: "A hand stayed at the shelf and the product left it", ObservationIds: [a.Id, b.Id], Evidence: [new NextGenOS.Hub.Events.EvidenceInput("image", "camera-1/frame-0042.jpg", "INTERNAL")]));
+        hub.Events.Append(new NextGenOS.Hub.Events.EventInput("shelf.low_stock", "model", "shelf-model", "INTERNAL", now.AddMinutes(-2), 0.62, "0.9", ZoneRef: "zone:aisle-3", Status: "proposed", Explanation: "The shelf looks nearly empty"));
+        var wrong = hub.Events.Append(new NextGenOS.Hub.Events.EventInput("shelf.restocked", "system", "hub", "INTERNAL", now.AddMinutes(-2), ZoneRef: "zone:aisle-3"));
+        hub.Events.Supersede(wrong.Id, new NextGenOS.Hub.Events.EventInput("shelf.checked", "person", "staff", "INTERNAL", now.AddMinutes(-1), ZoneRef: "zone:aisle-3", Explanation: "Someone only looked at it"), null, "it was only looked at");
+        return Results.Ok(new { events = hub.Events.Counts().Confirmed });
+    }).AllowAnonymous().DisableAntiforgery();
+}
+
 app.Run();

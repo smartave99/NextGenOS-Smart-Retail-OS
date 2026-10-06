@@ -6,12 +6,14 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ### New
 - **AI helpers (optional, off by default)**: *Settings → AI helpers* for the owner. Eight switches, a description of the computer, AI services with permissions per kind of data, limits and a use record, keys kept in the system's safe, and a list of models with a way back. Needs the `ai` part in the licence. The shop's own screens do not use it and are unchanged.
+- **Business event history (optional, off by default)**: *Settings → AI helpers → Business events* for the owner. What cameras and sensors saw is kept apart from what happened in the business; every event says who or what, where, when, how sure, why the system believes it and what it rests on; a wrong event is marked wrong or replaced and stays in the history. Records are forgotten when their time is up (short for what is private, biometric data not kept at all unless the owner says so, card details never), even with the switch off.
 - **Safer updates**: before an update changes an existing shop's database, the whole file is copied next to it (`shop.db.before-update-….bak`), and the new database step has a tested way back.
 
 ### Changed
 - Only the owner has the new permission `ai`; the other roles are unchanged.
 
 ### Not yet
+- Nothing in the shop writes business events yet (sales, voids and stock changes will, from the business map onwards).
 - A queue for AI jobs, hiding names and numbers before text goes to an online service, downloading or checking model files, the command-line assistants, cameras, events and the business map (Version 2, phases 2 to 8).
 
 ## 1.0.0 (release candidate)

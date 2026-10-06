@@ -1,0 +1,264 @@
+@page "/settings/events"
+@attribute [Authorize(Policy = Perm.Ai)]
+@inherits HubPage
+@using System.Globalization
+@using NextGenOS.Hub.Ai
+@using NextGenOS.Hub.Events
+
+<PageTitle>Business events</PageTitle>
+<h1>Business events</h1>
+<p class="sub">What happened in the business, and why the system believes it. An <strong>event</strong> is something that happened (a product was picked up); an <strong>observation</strong> is only what a camera or sensor saw. <a href="settings/ai">Back to the AI helpers</a></p>
+<Notice Error="@Error" Info="@Info" />
+
+@if (!App.Ai.Flags.Licensed)
+{
+    <div class="notice warn" id="ev-unlicensed">The business event history is not part of this shop's licence. What was kept before stays readable, and nothing new is recorded.</div>
+}
+else if (!App.Events.Recording)
+{
+    <div class="notice warn" id="ev-off">The business event history is switched off, so nothing is being recorded. You can switch it on under <a href="settings/ai">AI helpers</a>. What is already here stays until its time is up.</div>
+}
+
+<section class="card" id="ev-counts">
+    <h2>What is kept</h2>
+    <div class="grid">
+        <div class="card stat"><span class="label">Events</span><span class="value" id="ev-total">@(counts.Proposed + counts.Confirmed + counts.Rejected + counts.Superseded)</span><span class="note">@counts.Confirmed confirmed, @counts.Proposed waiting to be checked</span></div>
+        <div class="card stat"><span class="label">Observations</span><span class="value" id="ev-obs">@counts.Observations</span><span class="note">seen by cameras and sensors</span></div>
+        <div class="card stat"><span class="label">Wrong or replaced</span><span class="value">@(counts.Rejected + counts.Superseded)</span><span class="note">@counts.Rejected rejected, @counts.Superseded replaced</span></div>
+    </div>
+    @if (counts.OldestEvent is { } oldest && counts.NewestEvent is { } newest)
+    {
+        <p class="muted small">From @Day(oldest) to @Day(newest).</p>
+    }
+</section>
+
+<section class="card" id="ev-list">
+    <h2>Look through the history</h2>
+    <div class="field-row">
+        <div>
+            <label for="f-what">Show</label>
+            <select id="f-what" @bind="filter.What"><option value="events">Events</option><option value="observations">What cameras and sensors saw</option></select>
+        </div>
+        <div><label for="f-type">Starts with</label><input id="f-type" @bind="filter.Words" maxlength="80" placeholder="for example customer_session" /></div>
+        <div>
+            <label for="f-status">Standing</label>
+            <select id="f-status" @bind="filter.Status">
+                <option value="">Any</option>
+                @foreach (var s in EventStatus.All) { <option value="@s">@EventStatus.Label(s)</option> }
+            </select>
+        </div>
+        <div><label for="f-from">From</label><input id="f-from" type="date" value="@filter.From" @onchange="e => filter.From = e.Value?.ToString() ?? string.Empty" /></div>
+        <div><label for="f-to">To</label><input id="f-to" type="date" value="@filter.To" @onchange="e => filter.To = e.Value?.ToString() ?? string.Empty" /></div>
+    </div>
+    <div class="row"><button type="button" class="btn primary" id="f-go" @onclick="Search">Show</button></div>
+
+    @if (filter.What == "events")
+    {
+        @if (events.Count == 0) { <div class="empty" id="ev-none">No events match.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="ev-table">
+                <thead><tr><th>When</th><th>What</th><th>Who or what, where</th><th class="num">Sure</th><th>Standing</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var e in events)
+                {
+                    var id = e.Id;
+                    <tr id="@("ev-" + id)">
+                        <td class="nowrap">@When(e.OccurredAt)</td>
+                        <td>@EventTypes.Label(e.Type)</td>
+                        <td>@Refs(e)</td>
+                        <td class="num">@Percent(e.Confidence)</td>
+                        <td>@EventStatus.Label(e.Status)</td>
+                        <td class="row">
+                            <button type="button" class="btn ghost small" @onclick="() => Explain(id)">Why?</button>
+                            @if (e.Status == EventStatus.Proposed)
+                            {
+                                <button type="button" class="btn ghost small" @onclick="() => Decide(id, EventStatus.Confirmed)">Yes, it happened</button>
+                                <button type="button" class="btn ghost small" @onclick="() => Decide(id, EventStatus.Rejected)">No, it was wrong</button>
+                            }
+                            else if (e.Status == EventStatus.Confirmed)
+                            {
+                                <button type="button" class="btn ghost small" @onclick="() => Decide(id, EventStatus.Rejected)">Mark as wrong</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+            @if (events.Count == Page) { <div class="row"><button type="button" class="btn ghost small" @onclick="More">Older ones</button></div> }
+        }
+    }
+    else
+    {
+        @if (seen.Count == 0) { <div class="empty" id="ev-none">Nothing matches.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="obs-table">
+                <thead><tr><th>When</th><th>Kind</th><th>Seen by</th><th>Where</th><th class="num">Sure</th><th>Kept until</th></tr></thead>
+                <tbody>
+                @foreach (var o in seen)
+                {
+                    <tr>
+                        <td class="nowrap">@When(o.OccurredAt)</td>
+                        <td>@EventTypes.Label(o.Kind)@(o.Label is null ? "" : " (" + o.Label + ")")</td>
+                        <td>@SourceType.Label(o.SourceType) @o.SourceId@(o.ModelId is null ? "" : " · " + o.ModelId + (o.ModelVersion is null ? "" : " " + o.ModelVersion))</td>
+                        <td>@(o.ZoneRef ?? "")</td>
+                        <td class="num">@Percent(o.Confidence)</td>
+                        <td class="nowrap">@Day(o.RetainUntil)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+            @if (seen.Count == Page) { <div class="row"><button type="button" class="btn ghost small" @onclick="More">Older ones</button></div> }
+        }
+    }
+</section>
+
+@if (why is not null)
+{
+    <section class="card" id="ev-why">
+        <div class="head"><h2>Why does the system believe this?</h2><button type="button" class="btn ghost small" @onclick="() => why = null">Close</button></div>
+        <p><strong>@EventTypes.Label(why.Event.Type)</strong>, @When(why.Event.OccurredAt). @EventStatus.Label(why.Event.Status).</p>
+        <p id="ev-sentence">@why.Sentence</p>
+        @if (why.Observations.Count > 0)
+        {
+            <h3>What it rests on</h3>
+            <ul class="small">@foreach (var o in why.Observations) { <li>@When(o.OccurredAt): @EventTypes.Label(o.Kind) seen by @SourceType.Label(o.SourceType).ToLowerInvariant() @o.SourceId, @Percent(o.Confidence) sure</li> }</ul>
+        }
+        @if (why.Evidence.Count > 0)
+        {
+            <h3>Evidence</h3>
+            <ul class="small">@foreach (var x in why.Evidence) { <li>@EvidenceKind.Label(x.Kind): <code>@x.Reference</code>, kept until @Day(x.RetainUntil)</li> }</ul>
+        }
+        @if (why.Replaces is not null) { <p class="small">It corrects an earlier event: @EventTypes.Label(why.Replaces.Type), @When(why.Replaces.OccurredAt).</p> }
+        @if (why.ReplacedBy is not null) { <p class="small">It was replaced by a later event: @EventTypes.Label(why.ReplacedBy.Type), @When(why.ReplacedBy.OccurredAt).</p> }
+    </section>
+}
+
+<section class="card" id="ev-retention">
+    <h2>How long things are kept</h2>
+    <p class="muted small">Records are forgotten when their time is up, even when the history is switched off. What is private is kept for a short time unless you choose otherwise. Biometric data (faces, fingerprints) is <strong>not kept at all</strong> unless you write a number of days here. Card and payment details are never kept.</p>
+    <div class="tbl-wrap">
+    <table class="tbl">
+        <thead><tr><th>Kind of data</th>@foreach (var subject in RetentionSubject.All) { <th class="num">@RetentionSubject.Label(subject) (days)</th> }<th></th></tr></thead>
+        <tbody>
+        @foreach (var dataClass in DataClass.All.Where(c => c != DataClass.PaymentSensitive))
+        {
+            var cls = dataClass;
+            <tr>
+                <td>@DataClass.Label(cls)</td>
+                @foreach (var subject in RetentionSubject.All)
+                {
+                    var sub = subject;
+                    var rule = rules.Single(r => r.Subject == sub && r.DataClass == cls);
+                    <td class="num"><input class="qty" inputmode="numeric" id="@("ret-" + sub + "-" + cls)" aria-label="@(RetentionSubject.Label(sub) + ", " + DataClass.Label(cls))" placeholder="@(RetentionService.DefaultDays(sub, cls) == 0 ? "not kept" : RetentionService.DefaultDays(sub, cls).ToString(CultureInfo.InvariantCulture))" @bind="days[(sub, cls)]" maxlength="4" /></td>
+                }
+                <td class="row"><button type="button" class="btn ghost small" @onclick="() => SaveDays(cls)">Save</button></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    </div>
+    <p class="muted small">An empty box means the usual time (shown in grey).</p>
+    <div class="row"><button type="button" class="btn ghost" id="ev-forget" @onclick="Forget">Forget what is past its time now</button></div>
+</section>
+
+@code {
+    private const int Page = 25;
+
+    private sealed class Filter { public string What = "events", Words = "", Status = "", From = "", To = ""; }
+
+    private readonly Filter filter = new();
+    private EventCounts counts = new(0, 0, 0, 0, 0, null, null);
+    private IReadOnlyList<EventRecord> events = Array.Empty<EventRecord>();
+    private IReadOnlyList<ObservationRecord> seen = Array.Empty<ObservationRecord>();
+    private IReadOnlyList<RetentionRule> rules = Array.Empty<RetentionRule>();
+    private readonly Dictionary<(string Subject, string DataClass), string> days = new();
+    private EventExplanation? why;
+    private long? beforeId;
+
+    protected override Task LoadAsync()
+    {
+        counts = App.Events.Counts();
+        rules = App.Retention.Rules();
+        foreach (var rule in rules) days[(rule.Subject, rule.DataClass)] = rule.IsDefault ? "" : rule.Days.ToString(CultureInfo.InvariantCulture);
+        Query(reset: false);
+        return Task.CompletedTask;
+    }
+
+    private void Query(bool reset)
+    {
+        if (reset) beforeId = null;
+        var from = Date(filter.From, end: false);
+        var to = Date(filter.To, end: true);
+        if (filter.What == "events")
+        {
+            var found = App.Events.Query(new EventQuery(from, to, string.IsNullOrWhiteSpace(filter.Words) ? null : filter.Words.Trim(), string.IsNullOrEmpty(filter.Status) ? null : filter.Status, Limit: Page, BeforeId: beforeId));
+            events = beforeId is null ? found : events.Concat(found).ToList();
+        }
+        else
+        {
+            var found = App.Events.QueryObservations(new ObservationQuery(from, to, string.IsNullOrWhiteSpace(filter.Words) ? null : filter.Words.Trim(), Limit: Page, BeforeId: beforeId));
+            seen = beforeId is null ? found : seen.Concat(found).ToList();
+        }
+    }
+
+    private DateTimeOffset? Date(string text, bool end)
+    {
+        if (!DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)) return null;
+        return end ? Shop.Time.StartOfNextDay(date).AddSeconds(-1) : Shop.Time.StartOfDay(date);
+    }
+
+    private async Task Search() { why = null; await Run(() => Query(reset: true)); }
+
+    private async Task More()
+    {
+        beforeId = filter.What == "events" ? events.LastOrDefault()?.Id : seen.LastOrDefault()?.Id;
+        await Run(() => Query(reset: false));
+    }
+
+    private async Task Explain(long id) => await Run(() => why = App.Events.Explain(id));
+
+    private async Task Decide(long id, string status)
+    {
+        await Run(() => App.Events.SetStatus(id, status, Me.Id), status == EventStatus.Confirmed ? "Confirmed." : "Marked as wrong. It stays in the history, and says so.");
+        why = null;
+        counts = App.Events.Counts();
+        Query(reset: true);
+    }
+
+    private async Task SaveDays(string dataClass)
+    {
+        await Run(() =>
+        {
+            foreach (var subject in RetentionSubject.All)
+            {
+                var text = (days[(subject, dataClass)] ?? "").Trim();
+                if (text.Length == 0) { App.Retention.UseDefault(subject, dataClass, Me.Id); continue; }
+                if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) throw new HubException("bad-days", "'" + text + "' is not a number of days.");
+                App.Retention.Set(subject, dataClass, n, Me.Id);
+            }
+        }, "Saved.");
+        await Reload();
+    }
+
+    private async Task Forget()
+    {
+        await Run(() =>
+        {
+            var result = App.Retention.Prune(Me.Id);
+            Info = result.Any
+                ? "Forgot " + result.Events + " events, " + result.Observations + " observations and " + result.Evidence + " pointers to evidence."
+                : "Nothing is past its time.";
+        });
+        await Reload();
+    }
+
+    private string Refs(EventRecord e) => string.Join(" · ", new[] { e.ActorRef ?? e.SubjectRef, e.ObjectRef, e.ZoneRef }.Where(x => !string.IsNullOrEmpty(x)));
+
+    private static string Percent(double confidence) => Math.Round(confidence * 100).ToString(CultureInfo.InvariantCulture) + "%";
+}

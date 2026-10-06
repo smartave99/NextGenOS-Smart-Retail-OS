@@ -73,7 +73,7 @@ const valid = (over: Record<string, unknown> = {}) => ({
     barcode: "8901234567890",
     categoryId: "c-oils",
     subcategoryId: "c-sun",
-    imageUrls: ["https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/a.jpg"],
+    imageUrls: ["https://res.cloudinary.com/demo/image/upload/v1/shop/products/a.jpg"],
     updateId: null,
     ...over,
 });
@@ -303,7 +303,7 @@ describe("checking what the browser asks to publish", () => {
             const cleaned = cleanPublishInput(valid({ imageUrls }));
             return cleaned.ok ? "ok" : cleaned.error;
         };
-        const good = "https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/a.jpg";
+        const good = "https://res.cloudinary.com/demo/image/upload/v1/shop/products/a.jpg";
         expect(why([good, good, good, good, good])).toBe("ok");
         expect(why([good, good, good, good, good, good])).toBe("The photos are not as expected.");
         for (const bad of [
@@ -341,8 +341,8 @@ describe("the fields an approved product sets", () => {
             highlights: ["Light"],
             specifications: [{ key: "Volume", value: "1 L" }],
             barcode: "8901234567890",
-            imageUrl: "https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/a.jpg",
-            images: ["https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/a.jpg"],
+            imageUrl: "https://res.cloudinary.com/demo/image/upload/v1/shop/products/a.jpg",
+            images: ["https://res.cloudinary.com/demo/image/upload/v1/shop/products/a.jpg"],
         });
         for (const key of ["stockLevel", "available", "featured", "offerId", "videoUrl", "averageRating", "reviewCount", "id"]) expect(fields).not.toHaveProperty(key);
     });

@@ -124,7 +124,7 @@ beforeEach(() => {
     mocks.findShopProduct.mockResolvedValue({ success: true, byKey: null, byBarcode: null });
     mocks.uploadToCloudinary.mockImplementation(async (data: string) => ({
         success: true,
-        url: `https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/${data.length}-${Math.random().toString(36).slice(2, 8)}.jpg`,
+        url: `https://res.cloudinary.com/demo/image/upload/v1/shop/products/${data.length}-${Math.random().toString(36).slice(2, 8)}.jpg`,
         publicId: "x",
     }));
     mocks.publishShopProduct.mockResolvedValue({ success: true, id: "site-1", created: true });

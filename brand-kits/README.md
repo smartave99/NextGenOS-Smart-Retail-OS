@@ -6,7 +6,10 @@ and posters the customer's name, colours and logo.
 
 ```
 brand-kits/
-  smart-avenue-99/      <- a customer of NextGenOS (the demo company)
+  example-shop/         <- NextGenOS's own neutral example: no company, no country, no address (the release builds from this unless told otherwise)
+    brand.json
+    logo.png
+  smart-avenue-99/      <- a customer of NextGenOS; built into a release only when that customer's kit is chosen
     brand.json
     logo.png
 ```

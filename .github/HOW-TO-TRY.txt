@@ -1,11 +1,15 @@
 How to try this release
 =======================
 
+The release page itself has a "Start here" table: for each thing you can try (the shop program on Windows or Linux, the website, the Android app, the Studio) it names
+the file to download and gives the steps. This file is the longer test plan for NextGenOS staff.
+
 Where things are (all on this release page):
 
   NextGenOS-Setup-Studio-<version>-windows.zip / -linux.zip   the Setup Studio for NextGenOS staff, with its own Node.js. Never for a customer.
   SmartRetailPOS-Hub-Setup-<version>.exe                      the Hub's Windows setup
   smart-retail-pos-hub_<version>-1_amd64.deb / _arm64.deb     the Hub's Linux packages
+  website-<customer>-windows.zip / -linux.zip                 the online shop, built for one customer, with its own Node.js (Start Website.bat / ./start-website.sh)
   SmartRetailPOS-<kit>-<version>.apk / .aab                   the Android app (signed with a one-off test key unless ANDROID-SIGNING.txt says otherwise)
   base-kit.json                                               the list the Studio reads: which file is which, and its fingerprint
   SHA256SUMS.txt, BUILD-STATUS.txt                            check your download; which parts were built

@@ -91,10 +91,8 @@ export default function CloudinaryUpload({
                 formData.append("api_key", sigResult.apiKey);
                 formData.append("timestamp", sigResult.timestamp.toString());
                 formData.append("signature", sigResult.signature);
-                formData.append("folder", `smart-avenue/${folder}`); // Match the server-side signing folder structure
-                // Note: Cloudinary expects just "folder" param in signed upload to match signature.
-                // In getCloudinarySignature we signed: folder: `smart-avenue/${folder}`
-                // So we must pass exactly that.
+                // Cloudinary checks the folder against the signature, so the upload names exactly the folder that was signed.
+                formData.append("folder", sigResult.folder ?? folder);
 
                 const uploadUrl = `https://api.cloudinary.com/v1_1/${sigResult.cloudName}/${resourceType}/upload`;
 

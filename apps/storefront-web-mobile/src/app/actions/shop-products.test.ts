@@ -25,8 +25,8 @@ import { shopProductId, uuidV5 } from "@/lib/live-shop/product-id";
 import { findShopProduct, publishShopProduct } from "./shop-products";
 
 const SHOP = "5b8f1a0e-1111-4222-8333-944455556666";
-const PHOTO = "https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/a.jpg";
-const PHOTO_2 = "https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/b.jpg";
+const PHOTO = "https://res.cloudinary.com/demo/image/upload/v1/shop/products/a.jpg";
+const PHOTO_2 = "https://res.cloudinary.com/demo/image/upload/v1/shop/products/b.jpg";
 
 const input = (over: Record<string, unknown> = {}) => ({
     shopId: SHOP,

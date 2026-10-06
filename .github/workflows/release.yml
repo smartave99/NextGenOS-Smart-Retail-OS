@@ -15,7 +15,7 @@ on:
     inputs:
       kit:
         type: string
-        default: "smart-avenue-99"
+        default: "example-shop"
       version_name:
         type: string
         default: "1.0.0"
@@ -33,7 +33,7 @@ on:
     inputs:
       kit:
         description: "Brand kit folder under brand-kits/"
-        default: "smart-avenue-99"
+        default: "example-shop"
       version_name:
         description: "Version shown to people, for example 1.0.0"
         default: "1.0.0"
@@ -55,7 +55,7 @@ permissions:
   contents: write
 
 env:
-  KIT: ${{ inputs.kit || 'smart-avenue-99' }}
+  KIT: ${{ inputs.kit || 'example-shop' }}
   VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
   VERSION_CODE: ${{ inputs.version_code || '1' }}
 
@@ -599,10 +599,8 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
-          {
-            if [ -f dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt ]; then echo "> **TRIAL BUILD, NO LICENCE KEYS.** The Windows setup in this release can never be activated. It is only for trying the install, the service and the uninstall. Never give it to a customer."; echo; fi
-            cat .github/release-notes.md; echo; echo "Built from ${GITHUB_SHA}."; echo; echo '```'; cat dist/BUILD-STATUS.txt; echo '```'
-          } > "${RUNNER_TEMP}/notes.md"
+          # The release page is written from the files that were really built: what to download for each thing a person may try, the steps, and what is not in this release.
+          node scripts/make-release-notes.mjs --dist dist --commit "${GITHUB_SHA}" --tag "${TAG}" --version "${VERSION_NAME}" --out "${RUNNER_TEMP}/notes.md"
           LAST=()
           for f in BUILD-STATUS.txt HOW-TO-TRY.txt NO-LICENCE-KEYS-TRIAL-ONLY.txt base-kit.json SHA256SUMS.txt; do [ -f "dist/${f}" ] && LAST+=("dist/${f}"); done
           node scripts/release-assets.mjs upload --release "${RELEASE_ID}" "${LAST[@]}"

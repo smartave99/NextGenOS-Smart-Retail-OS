@@ -35,6 +35,19 @@ A scanner that plugs in (USB) or pairs by Bluetooth works like a keyboard: click
 
 Your information is in one folder on this PC, `C:\ProgramData\NextGenOS\Hub`. **Copy that folder to a USB drive or cloud drive regularly** (close the program first: Windows *Services* → *Smart Retail POS Hub* → Stop). Uninstalling the program does not delete it.
 
-## 7. Help
+## 7. How the programs open, and what closing the window does
+
+Every program opens from an icon, in a window of its own. **No black window appears, and nobody asks you to type anything.** There are two kinds, and it matters which is which:
+
+| Program | Open it with | If you close its window |
+|---|---|---|
+| **Smart Retail POS** (the shop program) | The **Smart Retail POS** icon on the desktop or in the Start menu | **It keeps running** in the background, on purpose: it starts with the PC and the shop must never stop because a window was closed. Click the icon again to bring the window back (there is never a second copy of the shop program). To stop it, for a back-up, see section 6. |
+| The sales dashboard on its own, and the plain folder of the shop program (for a person who sets things up by hand) | **Start Smart Retail POS**, or **Start Business Hub**, in their folder | **It keeps running**, the same way. Open the same icon again to bring a window back. It stops when the PC is restarted. To stop it sooner: Task Manager (Ctrl+Shift+Esc), *Details*, choose the program, *End task*. The setup is the normal way to install the shop program; the plain folder is for trying it. |
+| Your online shop's website, on your own PC | **Start Website** | **The website stops.** Keep its window open (it can be minimised) while customers should reach it. A website that must be there all day belongs on a server: ask your supplier. |
+| The older Windows POS and the AI add-on | The Start menu entry or desktop icon of their setup | They are ordinary Windows programs: closing the window closes them (the AI add-on also sits as an icon near the clock; right-click it and choose Exit). |
+
+If a program will not open, your supplier may ask you to open the file beside it named *"... (with a window, for problems)"* and read them what it says. That file shows a window on purpose. It is not the normal way in.
+
+## 8. Help
 
 Settings → Licence shows your licence and who to call. For a problem, tell us: what you pressed, what you expected, what happened, and the time.

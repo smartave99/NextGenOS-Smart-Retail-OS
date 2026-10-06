@@ -193,10 +193,11 @@ test('what a person typed reaches a script only through the environment, never i
   for (const [name, job] of Object.entries(jobs)) for (const step of job.steps) {
     if (step.run !== undefined) assert.doesNotMatch(step.run, /\$\{\{/, `${name} / ${step.name}: no \${{ }} inside a script`);
   }
-  // The dispatch inputs appear in the group name and as environment values, nowhere else.
+  // The dispatch inputs appear in the group name, in the title of the run (the Setup Studio finds its own run by it) and as environment values, nowhere else.
   for (const line of text.split('\n').filter((l) => /\$\{\{\s*inputs\./.test(l))) {
-    assert.match(line, /^\s+group: customer-\$\{\{ inputs\.customer \}\}$|^\s+[A-Z_]+: \$\{\{ inputs\.\w+ \}\}$/, line);
+    assert.match(line, /^\s+group: customer-\$\{\{ inputs\.customer \}\}$|^run-name: customer-\$\{\{ inputs\.customer \}\}-\$\{\{ inputs\.build \}\}$|^\s+[A-Z_]+: \$\{\{ inputs\.\w+ \}\}$/, line);
   }
+  assert.match(text, /^run-name: customer-\$\{\{ inputs\.customer \}\}-\$\{\{ inputs\.build \}\}$/m, 'the title of a run names the customer and the build: the Studio looks its run up by it');
   // The values the first job checked reach the other jobs through the environment too.
   for (const line of text.split('\n').filter((l) => /\$\{\{\s*needs\.inputs\.outputs\./.test(l))) {
     assert.ok(/^\s+(if: \$\{\{.*\}\}|[A-Z_]+: \$\{\{ needs\.inputs\.outputs\.\w+ \}\})$/.test(line), line);

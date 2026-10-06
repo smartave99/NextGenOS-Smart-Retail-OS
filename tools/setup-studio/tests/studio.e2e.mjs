@@ -1,5 +1,6 @@
 // The Setup Studio in a real browser, as the people who use it would: first-time welcome, signing in, adding a customer, filling in the details, seeing the look in a real
-// preview, preparing the setup, a second person approving it, and the hand-over. A stand-in AI tool answers when asked. Nothing leaves this PC.
+// preview, preparing the setup, a second person approving it, the website and app made by the build service, and the hand-over. A stand-in AI tool answers when asked, and a stand-in
+// build service makes the website and app. Nothing leaves this PC.
 import assert from 'node:assert';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync, mkdirSync, readFileSync } from 'node:fs';
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { startStudio } from '../lib/server.mjs';
 import { listZip } from '../lib/zip.mjs';
 import { makeBaseKit } from '../../../scripts/make-base-kit.mjs';
+import { standInGitHub } from './stand-in-github.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { chromium } = createRequire(resolve(here, '..', '..', '..', 'apps', 'business-hub', 'e2e', 'package.json'))('playwright');
@@ -27,7 +29,8 @@ const oldPath = process.env.PATH;
 process.env.PATH = tools + delimiter + oldPath;
 process.env.ANTHROPIC_API_KEY = 'sk-ant-test-123456';
 
-const studio = await startStudio({ folder: join(root, 'ws'), env: process.env });
+const github = await standInGitHub({ stepMs: 80 });
+const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, build: { api: github.url, pollMs: 100, ceilingMs: 60_000, requestTimeoutMs: 3000 } });
 const browser = await chromium.launch();
 const problems = [];
 const step = (s) => console.log('✓ ' + s);
@@ -146,6 +149,10 @@ try {
   await page.locator('[data-tab="extras"]').click();
   // the AI assistant's own settings (who the model photos show, festivals, a second language) appear only when the customer gets the assistant, and stay neutral until typed
   assert.strictEqual(await page.locator('#ai-profile-holder').isHidden(), true, 'no AI settings before the assistant is ordered');
+  await page.locator('label.switch', { hasText: 'A website' }).click();
+  await page.locator('input[data-path="ecosystem.website.domain"]').fill('luzonfresh.example');
+  await page.locator('label.switch', { hasText: 'An Android app' }).click();
+  await page.locator('input[data-path="ecosystem.android.appId"]').fill('com.luzonfresh.shop');
   await page.locator('label.switch', { hasText: 'The AI assistant (Windows)' }).click();
   await page.locator('#ai-profile').waitFor();
   const said = async (id) => page.locator(`#ai-explain [data-line="${id}"]`).innerText();
@@ -295,6 +302,89 @@ try {
   await shot(page, '14-approved');
   step('the reviewer approves it as a second person; the approved release has a fingerprint and its setup files can be downloaded');
 
+  // the website and the app: an administrator connects the build service, a salesperson sees what would be sent, a reviewer starts the build and watches it
+  const siteUrl = studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/site';
+  await page.goto(siteUrl);
+  await page.locator('#site-step').waitFor();
+  await page.locator('#site-not-connected').waitFor();
+  assert.strictEqual(await page.locator('#site-build').isDisabled(), true, 'no build before the build service is connected');
+  await page.locator('#site-parts [data-part="website-linux"][data-state="missing"]').waitFor();
+  await page.locator('#site-parts [data-part="android"][data-state="missing"]').waitFor();
+  await shot(page, '14f-site-not-connected');
+  await page.locator('#signout').click();
+  await signIn(page, 'Sam Sales', 'sam-long-password');
+  await page.goto(siteUrl);
+  await page.locator('#site-role-note').waitFor();
+  assert.strictEqual(await page.locator('#site-build').isDisabled(), true, 'a salesperson cannot start a build');
+  await page.locator('#site-sent summary', { hasText: 'brand.json' }).click();
+  assert.match(await page.locator('#site-sent').innerText(), /Luzon Fresh Mart/);
+  await page.locator('#site-sent summary', { hasText: 'website-settings.env' }).click();
+  assert.match(await page.locator('#site-sent').innerText(), /NEXT_PUBLIC_SITE_URL=https:\/\/luzonfresh\.example/);
+  assert.doesNotMatch(await page.locator('#site-sent').innerText(), /AIza|sk-[a-z]|PRIVATE KEY|postgres:/, 'nothing that looks like a key is sent');
+  await shot(page, '14g-site-salesperson');
+  step('the website and app step shows a salesperson what is to be made and exactly what would be sent (public details only), and does not let them start a build');
+  await page.locator('#signout').click();
+  await signIn(page, 'Asha Admin', 'a-long-password');
+  await page.goto(studio.url.replace(/\?k=.*/, '') + '#/settings');
+  await page.locator('#build-settings').waitFor();
+  await page.locator('#build-source').fill(github.source);
+  await page.locator('#build-results').fill(github.source);
+  await page.locator('#build-save').click();
+  await page.locator('.toast.bad', { hasText: 'different place' }).last().waitFor();
+  await page.locator('#build-results').fill(github.results);
+  await page.locator('#build-save').click();
+  await page.locator('.toast', { hasText: 'Saved' }).last().waitFor();
+  await page.locator('#code-start').fill('wrong-access-code-for-the-test-0000');
+  await page.locator('[data-save-code="start"]').click();
+  await page.locator('.toast', { hasText: 'Access code saved' }).last().waitFor();
+  await page.locator('#code-results').fill(github.tokens.results);
+  await page.locator('[data-save-code="results"]').click();
+  await page.locator('#build-connected .notice.ok').waitFor();
+  await page.locator('#build-test').click();
+  await page.locator('#build-test-summary.warn').waitFor();
+  assert.match(await page.locator('[data-check="start-code"]').innerText(), /did not accept the access code for starting builds/);
+  assert.doesNotMatch(await page.locator('#build-settings').innerText(), /wrong-access-code-for-the-test|test-results-access-code/, 'a code is never shown again');
+  await shot(page, '14h-settings-build-wrong-code');
+  await page.locator('#code-start').fill(github.tokens.start);
+  await page.locator('[data-save-code="start"]').click();
+  await page.locator('.toast', { hasText: 'Access code saved' }).last().waitFor();
+  await page.locator('#build-test').click();
+  await page.locator('#build-test-summary.ok').waitFor();
+  assert.strictEqual(await page.locator('#build-test-result [data-check]').count(), 9);
+  assert.strictEqual(await page.locator('#build-test-result [data-ok="false"]').count(), 0);
+  await shot(page, '14i-settings-build-connected');
+  step('an administrator connects the build service: a wrong access code is explained in plain words, a right one passes every check, and a code is never shown again');
+  await page.locator('#signout').click();
+  await signIn(page, 'Rita Reviewer', 'rita-long-password');
+  await page.goto(siteUrl);
+  await page.locator('#site-step').waitFor();
+  assert.strictEqual(await page.locator('#site-build').isDisabled(), false);
+  github.options.holdPublish = true;
+  await page.locator('#site-build').click();
+  await page.locator('#site-current').waitFor();
+  await page.locator('#site-steps li', { hasText: 'Building the website for Linux' }).waitFor({ timeout: 15000 });
+  await page.locator('#site-steps li', { hasText: 'Building the Android app' }).waitFor();
+  assert.match(await page.locator('#site-state').innerText(), /Going on/);
+  assert.match(await page.locator('#site-current').innerText(), /Build 1/);
+  assert.strictEqual(await page.locator('#site-build').isDisabled(), true, 'one build at a time');
+  await shot(page, '14j-site-building');
+  github.options.holdPublish = false;
+  await page.locator('#site-ready').waitFor({ timeout: 30000 });
+  assert.match(await page.locator('#site-state').innerText(), /Finished/);
+  assert.strictEqual(await page.locator('#site-steps li[data-step-state="done"]').count() >= 8, true);
+  assert.strictEqual(await page.locator('#site-parts [data-state="built"]').count(), 3);
+  await shot(page, '14k-site-done');
+  step('a reviewer starts the build, sees each step in plain words while it goes on, and is told when the website and the app are ready');
+  await page.locator('#site-to-installer').click();
+  await page.waitForURL(/\/installer/);
+  const phoneSite = await newPage(420, 860);
+  await signIn(phoneSite, 'Rita Reviewer', 'rita-long-password');
+  await phoneSite.goto(siteUrl);
+  await phoneSite.locator('#site-current').waitFor();
+  assert.strictEqual(await phoneSite.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'the step fits a narrow window without sideways scrolling');
+  await shot(phoneSite, '14l-site-narrow');
+  step('the step fits a narrow window too');
+
   // the installer: an administrator tells the Studio where the released programs are; a reviewer makes the customer's pack
   const programs = join(root, 'programs'); mkdirSync(programs);
   writeFileSync(join(programs, 'SmartRetailPOS-Hub-Setup-1.4.0.exe'), Buffer.alloc(20000, 5));
@@ -323,6 +413,8 @@ try {
   await page.locator('#programs-ok').waitFor();
   await page.locator('#pack-items [data-part="shop-pc"][data-status="ready"]').waitFor();
   await page.locator('#pack-items [data-part="ai"][data-status="ready"]').waitFor();
+  await page.locator('#pack-items [data-part="website"][data-status="ready"]').waitFor();
+  await page.locator('#pack-items [data-part="android"][data-status="ready"]').waitFor();
   await shot(page, '14d-installer-ready');
   await page.locator('#make-pack').click();
   await page.locator('.toast', { hasText: 'The pack is made' }).last().waitFor({ timeout: 60000 });
@@ -333,7 +425,7 @@ try {
   const packPath = join(root, 'downloaded-pack.zip');
   await packDownload.saveAs(packPath);
   const inPack = listZip(readFileSync(packPath));
-  for (const want of ['Luzon Fresh Mart/START HERE.html', 'Luzon Fresh Mart/1 - Shop PC (Windows)/SmartRetailPOS-Hub-Setup-1.4.0.exe', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/setup.json', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/install.ini', 'Luzon Fresh Mart/2 - AI assistant (Windows)/SmartRetailAI-Setup.exe', 'Luzon Fresh Mart/2 - AI assistant (Windows)/profile/ai.json']) assert.ok(inPack.includes(want), want + ' is in the pack');
+  for (const want of ['Luzon Fresh Mart/START HERE.html', 'Luzon Fresh Mart/1 - Shop PC (Windows)/SmartRetailPOS-Hub-Setup-1.4.0.exe', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/setup.json', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/install.ini', 'Luzon Fresh Mart/2 - AI assistant (Windows)/SmartRetailAI-Setup.exe', 'Luzon Fresh Mart/2 - AI assistant (Windows)/profile/ai.json', 'Luzon Fresh Mart/3 - Website/website-luzon-fresh-mart-linux.zip', 'Luzon Fresh Mart/3 - Website/website-luzon-fresh-mart-windows.zip', 'Luzon Fresh Mart/4 - Android app/SmartRetailPOS-luzon-fresh-mart-1.0.1.apk']) assert.ok(inPack.includes(want), want + ' is in the pack');
   await shot(page, '14e-pack-made');
   step('an administrator chooses the programs folder (a wrong folder is explained); a reviewer sees what goes in the pack, makes it, and downloads the zip with the setup and the customer\'s profile beside it');
 
@@ -371,5 +463,6 @@ try {
   process.env.PATH = oldPath;
   await browser.close();
   await studio.close();
+  await github.close();
   rmSync(root, { recursive: true, force: true });
 }

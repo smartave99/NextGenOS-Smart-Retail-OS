@@ -55,3 +55,47 @@ export function removeKey(provider, env = process.env) {
   delete all[provider];
   writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
 }
+
+// ---- the two access codes for the build service -----------------------------------------------------------------------------------------------------
+// The build service makes a customer's website and Android app. The Studio holds two access codes for it: one that may only start builds and watch them, and one that may only
+// keep and fetch the results. They are kept exactly like the AI keys: in the same small file in this person's own user folder, never in the workspace, a pack, a backup, the
+// activity record or a message, never shown again, and sent only to the build service.
+export const BUILD_CODES = {
+  start: { label: 'Access code for starting builds', key: 'build-start' },
+  results: { label: 'Access code for keeping the results', key: 'build-results' },
+};
+
+/** The access code, or null. */
+export function getBuildCode(which, env = process.env) {
+  const c = BUILD_CODES[which];
+  if (!c) return null;
+  const saved = readFile(env)[c.key];
+  return typeof saved === 'string' && saved ? saved : null;
+}
+
+/** Says whether each code is there, never the code. */
+export function buildCodeStatus(env = process.env) {
+  return Object.fromEntries(Object.entries(BUILD_CODES).map(([id, c]) => [id, { label: c.label, set: !!getBuildCode(id, env) }]));
+}
+
+export function saveBuildCode(which, code, env = process.env) {
+  const c = BUILD_CODES[which];
+  if (!c) throw new Error('That access code is not known.');
+  const value = String(code ?? '').trim();
+  if (value.length < 20 || value.length > 400 || !/^[\x21-\x7e]+$/.test(value)) throw new Error('That does not look like an access code. Paste the whole code, without spaces.');
+  const other = Object.keys(BUILD_CODES).find((id) => id !== which);
+  if (getBuildCode(other, env) === value) throw new Error('This is the same code as the other box. The two boxes need two different codes: one for starting builds and one for keeping the results.');
+  const all = readFile(env);
+  all[c.key] = value;
+  mkdirSync(configFolder(env), { recursive: true, mode: 0o700 });
+  writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
+  try { chmodSync(file(env), 0o600); } catch { /* the folder is the person's own on this system */ }
+}
+
+export function removeBuildCode(which, env = process.env) {
+  const c = BUILD_CODES[which];
+  if (!c) throw new Error('That access code is not known.');
+  const all = readFile(env);
+  delete all[c.key];
+  writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
+}

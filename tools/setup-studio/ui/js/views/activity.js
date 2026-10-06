@@ -7,6 +7,8 @@ const WORDS = {
   'customer.created': 'Added a customer', 'customer.changed': 'Changed a customer\'s details', 'customer.logo': 'Set the logo', 'proposal.saved': 'Saved a setup', 'review.submitted': 'Sent for approval', 'review.rejected': 'Sent back',
   'release.approved': 'Approved', 'build.made': 'Built an installer', 'customer.delivered': 'Handed over', 'backup.made': 'Made a backup', 'settings.changed': 'Changed settings', 'ai.asked': 'Asked an AI tool', 'key.saved': 'Saved a key', 'key.removed': 'Removed a key',
   'tool.update.start': 'Started updating a tool', 'tool.update.done': 'Updated a tool', 'tool.update.failed': 'A tool update failed',
+  'build.requested': 'Asked the build service for a website and app', 'build.finished': 'The website and app came back', 'build.partly': 'Part of the website and app came back', 'build.failed': 'The website and app could not be made',
+  'build.stopped': 'Stopped waiting for the build service', 'build.service.tested': 'Tested the connection to the build service',
 };
 
 export async function render({ params }) {

@@ -1,11 +1,13 @@
-# Smart Retail Suite - Interactive Launcher
+# For developers: a text menu in a window that starts each program from its source, or builds them all. A shop never uses this: every program has its own icon or setup.
+# (It shows a window on purpose; the file that opens it says so in its name.)
 Clear-Host
-$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$DevRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ScriptRoot = Split-Path -Parent $DevRoot
 $RepoRoot = Split-Path -Parent $ScriptRoot
 
 function Show-Header {
     Write-Host "================================================================" -ForegroundColor Cyan
-    Write-Host "           SMART RETAIL SUITE - MASTER CONTROL PANEL            " -ForegroundColor Cyan
+    Write-Host "           SMART RETAIL SUITE - MENU FOR DEVELOPERS             " -ForegroundColor Cyan
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host " Location: $RepoRoot" -ForegroundColor Gray
     Write-Host ""
@@ -33,23 +35,23 @@ do {
     switch ($choice.ToUpper()) {
         "1" {
             Write-Host "`nLaunching Core Desktop POS..." -ForegroundColor Cyan
-            Start-Process cmd.exe -ArgumentList "/c `"$ScriptRoot\start-pos-desktop.bat`""
+            Start-Process -FilePath "$DevRoot\Windows POS (with a window, for developers).bat"
         }
         "2" {
             Write-Host "`nLaunching AI Side-Panel Companion..." -ForegroundColor Cyan
-            Start-Process cmd.exe -ArgumentList "/c `"$ScriptRoot\start-pos-ai.bat`""
+            Start-Process -FilePath "$DevRoot\AI add-on (with a window, for developers).bat"
         }
         "3" {
             Write-Host "`nLaunching POS Web Dashboard..." -ForegroundColor Cyan
-            Start-Process cmd.exe -ArgumentList "/c `"$ScriptRoot\start-pos-dashboard.bat`""
+            Start-Process -FilePath "$DevRoot\Dashboard (with a window, for developers).bat"
         }
         "4" {
             Write-Host "`nLaunching Smart Retail POS Web Storefront..." -ForegroundColor Cyan
-            Start-Process cmd.exe -ArgumentList "/c `"$ScriptRoot\start-storefront.bat`""
+            Start-Process -FilePath "$DevRoot\Website while developing (with a window, for developers).bat"
         }
         "5" {
             Write-Host "`nLaunching Smart Retail POS Desktop Client..." -ForegroundColor Cyan
-            Start-Process cmd.exe -ArgumentList "/c `"$ScriptRoot\start-storefront-desktop.bat`""
+            Start-Process -FilePath "$DevRoot\Desktop shopping app while developing (with a window, for developers).bat"
         }
         "B" {
             Write-Host "`nRunning Master Build Script..." -ForegroundColor Yellow
@@ -64,7 +66,7 @@ do {
             Read-Host "`nPress Enter to return to menu..."
         }
         "Q" {
-            Write-Host "`nExiting Control Panel. Goodbye!" -ForegroundColor Gray
+            Write-Host "`nExiting menu. Goodbye!" -ForegroundColor Gray
             break
         }
         default {

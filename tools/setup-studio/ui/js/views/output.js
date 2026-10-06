@@ -33,10 +33,12 @@ export async function render(ctx) {
   const items = data.items ?? [];
   const rows = items.map((i) => {
     const [ic, tone, word] = STATUS[i.status] ?? STATUS.skipped;
+    // The website and the app are made for each customer in their own step, not taken from the programs folder.
+    const madeHere = ['website', 'android'].includes(i.id) && i.status === 'missing';
     return h('div', { class: 'row', 'data-part': i.id, 'data-status': i.status, style: { 'align-items': 'flex-start', padding: '10px 0', 'border-top': '1px solid var(--ngos-line)' } },
       h('span', { class: 'tone-' + tone, style: { 'margin-top': '2px' } }, icon(ic, 's')),
-      h('div', { class: 'grow' }, h('b', {}, i.title), h('div', { class: 'small muted' }, i.note), i.files.length ? h('div', { class: 'tiny muted' }, i.files.join(' · ')) : null),
-      h('span', { class: 'pill' + (tone ? ' ' + tone : '') }, word));
+      h('div', { class: 'grow' }, h('b', {}, i.title), h('div', { class: 'small muted' }, i.note), madeHere ? h('a', { class: 'small', href: `#/customers/${ctx.id}/site`, 'data-open-site': i.id }, 'Open "Website and app"') : null, i.files.length ? h('div', { class: 'tiny muted' }, i.files.join(' · ')) : null),
+      h('span', { class: 'pill' + (tone ? ' ' + tone : '') }, madeHere ? 'Not made yet' : word));
   });
   const ready = items.find((i) => i.id === 'shop-pc')?.status === 'ready';
   const result = h('div', { id: 'pack-result' });
@@ -52,7 +54,8 @@ export async function render(ctx) {
   box.append(h('div', { class: 'card' }, h('h2', {}, `What goes in ${c.name}'s pack`),
     h('p', { class: 'lead' }, `From release ${release.n} (approved ${when(release.approvedAt)}). One folder and one zip file.`),
     items.length ? h('div', { id: 'pack-items' }, rows) : h('p', { class: 'muted' }, 'Choose the programs folder to see what the pack will hold.'),
-    kit.trial ? h('label', { class: 'row mt-s', style: { gap: '10px' } }, allow, h('span', {}, 'This is only to try the installing; it is not for a customer.')) : null,
+    data.trial ? h('label', { class: 'row mt-s', style: { gap: '10px' } }, allow, h('span', {}, 'This is only to try the installing; it is not for a customer.')) : null,
+    data.trial && !kit.trial ? h('div', { class: 'notice warn mt-s', id: 'site-trial-note' }, icon('warn'), 'The website or app in this pack was made without the licence keys, only to try. A customer could never use it.') : null,
     h('div', { class: 'row mt' }, make, !ctx.can.build ? h('span', { class: 'small muted' }, 'Your role cannot make installers.') : null), result));
 
   // 3. What was made before.

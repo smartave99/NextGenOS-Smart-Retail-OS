@@ -8,9 +8,9 @@ const ADMIN = () => app.can.settings;
 
 export async function render() {
   const [settings, tools] = await Promise.all([get('/api/settings'), get('/api/ai/tools')]);
-  const root = h('div', { class: 'view' }, h('div', { class: 'page-head' }, h('div', { class: 'grow' }, h('h1', {}, 'Settings'), h('p', { class: 'sub' }, 'Your company, the AI tools, and keeping things safe.'))));
+  const root = h('div', { class: 'view' }, h('div', { class: 'page-head' }, h('div', { class: 'grow' }, h('h1', {}, 'Settings'), h('p', { class: 'sub' }, 'Your company, the build service, the AI tools, and keeping things safe.'))));
   if (!ADMIN()) root.append(h('div', { class: 'notice mt', style: { 'margin-bottom': '18px' } }, icon('lock'), 'Only an administrator can change settings. You can look at them here.'));
-  root.append(companyCard(settings), await programsCard(), aiCard(settings, tools), keysCard(settings), safeCard(settings));
+  root.append(companyCard(settings), await programsCard(), await buildServiceCard(), aiCard(settings, tools), keysCard(settings), safeCard(settings));
   return root;
 }
 
@@ -44,6 +44,56 @@ async function programsCard() {
       const b = e.currentTarget; b.classList.add('busy');
       try { const r = await put('/api/programs', { folder: input.value }); show(r.programs, r.saved); if (r.saved) toast('Saved.'); } catch (x) { toast(x.message, 'bad'); } finally { b.classList.remove('busy'); }
     } }, 'Check and save')) : null);
+}
+
+// ---------- the build service ----------
+// A customer's website and Android app are made off this PC, by a build service. Two access codes (kept only in the Studio's own secret store, never shown again) and the names of
+// two places. "Test the connection" says in plain words what is wrong.
+async function buildServiceCard() {
+  const { connection: conn } = await get('/api/build-service');
+  const field = (id, label, value, hint, extra = {}) => h('div', { class: 'field' }, h('label', { for: id }, label), h('input', { type: 'text', id, value, disabled: !ADMIN(), spellcheck: 'false', autocomplete: 'off', ...extra }), h('span', { class: 'hint' }, hint));
+  const source = field('build-source', 'Where the programs are made', conn.sourceRepo, 'The name of the place NextGenOS keeps the programs in, written like owner/name. NextGenOS tells you the name.', { placeholder: 'owner/name' });
+  const results = field('build-results', 'Where the results are kept', conn.resultsRepo, 'A private place that holds no programs: only each customer\'s settings and the files made for them. Written like owner/name.', { placeholder: conn.suggestedResults || 'owner/name' });
+  const version = field('build-ref', 'Which version of the programs to build from', conn.ref, 'Leave this empty to use the main one.', { placeholder: 'the main one' });
+  const say = h('div', { id: 'build-test-result', class: 'col mt-s' });
+  const status = h('div', { id: 'build-connected' });
+  const showConnected = (c) => status.replaceChildren(c.ready ? h('div', { class: 'notice ok' }, icon('check'), 'Both places are named and both access codes are saved. Press "Test the connection" to check them.') : h('div', { class: 'notice warn' }, icon('warn'), c.why));
+  showConnected(conn);
+
+  const codes = h('div', { class: 'col', id: 'build-codes' });
+  const hints = { start: 'Lets the Studio ask for a build and watch it. It must not be able to read the programs.', results: 'Lets the Studio keep a customer\'s settings and fetch the finished files. It must only reach the results place.' };
+  const drawCodes = (c) => codes.replaceChildren(...Object.entries(c.codes).map(([id, k]) => {
+    const input = h('input', { type: 'password', id: 'code-' + id, placeholder: k.set ? 'Paste a new code to replace it' : 'Paste the code', autocomplete: 'off', 'aria-label': k.label, disabled: !ADMIN() });
+    return h('div', { class: 'field', 'data-code': id },
+      h('label', { for: 'code-' + id }, k.label),
+      h('div', { class: 'row wrap' }, h('div', { class: 'grow', style: { 'min-width': '220px' } }, input),
+        ADMIN() ? h('button', { class: 'btn small', type: 'button', 'data-save-code': id, onclick: async () => { try { const r = await put(`/api/build-service/codes/${id}`, { code: input.value }); input.value = ''; drawCodes(r.connection); showConnected(r.connection); toast('Access code saved.'); } catch (e) { toast(e.message, 'bad'); } } }, 'Save') : null,
+        ADMIN() && k.set ? h('button', { class: 'btn small danger', type: 'button', onclick: async () => { try { const r = await del(`/api/build-service/codes/${id}`); drawCodes(r.connection); showConnected(r.connection); toast('Access code removed.'); } catch (e) { toast(e.message, 'bad'); } } }, 'Remove') : null,
+        k.set ? h('span', { class: 'pill ok' }, icon('check', 's'), 'Saved') : h('span', { class: 'pill' }, 'Not added')),
+      h('span', { class: 'hint' }, hints[id]));
+  }));
+  drawCodes(conn);
+
+  const showTest = (r) => say.replaceChildren(
+    h('div', { class: 'notice ' + (r.ok ? 'ok' : 'warn'), id: 'build-test-summary' }, icon(r.ok ? 'check' : 'warn'), r.ok ? 'Everything checks out: each access code can do what it is for, and no more.' : 'Something needs attention. Each line below says what.'),
+    h('ul', { class: 'col', style: { 'list-style': 'none', padding: 0, margin: 0, gap: '6px' } }, r.checks.map((c) => h('li', { class: 'row', 'data-check': c.id, 'data-ok': String(c.ok), style: { 'align-items': 'flex-start', gap: '10px' } }, h('span', { class: c.ok === true ? 'tone-ok' : c.ok === false ? 'tone-warn' : 'muted' }, icon(c.ok === true ? 'check' : c.ok === false ? 'warn' : 'info', 's')), h('span', { class: 'grow' }, c.words)))));
+
+  return h('div', { class: 'card', id: 'build-settings' }, h('h2', {}, 'Connect the build service'),
+    h('p', { class: 'lead' }, 'A customer\'s website and Android app are made by a build service, not on this PC: they carry the customer\'s own name and settings, and making them needs NextGenOS\'s program files, which never come to this PC. An administrator connects it once. The steps for making the two access codes are in the Setup Studio guide, "Connecting the build service".'),
+    status,
+    h('div', { class: 'grid2 mt' }, source, results),
+    h('details', { class: 'more mt-s' }, h('summary', {}, icon('gear', 's'), 'More options'), h('div', { class: 'grid2 mt-s' }, version)),
+    h('div', { class: 'mt' }, codes),
+    ADMIN() ? h('div', { class: 'row mt wrap' },
+      h('button', { class: 'btn primary', id: 'build-save', type: 'button', onclick: async (e) => {
+        const b = e.currentTarget; b.classList.add('busy');
+        try { const r = await put('/api/build-service', { sourceRepo: source.querySelector('input').value, resultsRepo: results.querySelector('input').value, ref: version.querySelector('input').value }); showConnected(r.connection); toast('Saved.'); } catch (x) { toast(x.message, 'bad'); } finally { b.classList.remove('busy'); }
+      } }, 'Save the names'),
+      h('button', { class: 'btn', id: 'build-test', type: 'button', onclick: async (e) => {
+        const b = e.currentTarget; b.classList.add('busy'); say.replaceChildren(h('p', { class: 'small muted' }, 'Asking the build service…'));
+        try { showTest(await post('/api/build-service/test')); } catch (x) { say.replaceChildren(h('div', { class: 'err' }, icon('warn', 's'), x.message)); } finally { b.classList.remove('busy'); }
+      } }, icon('refresh', 's'), 'Test the connection')) : null,
+    say);
 }
 
 // ---------- AI tools ----------

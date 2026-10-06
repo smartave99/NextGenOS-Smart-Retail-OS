@@ -52,7 +52,7 @@ public static class HubHost
         var services = builder.Services;
 
         // The AI parts of the Hub are allowed only when the signed licence has the "ai" module (and they are all off until the owner switches them on).
-        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(new LicenceEntitlements(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>()))));
+        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>()))));
 
         // The sign-in cookie is protected with keys kept in the data folder (and, on Windows, locked to this PC), so a restart does not sign everyone out.
         var protection = services.AddDataProtection().SetApplicationName("NextGenOS.Hub").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(folder, "keys")));

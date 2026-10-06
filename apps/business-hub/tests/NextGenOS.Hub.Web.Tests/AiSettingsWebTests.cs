@@ -91,9 +91,9 @@ public class AiSettingsWebTests
         var without = new NextGenOS.Licensing.AspNetCore.ProductLicence(() => new NextGenOS.Licensing.LicenceState { Status = NextGenOS.Licensing.LicenceStatus.Valid, Licence = new NextGenOS.Licensing.LicenceClaims { Modules = ["hub"] } });
         var expired = new NextGenOS.Licensing.AspNetCore.ProductLicence(() => new NextGenOS.Licensing.LicenceState { Status = NextGenOS.Licensing.LicenceStatus.Expired, Licence = new NextGenOS.Licensing.LicenceClaims { Modules = ["hub", "ai"] } });
         var missing = new NextGenOS.Licensing.AspNetCore.ProductLicence(() => new NextGenOS.Licensing.LicenceState { Status = NextGenOS.Licensing.LicenceStatus.Missing });
-        Assert.True(new NextGenOS.Hub.Web.Auth.LicenceEntitlements(withAi).Has("ai"));
-        Assert.False(new NextGenOS.Hub.Web.Auth.LicenceEntitlements(without).Has("ai"));
-        Assert.False(new NextGenOS.Hub.Web.Auth.LicenceEntitlements(expired).Has("ai"));
-        Assert.False(new NextGenOS.Hub.Web.Auth.LicenceEntitlements(missing).Has("ai"));
+        Assert.True(NextGenOS.Hub.Web.Auth.LicenceEntitlements.From(withAi).Has("ai"));
+        Assert.False(NextGenOS.Hub.Web.Auth.LicenceEntitlements.From(without).Has("ai"));
+        Assert.False(NextGenOS.Hub.Web.Auth.LicenceEntitlements.From(expired).Has("ai"));
+        Assert.False(NextGenOS.Hub.Web.Auth.LicenceEntitlements.From(missing).Has("ai"));
     }
 }

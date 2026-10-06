@@ -9,6 +9,7 @@
 @inject IJSRuntime Js
 @inject ILogger<Creative> Log
 @inject BrandService Brand
+@inject AiEnvironment Ai
 
 <PageTitle>@(project?.Title ?? "Creative") · Creatives · @Brand.Name</PageTitle>
 
@@ -153,8 +154,8 @@ else
 
                 <div class="brief-step"><span class="step-no" aria-hidden="true">3</span> What should it say? <span class="muted">Optional</span></div>
                 <p class="small muted words-help">The AI draws these words as you write them. No numbers, ₹ or %: the app adds each price itself. English is drawn best; check other languages closely.</p>
-                @(WordInput("headline", "Headline", brief.Headline, CreativeWords.MaxHeadline, "e.g. Diwali Dhamaka", v => b => b with { Headline = v }))
-                @(WordInput("subtitle", "Line under it", brief.Subtitle, CreativeWords.MaxLine, "e.g. Fresh stock for the festival", v => b => b with { Subtitle = v }))
+                @(WordInput("headline", "Headline", brief.Headline, CreativeWords.MaxHeadline, SampleWords.CreativeHeadline(Ai.Shop), v => b => b with { Headline = v }))
+                @(WordInput("subtitle", "Line under it", brief.Subtitle, CreativeWords.MaxLine, SampleWords.CreativeSubtitle(Ai.Shop), v => b => b with { Subtitle = v }))
 
                 <details class="brief-more" open="@moreOpen">
                     <summary>More choices <span class="muted">All optional</span></summary>
@@ -171,7 +172,7 @@ else
                     @(WordInput("cta", "What to do", brief.CallToAction, CreativeWords.MaxLine, "e.g. Visit us today", v => b => b with { CallToAction = v }))
                     @(WordInput("small-print", "Small print", brief.SmallPrint, CreativeWords.MaxLine, "e.g. While stocks last", v => b => b with { SmallPrint = v }))
                     <label class="field-label" for="background">Background</label>
-                    <textarea id="background" class="form-control" rows="2" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. a warm evening glow with diyas"
+                    <textarea id="background" class="form-control" rows="2" maxlength="@CreativeWords.MaxNotes" placeholder="@SampleWords.CreativeBackground(Ai.Shop)"
                               @onchange="@(e => SaveAsync(b => b with { Background = Text(e) }))">@brief.Background</textarea>
                     <label class="field-label" for="instructions">More for the AI</label>
                     <textarea id="instructions" class="form-control" rows="2" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. put the products side by side on a wooden table"

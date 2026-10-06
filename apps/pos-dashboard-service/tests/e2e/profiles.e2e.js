@@ -2,6 +2,7 @@
 // one market (CLAUDE.md, section 8). The same demo shop is started three ways and the screens are compared:
 //   1. with NO profile: no festival suggestions, no second-language line, "Model 1/2/3" for the photos with a person (on the screens and in the
 //      name a photo downloads under), and nothing about a country or a language in what the AI is asked;
+//      The "for example" words in the Creatives, Past chats and Memory boxes follow the profile in the same way (a festival, a language, or neutral);
 //   2. with a Filipino profile (second language Filipino, tag fil, festivals Christmas and Sinulog): the form says "Filipino line", suggests those
 //      festivals, the photos are named as the profile names them, and the AI is asked for a Filipino line;
 //   3. with the legacy India profile (Hindi, Diwali ...) the other tests use: the same screens now say Hindi and suggest Diwali.
@@ -147,6 +148,23 @@ async function look(browser, shop) {
     const download = await page.request.get(`${BASE}/product-photos/24/${penFile}?download=true`);
     assert.strictEqual(download.status(), 200);
     seen.downloadName = decodeURIComponent(download.headers()['content-disposition'] || '');
+
+    // The "for example" words in the boxes: a creative's headline and background, the search of past chats, what the memory might hold.
+    await page.goto(BASE + '/creatives', { waitUntil: 'networkidle' });
+    await page.fill('.creative-new .scan-input', 'sunflower');
+    await page.locator('.creative-new .found-list li', { hasText: 'Sunflower Oil 1 L' }).getByRole('button', { name: 'Add' }).click();
+    await page.locator('.picked-products li', { hasText: 'Sunflower Oil 1 L' }).waitFor();
+    await page.getByRole('button', { name: 'Start the creative' }).click();
+    await page.waitForURL(/\/creatives\/\d{8}-\d{6}$/);
+    await page.locator('#headline').waitFor();
+    seen.creativeHeadline = await page.locator('#headline').getAttribute('placeholder');
+    seen.creativeSubtitle = await page.locator('#subtitle').getAttribute('placeholder');
+    seen.creativeBackground = await page.locator('#background').getAttribute('placeholder');
+    await page.goto(BASE + '/ask/past', { waitUntil: 'networkidle' });
+    seen.pastSearch = await page.getByLabel('Search past chats').getAttribute('placeholder');
+    await page.goto(BASE + '/memory', { waitUntil: 'networkidle' });
+    seen.memoryShop = await page.getByLabel('Add to About the shop').getAttribute('placeholder');
+    seen.memoryYou = await page.getByLabel('Add to About you').getAttribute('placeholder');
   } finally {
     await page.close();
   }
@@ -180,6 +198,10 @@ async function look(browser, shop) {
     assert.strictEqual(none.prompts.length, 1, 'the AI was asked once for the poster');
     assert.ok(!/India|Hindi|Diwali|Navratri|Filipino|Philippines|local_line|second language|\bin its own script\b/i.test(none.prompts[0]), 'the AI was told of a market: ' + none.prompts[0]);
     assert.ok(!/(European|Indian|East Asian) model/.test(none.photoTitles.join(' ')));
+    assert.deepStrictEqual([none.creativeHeadline, none.creativeSubtitle, none.creativeBackground], ['e.g. Seasonal sale', 'e.g. Fresh stock just in', 'e.g. a warm evening glow']);
+    assert.deepStrictEqual([none.pastSearch, none.memoryShop, none.memoryYou],
+      ['Search past chats, e.g. best sellers', 'e.g. Sales are higher in the last week of the month', 'e.g. Answer short, with the main figures first']);
+    assert.ok(!/diwali|diya|hindi|hinglish|rupee|india|festival/i.test(JSON.stringify([none.creativeHeadline, none.creativeSubtitle, none.creativeBackground, none.pastSearch, none.memoryShop, none.memoryYou])), 'a sample names a market');
     assert.strictEqual(none.slotTitle, '3 · Model 1');
     assert.ok(none.downloadName.includes('Ball Pen, pack of 5 - 3 Model 1.png'), none.downloadName);
     step('With no profile: no festival suggestions, no second-language line, "Model 1/2/3", and the AI is told nothing about a country or language');
@@ -193,6 +215,9 @@ async function look(browser, shop) {
     assert.strictEqual(fil.sheetLocal, 'Malaking tipid, bilisan na');
     assert.deepStrictEqual(fil.photoTitles, ['White background', 'In use', 'Filipino model', 'Cebuano model', 'Chinese-Filipino model']);
     assert.ok(fil.photosIntro.includes('(filipino model, cebuano model, chinese-filipino model)'), fil.photosIntro);
+    assert.deepStrictEqual([fil.creativeHeadline, fil.creativeSubtitle, fil.creativeBackground], ['e.g. Christmas offer', 'e.g. Fresh stock for Christmas', 'e.g. a warm evening glow with Christmas decorations']);
+    assert.deepStrictEqual([fil.pastSearch, fil.memoryShop, fil.memoryYou],
+      ['Search past chats, e.g. sugar Christmas', 'e.g. Sales are higher in Christmas week', 'e.g. Answer in Filipino, short, with the main figures first']);
     assert.strictEqual(fil.slotTitle, '3 · Filipino model');
     assert.ok(fil.downloadName.includes('Ball Pen, pack of 5 - 3 Filipino model.png'), fil.downloadName);
     assert.strictEqual(fil.prompts.length, 1);
@@ -208,6 +233,8 @@ async function look(browser, shop) {
     assert.strictEqual(india.localField.lang, 'hi');
     assert.strictEqual(india.sheetLocal, 'भारी छूट, जल्दी करें');
     assert.deepStrictEqual(india.photoTitles, ['White background', 'In use', 'European model', 'Indian model', 'East Asian model']);
+    assert.deepStrictEqual([india.creativeHeadline, india.pastSearch, india.memoryShop, india.memoryYou],
+      ['e.g. Diwali offer', 'Search past chats, e.g. sugar Diwali', 'e.g. Sales are higher in Diwali week', 'e.g. Answer in Hindi, short, with the main figures first']);
     assert.strictEqual(india.slotTitle, '3 · European model');
     assert.ok(india.downloadName.includes('Ball Pen, pack of 5 - 3 European model.png'), india.downloadName);
     assert.ok(/one line in Hindi/.test(india.prompts[0]) && !/Filipino|Philippines/.test(india.prompts[0]));

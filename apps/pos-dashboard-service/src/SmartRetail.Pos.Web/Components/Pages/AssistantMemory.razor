@@ -6,6 +6,7 @@
 @inject ChatHistoryService Chats
 @inject ILogger<AssistantMemory> Log
 @inject BrandService Brand
+@inject AiEnvironment Ai
 
 <PageTitle>Memory · @Brand.Name</PageTitle>
 
@@ -291,9 +292,9 @@
         ? "What sells when, what the shop tried and how it went, decisions taken."
         : "How you like answers, your language, budget and goals.";
 
-    private static string AddHint(MemoryPart part) => part == MemoryPart.Shop
-        ? "e.g. Sweets sell three times more in Diwali week"
-        : "e.g. Answer in Hinglish, short, with rupee figures";
+    private string AddHint(MemoryPart part) => part == MemoryPart.Shop
+        ? SampleWords.MemoryAboutShop(Ai.Shop)
+        : SampleWords.MemoryAboutYou(Ai.Shop);
 
     private static string Key(MemoryPart part, string text) => part + "|" + text;
 

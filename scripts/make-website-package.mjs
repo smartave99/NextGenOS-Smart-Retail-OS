@@ -296,7 +296,7 @@ export async function nodeRuntime({ os, given = null, download = null, work, cac
 
 /** What a build may see of this computer: its tools and its temporary folder, and the public settings. Nothing else (no database address, no key, no licence) can end up in the pages. */
 export function buildEnvironment(settings, extra = {}) {
-  const keep = /^(PATH|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|TEMP|TMP|TMPDIR|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|PROGRAMFILES|PROGRAMDATA|NUMBER_OF_PROCESSORS|PROCESSOR_ARCHITECTURE|LANG|LC_ALL|CI|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|HTTPS?_PROXY|NO_PROXY|NPM_CONFIG_[A-Z_]+)$/i;
+  const keep = /^(PATH|HOME|USER|LOGNAME|SHELL|TERM|USERPROFILE|USERNAME|USERDOMAIN|COMPUTERNAME|APPDATA|LOCALAPPDATA|HOMEDRIVE|HOMEPATH|ALLUSERSPROFILE|TEMP|TMP|TMPDIR|SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|PATHEXT|OS|PSMODULEPATH|PROGRAMFILES|PROGRAMFILES\(X86\)|PROGRAMW6432|PROGRAMDATA|COMMONPROGRAMFILES|NUMBER_OF_PROCESSORS|PROCESSOR_[A-Z0-9_]+|LANG|LC_ALL|CI|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|HTTPS?_PROXY|NO_PROXY|NPM_CONFIG_[A-Z_]+)$/i;
   const env = {};
   for (const [k, v] of Object.entries(process.env)) if (keep.test(k)) env[k] = v;
   return { ...env, ...settings, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1', PRISMA_HIDE_UPDATE_MESSAGE: '1', CHECKPOINT_DISABLE: '1', NODE_OPTIONS: '--max-old-space-size=4096', ...extra };

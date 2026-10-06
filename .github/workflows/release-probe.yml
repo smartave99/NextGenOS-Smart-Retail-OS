@@ -80,6 +80,20 @@ jobs:
           echo "  tags that exist: $(jq -c '[.[]?.ref]' /tmp/out)"
           call GET "/repos/${R}/releases?per_page=10"
           echo "  releases that exist: $(jq -c '[.[]? | {tag_name, draft}]' /tmp/out)"
+          # P: the whole life of a release at the commit this run was started for: draft, one file, publish (this is what makes the tag), then remove release and tag again
+          call POST "/repos/${R}/releases" "{\"tag_name\":\"v0.0.1-probe-p\",\"target_commitish\":\"${SHA}\",\"draft\":true,\"prerelease\":true,\"name\":\"probe p\"}"
+          PID=$(jq -r '.id // empty' /tmp/out); UP=$(jq -r '.upload_url // empty' /tmp/out | sed 's/{.*//')
+          echo "  (P: draft) id=${PID}"
+          if [ -n "${PID}" ]; then
+            echo hello > /tmp/probe.txt
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Content-Type: application/octet-stream" "${UP}?name=probe.txt" --data-binary @/tmp/probe.txt); echo "  (P: upload a file) -> ${code}"
+            call PATCH "/repos/${R}/releases/${PID}" '{"draft":false}'
+            echo "  (P: publish) $(jq -c '{draft, tag_name, message}' /tmp/out)"
+            call GET "/repos/${R}/git/ref/tags/v0.0.1-probe-p"
+            echo "  (P: the tag points at) $(jq -r '.object.sha // .message' /tmp/out) (this run: ${SHA})"
+            call DELETE "/repos/${R}/releases/${PID}"
+            call DELETE "/repos/${R}/git/refs/tags/v0.0.1-probe-p"
+          fi
           call POST "/repos/${R}/git/refs" "{\"ref\":\"refs/tags/v0.0.1-probe-i\",\"sha\":\"${SHA}\"}"
           echo "  (I: a tag whose name starts with v) $(jq -c '{ref, message}' /tmp/out)"
           call DELETE "/repos/${R}/git/refs/tags/v0.0.1-probe-i"

@@ -142,6 +142,7 @@ public sealed class AiFoundation
         Usage = new UsageService(db, clock);
         Hardware = new HardwareService(options.Probe ?? new SystemHardwareProbe(), dataFolder, clock);
         Gateway = new AiGateway(Providers, Flags, Usage, factory);
+        Jobs = new AiJobQueue(Gateway);
     }
 
     public IEntitlements Entitlements { get; }
@@ -152,6 +153,8 @@ public sealed class AiFoundation
     public UsageService Usage { get; }
     public HardwareService Hardware { get; }
     public AiGateway Gateway { get; }
+    /// <summary>The waiting line in front of the gateway, for work that should not crowd out a person who is waiting (reports, cameras).</summary>
+    public AiJobQueue Jobs { get; }
 }
 
 /// <summary>What the program that hosts the Hub gives the AI foundation. Anything not given is the safe choice: no licence for AI, the computer's own secret store, the real machine.</summary>

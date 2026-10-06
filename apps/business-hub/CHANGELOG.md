@@ -15,7 +15,7 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ### Not yet
 - Nothing in the shop writes business events yet (sales, voids and stock changes will, from the business map onwards).
-- A queue for AI jobs, hiding names and numbers before text goes to an online service, downloading or checking model files, the command-line assistants, cameras, events and the business map (Version 2, phases 2 to 8).
+- A durable queue for AI jobs (the waiting line there is lives in memory), removing names before text goes to an online service (an e-mail address or phone number already makes a text personal data), downloading or checking model files, the command-line assistants, cameras, events and the business map (Version 2, phases 2 to 8).
 
 ## 1.0.0 (release candidate)
 

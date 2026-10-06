@@ -55,6 +55,9 @@ public sealed record CreativeBrief
 
     public string Style { get; init; } = CreativeStyle.Clean.Id;
 
+    /// <summary>Who the advertisement is for, in the owner's words. Empty when not given, also in a creative saved before this was asked.</summary>
+    public string Audience { get; init; } = "";
+
     public string Headline { get; init; } = "";
 
     public string Subtitle { get; init; } = "";

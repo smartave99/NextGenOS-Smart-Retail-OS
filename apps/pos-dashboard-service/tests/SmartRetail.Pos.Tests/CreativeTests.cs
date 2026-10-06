@@ -134,6 +134,41 @@ public sealed class CreativeStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_creative_saved_before_the_audience_was_asked_loads_with_it_empty_and_keeps_the_rest()
+    {
+        var id = _store.Create(new CreativeProject { Title = "Old one" }, _now).Id;
+        var oldFile = $$"""
+            {
+              "Id": "{{id}}",
+              "Title": "Old one",
+              "Created": "2026-09-28T11:30:00",
+              "Updated": "2026-09-28T11:30:00",
+              "Brief": {
+                "Format": "story", "Style": "festive", "Headline": "Fresh stock", "Subtitle": "", "CallToAction": "Visit us today", "SmallPrint": "",
+                "Background": "", "Instructions": "Keep it simple", "Products": [ { "ProductId": 6, "Offer": 148 } ], "References": [], "ShowPrices": true
+              },
+              "Generations": [
+                { "Number": 1, "Brief": { "Format": "story", "Headline": "Fresh stock", "Instructions": "Keep it simple" }, "Started": "2026-09-28T11:31:00", "HasImage": true }
+              ]
+            }
+            """;
+        File.WriteAllText(Path.Combine(_root, "Creatives", id, CreativeStore.ProjectFileName), oldFile);
+
+        var loaded = _store.Load(id)!;
+
+        Assert.Equal("", loaded.Brief.Audience);
+        Assert.Equal("", loaded.Generations[0].Brief.Audience);
+        Assert.Equal(("story", "festive", "Fresh stock", "Visit us today", "Keep it simple"),
+            (loaded.Brief.Format, loaded.Brief.Style, loaded.Brief.Headline, loaded.Brief.CallToAction, loaded.Brief.Instructions));
+        Assert.Equal(new[] { new CreativeItem(6, 148m) }, loaded.Brief.Products);
+
+        // Saved again, the audience is kept with the brief and the old words are not lost.
+        var saved = _store.Update(id, p => p with { Brief = p.Brief with { Audience = "families with young children" } }, _now.AddMinutes(1))!;
+        Assert.Equal("families with young children", _store.Load(id)!.Brief.Audience);
+        Assert.Equal("Fresh stock", saved.Brief.Headline);
+    }
+
+    [Fact]
     public void Pictures_their_prompts_references_and_exports_are_kept_under_names_the_store_makes()
     {
         var id = _store.Create(new CreativeProject(), _now).Id;
@@ -306,6 +341,65 @@ public sealed class CreativeServiceTests : IDisposable
         service.Choose(project.Id, 2);
         Assert.Equal(2, service.Store.Load(project.Id)!.Chosen);
         Assert.Equal(2, service.Store.Load(project.Id)!.Shown!.Number);
+    }
+
+    [Fact]
+    public void Who_it_is_for_is_kept_on_one_line_trimmed_and_cut_when_too_long()
+    {
+        var service = Service();
+        var project = service.Create(CreativeFormat.Square, new[] { Oil }, "Oil");
+        Assert.Equal("", project.Brief.Audience);
+
+        project = service.SaveBrief(project.Id, "", project.Brief with { Audience = "  families with young children\r\nand \"grandparents\"\u0007  " });
+        Assert.Equal("families with young children and 'grandparents'", project.Brief.Audience);
+        Assert.Equal(project.Brief.Audience, service.Store.Load(project.Id)!.Brief.Audience);
+
+        // Saving something else does not lose it.
+        project = service.SaveBrief(project.Id, "", project.Brief with { Headline = "Fresh stock" });
+        Assert.Equal("families with young children and 'grandparents'", service.Store.Load(project.Id)!.Brief.Audience);
+
+        // Too long: cut to the same length as the other notes, without a space left at the end.
+        var tooLong = string.Concat(Enumerable.Repeat("ab ", 200));
+        project = service.SaveBrief(project.Id, "", project.Brief with { Audience = tooLong });
+        Assert.InRange(project.Brief.Audience.Length, CreativeWords.MaxNotes - 1, CreativeWords.MaxNotes);
+        Assert.StartsWith("ab ab ab", project.Brief.Audience);
+        Assert.Equal(project.Brief.Audience.TrimEnd(), project.Brief.Audience);
+        Assert.Equal(project.Brief.Audience, service.Store.Load(project.Id)!.Brief.Audience);
+        Assert.Equal(CreativeWords.MaxNotes, service.SaveBrief(project.Id, "", project.Brief with { Audience = new string('a', CreativeWords.MaxNotes + 50) }).Brief.Audience.Length);
+
+        // Emptied, or only blanks and line breaks: nothing is kept.
+        Assert.Equal("", service.SaveBrief(project.Id, "", project.Brief with { Audience = " \r\n\t\u0007 " }).Brief.Audience);
+        Assert.Equal("", service.SaveBrief(project.Id, "", project.Brief with { Audience = null! }).Brief.Audience);
+    }
+
+    [Fact]
+    public async Task Who_it_is_for_goes_to_the_AI_only_when_it_is_given_and_a_number_in_it_is_fine()
+    {
+        var service = Service();
+        var project = service.Create(CreativeFormat.Square, new[] { Oil }, "Oil");
+        service.SaveBrief(project.Id, "", project.Brief with { Headline = "Fresh stock", Audience = "families with 2 children" });
+        service.Make(project.Id);
+        await service.MakeNextAsync(CancellationToken.None);
+
+        var asked = Assert.Single(_asked);
+        Assert.Equal("families with 2 children", asked.Audience);
+        var prompt = service.Store.Prompt(project.Id, 1)!;
+        Assert.Contains("- Who it is for: families with 2 children. Let the people, the setting and the mood suit them.", prompt);
+        Assert.Contains("Strictly no numbers, prices, currency signs such as ₹, percent signs", prompt);
+        Assert.Contains("and no other words:", prompt);
+        var kept = File.ReadAllText(Path.Combine(Path.GetDirectoryName(service.Store.ResultPath(project.Id, 1))!, "request.json"));
+        Assert.Contains("\"Audience\": \"families with 2 children\"", kept);
+
+        // Taken out again, the next picture says nothing about it.
+        var brief = service.Store.Load(project.Id)!.Brief;
+        service.SaveBrief(project.Id, "", brief with { Audience = "" });
+        service.Make(project.Id);
+        await service.MakeNextAsync(CancellationToken.None);
+
+        Assert.Equal("", _asked[1].Audience);
+        Assert.DoesNotContain("Who it is for", service.Store.Prompt(project.Id, 2));
+        // The first picture keeps the brief it was made from.
+        Assert.Equal("families with 2 children", service.Store.Load(project.Id)!.Generation(1)!.Brief.Audience);
     }
 
     [Theory]

@@ -169,6 +169,11 @@ else
                         }
                     </div>
 
+                    <label class="field-label" for="audience">Who is it for?</label>
+                    <input id="audience" class="form-control" maxlength="@CreativeWords.MaxNotes" placeholder="e.g. families with young children" aria-describedby="audience-help"
+                           value="@brief.Audience" @onchange="@(e => SaveAsync(b => b with { Audience = Text(e) }))" />
+                    <p class="small muted" id="audience-help">The AI uses it to choose the people, the place and the mood. It is never written on the picture.</p>
+
                     @(WordInput("cta", "What to do", brief.CallToAction, CreativeWords.MaxLine, "e.g. Visit us today", v => b => b with { CallToAction = v }))
                     @(WordInput("small-print", "Small print", brief.SmallPrint, CreativeWords.MaxLine, "e.g. While stocks last", v => b => b with { SmallPrint = v }))
                     <label class="field-label" for="background">Background</label>
@@ -596,7 +601,7 @@ else
     private static string Text(ChangeEventArgs e) => e.Value as string ?? "";
 
     /// <summary>Something under "More choices" is set.</summary>
-    private bool MoreIsUsed => CreativeStyle.Find(brief.Style) != CreativeStyle.Clean || !string.IsNullOrEmpty(brief.CallToAction) || !string.IsNullOrEmpty(brief.SmallPrint)
+    private bool MoreIsUsed => CreativeStyle.Find(brief.Style) != CreativeStyle.Clean || !string.IsNullOrEmpty(brief.Audience) || !string.IsNullOrEmpty(brief.CallToAction) || !string.IsNullOrEmpty(brief.SmallPrint)
         || !string.IsNullOrEmpty(brief.Background) || !string.IsNullOrEmpty(brief.Instructions) || brief.References.Count > 0;
 
     private RenderFragment WordInput(string id, string label, string value, int max, string placeholder, Func<string, Func<CreativeBrief, CreativeBrief>> edit) =>

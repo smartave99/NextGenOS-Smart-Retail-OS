@@ -143,6 +143,7 @@ public sealed class CreativeService
         {
             Format = CreativeFormat.Find(brief.Format).Id,
             Style = CreativeStyle.Find(brief.Style).Id,
+            Audience = Trim(CreativeWords.Tidy(brief.Audience), CreativeWords.MaxNotes),
             Headline = Trim(brief.Headline, CreativeWords.MaxHeadline),
             Subtitle = Trim(brief.Subtitle, CreativeWords.MaxLine),
             CallToAction = Trim(brief.CallToAction, CreativeWords.MaxLine),
@@ -644,6 +645,7 @@ public sealed class CreativeService
             Width = format.Width,
             Height = format.Height,
             Style = CreativeStyle.Find(brief.Style).Brief,
+            Audience = brief.Audience,
             ShopName = brand.ShopName,
             BrandColours = brand.Colours.ToList(),
             BrandNotes = brand.Notes,
@@ -668,6 +670,7 @@ public sealed class CreativeService
         request.Width,
         request.Height,
         request.Style,
+        request.Audience,
         request.ShopName,
         request.BrandColours,
         request.BrandNotes,

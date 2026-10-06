@@ -53,6 +53,10 @@ namespace SmartRetail.AI.Creatives
         /// <summary>The look, e.g. "Festive: rich colours, marigolds and warm lights, for an Indian festival".</summary>
         public string Style { get; set; } = "";
 
+        /// <summary>Who the advertisement is for, in the owner's words (e.g. "families with young children"). Empty when not given:
+        /// then the prompt says nothing about it. It is never drawn: it only guides the people, the setting and the mood.</summary>
+        public string Audience { get; set; } = "";
+
         public string ShopName { get; set; } = "";
 
         /// <summary>The shop's colours, as #RRGGBB.</summary>
@@ -123,6 +127,7 @@ namespace SmartRetail.AI.Creatives
                 ?? CreativeWords.NameProblem("The shop's name", ShopName, CreativeWords.MaxLine)
                 ?? CreativeWords.Problem("The background", Background, CreativeWords.MaxNotes, allowNumbers: true)
                 ?? CreativeWords.Problem("The instructions", Instructions, CreativeWords.MaxNotes, allowNumbers: true)
+                ?? CreativeWords.Problem("Who it is for", Audience, CreativeWords.MaxNotes, allowNumbers: true)
                 ?? CreativeWords.Problem("The brand notes", BrandNotes, CreativeWords.MaxNotes, allowNumbers: true)
                 ?? CreativeWords.Problem("What to change", Change, CreativeWords.MaxNotes, allowNumbers: true);
         }
@@ -252,9 +257,10 @@ namespace SmartRetail.AI.Creatives
                 : null;
         }
 
-        /// <summary>The words on one line, without quotes that would end them in the prompt.</summary>
+        /// <summary>The words on one line, without quotes that would end them in the prompt, and without line breaks or other
+        /// control characters (each becomes a space), so the owner's words can never start another line of the prompt.</summary>
         public static string Tidy(string words) =>
-            Regex.Replace((words ?? "").Replace('"', '\'').Replace('“', '\'').Replace('”', '\''), @"\s+", " ").Trim();
+            Regex.Replace((words ?? "").Replace('"', '\'').Replace('“', '\'').Replace('”', '\''), @"[\s\p{Cc}]+", " ").Trim();
     }
 
     /// <summary>The task for Codex: one finished advertisement, drawn by its image tool, with room left for prices.</summary>
@@ -423,6 +429,14 @@ namespace SmartRetail.AI.Creatives
             if (!string.IsNullOrWhiteSpace(request.Background))
             {
                 prompt.Append("- Background: ").Append(CreativeWords.Tidy(request.Background).TrimEnd('.')).Append(".\n");
+            }
+
+            // Who it is for guides the people, the setting and the mood. It is never a word to draw: the list of words above stays the only one.
+            var audience = CreativeWords.Tidy(request.Audience).TrimEnd('.');
+            if (audience.Length > 0)
+            {
+                prompt.Append("- Who it is for: ").Append(audience).Append(". Let the people, the setting and the mood suit them. ")
+                    .Append("Do not write any words about them: the only words are the ones listed above, if any.\n");
             }
 
             if (request.References.Count > 0)

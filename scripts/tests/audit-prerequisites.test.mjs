@@ -119,3 +119,26 @@ test('Linux: OpenSSL 3 may be relied on only when the package says so (the websi
   assert.match(old, /needs libssl\.so\.1\.1/);
   assert.match(old, /needs libz\.so\.1/);
 });
+
+const winManifest = (extra = {}) => JSON.stringify({ schema: 1, os: 'windows', arch: 'x64', bundled: ['the Node.js runtime'], system: ['windows-10-22h2-or-11-x64', 'windows-system-dlls'], minimumSystem: 'Windows 10 22H2 or 11, 64-bit', ...extra });
+
+test('a 32-bit launcher is accepted only when the package names it; what it imports is still checked', () => {
+  const launcher = makePe({ imports: ['KERNEL32.dll', 'USER32.dll', 'SHELL32.dll'], machine: 0x14c });
+  const named = audit({ 'prerequisites.json': winManifest({ launchers: ['Start Website.exe'] }), 'Start Website.exe': launcher }, { os: 'windows' });
+  assert.deepEqual(named.problems, []);
+  const unnamed = audit({ 'prerequisites.json': winManifest(), 'Start Website.exe': launcher }, { os: 'windows' });
+  assert.match(unnamed.problems.join('\n'), /Start Website\.exe: made for another processor \(0x14c\), not x64/);
+  const other = audit({ 'prerequisites.json': winManifest({ launchers: ['Start Website.exe'] }), 'Other.exe': launcher }, { os: 'windows' });
+  assert.match(other.problems.join('\n'), /Other\.exe: made for another processor/, 'only the named file is allowed');
+  const needy = audit({ 'prerequisites.json': winManifest({ launchers: ['Start Website.exe'] }), 'Start Website.exe': makePe({ imports: ['KERNEL32.dll', 'VCRUNTIME140.dll'], machine: 0x14c }) }, { os: 'windows' });
+  assert.match(needy.problems.join('\n'), /vcruntime140\.dll/i, 'a launcher may not need anything that is not in Windows');
+  const arm = audit({ 'prerequisites.json': winManifest({ launchers: ['Start Website.exe'] }), 'Start Website.exe': makePe({ imports: ['KERNEL32.dll'], machine: 0xaa64 }) }, { os: 'windows' });
+  assert.match(arm.problems.join('\n'), /made for another processor \(0xaa64\)/, 'only a 32-bit Intel launcher is allowed');
+});
+
+test('the list of launchers must be a list of .exe names at the top, and only for Windows', () => {
+  const bad = audit({ 'prerequisites.json': winManifest({ launchers: ['sub/dir.exe', 'run.sh'] }) }, { os: 'windows' });
+  assert.match(bad.problems.join('\n'), /"launchers" must be a list of \.exe file names at the top of the package/);
+  const linux = audit({ 'prerequisites.json': manifest({ launchers: ['x.exe'] }) }, { os: 'linux' });
+  assert.match(linux.problems.join('\n'), /only a Windows package has launchers/);
+});

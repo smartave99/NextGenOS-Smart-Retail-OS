@@ -11,7 +11,7 @@ import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { listZip } from '../../tools/setup-studio/lib/zip.mjs';
 import {
-  LAUNCHER, START_BAT, START_SH, TRIAL_FILE, WebsiteError, assemblePackage, buildEnvironment, checkCustomer, checkLogo, checkPackage, checkSystem, checkVersion, copyAppSource,
+  LAUNCHER, START_BAT, START_BAT_NAME, START_SH, TRIAL_FILE, WebsiteError, assemblePackage, buildEnvironment, checkCustomer, checkLogo, checkPackage, checkSystem, checkVersion, copyAppSource,
   keysBuiltIn, librariesMatchLock, licenceProblems, packageName, parseSettings, readmeFor, settingsFromKit, zipPackage,
 } from '../make-website-package.mjs';
 
@@ -286,13 +286,17 @@ test('a Linux package is put together from the build: what goes in, what is left
   const p = make('linux');
   try {
     const at = (f) => join(p.folder, ...f.split('/'));
-    for (const f of ['start-website.js', 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json', 'node/bin/node', 'node/LICENSE', 'EULA.txt'.replace('EULA.txt', 'licence/READ ME.txt'),
+    for (const f of ['start-website.js', 'app-window.mjs', 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json', 'node/bin/node', 'node/LICENSE', 'EULA.txt'.replace('EULA.txt', 'licence/READ ME.txt'),
       'app/server.js', 'app/package.json', 'app/.next/BUILD_ID', 'app/.next/server/app/page.js', 'app/.next/static/chunks/main-abc.js', 'app/public/favicon.ico', 'app/node_modules/next/index.js', 'app/node_modules/next/LICENSE',
       'app/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node', 'app/node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64.node']) assert.ok(existsSync(at(f)), `${f} is in the package`);
     // Left out: the build's source, its .env, the other systems' picture parts, type files and maps, the build's own package.json.
     for (const f of ['app/src', 'app/.env.production', 'app/node_modules/typed/index.d.ts', 'app/node_modules/typed/index.js.map', 'app/node_modules/@img/sharp-linuxmusl-x64', 'app/node_modules/@img/sharp-libvips-linuxmusl-x64', 'start-website.bat']) assert.ok(!existsSync(at(f)), `${f} is not in the package`);
     assert.doesNotMatch(readFileSync(at('app/package.json'), 'utf8'), /scripts|devDependencies|vitest/);
     assert.ok(statSync(at('start-website.sh')).mode & 0o100, 'the start script can be run');
+    const sh = readFileSync(at('start-website.sh'), 'utf8');
+    assert.match(sh, /--app/, 'it opens the website as a program of its own');
+    assert.match(sh, /--install-menu/, 'it can put the website in the applications menu');
+    assert.ok(!readdirSync(p.folder).some((n) => /\.(exe|bat)$/.test(n)), 'no Windows launcher in a Linux package');
     assert.ok(statSync(at('node/bin/node')).mode & 0o100, 'Node.js can be run');
     assert.deepEqual(p.pruned.other.sort(), ['@img/sharp-libvips-linuxmusl-x64', '@img/sharp-linuxmusl-x64'].sort());
 
@@ -322,9 +326,16 @@ test('a Windows package: its own start file, Windows native parts, and no Linux 
   const p = make('windows');
   try {
     const at = (f) => join(p.folder, ...f.split('/'));
-    for (const f of ['Start Website.bat', 'start-website.js', 'node/node.exe', 'app/node_modules/.prisma/client/query_engine-windows.dll.node', 'app/node_modules/@img/sharp-win32-x64/lib/sharp-win32-x64.node']) assert.ok(existsSync(at(f)), f);
+    for (const f of ['Start Website.exe', START_BAT_NAME, 'app-window.mjs', 'start-website.js', 'node/node.exe', 'app/node_modules/.prisma/client/query_engine-windows.dll.node', 'app/node_modules/@img/sharp-win32-x64/lib/sharp-win32-x64.node']) assert.ok(existsSync(at(f)), f);
     assert.ok(!existsSync(at('start-website.sh')) && !existsSync(at('app/node_modules/@img/sharp-linux-x64')), 'nothing for the other system');
-    const bat = readFileSync(at('Start Website.bat'), 'utf8');
+    const bat = readFileSync(at(START_BAT_NAME), 'utf8');
+    // The icon people double-click is a window program (no black terminal) that starts the website's own Node.js as a program of its own.
+    const exe = readFileSync(at('Start Website.exe'));
+    assert.equal(exe.subarray(0, 2).toString('latin1'), 'MZ');
+    assert.equal(exe.readUInt16LE(exe.readUInt32LE(0x3c) + 24 + 68), 2, 'a window program (subsystem 2): no black terminal opens');
+    assert.ok(exe.includes(Buffer.from('start-website.js --app', 'utf16le')), 'it starts the website as a program of its own');
+    assert.ok(!existsSync(at('Start Website.bat')), 'no script that opens a terminal is the way in');
+    assert.equal(readFileSync(at('app-window.mjs'), 'utf8'), readFileSync(join(scripts, 'lib', 'app-window.mjs'), 'utf8'), 'the window code is the one source, unchanged');
     assert.ok(bat.split('\n').slice(0, -1).every((l) => l.endsWith('\r')), 'a Windows script has Windows line ends');
     const pre = JSON.parse(readFileSync(at('prerequisites.json'), 'utf8'));
     assert.deepEqual(pre.system, ['windows-10-22h2-or-11-x64', 'windows-system-dlls']);
@@ -534,7 +545,10 @@ test('the README is plain: it says what to do, for the right system, and that no
   for (const os of ['windows', 'linux']) {
     const text = readmeFor({ name: 'Luzon Fresh Mart', os, customer: 'luzon-fresh-mart', trial: false, version: '1.2.3', nodeVersion: 'v22.22.0' });
     assert.match(text, /Nothing has to be installed first/);
-    assert.match(text, os === 'windows' ? /Start Website\.bat/ : /\.\/start-website\.sh/);
+    assert.match(text, os === 'windows' ? /Double-click "Start Website"/ : /\.\/start-website\.sh --app/);
+    assert.match(text, /no black terminal window|terminal can be closed at once/, 'it says there is no terminal to keep open');
+    assert.doesNotMatch(text, /leave (it|the terminal) open/i);
+    assert.match(text, /close its window/, 'it says how to stop it');
     assert.match(text, /http:\/\/127\.0\.0\.1:3000\/admin\/licence/);
     assert.match(text, /private-settings\.example\.env/);
     assert.ok(text.split('\n').slice(0, -1).every((l) => l.endsWith('\r')));

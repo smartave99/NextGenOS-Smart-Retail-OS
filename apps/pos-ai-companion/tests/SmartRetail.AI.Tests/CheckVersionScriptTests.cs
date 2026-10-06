@@ -180,7 +180,10 @@ namespace SmartRetail.AI.Tests
             // The setup is built on Linux (the Windows setup compiler of Chocolatey has no 64-bit stub) and then tried on a real Windows PC.
             Assert.Matches(@"(?m)^  windows-build:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n(    .*\n)*?    runs-on: ubuntu-latest\s*\n", workflow);
             Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: \[gate, prepare, windows-build\]\s*\n(    .*\n)*?    runs-on: windows-latest\s*\n", workflow);
-            Assert.DoesNotContain("choco install nsis", workflow);
+            // The Hub's setup needs the 64-bit stub of the setup compiler, which only the Ubuntu package has. (The 32-bit launcher of the website is made on the Windows runner with the
+            // Chocolatey one: it needs no 64-bit stub, and a launcher is allowed to be 32-bit, see docs/PREREQUISITES.md.)
+            Assert.Contains("apt-get install -y -q nsis", System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  windows-build:\s*\n(.*?)^  windows:").Groups[1].Value);
+            Assert.DoesNotContain("choco install nsis", System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  windows-build:\s*\n(.*?)^  windows:").Groups[1].Value);
             // So is the Linux package of the Hub; the release waits for all three builds to report.
             Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // And so is the staff bundle of the Setup Studio.

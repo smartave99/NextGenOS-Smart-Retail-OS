@@ -78,7 +78,7 @@ function startHere(files, ctx) {
       ctx.windowsSigned
         ? '2. Windows shows the publisher\'s name. That is expected.'
         : '2. Windows may say "unknown publisher", because this setup is not signed yet. Click **More info**, then **Run anyway**.',
-      '3. When it finishes, your web browser opens `http://127.0.0.1:5280`. The program starts by itself every time the PC starts (it runs as a Windows service).',
+      '3. When it finishes, the program opens in a window of its own (no address bar). The program runs in the background and starts by itself every time the PC starts (it is a Windows service), so closing the window does not stop it. Open it again from the Smart Retail POS icon on the desktop or in the Start menu.',
       `4. ${trialNote}`,
       '5. To remove it: Settings, then Apps. The shop\'s information stays on the PC on purpose (folder `C:\\ProgramData\\NextGenOS`).',
     ]);
@@ -92,7 +92,7 @@ function startHere(files, ctx) {
       `Download ${debs.map((d) => code(d.name) + (d.arch === 'x64' ? ' (Intel or AMD computers: most PCs)' : ' (ARM computers)')).join(' or ')}.`,
       '1. Open a terminal in the folder where you saved it.',
       `2. Type ${code('sudo apt install ./' + first.name)} and press Enter.`,
-      '3. Open `http://127.0.0.1:5280` in your web browser, or choose "Smart Retail POS" in the applications menu. The program starts by itself every time the computer starts.',
+      '3. Choose "Smart Retail POS" in the applications menu: the program opens in a window of its own (no address bar). The program runs in the background and starts by itself every time the computer starts, so closing the window does not stop it.',
       `4. ${trialNote}`,
       '5. To remove it: `sudo apt remove smart-retail-pos-hub`. The shop\'s information stays in `/var/lib/nextgenos` on purpose.',
     ]);
@@ -106,10 +106,10 @@ function startHere(files, ctx) {
       '#### The online shop (website)',
       `Download ${sites.map((s) => code(s.name) + (s.os === 'windows' ? ' (Windows)' : ' (Linux)')).join(' or ')}.`,
     ];
-    if (win) lines.push(`- **Windows:** right-click ${code(win.name)} and choose Extract All. Open the new folder and double-click ${code('Start Website.bat')}. A window opens: leave it open while the website is in use.`);
-    if (lin) lines.push(`- **Linux:** unzip ${code(lin.name)}, open a terminal in the new folder and type ${code('./start-website.sh')}. Leave the terminal open while the website is in use.`);
-    lines.push('- Then open `http://127.0.0.1:3000` in your web browser.');
-    lines.push(`- ${ctx.trial ? 'Without a licence the website says it is not available. That is the correct result for a trial.' : 'It needs the customer\'s licence before it shows the shop.'}`);
+    if (win) lines.push(`- **Windows:** right-click ${code(win.name)} and choose Extract All. Open the new folder and double-click **Start Website** (the icon with the blue box). The website opens in a window of its own; there is no black terminal window. Windows may say "Windows protected your PC" (the program is not signed yet): click **More info**, then **Run anyway**.`);
+    if (lin) lines.push(`- **Linux:** unzip ${code(lin.name)}, open a terminal in the new folder and type ${code('./start-website.sh --app')}. The website opens in a window of its own and the terminal can be closed at once. ${code('./start-website.sh --install-menu')} puts it in the applications menu.`);
+    lines.push('- To stop it, close its window. Opening it again while it is open only brings up the same window.');
+    lines.push(`- ${ctx.trial ? 'This is a trial build: the window shows the page where a licence key is typed, and nothing can be activated. Visitors to a website with no licence see a page that says it is not available. That is the correct result for a trial.' : 'With no licence yet the window shows the page where the licence key is typed. The shop shows once the customer\'s licence is in.'}`);
     const kits = [...new Set(sites.map((s) => s.kit))];
     lines.push(`- This website is built for ${kits.map((k) => code(k)).join(', ')} (the name in the file). A customer's own website is built by NextGenOS from that customer's own settings, with the Setup Studio.`);
     if (win) lines.push('- The Windows one was started by the build machine, not by a person on a real PC yet.');

@@ -63,6 +63,9 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
 
   // 1. The package says what it carries and what it relies on.
   let declared = [];
+  // A launcher is a tiny 32-bit Windows program (made with NSIS) that only starts the 64-bit program beside it; every 64-bit Windows runs it (docs/PREREQUISITES.md).
+  // It is accepted as 32-bit only when the package names it here, as a file at the top of the package; what it imports is checked like any other program.
+  const launchers = new Set();
   const manifest = join(root, 'prerequisites.json');
   if (!existsSync(manifest)) problems.push('prerequisites.json is missing (it says what the package carries and what it relies on the system for)');
   else {
@@ -76,6 +79,11 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
       else declared = m.system;
       if (Array.isArray(m.system)) for (const item of m.system) if (!SYSTEM_ITEMS[os].has(item)) problems.push(`prerequisites.json relies on "${item}", which is not on the allowed list for ${os} (docs/PREREQUISITES.md)`);
       if (typeof m.minimumSystem !== 'string' || !m.minimumSystem) problems.push('prerequisites.json must say the minimum system in words (minimumSystem)');
+      if (m.launchers !== undefined) {
+        if (!Array.isArray(m.launchers) || m.launchers.some((n) => typeof n !== 'string' || !/^[^\\/:*?"<>|]+\.exe$/i.test(n))) problems.push('prerequisites.json: "launchers" must be a list of .exe file names at the top of the package');
+        else if (os !== 'windows') problems.push('prerequisites.json: only a Windows package has launchers');
+        else for (const n of m.launchers) launchers.add(n);
+      }
     } catch { problems.push('prerequisites.json is not valid JSON'); }
   }
 
@@ -95,7 +103,7 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
       if (!r.managed) {
         native += 1;
         const want = arch === 'arm64' ? 0xaa64 : 0x8664;
-        if (machine !== want) problems.push(`${rel}: made for another processor (0x${machine.toString(16)}), not ${arch}`);
+        if (machine !== want && !(machine === 0x14c && arch === 'x64' && launchers.has(rel))) problems.push(`${rel}: made for another processor (0x${machine.toString(16)}), not ${arch}`);
         for (const dll of r.imports) {
           if (present.has(dll) || /^(api|ext)-ms-win-/.test(dll) || WINDOWS_SYSTEM.has(dll)) continue;
           problems.push(VC_RUNTIME.test(dll) ? `${rel}: needs ${dll} (the Visual C++ runtime), which is not in the package: carry it beside the file or in the setup` : `${rel}: needs ${dll}, which is neither in the package nor part of Windows`);

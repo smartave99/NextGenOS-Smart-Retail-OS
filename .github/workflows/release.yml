@@ -452,6 +452,12 @@ jobs:
             printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
             node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
           fi
+      - name: Tool for the Windows launcher (NSIS, a build tool, never shipped)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS could not be installed.' }
       - name: Build the website package (build, check prerequisites, audit, write the zip)
         id: build
         shell: bash
@@ -508,6 +514,52 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
           node scripts/smoke-website.mjs (Join-Path $dir "website-$($env:CUSTOMER)-windows") --os windows
           if ($LASTEXITCODE -ne 0) { throw 'The website package did not behave.' }
+      - name: Open Start Website.exe the way a person does (double-click), check the window, open it again, close the window (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        env:
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pkg = Join-Path (Join-Path $env:RUNNER_TEMP 'website-zip') "website-$($env:CUSTOMER)-windows"
+          $exe = Join-Path $pkg 'Start Website.exe'
+          if (-not (Test-Path $exe)) { throw 'Start Website.exe is not in the package.' }
+          $note = Join-Path (Join-Path (Join-Path $env:APPDATA 'NextGenOS Website') $env:CUSTOMER) 'running.json'
+          Remove-Item $note -ErrorAction SilentlyContinue
+
+          # 1. Opened like a double-click: it must start and answer (a website with no licence answers "not available").
+          Start-Process -FilePath $exe | Out-Null
+          for ($i = 0; $i -lt 120 -and -not (Test-Path $note); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $note)) { throw 'The website did not start within 120 seconds.' }
+          $info = Get-Content $note -Raw | ConvertFrom-Json
+          $status = 0
+          try { $status = (Invoke-WebRequest -Uri $info.url -UseBasicParsing -SkipHttpErrorCheck).StatusCode } catch { throw "The website does not answer at $($info.url)." }
+          Write-Host "The website answers at $($info.url) with status $status."
+          $program = Get-CimInstance Win32_Process -Filter "ProcessId = $($info.pid)"
+          Write-Host $program.CommandLine
+          if ($program.CommandLine -notlike '*start-website.js --app*' -or $program.ExecutablePath -notlike "$pkg*") { throw 'The website is not running from its own folder with its own Node.js.' }
+
+          # 2. A window of its own was opened for it (Edge, in app mode: no address bar).
+          $window = $null
+          for ($i = 0; $i -lt 30 -and -not $window; $i++) {
+            $window = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like "*--app=$($info.url)*" } | Select-Object -First 1
+            if (-not $window) { Start-Sleep -Seconds 1 }
+          }
+          if (-not $window) { throw 'No app window was opened for the website.' }
+          Write-Host 'An Edge app window is open for it.'
+
+          # 3. Opened a second time: still one website.
+          Start-Process -FilePath $exe | Out-Null
+          Start-Sleep -Seconds 15
+          $running = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*start-website.js*' })
+          if ($running.Count -ne 1) { throw "There are $($running.Count) websites running; there must be one." }
+
+          # 4. The window is closed: the website stops and its note is removed.
+          Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*NextGenOS Website*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          for ($i = 0; $i -lt 40 -and (Get-Process -Id $info.pid -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+          if (Get-Process -Id $info.pid -ErrorAction SilentlyContinue) { throw 'The website did not stop when its window was closed.' }
+          if (Test-Path $note) { throw 'The note that the website is running was not removed.' }
+          Write-Host 'The website opened in a window of its own, ran once, and stopped when the window was closed.'
       - name: Put the website zip in dist
         shell: bash
         env:

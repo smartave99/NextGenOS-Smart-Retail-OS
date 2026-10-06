@@ -62,3 +62,7 @@ A website is a Node.js server, so its package is a folder with its own `node` (o
 | Windows | Windows 10 (22H2) or 11, 64-bit, and its own system DLLs | `audit-prerequisites.mjs`: `node.exe`, the engine and the picture library import only DLLs on the list; the Visual C++ runtime is not needed |
 
 The start program also checks that the port is free and that there is room on the disk, and says what to do. It needs no browser; people who use the website have their own. Only 64-bit Intel/AMD websites are built; an ARM website would need an ARM build machine and is not made yet.
+
+## Launchers: the one 32-bit program that is allowed in a 64-bit Windows package
+
+The small program a person double-clicks to open one of our programs with no terminal window (`Start Website.exe`, `Setup Studio.exe`; made with NSIS by `scripts/lib/build-launcher.mjs`) is a **32-bit** Windows program. **Reason:** the free NSIS for Windows has no 64-bit stub, and every 64-bit Windows 10 and 11 runs 32-bit programs (WoW64 is part of Windows). It only starts the 64-bit Node.js beside it. The audit accepts such a file only when `prerequisites.json` names it in `"launchers"` (a `.exe` at the top of the package), and it still checks that the launcher imports nothing but Windows' own libraries.

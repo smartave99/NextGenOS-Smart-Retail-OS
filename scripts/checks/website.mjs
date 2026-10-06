@@ -7,7 +7,7 @@ export function checks({ root, has, runCmd, join, existsSync }) {
       name: 'website-package-tests',
       title: 'The website package: settings checked, names that escape refused, what goes in and what never does, the start program, the audits pass a good package and refuse a planted file, key or .env',
       run: () => {
-        const r = runCmd('website-package-tests', 'node', ['--test', 'scripts/tests/make-website-package.test.mjs']);
+        const r = runCmd('website-package-tests', 'node', ['--test', 'scripts/tests/make-website-package.test.mjs', 'scripts/tests/website-app-mode.test.mjs']);
         if (r.status !== 'PASS') return r;
         const n = /# pass (\d+)/.exec(r.out);
         return { status: 'PASS', detail: `${n ? n[1] : 'all'} tests passed` };

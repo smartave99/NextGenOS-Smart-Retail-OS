@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { auditFolder, findSecrets } from './audit-package.mjs';
 import { auditPrerequisites } from './audit-prerequisites.mjs';
 import { writeZipFile } from '../tools/setup-studio/lib/zip.mjs';
+import { buildLauncher } from './lib/build-launcher.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repo = resolve(here, '..');
@@ -434,6 +435,7 @@ export function prerequisitesFor(os, nodeVersion = null) {
     schema: 1, os, arch: 'x64',
     bundled: ['nodejs-runtime (an official build, checked against nodejs.org\'s fingerprint)', 'the built website and its static files', 'native-libraries (database engine, picture library)', 'every library the website uses'],
     system: os === 'windows' ? ['windows-10-22h2-or-11-x64', 'windows-system-dlls'] : ['glibc-2.35-or-newer', 'libstdc++6-libgcc-s1', 'openssl-3'],
+    ...(os === 'windows' ? { launchers: ['Start Website.exe'] } : {}),
     minimumSystem: os === 'windows' ? 'Windows 10 (22H2) or Windows 11, 64-bit Intel/AMD; or Windows Server 2019 or later' : 'Ubuntu 22.04 or 24.04, Linux Mint 21 or later, Debian 12 or later; 64-bit Intel/AMD',
     ...(nodeVersion ? { node: nodeVersion } : {}),
   };
@@ -490,96 +492,21 @@ export function privateSettingsExample(os) {
 }
 
 /**
- * The program that starts the website. It runs with the Node.js that is inside the package. Plain words, because the person who reads them is a shop owner or the
- * person who looks after the shop's computer. It never changes a setting that decides what the website is allowed to do: the production mode is set here.
+ * The program that starts the website (scripts/website-launcher.cjs, written into the package as start-website.js). It runs with the Node.js that is inside the package. Plain words,
+ * because the person who reads them is a shop owner or the person who looks after the shop's computer. It never changes a setting that decides what the website is allowed to do:
+ * the production mode is set there. With --app it opens the website as a program of its own (see scripts/lib/app-window.mjs).
  */
-export const LAUNCHER = `// Starts the website. "Start Website.bat" (Windows) and start-website.sh (Linux) run this with the Node.js that is inside this folder.
-'use strict';
-const fs = require('fs');
-const net = require('net');
-const path = require('path');
+export const LAUNCHER = readFileSync(join(here, 'website-launcher.cjs'), 'utf8');
 
-const here = __dirname;
-const stop = (message) => { console.error('\\n' + message + '\\n'); process.exit(1); };
-
-// What the person asked for: a port number, and whether other computers may open the website.
-let port = 3000;
-let host = '127.0.0.1';
-const args = process.argv.slice(2);
-for (let i = 0; i < args.length; i += 1) {
-  const a = args[i];
-  if (/^\\d+$/.test(a)) port = Number(a);
-  else if (a === '--port') port = Number(args[++i]);
-  else if (a === '--public') host = '0.0.0.0';
-  else if (a === '--host') host = String(args[++i] || '');
-  else stop('I do not understand "' + a + '".\\nTo start the website on this computer only:  start with no extra words.\\nTo choose the port:  add the number, for example 8080.\\nTo let other computers open it:  add --public');
-}
-if (!Number.isInteger(port) || port < 1 || port > 65535) stop('The port must be a number from 1 to 65535, for example 8080.');
-if (!host) stop('Say which address to listen on after --host, for example --host 127.0.0.1');
-
-let info = {};
-try { info = JSON.parse(fs.readFileSync(path.join(here, 'PACKAGE-INFO.json'), 'utf8')); } catch (e) { /* the folder is incomplete: the server file check below says so */ }
-if (!fs.existsSync(path.join(here, 'app', 'server.js'))) stop('This folder is not complete: the website itself (app/server.js) is missing. Unpack the zip again, all of it, into a new folder.');
-
-// The private settings (database address, passwords, keys) are read from private-settings.env if it is there. A value set in the computer's own settings wins.
-// The public settings (name, address, country, kind of business) are already inside the website and are not read from here.
-const NEVER = new Set(['NODE_ENV', 'NGOS_DEV_UNLICENSED', 'NODE_OPTIONS', 'PORT', 'HOSTNAME']);
-const file = path.join(here, 'private-settings.env');
-if (fs.existsSync(file)) {
-  const ignored = [];
-  fs.readFileSync(file, 'utf8').split(/\\r?\\n/).forEach((raw) => {
-    const line = raw.replace(/^\\uFEFF/, '').trim();
-    if (!line || line.startsWith('#')) return;
-    const m = /^([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(.*)$/.exec(line);
-    if (!m) return;
-    let value = m[2].trim();
-    if (/^(".*"|'.*')$/.test(value) && value.length >= 2) value = value.slice(1, -1);
-    if (m[1].startsWith('NEXT_PUBLIC_') || NEVER.has(m[1])) { ignored.push(m[1]); return; }
-    if (value !== '' && process.env[m[1]] === undefined) process.env[m[1]] = value;
-  });
-  if (ignored.length) console.log('Ignored in private-settings.env (they are built in or set by the start command): ' + ignored.join(', '));
-}
-
-process.env.NODE_ENV = 'production';
-process.env.PORT = String(port);
-process.env.HOSTNAME = host;
-process.env.NEXT_TELEMETRY_DISABLED = '1';
-if (!process.env.LICENCE_DIR) process.env.LICENCE_DIR = path.join(here, 'licence');
-try { fs.mkdirSync(process.env.LICENCE_DIR, { recursive: true }); } catch (e) { stop('The folder for the licence cannot be made here (' + process.env.LICENCE_DIR + '). Unpack the website into a folder you may write to, such as your Documents or home folder, not into Program Files.'); }
-
-// Is there room to work? The website keeps a cache of resized pictures.
-try {
-  const s = fs.statfsSync(here);
-  if (s.bavail * s.bsize < 300 * 1024 * 1024) stop('There is less than 300 MB of free space on this disk. Free some space and start again.');
-} catch (e) { /* the check is not possible on this system: carry on */ }
-
-const hasLicence = Boolean(process.env.NGOS_LICENCE) || fs.existsSync(path.join(process.env.LICENCE_DIR, 'licence.ngos'));
-const probe = net.createServer();
-probe.once('error', (e) => {
-  if (e.code === 'EADDRINUSE') stop('Port ' + port + ' is already used by another program on this computer.\\nClose that program, or start the website on another port, for example 8080.');
-  if (e.code === 'EACCES') stop('This computer does not let the website use port ' + port + '. Use a number above 1024, for example 8080.');
-  if (e.code === 'EADDRNOTAVAIL') stop('This computer has no address ' + host + '.');
-  stop('The website could not start listening: ' + e.message);
-});
-probe.listen(port, host, () => probe.close(() => {
-  const shown = host === '0.0.0.0' ? '127.0.0.1' : host;
-  console.log('\\n' + (info.name || 'The website') + (info.version ? ' (version ' + info.version + ')' : ''));
-  console.log('Starting. In a few seconds you can open it in a web browser at:\\n\\n    http://' + shown + ':' + port + '\\n');
-  console.log('Leave this window open while the website is in use. To stop the website, close this window (or press Ctrl+C).');
-  if (host === '0.0.0.0') console.log('Other computers can open it too, at this computer\\'s address and port ' + port + '.');
-  if (!hasLicence) console.log('\\nThere is no licence yet, so the website shows a page saying it is not available. Open http://' + shown + ':' + port + '/admin/licence and type the licence key you were given,\\nor put the licence file (licence.ngos) in the folder "licence".');
-  process.on('uncaughtException', (e) => { console.error('\\nThe website stopped because of a problem:\\n' + (e && e.stack ? e.stack : e)); process.exit(1); });
-  process.chdir(path.join(here, 'app'));
-  require(path.join(here, 'app', 'server.js'));
-}));
-`;
-
+export const START_BAT_NAME = 'Start Website (with a window, for problems).bat';
 export const START_BAT = CRLF([
   '@echo off',
-  'rem Starts the website. It carries its own Node.js: nothing has to be installed first.',
-  'rem   Start Website.bat            starts it on this computer, at http://127.0.0.1:3000',
-  'rem   Start Website.bat 8080       starts it on another port',
-  'rem   Start Website.bat --public   lets other computers open it too',
+  'rem Starts the website in this window, which shows what it says: for finding a problem, or for the person who looks after the website\'s computer.',
+  'rem The normal way to open the website is "Start Website" (the icon), which has no such window and opens the website as a program of its own.',
+  'rem It carries its own Node.js: nothing has to be installed first.',
+  'rem   Start Website (with a window, for problems).bat            starts it on this computer, at http://127.0.0.1:3000',
+  'rem   Start Website (with a window, for problems).bat 8080       starts it on another port',
+  'rem   Start Website (with a window, for problems).bat --public   lets other computers open it too',
   'cd /d "%~dp0"',
   'if /i not "%PROCESSOR_ARCHITECTURE%"=="AMD64" if /i not "%PROCESSOR_ARCHITEW6432%"=="AMD64" (',
   '  echo This website needs a 64-bit Windows PC with an Intel or AMD processor. This computer is not one.',
@@ -592,13 +519,48 @@ export const START_BAT = CRLF([
 
 export const START_SH = `#!/bin/sh
 # Starts the website. It carries its own Node.js: nothing has to be installed first.
-#   ./start-website.sh            starts it on this computer, at http://127.0.0.1:3000
-#   ./start-website.sh 8080       starts it on another port
-#   ./start-website.sh --public   lets other computers open it too
-cd "$(dirname "$0")" || exit 1
+#   ./start-website.sh --app            opens the website as a program of its own (a window, no terminal); this terminal can be closed at once. Closing the window stops it.
+#   ./start-website.sh --install-menu   puts "Smart Retail POS website" in the applications menu, so it opens like any other program
+#   ./start-website.sh                  starts it in this terminal, on this computer, at http://127.0.0.1:3000 (for the person who looks after the website's computer)
+#   ./start-website.sh 8080             starts it on another port
+#   ./start-website.sh --public         lets other computers open it too
+here="$(cd "$(dirname "$0")" && pwd)" || exit 1
+cd "$here" || exit 1
+# The customer's short name is in PACKAGE-INFO.json (nothing about a customer is written in this program).
+customer="$(sed -n 's/.*"customer": *"\\([a-z0-9-]*\\)".*/\\1/p' PACKAGE-INFO.json 2> /dev/null | head -n 1)"
+[ -n "$customer" ] || customer=website
+note="\${XDG_CONFIG_HOME:-$HOME/.config}/nextgenos-website/$customer"
+# A problem is said in the terminal, and, when there is no terminal (--app), written in a note that opens by itself.
+problem() {
+  echo "$1"
+  if [ "$app" = yes ]; then
+    mkdir -p "$note" 2> /dev/null
+    printf '%s\\n' 'The website could not start.' '' "$1" > "$note/Website problem.txt"
+    command -v xdg-open > /dev/null 2>&1 && xdg-open "$note/Website problem.txt" > /dev/null 2>&1 &
+  fi
+  exit 1
+}
+app=no
+case "\${1:-}" in
+  --install-menu)
+    dir="\${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    mkdir -p "$dir" || exit 1
+    cat > "$dir/nextgenos-website-$customer.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Smart Retail POS website ($customer)
+Comment=The online shop, as a program of its own
+Exec="$here/start-website.sh" --app
+Terminal=false
+Categories=Office;
+DESKTOP
+    echo "Done. The website is now in your applications menu: Smart Retail POS website ($customer)"
+    exit 0 ;;
+  --app) app=yes ;;
+esac
 case "$(uname -m)" in
   x86_64|amd64) ;;
-  *) echo "This website is made for 64-bit Intel or AMD computers. This computer is a $(uname -m)."; exit 1 ;;
+  *) problem "This website is made for 64-bit Intel or AMD computers. This computer is a $(uname -m)." ;;
 esac
 # The website's database part needs OpenSSL 3, which Ubuntu 22.04 and later and Debian 12 and later have.
 found=no
@@ -607,9 +569,13 @@ for f in /lib/libssl.so.3 /lib64/libssl.so.3 /usr/lib/libssl.so.3 /usr/lib64/lib
 done
 if [ "$found" = no ] && { /sbin/ldconfig -p 2> /dev/null || ldconfig -p 2> /dev/null; } | grep -q 'libssl\\.so\\.3'; then found=yes; fi
 if [ "$found" = no ]; then
-  echo "This computer does not have OpenSSL 3, which the website's database part needs."
-  echo "On Ubuntu, Linux Mint or Debian, open a terminal and type:  sudo apt install libssl3"
-  exit 1
+  problem "This computer does not have OpenSSL 3, which the website's database part needs. On Ubuntu, Linux Mint or Debian, open a terminal and type:  sudo apt install libssl3"
+fi
+if [ "$app" = yes ]; then
+  # Started so that the terminal (or the file manager) can be closed at once; what it says goes to a log.
+  mkdir -p "$note" 2> /dev/null
+  nohup ./node/bin/node start-website.js "$@" > "$note/website.log" 2>&1 &
+  exit 0
 fi
 exec ./node/bin/node start-website.js "$@"
 `;
@@ -617,7 +583,7 @@ exec ./node/bin/node start-website.js "$@"
 /** The page of steps for the shop owner or the person who looks after the computer. */
 export function readmeFor({ name, os, customer, trial, version, nodeVersion }) {
   const windows = os === 'windows';
-  const start = windows ? 'Start Website.bat' : './start-website.sh';
+  const start = windows ? 'Start Website (with a window, for problems).bat' : './start-website.sh';
   return CRLF([
     ...(trial ? ['*** TRIAL BUILD, NO LICENCE KEYS ***', 'This website was made without the licence keys. It can never be licensed: it only shows the page "not available". It is for trying the start-up only.', 'Never give it to a customer.', ''] : []),
     `${name}: the website`,
@@ -632,17 +598,16 @@ export function readmeFor({ name, os, customer, trial, version, nodeVersion }) {
     '',
     'TO TRY IT (about 5 minutes)',
     windows ? '  1. Unpack the zip into a folder you may write to, for example C:\\NextGenOS-Website. Not into Program Files.' : '  1. Unpack the zip into your home folder (or any folder you may write to).',
-    `  2. ${windows ? 'Double-click "Start Website.bat". A window opens: leave it open while the website is in use.' : 'Open a terminal in the folder and type  ./start-website.sh  and press Enter. Leave the terminal open while the website is in use.'}`,
-    '  3. Open http://127.0.0.1:3000 in a web browser. Without a licence the website shows a page that says it is not available. That is correct.',
-    '  4. Open http://127.0.0.1:3000/admin/licence and type the licence key, or put the licence file (licence.ngos) in the folder "licence" and refresh.',
-    `  5. To stop the website, ${windows ? 'close the window' : 'close the terminal'} (or press Ctrl+C in it).`,
+    `  2. ${windows ? 'Double-click "Start Website" (the icon with the blue box). The website opens in a window of its own: there is no black terminal window. If Windows says "Windows protected your PC", click "More info", then "Run anyway".' : 'Run  ./start-website.sh --app  (once, in a terminal; the terminal can be closed at once). The website opens in a window of its own. To have it in the applications menu, run  ./start-website.sh --install-menu.'}`,
+    '  3. With no licence yet, the window shows the page where you type the licence key. Type the key you were given and press the button (or put the licence file, licence.ngos, in the folder "licence" and start again). The page is /admin/licence of the website: http://127.0.0.1:3000/admin/licence. Visitors to a website that has no licence see a page that says it is not available. That is correct.',
+    '  4. To stop the website, close its window. Starting it again while it is open only brings up the same window.',
     '',
     'TO PUT IT ONLINE (for the person who looks after the website\'s computer)',
     `  - Copy private-settings.example.env to private-settings.env and fill it in. Then start with  ${start}  again.`,
     '  - The website listens on this computer only. Put a web server with HTTPS (Caddy, nginx or IIS) in front of it, pointing at http://127.0.0.1:3000, and set NGOS_TRUST_PROXY=1 in private-settings.env.',
     `  - To start it on another port:  ${start} 8080.  To let other computers open it without a web server:  ${start} --public  (not safe on the open internet).`,
     '  - The licence is tied to the website\'s web address: open the website by that address (through the web server), not by 127.0.0.1.',
-    windows ? '  - To start it with the PC, make a shortcut to "Start Website.bat" in the Startup folder (Win+R, then shell:startup), or run it as a service with a tool such as NSSM.' : '  - To start it with the PC, run it from a systemd service or from cron with @reboot.',
+    windows ? '  - To keep it running all day without anyone opening a window, run it as a service (a tool such as NSSM can run node\\node.exe with start-website.js), or as a scheduled task at start-up. The "Start Website" icon is for opening it as a program on a laptop or counter PC.' : '  - To keep it running all day without anyone opening a window, run it from a systemd service (ExecStart=./node/bin/node start-website.js). ./start-website.sh --app is for opening it as a program on a laptop or counter PC.',
     '',
     'WHAT IS BUILT IN',
     '  The shop\'s name, address, country, kind of business and place are part of the website itself (see PACKAGE-INFO.json). To change them, ask NextGenOS for a new build of the website: they cannot be changed by editing a file in this folder.',
@@ -699,8 +664,15 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
 
   const name2 = settings.NEXT_PUBLIC_SITE_NAME || customer;
   writeFileSync(join(pkg, 'start-website.js'), LAUNCHER);
-  if (os === 'windows') writeFileSync(join(pkg, 'Start Website.bat'), START_BAT);
-  else writeFileSync(join(pkg, 'start-website.sh'), START_SH, { mode: 0o755 });
+  // The window code is one file for every program of ours (scripts/lib/app-window.mjs); the package carries it unchanged.
+  copyFileSync(join(here, 'lib', 'app-window.mjs'), join(pkg, 'app-window.mjs'));
+  if (os === 'windows') {
+    // "Start Website.exe" starts the website's own Node.js with no terminal window; the website then opens in a window of its own.
+    buildLauncher({ outFile: join(pkg, 'Start Website.exe'), name: 'Smart Retail POS website', program: 'node\\node.exe', args: 'start-website.js --app', check: 'start-website.js', icon: join(here, 'launcher', 'product.ico'), version: /^\d+\.\d+\.\d+/.exec(version)?.[0] ?? '1.0.0' });
+    writeFileSync(join(pkg, START_BAT_NAME), START_BAT);
+  } else {
+    writeFileSync(join(pkg, 'start-website.sh'), START_SH, { mode: 0o755 });
+  }
   writeFileSync(join(pkg, 'private-settings.example.env'), privateSettingsExample(os));
   writeFileSync(join(pkg, 'prerequisites.json'), JSON.stringify(prerequisitesFor(os, node.version), null, 2) + '\n');
   mkdirSync(join(pkg, 'licence'), { recursive: true });
@@ -718,7 +690,7 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
 
 /** What must be in a finished package. */
 export const requiredFiles = (os) => [
-  'start-website.js', os === 'windows' ? 'Start Website.bat' : 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json',
+  'start-website.js', 'app-window.mjs', os === 'windows' ? 'Start Website.exe' : 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json',
   os === 'windows' ? 'node/node.exe' : 'node/bin/node', 'node/LICENSE', 'app/server.js', 'app/package.json', 'app/.next/BUILD_ID', 'app/.next/static', 'app/public',
 ];
 

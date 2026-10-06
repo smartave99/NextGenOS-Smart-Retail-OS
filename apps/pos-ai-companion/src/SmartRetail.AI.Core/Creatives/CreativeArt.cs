@@ -374,8 +374,8 @@ namespace SmartRetail.AI.Creatives
             var products = request.Products.Where(p => p != null).ToList();
             if (products.Count > 0)
             {
-                prompt.Append("- Products to feature, each exactly as in its photo (the same shape, colours, labels and printed text; ")
-                    .Append("never invent a brand or change a label):\n");
+                prompt.Append("- Products to feature, each exactly as in its photo (the same shape, materials, colours, labels and printed text; ")
+                    .Append("never invent a brand, a label, a feature or an accessory, and never change a label):\n");
                 for (var i = 0; i < products.Count; i++)
                 {
                     var product = products[i];

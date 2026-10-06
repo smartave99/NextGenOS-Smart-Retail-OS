@@ -312,6 +312,21 @@ namespace SmartRetail.AI.Tests
             Assert.DoesNotContain("India", prompt); // no country unless the customer's profile names one
         }
 
+        [Fact]
+        public void A_product_is_shown_exactly_as_in_its_photo_and_nothing_about_it_is_invented()
+        {
+            var request = new CreativeArtRequest
+            {
+                FormatName = "Story", Width = 1080, Height = 1920,
+                Products = { new CreativeArtProduct { Name = "Sunflower oil", Photo = "oil.jpg" } },
+            };
+
+            var prompt = CreativeArtPrompt.CodexPrompt(request);
+
+            Assert.Contains("each exactly as in its photo (the same shape, materials, colours, labels and printed text;", prompt);
+            Assert.Contains("never invent a brand, a label, a feature or an accessory, and never change a label", prompt);
+        }
+
         private const string AudienceRule = " Let the people, the setting and the mood suit them. Do not write any words about them: the only words are the ones listed above, if any.";
 
         [Fact]

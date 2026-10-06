@@ -8,7 +8,7 @@ This is a **private, proprietary codebase** of NextGenOS (see [`LICENSE`](LICENS
 
 - [`SmartRetailAI/`](SmartRetailAI/README.md): the Windows app (WinForms on .NET Framework 4.8, showing the dashboard with WebView2), the AI Core library, the setup program and the release scripts.
 - [`SmartRetailPOS/`](SmartRetailPOS/README.md): the dashboard (a .NET 10 Blazor Server app), the owner's web page and the Supabase scripts.
-- [`AGENTS.md`](AGENTS.md): the working rules of the project in detail, for people and for coding assistants. Read the part about the area you change.
+- [`CLAUDE.md`](CLAUDE.md): the project's rules, the same for people and for every coding assistant ([`AGENTS.md`](AGENTS.md) only points to it); then [`docs/OPEN-WORK.md`](docs/OPEN-WORK.md), what is left and what only the owner can do.
 
 ## Build and test
 

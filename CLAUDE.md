@@ -84,3 +84,33 @@ Everything a person starts on a laptop, a counter PC or a device (the Setup Stud
 ## 9. Style
 
 Plain words for the people who use the product: shop owners, cashiers, salespeople. No jargon in screens or messages. Match the code around you. Say what changed in `CHANGELOG.md` when a release is cut.
+
+## 11. What the product is, and how a customer gets it
+
+- **The Setup Studio is the one tool NextGenOS staff use** (the "super installer"). A non-technical person opens it, starts a new project for a new company, fills in the company's details, and gets that customer's output: the installer pack for the shop program, the website and the Android app. Staff never use a terminal, GitHub, Node.js or a build tool to do this. Every new feature for staff goes into the Studio, in plain words (§9, §10).
+- **The Studio holds no source code and builds no program itself** (§3). Programs are built by the release workflow on GitHub from this repository, which holds the source. A customer's website and app have the customer's settings built into them, so they are built for that customer on GitHub, never on a staff PC. The Studio is where staff ask for them and where the results come back.
+- **Say only what is true.** Where the Studio cannot yet do a step by itself, `docs/SETUP-STUDIO.md` and `docs/OPEN-WORK.md` say so in plain words, and no screen, page or answer says the Studio does what it does not. Closing that gap is listed in `docs/OPEN-WORK.md` until it is done.
+- **A customer's identity and everything the customer sees is a setting** of that customer (§1, §8). The Studio, the brand kit and the licence carry it; program code never does.
+
+## 12. Releases
+
+- **Two kinds of release, one gate.** A **full release** (tag `v1.0.0`, or `v1.0.0-rc1` to try it first) is the shop program for Windows and Linux, the website, the Android app and the Studio, built with the owner's licence keys. A **Studio release** (tag `studio-v1.0.0`, or `studio-v1.0.0-rc1` first) is the Setup Studio alone; it needs no keys, because the Studio holds none. Both run the whole gate (`node scripts/verify-all.mjs --full`) first, and nothing is released if it fails. A **trial** (started from a branch by `.github/trial-release.json`) has no licence keys, says so on its face, and is never given to a customer.
+- **The licence signing key belongs to the owner alone.** No AI assistant, build job or cloud session creates, holds, sees or stores it: a cloud session is deleted when it is idle, and a lost key means every licence ever issued is lost. A full release needs only the owner's **public** keys and the Licence Studio's address (repository variables `NGOS_PUBLIC_KEYS` and `NGOS_LICENCE_URL`, shown with Copy buttons in the Licence Studio under Settings, "For a release build"). An assistant that needs them says so and hands the owner the exact steps.
+- **Every release page tells a person, in plain words, what to download and what to do with each file** (`scripts/make-release-notes.mjs`), what is not in it, and what was and was not verified. The owner and the team test from that page; they should never have to ask "what do I run?".
+- **`main` is the line of record and never lags behind.** When a piece of work is finished and its gate passes, it is merged into `main` (a pull request with a merge commit, history kept) so that `main` and the working branch are the same commit; do not leave finished work only on a side branch. Tags for real releases are made on `main`. The owner has asked for this more than once: it is a rule, not a favour.
+- **Nothing irreversible without the owner's word for that action:** no force-push, no rewriting of history, no deleting a release, tag or branch that the owner did not ask to be deleted. Secrets found in history are rotated first (§3).
+- After a release, say where its files are (the release page) and what each is; send the owner the files that fit in the conversation (§7).
+
+## 13. Working with the owner: every assistant and every person
+
+- **Do your whole part.** Do everything that can be done with the tools and access you have, without asking permission for what is plainly part of the task. For what you cannot do (it needs the owner's accounts, machines, money, signing key, or a real PC), write exactly what it is, why you cannot, and the click-by-click steps, in `docs/OPEN-WORK.md` under "Needs the owner", and say it in your answer. The owner does those parts. Never stall on them, never ask the owner to do something you can do, and never fake a step that needs the owner.
+- **The owner must never have to repeat a rule, a preference or a decision.** When the owner states one, write it into this file (or the guide it belongs to) in the same session, in plain words, and push it. A thing is not remembered until it is in the repository. Before you ask the owner a question, check this file, `docs/OPEN-WORK.md` and the guides: the answer may be there.
+- **Say what you are doing, and what you are waiting for.** If work takes more than a minute, say in a few words what you are doing; if you are waiting for something (a build, a person), say what and for how long. Answer "is it done?" with what is done, what is not, and what you are waiting for; use the words "complete", "done" or "ready" only as §2 allows.
+- **Plain words** in every message to the owner too (§9). Links, not bare numbers (a release, a pull request, a run).
+- **Keep `docs/OPEN-WORK.md` true.** Whenever you finish, find or put off a piece of work, update that file in the same commit. Before you answer "what is left?", read it, and check it against the repository.
+- **Work in parallel when the tools allow it** and the pieces are independent; if helpers fail (for example a usage limit), carry on yourself. Check a helper's result before you report it.
+- **Do not work around a refused action.** If a permission or policy refuses something, say so and say what the owner can do; never find another way to the same result.
+
+## 14. Everyone reads the same rules
+
+`CLAUDE.md` is the one set of rules, for people and for every AI assistant, in any session, on any machine. `AGENTS.md` (read by Codex, Copilot's agent, Cursor and others), `GEMINI.md`, `.github/copilot-instructions.md` and `.cursor/rules/project-rules.mdc` exist only to send a reader here; they hold no rules of their own, so there is nothing to keep in step. The gate (`scripts/checks/rules.mjs`) fails if one of them is missing or stops pointing here, if a numbered section of this file is lost, or if `docs/OPEN-WORK.md` is missing. A new assistant or a new member of staff starts by reading this file, then `docs/OPEN-WORK.md`.

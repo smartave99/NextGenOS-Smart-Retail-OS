@@ -37,6 +37,16 @@ If the Windows job stops with *"The licence keys are not built in yet"*, step 2 
 
 **Making the tag.** Pushing a tag needs permission to create tags. If your tools cannot push one, make it on GitHub: *Releases → Draft a new release → Choose a tag → type `v1.0.0-rc1` → Create new tag*, set **Target** to the branch `claude/happy-fermat-jv4lg8` (or `main` once merged), tick *Set as a pre-release*, and *Publish release*. Publishing makes the tag, and the workflow starts; it then adds its files to that release.
 
+## Release only the Setup Studio
+
+The Studio is what your staff use to set up a new company, so it can be released on its own, before the shop program, the website and the app. It holds **no licence keys**, so this needs nothing from the Licence Studio.
+
+1. Make a tag that names the Studio's own version: `studio-v1.0.0-rc1` to try it first, `studio-v1.0.0` after your team's tests pass. (The number must be the one in `tools/setup-studio/package.json`; the workflow refuses a tag that does not match, and says which two numbers differ.) On GitHub: Releases, Draft a new release, Choose a tag, type the name, target `main`, tick "Set as a pre-release" for `-rc1`, Publish.
+2. The workflow runs the whole gate, builds the Studio for Windows and for Linux, **opens the Windows one on a real Windows runner** (double-click, one copy, quit from its page), and publishes a page about the Studio only. If the gate fails, or the Studio is not built or not opened on Windows, nothing is published.
+3. Download the Studio for your system from the page and follow its steps: the first time it asks for an administrator name and password.
+
+To make a customer's installer pack the Studio needs the files of a **full release** (they carry the licence keys) in one folder: Settings, "The programs folder". A pack made from a trial release is marked as a trial and the Studio refuses it for a customer.
+
 ## Removing old trial pages
 
 Every trial leaves a page on the Releases list and a tag. When you no longer need old ones, the *Remove old trial releases* workflow (`.github/workflows/remove-trial-releases.yml`) takes them away. There are two ways to ask for it:
@@ -61,7 +71,7 @@ Tell me, or the person who supports you, **exactly** what you did and saw for an
 ## After the first release
 
 - **Rotate the old secrets** (OpenAI key, the Neon database password, Firebase secrets, the SQL Server `sa` password): they are still in the repository's history. See `docs/SECURITY-MODEL.md`, "Known limits".
-- **`main` still holds the old MIT licence file** until this branch is merged into it. Merge only when you are ready: from then on the proprietary licence applies to everything. (Copies that someone already received under MIT stay under it.)
+- **`main` now holds the proprietary licence** (the first pull request was merged into it): the proprietary licence applies to everything from there on. Copies that someone received earlier under the old MIT file stay under it.
 - Fill in the placeholders in `EULA.txt` (legal name and address, governing law) with your lawyer.
 - Have the tax rules of each country you sell in checked by a local tax adviser.
 - Test each make of printer you sell once, on a real Windows PC.

@@ -376,7 +376,8 @@ namespace SmartRetail.AI.Products
         }
 
         private const string KeepTheProduct =
-            " Keep the product exactly as it is in the photos: the same shape, proportions, colours, printed text, labels and logos."
+            " Keep the product exactly as it is in the photos: the same shape, proportions, materials, finish, colours, printed text, labels, logos"
+            + " and working parts (such as caps, buttons and handles). Do not redesign it, and do not invent features, finishes, branding, labels or accessories."
             + " Do not add, remove or change any text or logo on the product. No watermark, no border and no added text or graphics.";
 
         private static string LikeARealPhoto(PhotoShape shape) =>

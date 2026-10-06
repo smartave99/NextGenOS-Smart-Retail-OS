@@ -92,6 +92,8 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("pure white background (RGB 255, 255, 255)", call.StandardInput);
             Assert.Contains("filling about 85% of a square image", call.StandardInput);
             Assert.Contains("Keep the product exactly as it is", call.StandardInput);
+            Assert.Contains("do not invent features, finishes, branding, labels or accessories", call.StandardInput);
+            Assert.Contains("materials", call.StandardInput);
             Assert.Contains("as clean.png", call.StandardInput);
             Assert.Contains("answer with JSON only", call.StandardInput);
             Assert.True(call.Timeout >= CodexCliProvider.MinimumPhotoTimeout);

@@ -16,7 +16,7 @@ const FULL = [
   'smart-retail-pos-hub_1.0.0-1_amd64.deb', 'smart-retail-pos-hub_1.0.0-1_arm64.deb',
   'website-example-shop-windows.zip', 'website-example-shop-linux.zip',
   'SmartRetailPOS-example-shop-1.0.0.apk', 'SmartRetailPOS-example-shop-1.0.0.aab',
-  'NextGenOS-Setup-Studio-0.1.0-windows.zip', 'NextGenOS-Setup-Studio-0.1.0-linux.zip',
+  'NextGenOS-Setup-Studio-1.0.0-windows.zip', 'NextGenOS-Setup-Studio-1.0.0-linux.zip',
   'HOW-TO-TRY.txt', 'SHA256SUMS.txt', 'base-kit.json',
 ];
 
@@ -145,4 +145,76 @@ test('the real template has every place the program fills, and no other', () => 
   const used = new Set([...text.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]));
   for (const p of ['TRIAL_BANNER', 'VERSION', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT']) assert.ok(used.has(p), `${p} is in the template`);
   assert.equal(used.size, 7);
+});
+
+// ---- a release of the Setup Studio alone (a tag such as studio-v1.0.0) ----------------------------------------------------------------------
+const STUDIO_FILES = ['NextGenOS-Setup-Studio-1.0.0-windows.zip', 'NextGenOS-Setup-Studio-1.0.0-linux.zip', 'SHA256SUMS.txt'];
+const STUDIO_STATUS = 'Release gate: success (every check of scripts/verify-all.mjs --full)\nSetup Studio for staff: success\nSetup Studio opened on a Windows PC: success\n';
+
+function studioNotes(dir, args = []) {
+  const r = spawnSync(process.execPath, [script, '--dist', dir, '--commit', 'abc1234def', '--tag', 'studio-v1.0.0-rc1', '--only', 'studio', ...args], { encoding: 'utf8' });
+  return { status: r.status, out: r.stdout, err: r.stderr };
+}
+
+test('a Studio release page speaks only of the Studio: its steps, what it needs, no shop program, website or app', () => {
+  const dir = folder(STUDIO_FILES, { 'BUILD-STATUS.txt': STUDIO_STATUS });
+  try {
+    const { status, out } = studioNotes(dir);
+    assert.equal(status, 0);
+    assert.match(out, /^\*\*NextGenOS Setup Studio\*\*, version 1\.0\.0/);
+    assert.match(out, /never give it to a customer/);
+    assert.match(out, /\| The Setup Studio \(NextGenOS staff only\) \| `NextGenOS-Setup-Studio-1\.0\.0-linux\.zip`<br>`NextGenOS-Setup-Studio-1\.0\.0-windows\.zip` \|/);
+    assert.match(out, /double-click \*\*Setup Studio\*\*/);
+    assert.match(out, /There is no black terminal window/);
+    assert.match(out, /closing the window|close its window/i);
+    assert.match(out, /This release holds only the Studio/, 'it says where the programs for a customer come from');
+    assert.match(out, /full release/);
+    for (const other of [/The shop program on/, /The online shop \(website\)/, /The Android app/, /Download `SmartRetailPOS/, /sudo apt install/, /HOW-TO-TRY/, /licence key from the NextGenOS Licence Studio\. Nothing in this release works/]) {
+      assert.doesNotMatch(out, other, String(other));
+    }
+    assert.doesNotMatch(out, /### Not in this release/, 'the other parts are not expected in a Studio release, so they are not listed as missing');
+    assert.doesNotMatch(out, /TRIAL BUILD/);
+    assert.doesNotMatch(out, /\{\{|\}\}/);
+    assert.match(out, /Setup Studio opened on a Windows PC: success/);
+    assert.match(out, /Built from abc1234def/);
+    assert.doesNotMatch(out, /smart.?avenue/i);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a Studio release without its Linux file names only that file as missing', () => {
+  const dir = folder(STUDIO_FILES.filter((f) => !/linux/.test(f)), { 'BUILD-STATUS.txt': STUDIO_STATUS.replace('Setup Studio for staff: success', 'Setup Studio for staff: failure') });
+  try {
+    const { status, out } = studioNotes(dir);
+    assert.equal(status, 0);
+    assert.match(out, /### Not in this release/);
+    assert.match(out, /- \*\*The Setup Studio for Linux\.\*\* Status: Setup Studio for staff: failure/);
+    assert.doesNotMatch(out, /Setup Studio for Windows\.\*\*/);
+    assert.doesNotMatch(out, /shop program for/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the version on a Studio page is the Studio\'s own, even when the tag says something else is coming', () => {
+  const dir = folder(STUDIO_FILES, { 'BUILD-STATUS.txt': STUDIO_STATUS });
+  try {
+    assert.match(studioNotes(dir, ['--tag', 'studio-v1.0.0']).out, /version 1\.0\.0, part of/);
+    assert.match(studioNotes(dir, ['--version', '1.0.0']).out, /version 1\.0\.0, part of/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('only the Studio can be asked for alone', () => {
+  const dir = folder(STUDIO_FILES);
+  try {
+    const spawned = spawnSync(process.execPath, [script, '--dist', dir, '--commit', 'abc1234def', '--only', 'hub'], { encoding: 'utf8' });
+    const r = { status: spawned.status, err: spawned.stderr };
+    assert.equal(r.status, 1);
+    assert.match(r.err, /--only can be "studio", not "hub"/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the Studio template has every place the program fills, and no other', () => {
+  const text = readFileSync(join(repo, '.github', 'release-notes-studio.md'), 'utf8');
+  const used = new Set([...text.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]));
+  for (const p of ['VERSION', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT']) assert.ok(used.has(p), `${p} is in the template`);
+  assert.ok(!used.has('TRIAL_BANNER'), 'a Studio release is never a trial without keys: it holds no keys at all');
+  assert.equal(used.size, 6);
 });

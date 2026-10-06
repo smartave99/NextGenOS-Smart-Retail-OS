@@ -67,6 +67,12 @@ One folder and one zip, `<customer>-pack-release-<n>.zip`, saved in the Studio's
 | `4 - Android app` | If wanted: the customer's brand kit (what the release workflow reads) and the steps to build the app; or the signed app itself when you have added it to the programs folder. |
 | `PACK-CONTENTS.json` | Every file with its SHA-256 fingerprint, the release number, the programs' version, and who made the pack and when. |
 
+### What the Studio does today, and what it does not do yet
+
+Staff open the Studio, start a new project for a new company, fill in its details and make the customer's **pack**: the shop program's setup with the customer's profile beside it, the website's settings and steps, the app's brand kit and steps, and the hand-over sheet. The Studio never builds a program and holds no source code (`CLAUDE.md`, sections 3 and 11).
+
+**Not yet:** the customer's **website** and **Android app** are not made by a button in the Studio. They have the customer's settings built into them, so they are built on GitHub (below), by a person who can run the release workflow, and the finished files are then put in the programs folder. Making this one button for staff (the Studio asks GitHub to build, then brings the files back) is listed in `docs/OPEN-WORK.md`.
+
 ### The website, one build per customer
 
 The website's name, address, country and kind of business are compiled into its pages, so **each customer needs a website of their own**, and the file is named for them: `website-<customer>-<windows|linux>.zip`, where `<customer>` is the customer's short name in the Studio (the same name as their brand kit). The Studio only copies it (after checking its fingerprint in `base-kit.json`); it never builds one. Inside the zip: its own Node.js, the built server, the libraries it needs, the database engine and picture library **for that system**, `Start Website.bat` or `start-website.sh` (listens on this computer only, on port 3000 unless told otherwise), a plain `READ ME FIRST.txt`, `private-settings.example.env` (the list of the database address, passwords and keys that the person who puts it online must fill in; none of them is in the package) and `prerequisites.json`. It holds no source, no `.env`, no key, no database and no licence, and the licence check stays in force: with no licence it shows a plain "not available" page.

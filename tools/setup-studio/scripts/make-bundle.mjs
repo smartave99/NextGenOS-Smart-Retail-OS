@@ -2,7 +2,7 @@
 /**
  * Makes the Setup Studio as one folder (and one zip) a member of staff can unpack and double-click, on a computer with nothing installed: it carries its own Node.js.
  *
- *   node tools/setup-studio/scripts/make-bundle.mjs --os windows|linux|macos --version 0.1.0 [--out dist] (--node-runtime <folder> | --download-node 22.12.0)
+ *   node tools/setup-studio/scripts/make-bundle.mjs --os windows|linux|macos --version 1.0.0 [--out dist] (--node-runtime <folder> | --download-node 22.12.0)
  *
  *   --node-runtime  a folder with an official Node.js runtime of that system already unpacked (node.exe, or bin/node)
  *   --download-node fetches nodejs.org's own build of that version for that system, and checks it against nodejs.org's published SHA-256 list
@@ -29,7 +29,7 @@ const os = flag('--os');
 const version = flag('--version') ?? JSON.parse(readFileSync(join(studio, 'package.json'), 'utf8')).version;
 const out = resolve(flag('--out') ?? join(repo, 'dist'));
 if (!['windows', 'linux', 'macos'].includes(os ?? '')) { console.error('Say the system: --os windows|linux|macos'); process.exit(2); }
-if (!/^\d+\.\d+\.\d+$/.test(version)) { console.error('The version must be three numbers: --version 0.1.0'); process.exit(2); }
+if (!/^\d+\.\d+\.\d+$/.test(version)) { console.error('The version must be three numbers: --version 1.0.0'); process.exit(2); }
 
 const say = (m) => console.log(`\n== ${m}`);
 const run = (cmd, a, opts = {}) => {

@@ -39,7 +39,8 @@ const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 's
 const PREVIEW_CSP = "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
 /** Starts the Studio. Returns { server, url, token, close, state }. `folder` is the workspace folder (made at first use). */
-export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env } = {}) {
+export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null } = {}) {
+  const hooks = { beat: onBeat, quit: onQuit };
   const token = randomBytes(18).toString('base64url');
   const tokenBuf = Buffer.from(token);
   const state = { ws: Workspace.exists(folder) ? Workspace.open(folder) : null, folder, sessions: new Map(), aiRunning: new Set() };
@@ -75,6 +76,14 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   // ---- before sign-in ------------------------------------------------------------------------------------------------------------------
   const teamPublic = () => (state.ws ? state.ws.team().filter((m) => !m.disabled).map((m) => ({ id: m.id, name: m.name, role: m.role, initials: m.initials })) : []);
   route('GET', '/api/state', { open: true }, () => ({ initialised: !!state.ws, folder: state.folder, team: teamPublic(), roles: ROLES, version: JSON.parse(readFileSync(resolve(here, '..', 'package.json'), 'utf8')).version }));
+  // The page says it is still open (so a Studio that nobody is looking at can stop by itself), and the person can quit it from the page.
+  route('GET', '/api/alive', { open: true }, () => { hooks.beat?.(); return { ok: true }; });
+  route('POST', '/api/quit', { open: true, limit: 1000 }, () => {
+    if (!hooks.quit) throw new StudioError('This Studio is stopped by closing the window or the terminal it was started from.', 409);
+    if (state.aiRunning.size) throw new StudioError('The AI is still working on something. Wait until it has finished, then quit.', 409);
+    setTimeout(() => hooks.quit(), 200);
+    return { ok: true };
+  });
   route('POST', '/api/setup', { open: true, limit: 20_000 }, ({ body }) => {
     if (state.ws) throw new StudioError('This Studio is already set up. Sign in instead.', 409);
     const chosen = body.folder ? resolve(String(body.folder)) : state.folder;

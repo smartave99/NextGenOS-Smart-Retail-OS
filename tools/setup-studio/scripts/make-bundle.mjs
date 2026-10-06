@@ -78,9 +78,16 @@ try {
   mkdirSync(here2, { recursive: true });
   for (const f of ['studio.mjs', 'package.json', 'package-lock.json']) cpSync(join(studio, f), join(here2, f));
   for (const d of ['lib', 'ui']) cpSync(join(studio, d), join(here2, d), { recursive: true });
-  // The launchers sit at the top of the bundle; they start the Studio from its own folder, with the Node.js beside it.
-  writeFileSync(join(top, 'Setup Studio.bat'), '@echo off\r\nrem Opens the NextGenOS Setup Studio in your web browser. It carries its own Node.js.\r\ncd /d "%~dp0tools\\setup-studio"\r\n"node\\node.exe" studio.mjs serve --open\r\nif errorlevel 1 pause\r\n');
-  writeFileSync(join(top, 'setup-studio.sh'), '#!/bin/sh\n# Opens the NextGenOS Setup Studio in your web browser. It carries its own Node.js.\ncd "$(dirname "$0")/tools/setup-studio" || exit 1\nexec ./node/bin/node studio.mjs serve --open\n', { mode: 0o755 });
+  // The launchers sit at the top of the bundle; they start the Studio from its own folder, with the Node.js beside it, and show it in a window of its own (no terminal).
+  if (os === 'windows') {
+    // "Setup Studio.exe" is a small program with the Studio's icon that starts the Studio's Node.js with no console window. It is made here with NSIS (makensis).
+    const made = spawnSync('makensis', ['-V2', `-DOUTFILE=${join(top, 'Setup Studio.exe')}`, `-DICON=${join(studio, 'launcher', 'studio.ico')}`, `-DVERSION=${version}`, join(studio, 'launcher', 'SetupStudio.nsi')], { encoding: 'utf8' });
+    if (made.error || made.status !== 0) { console.error(`\nThe Windows launcher could not be made. It needs NSIS (makensis): on Linux, apt-get install nsis.\n${made.error?.message ?? ''}${(made.stdout || '').slice(-1500)}${(made.stderr || '').slice(-1500)}`); process.exit(1); }
+    cpSync(join(studio, 'launcher', 'Setup Studio (with a window, for problems).bat'), join(top, 'Setup Studio (with a window, for problems).bat'));
+  } else {
+    cpSync(join(studio, 'launcher', 'setup-studio.sh'), join(top, 'setup-studio.sh'));
+    chmodSync(join(top, 'setup-studio.sh'), 0o755);
+  }
   mkdirSync(join(tools, 'brand-studio', 'lib'), { recursive: true });
   cpSync(join(repo, 'tools', 'brand-studio', 'lib', 'kit.mjs'), join(tools, 'brand-studio', 'lib', 'kit.mjs'));
   say('Copying the packs and the Hub\'s style files (data)');
@@ -102,8 +109,11 @@ try {
   writeFileSync(join(top, 'READ ME FIRST.txt'), [
     'NextGenOS Setup Studio', '======================', '',
     'For NextGenOS staff only. Do not give this folder to a customer.', '',
-    os === 'windows' ? 'Double-click "Setup Studio.bat". A window opens (leave it open) and your web browser shows the Studio.' : 'Run ./setup-studio.sh. Your web browser shows the Studio.',
-    'The first time, make the administrator account. Close the window to stop the Studio.', '',
+    os === 'windows'
+      ? 'Double-click "Setup Studio" (the icon with the blue box). The Studio opens in a window of its own; there is no black terminal window.'
+      : 'Run ./setup-studio.sh (once, in a terminal; you can close the terminal at once). The Studio opens in a window of its own. To have it in the applications menu, run ./setup-studio.sh --install-menu.',
+    'The first time, make the administrator account. To stop the Studio, close its window or press the Quit button (the power icon, bottom left).',
+    os === 'windows' ? 'If Windows says "Windows protected your PC" (the program is not signed yet): click "More info", then "Run anyway". If something goes wrong, open "Setup Studio (with a window, for problems)" and read what it says.' : 'If something goes wrong, run ./setup-studio.sh --show and read what it says.', '',
     'It keeps its files in Documents/NextGenOS Setup Studio. Back them up from Settings.',
     'To make a customer\'s pack you also need the released programs: Settings, "The programs folder".', '',
   ].join('\r\n'));

@@ -535,6 +535,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Tool for the Windows launcher (build tool, never shipped)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q nsis
       - name: Make the bundles (the Studio, its packs, its one library and Node.js, checked against nodejs.org's fingerprint)
         run: |
           set -euo pipefail
@@ -548,9 +553,77 @@ jobs:
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
         run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
 
+  studio-windows:
+    name: Setup Studio opened on a Windows PC
+    needs: [gate, prepare, studio]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the Windows bundle of the Studio from the draft release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs download --release "${RELEASE_ID}" --out dl --match '^NextGenOS-Setup-Studio-.*-windows\.zip$'
+      - name: Open it the way a person does (double-click Setup Studio.exe), check it, open it again, quit it from its page
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Web
+          $zip = Get-ChildItem dl -Filter 'NextGenOS-Setup-Studio-*-windows.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'The Studio zip is not on the draft release.' }
+          Expand-Archive -Path $zip.FullName -DestinationPath studio
+          $top = Join-Path (Get-Location).Path 'studio\NextGenOS Setup Studio'
+          $exe = Join-Path $top 'Setup Studio.exe'
+          if (-not (Test-Path $exe)) { throw 'Setup Studio.exe is not in the zip.' }
+          $env:SETUP_STUDIO_WORKSPACE = Join-Path $env:RUNNER_TEMP 'studio-workspace'
+          $note = Join-Path (Join-Path $env:APPDATA 'NextGenOS Setup Studio') 'running.json'
+          Remove-Item $note -ErrorAction SilentlyContinue
+
+          # 1. Opened like a double-click: it must start, answer, and run from its own folder with its own Node.js.
+          Start-Process -FilePath $exe | Out-Null
+          for ($i = 0; $i -lt 90 -and -not (Test-Path $note); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $note)) { throw 'The Studio did not start within 90 seconds.' }
+          $info = Get-Content $note -Raw | ConvertFrom-Json
+          $uri = [Uri]$info.url
+          $key = [System.Web.HttpUtility]::ParseQueryString($uri.Query)['k']
+          $base = "$($uri.Scheme)://$($uri.Authority)"
+          $headers = @{ 'x-studio-key' = $key }
+          $state = Invoke-RestMethod -Uri "$base/api/state" -Headers $headers
+          Write-Host "The Studio answers: version $($state.version), set up: $($state.initialised)"
+          $program = Get-CimInstance Win32_Process -Filter "ProcessId = $($info.pid)"
+          Write-Host $program.CommandLine
+          if ($program.CommandLine -notlike '*studio.mjs serve --app*' -or $program.ExecutablePath -notlike "$top*") { throw 'The Studio is not running from its own folder with its own Node.js.' }
+
+          # 2. A window of its own was opened for it (Edge, in app mode: no address bar).
+          $window = $null
+          for ($i = 0; $i -lt 30 -and -not $window; $i++) {
+            $window = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like "*--app=$($info.url)*" } | Select-Object -First 1
+            if (-not $window) { Start-Sleep -Seconds 1 }
+          }
+          if (-not $window) { throw 'No app window was opened for the Studio.' }
+          Write-Host 'An Edge app window is open for it.'
+
+          # 3. Opened a second time: there is still one Studio.
+          Start-Process -FilePath $exe | Out-Null
+          Start-Sleep -Seconds 15
+          $running = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*studio.mjs serve*' })
+          if ($running.Count -ne 1) { throw "There are $($running.Count) Studios running; there must be one." }
+
+          # 4. Quit from its page: it stops and says so.
+          Invoke-RestMethod -Method Post -Uri "$base/api/quit" -Headers $headers -ContentType 'application/json' -Body '{}' | Out-Null
+          for ($i = 0; $i -lt 30 -and (Get-Process -Id $info.pid -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+          if (Get-Process -Id $info.pid -ErrorAction SilentlyContinue) { throw 'The Studio did not stop when asked to quit.' }
+          if (Test-Path $note) { throw 'The note that the Studio is running was not removed.' }
+          Write-Host 'The Setup Studio opened in a window of its own, ran once, and quit when asked.'
+
   publish:
     name: Publish the GitHub Release
-    needs: [gate, prepare, android, windows-build, windows, linux, studio, website]
+    needs: [gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website]
     # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
     if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
@@ -571,6 +644,7 @@ jobs:
           WINDOWS: ${{ needs.windows.result }}
           LINUX: ${{ needs.linux.result }}
           STUDIO: ${{ needs.studio.result }}
+          STUDIO_WINDOWS: ${{ needs.studio-windows.result }}
           WEBSITE: ${{ needs.website.result }}
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
@@ -582,6 +656,7 @@ jobs:
             echo "Linux packages for the Business Hub: ${LINUX}"
             echo "Android app: ${ANDROID}"
             echo "Setup Studio for staff: ${STUDIO}"
+            echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
             echo "Website for the customer (Linux and Windows): ${WEBSITE}"
           } > dist/BUILD-STATUS.txt
           cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt

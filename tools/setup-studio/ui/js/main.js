@@ -68,10 +68,27 @@ function frame() {
   mount(app.root, h('div', { class: 'frame' },
     h('aside', { class: 'sidebar' }, h('div', { class: 'logo' }, h('div', { class: 'logo-mark' }, icon('package')), h('div', {}, h('b', {}, 'Setup Studio'), h('span', {}, 'NextGenOS'))), nav,
       h('div', { class: 'side-foot' }, h('div', { class: 'avatar' }, me.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()), h('div', { class: 'who grow' }, h('b', {}, me.name), h('span', {}, ROLE_WORDS[me.role] ?? me.role)),
-        h('button', { class: 'btn quiet small', id: 'signout', type: 'button', title: 'Sign out', onclick: signOut }, icon('lock', 's')))),
+        h('button', { class: 'btn quiet small', id: 'signout', type: 'button', title: 'Sign out', onclick: signOut }, icon('lock', 's')),
+        h('button', { class: 'btn quiet small', id: 'quit', type: 'button', title: 'Quit the Studio', onclick: quit }, icon('power', 's')))),
     app.content));
 }
 async function signOut() { try { await post('/api/signout'); } catch { /* already out */ } setSession(''); await start(); }
+
+// ---------- the Studio is a program on this PC: say so when it has stopped, and let the person quit it ----------
+let stoppedShown = false;
+function stopped(text = 'The Studio is not running any more. You can close this window. To use it again, open it from its icon.') {
+  if (stoppedShown) return;
+  stoppedShown = true;
+  mount(app.root, h('div', { class: 'auth' }, h('div', { class: 'auth-card view', id: 'stopped' }, mark(), h('h1', {}, 'The Studio has stopped'), h('p', { class: 'lead' }, text))));
+}
+async function quit() {
+  try { await post('/api/quit'); stopped('The Studio is closed. You can close this window.'); } catch (e) { toast(e.message); }
+}
+let misses = 0;
+setInterval(async () => {
+  if (stoppedShown) return;
+  try { await get('/api/alive'); misses = 0; } catch (e) { if (e instanceof ApiError && e.code === 'offline') { misses += 1; if (misses >= 2) stopped(); } }
+}, 15000);
 
 let token = 0;
 async function route() {

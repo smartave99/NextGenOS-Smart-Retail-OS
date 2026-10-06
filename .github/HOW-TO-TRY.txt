@@ -20,8 +20,9 @@ page and nothing more. Never give a trial to a customer.
 PART A: the Studio (about 15 minutes)
 -------------------------------------
 1. Download every file of the release into ONE folder (for example C:\release). Unzip the Studio zip somewhere else.
-2. Double-click "Setup Studio.bat" in the folder "NextGenOS Setup Studio" (Linux: ./setup-studio.sh). A window opens (leave it open) and your browser shows the Studio.
-   Windows may warn about an unknown publisher: "More info", then "Run anyway".
+2. In the folder "NextGenOS Setup Studio", double-click "Setup Studio" (the icon with the blue box; Linux: ./setup-studio.sh). The Studio opens in a window of its own:
+   there should be NO black terminal window. Windows may say "Windows protected your PC" (the program is not signed yet): "More info", then "Run anyway".
+   Check: open it a second time while it is open (it should only bring up the same window); close the window (the Studio should be gone: the Task Manager shows no node.exe).
 3. Make the administrator account (a name and a password of at least 8 characters). In Settings add a salesperson and a reviewer.
 4. Sign in as the salesperson. Add a customer (three questions), fill in the details, choose a look and a machine. Watch the picture of the program change.
 5. Prepare the setup and send it for approval. Sign in as the reviewer and approve it. (The person who prepared it cannot approve it: try.)

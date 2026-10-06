@@ -45,8 +45,11 @@ test('a full release: every program has its steps, with the real file names', ()
     assert.match(out, /sudo apt install \.\/smart-retail-pos-hub_1\.0\.0-1_amd64\.deb/);
     assert.match(out, /Start Website\.bat/);
     assert.match(out, /\.\/start-website\.sh/);
-    assert.match(out, /Setup Studio\.bat/);
+    assert.match(out, /double-click \*\*Setup Studio\*\*/);
+    assert.doesNotMatch(out, /Setup Studio\.bat/, 'the Studio opens from its icon, not from a script that shows a terminal');
+    assert.match(out, /There is no black terminal window/);
     assert.match(out, /\.\/setup-studio\.sh/);
+    assert.match(out, /--install-menu/);
     assert.match(out, /http:\/\/127\.0\.0\.1:5280/);
     assert.match(out, /unknown publisher/, 'an unsigned setup warns about the warning Windows will show');
     assert.match(out, /one-off TEST key/);

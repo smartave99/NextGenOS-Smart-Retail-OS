@@ -8,11 +8,18 @@ The Setup Studio turns what you learn about a customer (their business, country,
 
 | Where | How |
 |---|---|
-| Windows | Double-click `Setup Studio.bat` |
-| Linux or macOS | Run `./setup-studio.sh` |
-| From the repository | `node tools/setup-studio/studio.mjs serve --open` |
+| Windows | Double-click **Setup Studio** (the icon with the blue box) in the unpacked folder. If something goes wrong, open `Setup Studio (with a window, for problems)` and read what it says. |
+| Linux | Run `./setup-studio.sh` once (the terminal can be closed at once). `./setup-studio.sh --install-menu` puts "NextGenOS Setup Studio" in the applications menu; `./setup-studio.sh --show` runs it in the terminal for finding a problem. |
+| From the repository | `node tools/setup-studio/studio.mjs serve --app` (a window of its own) or `serve --open` (in this terminal, and a tab in your usual browser) |
 
-It opens a page in your web browser. The page is served by a small program **on your own PC only** (`127.0.0.1`); the address holds a secret that is new every time the Studio starts, so nothing else on the PC or the network can use it. Close the window and the Studio stops.
+**It opens as a program of its own: a window with no address bar and no black terminal window behind it.** The window is the PC's own Edge (every Windows 10 and 11 has it), or Chrome or Chromium on Linux, opened in "app" mode with a profile of its own, so it never touches your own browsing. On a PC with none of these it opens in your usual browser, as a tab.
+
+- **One Studio at a time.** Opening it again while it is open brings up its window; it never starts a second Studio on the same files.
+- **To stop it:** close its window, or press the power button at the bottom left of the Studio. A Studio that nobody has had open for ten minutes stops by itself (a sleeping PC is not counted). The page says plainly when the Studio has stopped.
+- **A problem at start-up** is written in a note, `Setup Studio problem.txt`, which opens by itself (there is no terminal to show it).
+- Staff who want a particular browser can set `SETUP_STUDIO_BROWSER` to its full path (it must be a Chromium-based one).
+
+The page is served by a small program **on your own PC only** (`127.0.0.1`); the address holds a secret that is new every time the Studio starts, so nothing else on the PC or the network can use it.
 
 The first time, it asks you to make the administrator account. The Studio keeps its files in `Documents/NextGenOS Setup Studio` (`node tools/setup-studio/studio.mjs where` tells you). **Back it up** from Settings; the backup is one zip of everything that cannot be made again.
 

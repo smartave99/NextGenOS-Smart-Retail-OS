@@ -141,12 +141,14 @@ function startHere(files, ctx) {
       '#### For NextGenOS staff only: the Setup Studio',
       `Download ${studios.map((s) => code(s.name) + (s.os === 'windows' ? ' (Windows)' : ' (Linux)')).join(' or ')}. **Never give it to a customer.**`,
       '1. Unzip it, and open the folder "NextGenOS Setup Studio" inside.',
-      `2. ${[win ? `Windows: double-click ${code('Setup Studio.bat')}` : '', lin ? `Linux: type ${code('./setup-studio.sh')} in a terminal in the folder` : ''].filter(Boolean).join('. ')}. Leave the window open; your web browser shows the Studio.`,
+      `2. ${[win ? 'Windows: double-click **Setup Studio** (the icon with the blue box)' : '', lin ? `Linux: type ${code('./setup-studio.sh')} in a terminal in that folder (the terminal can be closed at once; ${code('./setup-studio.sh --install-menu')} puts the Studio in the applications menu)` : ''].filter(Boolean).join('. ')}. The Studio opens in a window of its own. There is no black terminal window.`,
+      win ? '   Windows may say "Windows protected your PC", because the program is not signed yet. Click **More info**, then **Run anyway**.' : '',
       '3. The first time, make the administrator account (a name and a password of at least 8 characters).',
-      '4. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
-      `5. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.`,
+      '4. To stop the Studio, close its window, or press the power button at the bottom left of the Studio. Opening it again while it is open just brings up its window.',
+      '5. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
+      `6. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.`,
     ];
-    sections.push(lines);
+    sections.push(lines.filter((l) => l !== ''));
   }
 
   if (files.some((f) => f.name === 'SHA256SUMS.txt')) {

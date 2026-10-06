@@ -35,7 +35,7 @@ const PATHS = {
   upload: '<path d="M12 16V5M7.5 9.5 12 5l4.5 4.5"/><path d="M5 15v3.5h14V15"/>', download: '<path d="M12 5v11M7.5 11.5 12 16l4.5-4.5"/><path d="M5 18.5h14"/>',
   trash: '<path d="M5 7h14M10 7V5h4v2M7 7l.8 12h8.4L17 7"/>', print: '<path d="M7 9V4h10v5M7 17H4.5v-6.5h15V17H17"/><path d="M7 14h10v6H7z"/>',
   refresh: '<path d="M19 8a7.5 7.5 0 0 0-13.5 1.5M5 16a7.5 7.5 0 0 0 13.5-1.5"/><path d="M19 4v4h-4M5 20v-4h4"/>', warn: '<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5M12 17.2v.1"/>',
-  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.1"/>', lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.1"/>', lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>', power: '<path d="M12 3.5v8"/><path d="M7.2 6.6a7.5 7.5 0 1 0 9.6 0"/>',
   laptop: '<rect x="5" y="5.5" width="14" height="9.5" rx="1.6"/><path d="M3 19h18"/>', tablet: '<rect x="6" y="3.5" width="12" height="17" rx="2"/><path d="M11 17.5h2"/>',
   till: '<rect x="4" y="4.5" width="16" height="11" rx="1.8"/><path d="M8 20h8M12 15.5V20"/>', kiosk: '<rect x="7" y="3" width="10" height="14" rx="1.8"/><path d="M9 21h6M12 17v4"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5S9.5 6 12 3.5z"/>',

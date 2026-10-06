@@ -185,12 +185,15 @@ namespace SmartRetail.AI.Tests
             Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // And so is the staff bundle of the Setup Studio.
             Assert.Matches(@"(?m)^  studio:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            // Its Windows bundle is then opened on a real Windows PC the way a person opens it (the program with no terminal window, one Studio, quit from its page).
+            Assert.Matches(@"(?m)^  studio-windows:\s*\n(    .*\n)*?    needs: \[gate, prepare, studio\]\s*\n(    .*\n)*?    runs-on: windows-latest\s*\n", workflow);
+            Assert.Contains("Setup Studio.exe", workflow);
             // And so is the website of the customer, on Linux and on Windows (each system builds its own, with its own native parts, then starts it from the zip).
             Assert.Matches(@"(?m)^  website:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             Assert.Contains("node scripts/make-website-package.mjs", workflow);
             Assert.Contains("node scripts/smoke-website.mjs", workflow);
             Assert.Contains("--node-app", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, website\]\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website\]\s*\n", workflow);
             // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
             // The draft and the tag are made at the very start, beside the gate (GitHub lets the token make them only at the newest commit of the branch), and taken away when the gate fails.
             var prepare = System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  prepare:\s*\n(.*?)^  cleanup:").Groups[1].Value;

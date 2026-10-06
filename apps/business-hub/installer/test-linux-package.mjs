@@ -61,7 +61,9 @@ try {
   installed = true;
   check('dpkg installs it (with no systemd running, as in a container, the scripts still finish)', dpkg.status === 0, dpkg.stdout + dpkg.stderr);
   if (dpkg.status !== 0) throw new Error('not installed');
-  const stat = (p, f) => quiet('stat', ['-c', f, p]).stdout.trim();
+  // The shop's data folders are closed to everyone but the Hub's account, so on a machine where this check does not run as root (GitHub's runner) only root can look inside them.
+  const stat = (p, f) => sudo('stat', ['-c', f, p]).stdout.trim();
+  const exists = (p) => sudo('test', ['-e', p]).status === 0;
   check('the Hub has its own account that cannot sign in', /nologin/.test(quiet('getent', ['passwd', 'nextgenos']).stdout));
   check('the shop data folder belongs to that account and is closed to everyone else (0750)', stat('/var/lib/nextgenos/hub', '%U %a') === 'nextgenos 750', stat('/var/lib/nextgenos/hub', '%U %a'));
   check('the program folder belongs to root', stat('/opt/nextgenos/smart-retail-hub/NextGenOS.Hub', '%U %a') === 'root 755', stat('/opt/nextgenos/smart-retail-hub/NextGenOS.Hub', '%U %a'));
@@ -130,13 +132,15 @@ try {
   const purge = sudo('dpkg', ['-P', 'smart-retail-pos-hub', 'smart-retail-profile-luzon-fresh-mart']);
   check('purging both works', purge.status === 0, purge.stdout + purge.stderr);
   check('the profile files and the full screen start-up are gone', !existsSync(`${dir}/theme.json`) && !existsSync('/etc/xdg/autostart/smart-retail-pos-fullscreen.desktop'));
-  check('the shop\'s data is still there, even after a purge', existsSync('/var/lib/nextgenos/hub/keep-me.txt'));
+  check('the shop\'s data is still there, even after a purge', exists('/var/lib/nextgenos/hub/keep-me.txt'));
   installed = false;
 } catch (e) {
   if (!['no package', 'not installed'].includes(e.message)) { console.error(String(e.stack || e)); failures += 1; }
 } finally {
   // Put this machine back as it was: only what this check made.
   if (installed) { sudo('dpkg', ['-P', 'smart-retail-pos-hub']); sudo('dpkg', ['-P', 'smart-retail-profile-luzon-fresh-mart']); }
+  sudo('systemctl', ['stop', 'nextgenos-hub.service']);
+  sudo('pkill', ['-u', 'nextgenos']);
   sudo('userdel', ['nextgenos']);
   sudo('groupdel', ['nextgenos']);
   sudo('rm', ['-rf', '--', '/var/lib/nextgenos']);

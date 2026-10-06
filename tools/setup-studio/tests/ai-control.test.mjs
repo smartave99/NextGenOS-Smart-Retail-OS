@@ -141,7 +141,24 @@ test('models of OpenAI-compatible services and Gemini come live from the service
     assert.equal(down.models.length, 0);
     assert.match(down.note, /could not be read/);
   } finally { delete process.env.OPENAI_API_KEY; delete process.env.GEMINI_API_KEY; await oa.close(); await gm.close(); }
-  assert.match((await listModels('antigravity', {})).note, /does not publish a model list/);
+  {
+    // Antigravity: no tool on this PC says so; with a tool, its own list is read from "agy models" and headings are not taken for models; a tool that fails gives no list.
+    const t = tools();
+    try {
+      assert.match((await onPath(t.dir, () => listModels('antigravity', {}), { only: true })).note, /not on this PC/);
+      t.make('agy', `if(process.argv[2]==='models'){console.log('Available models:\\n  gemini-3.5-pro  (most capable)\\n- gemini-3.5-flash\\n\\n* gemini-3.5-pro\\nusage: agy models')}`);
+      const a = await onPath(t.dir, () => listModels('antigravity', {}));
+      assert.deepEqual(a.models.map((m) => m.id), ['gemini-3.5-pro', 'gemini-3.5-flash']);
+      assert.equal(a.models[0].label, 'gemini-3.5-pro: most capable');
+      assert.deepEqual(a.models[0].efforts.map((e) => e.id), ['low', 'medium', 'high']);
+      assert.equal(a.source, 'tool');
+      t.make('agy', `process.stderr.write('unknown command'); process.exit(2)`);
+      const bad = await onPath(t.dir, () => listModels('antigravity', {}));
+      assert.equal(bad.models.length, 0);
+      assert.match(bad.note, /could not be read/);
+      assert.deepEqual(bad.defaultEfforts.map((e) => e.id), ['low', 'medium', 'high']);
+    } finally { t.done(); }
+  }
   assert.equal((await listModels('generic-cli', {})).models.length, 0);
 });
 

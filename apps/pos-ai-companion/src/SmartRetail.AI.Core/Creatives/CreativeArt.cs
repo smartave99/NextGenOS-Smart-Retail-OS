@@ -1,4 +1,5 @@
 using System;
+using SmartRetail.AI.Settings;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -35,6 +36,9 @@ namespace SmartRetail.AI.Creatives
         public const int MaxProducts = 4;
 
         public const int MaxReferences = 2;
+
+        /// <summary>The customer's business (from its profile): the creative is made for it, in its country. Neutral when not given.</summary>
+        public ShopProfile Shop { get; set; } = ShopProfile.Neutral;
 
         /// <summary>E.g. "Square post".</summary>
         public string FormatName { get; set; } = "";
@@ -311,7 +315,7 @@ namespace SmartRetail.AI.Creatives
 
             var prompt = new StringBuilder();
             var shop = CreativeWords.Tidy(request.ShopName);
-            prompt.Append("You are the designer of an advertising creative for a small shop in India")
+            prompt.Append("You are the designer of an advertising creative for " + (request.Shop ?? ShopProfile.Neutral).Shop)
                 .Append(shop.Length > 0 ? ", " + shop : "").Append(".\n");
             if (request.IsRevision)
             {

@@ -51,6 +51,7 @@ builder.Services.AddSingleton<UpdateStatusService>();
 builder.Services.AddSingleton<WhatsNewService>();
 builder.Services.Configure<CodexUpdateOptions>(builder.Configuration.GetSection(CodexUpdateOptions.SectionName));
 builder.Services.AddSingleton<CodexUpdateService>();
+builder.Services.AddSingleton<AiToolService>();
 builder.Services.AddLicensedWorker<CodexUpdateWorker>();
 builder.Services.AddSingleton<ProductPhotoService>();
 // Finding a product with the camera: barcodes always, and its look once turned on (DINOv2, on this PC).

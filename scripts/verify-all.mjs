@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SECRET_PATTERNS, SECRET_ALLOW } from './lib/secret-patterns.mjs';
+import { SECRET_PATTERNS, SECRET_ALLOW, SECRET_SKIP_PATH } from './lib/secret-patterns.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -38,7 +38,6 @@ const read = (f) => { try { return readFileSync(join(root, f), 'utf8'); } catch 
 // Checks. Each returns { status: 'PASS' | 'FAIL' | 'SKIP', detail }.
 // ---------------------------------------------------------------------------------------------------------------------
 
-const SECRET_SKIP_PATH = /^(licenses\/|.*package-lock\.json$|.*\.min\.js$|apps\/pos-dashboard-service\/owner-app\/vendor\/|apps\/storefront-web-mobile\/android\/gradle)/;
 
 function checkSecrets() {
   const hits = [];
@@ -54,7 +53,23 @@ function checkSecrets() {
       }
     });
   }
-  return hits.length ? { status: 'FAIL', detail: `${hits.length} possible secret(s):\n  ` + hits.slice(0, 40).join('\n  ') + (hits.length > 40 ? `\n  ... and ${hits.length - 40} more` : '') } : { status: 'PASS', detail: 'no secret patterns in tracked or new files' };
+  // A secret that was committed and later deleted is still a leak: it stays in the history. Look at every commit this one is built on.
+  const h = sh('node', [join(root, 'scripts', 'scan-history.mjs'), '--json']);
+  let history = null;
+  try { history = JSON.parse(h.stdout); } catch { /* reported below */ }
+  if (!history) return { status: 'FAIL', detail: `the history scan did not run:\n${tail(h)}` };
+  if (history.shallow && full) return { status: 'FAIL', detail: 'this copy of the repository has only part of its history, so the history could not be checked (fetch all of it: git fetch --unshallow)' };
+  // Places in the old history that are known and declared (scripts/known-history-secrets.json): the list may only shrink.
+  const known = JSON.parse(read('scripts/known-history-secrets.json') || '{"entries":[]}').entries;
+  const key = (x) => `${x.commit}|${x.file}|${x.kind}`;
+  const knownKeys = new Set(known.map(key));
+  const seen = new Set(history.hits.map(key));
+  for (const x of history.hits) if (!knownKeys.has(key(x))) hits.push(`history, commit ${x.commit}: ${x.file}  ${x.kind}  (NEW: not on the declared list)`);
+  const stale = history.shallow ? [] : known.filter((x) => !seen.has(key(x)));
+  if (stale.length) return { status: 'FAIL', detail: `${stale.length} place(s) on scripts/known-history-secrets.json are no longer in the history (it was cleaned): remove them from that list:\n  ` + stale.slice(0, 20).map((x) => `${x.commit} ${x.file}`).join('\n  ') };
+  const where = history.shallow ? 'tracked and new files (history not available here)' : `tracked and new files, and ${history.commits} commit(s) of history`;
+  const old = history.hits.length - hits.filter((h) => h.startsWith('history')).length;
+  return hits.length ? { status: 'FAIL', detail: `${hits.length} possible secret(s):\n  ` + hits.slice(0, 40).join('\n  ') + (hits.length > 40 ? `\n  ... and ${hits.length - 40} more` : '') } : { status: 'PASS', detail: `no new secret pattern in ${where}${old ? `; ${old} place(s) in the OLD history are known and declared (scripts/known-history-secrets.json) and their secrets must be rotated` : ''}` };
 }
 
 const BYPASS_PATTERNS = [
@@ -80,7 +95,7 @@ function checkBypass() {
 
 // Smart Avenue 99 is a customer. Its identity may live only in brand kits, documentation of that customer, and the (separate) decompiled POS source.
 // Internal names of the legacy POS source (assembly, exe, solution paths): renaming them needs a Windows build machine to regression-test.
-const IDENTITY_ALLOW = /^(SmartRetailSuite\.sln|scripts\/build-all\.ps1|apps\/pos-desktop\/|brand-kits\/|docs\/|CLAUDE\.md|CHANGELOG\.md|scripts\/verify-all\.mjs|apps\/pos-desktop\/(Source|Documentation)\/|licenses\/|.*package-lock\.json$|apps\/storefront-web-mobile\/(tmp\/|.*\.resolved$|build_log|test-output|compare-output|verification_result))/;
+const IDENTITY_ALLOW = /^(SmartRetailSuite\.sln|scripts\/build-all\.ps1|apps\/pos-desktop\/|brand-kits\/|docs\/|CLAUDE\.md|CHANGELOG\.md|scripts\/verify-all\.mjs|scripts\/known-history-secrets\.json|apps\/pos-desktop\/(Source|Documentation)\/|licenses\/|.*package-lock\.json$|apps\/storefront-web-mobile\/(tmp\/|.*\.resolved$|build_log|test-output|compare-output|verification_result))/;
 function checkIdentity() {
   const hits = [];
   for (const f of repoFiles()) {

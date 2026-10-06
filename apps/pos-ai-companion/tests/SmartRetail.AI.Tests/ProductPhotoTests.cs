@@ -71,7 +71,7 @@ namespace SmartRetail.AI.Tests
             Assert.Equal(TimeSpan.FromSeconds(42), result.Duration);
             Assert.Equal("a pink plastic water bottle with a flip-top lid", result.Understanding.WhatItIs);
             Assert.Equal(new[] { "pink", "white" }, result.Understanding.Colours);
-            Assert.Equal("पानी की बोतल", result.Understanding.HindiName);
+            Assert.Equal("पानी की बोतल", result.Understanding.LocalName); // an answer that still says hindi_name is read
             Assert.Equal("a sunny office desk beside a laptop", result.Understanding.UseCaseScene);
             Assert.Equal("a woman in her early 30s", result.Understanding.ModelPerson);
             Assert.Contains("photo 1 of 5: White background", Assert.Single(messages));
@@ -104,6 +104,7 @@ namespace SmartRetail.AI.Tests
             _runner.Handler = MakesPhoto();
             var request = Request(_temp.File("front.jpg", "front"));
             request.Kind = PhotoKind.EuropeanModel;
+            _settings.Shop = Shops.Philippines;
             request.CataloguePhoto = _temp.File("white-20260924-100000.png", "white");
             request.Understanding = ProductUnderstanding.Parse(Answer);
 
@@ -117,8 +118,9 @@ namespace SmartRetail.AI.Tests
             var prompt = call.StandardInput;
             Assert.Contains("The first attached photo is a catalogue photo of it made earlier", prompt);
             Assert.Contains("It is a pink plastic water bottle with a flip-top lid.", prompt);
-            Assert.Contains("This is photo 3 of 5: European model.", prompt);
-            Assert.Contains("one model, a woman in her early 30s (European), using or holding the product in a sunny office desk beside a laptop", prompt);
+            Assert.Contains("This is photo 3 of 5: Filipino model.", prompt);
+            Assert.Contains("You are making product photos for a small shop in the Philippines,", prompt);
+            Assert.Contains("one model, a woman in her early 30s (Filipino, in her late twenties), using or holding the product in a sunny office desk beside a laptop", prompt);
             Assert.Contains("answer with one short sentence", prompt);
         }
 
@@ -161,8 +163,8 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("no faces", inUse);
             Assert.Contains("must look like a real photograph", inUse);
 
-            Assert.Contains("(Indian, with a fair complexion)", ProductPhotoPrompt.ImageInstructions(PhotoKind.IndianModel, seen));
-            Assert.Contains("(East Asian)", ProductPhotoPrompt.ImageInstructions(PhotoKind.EastAsianModel, seen));
+            Assert.Contains("(Chinese-Filipino)", ProductPhotoPrompt.ImageInstructions(PhotoKind.IndianModel, seen, null, Shops.Philippines));
+            Assert.Contains("(Visayan, in his forties)", ProductPhotoPrompt.ImageInstructions(PhotoKind.EastAsianModel, seen, null, Shops.Philippines));
             foreach (var kind in PhotoKinds.All.Where(k => k.IsModel()))
             {
                 var text = ProductPhotoPrompt.ImageInstructions(kind, seen);
@@ -175,7 +177,8 @@ namespace SmartRetail.AI.Tests
             // Without a description yet, the AI chooses the person and the place from the product.
             var unknown = ProductPhotoPrompt.ImageInstructions(PhotoKind.EuropeanModel);
             Assert.Contains("an adult whose gender and age suit the product's typical buyer or user", unknown);
-            Assert.Contains("the most typical real-world place for this product in India", unknown);
+            Assert.Contains("the most typical real-world place for this product, at home, at work or outdoors", unknown); // no country is assumed
+            Assert.Contains("the most typical real-world place for this product in the Philippines, at home", ProductPhotoPrompt.ImageInstructions(PhotoKind.EuropeanModel, null, null, Shops.Philippines));
             Assert.Equal(new[] { 1, 2, 3, 4, 5 }, PhotoKinds.All.Select(k => k.Number()));
             Assert.Equal(new[] { "white", "in-use", "european-model", "indian-model", "east-asian-model" }, PhotoKinds.All.Select(k => k.FilePrefix()));
         }

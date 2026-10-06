@@ -94,6 +94,10 @@ The assistant talks to AI through **command-line tools installed on the PC** (pr
 
 **Model names** can be changed in Settings. Leave a CLI model empty to use the tool's own default.
 
+**Every model and every thinking level, for each tool.** Codex's list is Codex's own. For **Claude Code** the list is Anthropic's, read live with the shop's Anthropic key (each model with the thinking levels it takes: `low` to `max`; a model with none, such as Haiku, shows none); without a key, or when Anthropic cannot be reached, it is a list built into the program, and the screen says so. For **Antigravity** the list is what `agy models` prints, with its three levels. A model that is in no list can be typed in. In the dashboard's *AI for…* panel and in the Windows settings (*Choose a model from the list…*) a job can have its own model and level; the level is kept to what the chosen model takes.
+
+**Version and updates, for each tool.** *Settings → Updates* (and *Version and updates…* in the Windows settings) show the installed version and the newest one (Claude Code's from npm) and update on request: Claude Code with its own `claude update`, Antigravity (Windows) with Google's installer. Looking changes nothing; an update runs only when the owner presses *Update now*, and the version is read again afterwards, so an update that changed nothing is reported as such. Codex keeps its own, automatic updater.
+
 ## Installing at a shop
 
 1. **Install the app.** Run `SmartRetailAI-Setup.exe`, from the repository's **Releases** page on GitHub (or see *Building* below), signed in to Windows as the user who works at the POS.

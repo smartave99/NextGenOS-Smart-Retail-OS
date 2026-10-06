@@ -6,6 +6,7 @@
 @inject AiEnvironment Ai
 @inject CodexAccountService Account
 @inject CodexUpdateService Updates
+@inject AiToolService Tools
 @inject IJSRuntime Js
 @inject ILogger<AiChoice> Log
 
@@ -65,6 +66,46 @@
                     <p class="small muted">The list is Codex's own answer for your account. OpenAI turns a new model on for accounts over several days, and an older Codex may not know it yet. Press Refresh the list, update Codex in Settings, or type the model's name under Another model.</p>
                 </details>
             }
+            else if (HasToolModels)
+            {
+                <label class="field-label" for="@($"{idPrefix}-model")">Model</label>
+                <select id="@($"{idPrefix}-model")" class="form-select" @onchange="SetModel">
+                    <option value="" selected="@(choice.Model.Length == 0 && !other)">@toolName's own choice@(toolModel.Length > 0 ? $" ({toolModel})" : "")</option>
+                    @foreach (var model in toolModels.Models)
+                    {
+                        <option value="@model.Id" selected="@(choice.Model == model.Id && !other)">@model.Label</option>
+                    }
+                    @if (choice.Model.Length > 0 && toolModels.Models.All(m => m.Id != choice.Model))
+                    {
+                        <option value="@choice.Model" selected="@(!other)">@choice.Model (typed in)</option>
+                    }
+                    <option value="@OtherValue" selected="@other">Another model…</option>
+                </select>
+                @if (other)
+                {
+                    <label class="field-label" for="@($"{idPrefix}-typed")">Model name <Required /></label>
+                    <div class="ai-choice-other">
+                        <input id="@($"{idPrefix}-typed")" class="form-control" maxlength="80" autocomplete="off" spellcheck="false" placeholder="The model's name" aria-required="true" @bind="typed" @bind:event="oninput" @onkeydown="TypedKey" />
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@(typed.Trim().Length == 0)" @onclick="UseTyped">Use</button>
+                    </div>
+                    @if (typedProblem is not null)
+                    {
+                        <p class="small trend-down" role="alert">@typedProblem</p>
+                    }
+                    else
+                    {
+                        <p class="small muted ai-choice-why">@toolName tries the name as it is. It works only if your account has that model; if not, the job says so in a few words.</p>
+                    }
+                }
+                <p class="small muted ai-choice-models">
+                    @toolModels.Note
+                    <button type="button" class="link-button ai-choice-refresh" disabled="@refreshing" @onclick="RefreshAsync">@(refreshing ? "Asking…" : "Refresh the list")</button>
+                </p>
+                @if (NewerTool is { } newerTool)
+                {
+                    <p class="small ai-choice-newer"><Icon Name="info" /> @toolName @newerTool is out. A new model sometimes needs the newest @toolName. <a href="settings#updates">Update it in Settings</a></p>
+                }
+            }
             else
             {
                 <p class="small muted ai-choice-tool">@(char.ToUpperInvariant(toolName[0]) + toolName[1..]) runs the AI jobs, as chosen in Advanced settings@(Efforts.Count > 0 ? ". Its model is chosen there; its thinking level here." : ", and it chooses how long to think by itself.")</p>
@@ -110,6 +151,7 @@
 
     private readonly string idPrefix = "ai-" + Guid.NewGuid().ToString("N")[..8];
     private IReadOnlyList<CodexModel> models = Array.Empty<CodexModel>();
+    private CliModelList toolModels = new();
     private AiJobChoice choice = new();
     private (string Model, string Effort) resolved;
     private string tool = SmartRetail.AI.Providers.ProviderIds.CodexCli;
@@ -129,13 +171,26 @@
 
     private bool IsCodex => tool == SmartRetail.AI.Providers.ProviderIds.CodexCli;
 
+    /// <summary>Claude Code and Antigravity have a list of models here too (Claude's from Anthropic, or the one built in); other tools take a name typed in Advanced settings.</summary>
+    private bool HasToolModels => tool == SmartRetail.AI.Providers.ProviderIds.ClaudeCli || tool == SmartRetail.AI.Providers.ProviderIds.AntigravityCli;
+
+    /// <summary>The newest version of Claude Code or Antigravity, when a newer one than this PC has was found at the last look.</summary>
+    private string? NewerTool => Tools.LastCheck(tool) is { Update: "available" } check && check.Latest.Length > 0 ? check.Latest : null;
+
     /// <summary>The thinking levels there are to choose from: the chosen Codex model's (Codex's default when none is
     /// chosen), else the usual three; Claude Code's or Antigravity's; none for a tool that chooses for itself.</summary>
-    private IReadOnlyList<string> Efforts => IsCodex ? ModelEfforts(choice.Model) ?? AiJobs.CommonEfforts : AiJobs.Efforts(tool);
+    private IReadOnlyList<string> Efforts => IsCodex ? ModelEfforts(choice.Model) ?? AiJobs.CommonEfforts : HasToolModels ? ModelEfforts(choice.Model) ?? AiJobs.Efforts(tool) : AiJobs.Efforts(tool);
 
     /// <summary>A Codex model's thinking levels, as its list says; null when not known.</summary>
     private IReadOnlyList<string>? ModelEfforts(string model)
     {
+        if (!IsCodex)
+        {
+            // Claude Code and Antigravity: the chosen model's levels as its list says (a model with none has none); null when the model is in no list.
+            var id = model.Length > 0 ? model : toolModel;
+            return HasToolModels && id.Length > 0 ? toolModels.Models.FirstOrDefault(m => m.Id == id)?.Efforts : null;
+        }
+
         var found = model.Length > 0 ? models.FirstOrDefault(m => m.Id == model) : DefaultModel;
         var efforts = found?.ReasoningEfforts.Select(e => e.Effort.ToLowerInvariant()).Distinct().ToList();
         return efforts is { Count: > 0 } ? efforts : null;
@@ -209,14 +264,38 @@
             typedProblem = null;
             models = await Account.ModelsAsync(CancellationToken.None);
         }
+        else if (open && HasToolModels)
+        {
+            other = false;
+            typedProblem = null;
+            await LoadToolModelsAsync(fresh: false);
+        }
     }
 
-    /// <summary>Asks Codex for its list of models now, not the one kept from a few minutes ago.</summary>
+    private async Task LoadToolModelsAsync(bool fresh)
+    {
+        try
+        {
+            toolModels = await Tools.ModelsAsync(tool, fresh, CancellationToken.None);
+        }
+        catch (CliToolException ex)
+        {
+            problem = ex.Message;
+        }
+    }
+
+    /// <summary>Asks the tool (or, for Claude, Anthropic) for its list of models now, not the one kept from a few minutes ago.</summary>
     private async Task RefreshAsync()
     {
         refreshing = true;
         try
         {
+            if (!IsCodex)
+            {
+                await LoadToolModelsAsync(fresh: true);
+                return;
+            }
+
             models = await Account.ModelsAsync(CancellationToken.None, fresh: true);
             problem = models.Count == 0 ? "Codex could not be asked. Check that it is set up and signed in on the Get started page." : null;
         }

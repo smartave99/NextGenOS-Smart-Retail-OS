@@ -74,6 +74,14 @@ public sealed class AiEnvironment : IDisposable
         return new ProviderRouter(ProviderCatalog.CreateAll(() => settings, secrets, runner, _http, gate: _gate), () => settings);
     }
 
+    /// <summary>Looks after Claude Code and Antigravity: their models and thinking levels, their version, and bringing them up to date. Reads the settings and the saved Anthropic key fresh each time.</summary>
+    public ICliToolCare CreateToolCare()
+    {
+        var settings = LoadSettings();
+        ISecretProtector protector = OperatingSystem.IsWindows() ? new DpapiSecretProtector() : new NoSecretProtector();
+        return new CliToolCare(new ProcessCliRunner(), () => settings, new SecretStore(() => settings, protector), _http);
+    }
+
     /// <summary>Codex CLI as set up in the side panel; it is the tool that can make images.</summary>
     public CodexCliProvider CreateCodex() => CreateRouter().Providers.OfType<CodexCliProvider>().First();
 

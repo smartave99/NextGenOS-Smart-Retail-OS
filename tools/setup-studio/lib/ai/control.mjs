@@ -104,7 +104,29 @@ export async function listModels(tool, { config = {}, env = process.env } = {}) 
       if (r?.models.length) return { models: r.models.map((m) => shape(m, 'tool')), ...note('tool', `The list is Codex's own${r.version ? ` (from Codex ${r.version})` : ''}.`) };
       return { models: [], ...note('none', 'Codex has not written its model list yet. Run "codex" once, or update it, then look again; or type any model name.'), defaultEfforts: effortWords(EFFORTS.codex) };
     }
-    case 'antigravity': return { models: [], ...note('none', 'Antigravity does not publish a model list the Studio can read. Leave this empty for its own choice, or type the model name.'), defaultEfforts: effortWords(EFFORTS.antigravity) };
+    case 'antigravity': {
+      // Antigravity's own list: "agy models", the first word of each line. One set of thinking levels for all its models.
+      const none = (text) => ({ models: [], ...note('none', text), defaultEfforts: effortWords(EFFORTS.antigravity) });
+      if (!resolveExecutable('agy', env)) return none('Antigravity is not on this PC. Leave the model empty for its own choice, or type the model name.');
+      let r;
+      try { r = await runCli({ command: 'agy', args: ['models'], timeoutMs: 20_000, env }); } catch { return none('Antigravity\'s list of models could not be read. Leave this empty for its own choice, or type the model name.'); }
+      if (r.code !== 0 || r.timedOut) return none('Antigravity\'s list of models could not be read. Leave this empty for its own choice, or type the model name.');
+      const seen = new Set();
+      const models = [];
+      for (const raw of String(r.stdout ?? '').split('\n')) {
+        const line = raw.trim().replace(/^[-*\u2022\s]+/, '').trim();
+        if (!line) continue;
+        const [first, ...rest] = line.split(/\s+/);
+        const id = first.replace(/[:,]+$/, '');
+        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{1,79}$/.test(id) || ['models', 'model', 'available', 'name', 'names', 'id', 'ids', 'usage', 'default', 'error', 'no', 'none'].includes(id.toLowerCase()) || seen.has(id)) continue;
+        seen.add(id);
+        const about = rest.join(' ').replace(/^\(|\)$/g, '').trim();
+        models.push({ id, label: about ? `${id}: ${about}` : id, efforts: EFFORTS.antigravity, defaultEffort: null });
+        if (models.length >= 100) break;
+      }
+      if (!models.length) return none('Antigravity\'s list of models could not be read. Leave this empty for its own choice, or type the model name.');
+      return { models: models.map((m) => shape(m, 'tool')), ...note('tool', 'The list is Antigravity\'s own (from "agy models").') };
+    }
     case 'openai': {
       const key = getKey('openai', env);
       const base = checkEndpoint(config.baseUrl || 'https://api.openai.com/v1').href.replace(/\/$/, '');

@@ -59,8 +59,8 @@ namespace SmartRetail.AI.Settings
     /// <summary>
     /// Each job's model and thinking level. Thinking longer costs more of the Codex limit and takes longer, so each job
     /// gets the least it needs: a quick answer thinks a little, the growth plan thinks hard. The owner can change any
-    /// job, and go back to the recommended one. The model is Codex's; Claude Code and Antigravity take the thinking level
-    /// too, at the nearest level they have. Other AI tools choose for themselves.
+    /// job, and go back to the recommended one. The model and the thinking level are the chosen tool's: Codex's, Claude Code's or
+    /// Antigravity's, the level at the nearest one the tool has. Other AI tools choose for themselves.
     /// </summary>
     public static class AiJobs
     {
@@ -99,8 +99,8 @@ namespace SmartRetail.AI.Settings
         }
 
         /// <summary>
-        /// The model typed for the tool the jobs run on in Advanced settings (empty: the tool's own choice). The list of models of
-        /// Codex comes from Codex itself; every other tool has no list here, so a new model is used once its name is typed there.
+        /// The model typed for the tool the jobs run on in Advanced settings (empty: the tool's own choice). The models of Codex come
+        /// from Codex itself, those of Claude from Anthropic (<see cref="CliToolCare"/>); a model that is in no list is used once its name is typed.
         /// </summary>
         public static string ToolModel(AssistantSettings settings)
         {
@@ -256,9 +256,9 @@ namespace SmartRetail.AI.Settings
                 case ProviderIds.CodexCli:
                     return (First(choice.Model, settings.Codex?.Model), CodexEffort(settings, choice, job));
                 case ProviderIds.ClaudeCli:
-                    return (First(settings.ClaudeCli?.Model), ToolEffort(settings.ClaudeCli?.Effort, ClaudeEfforts, choice, job));
+                    return (First(choice.Model, settings.ClaudeCli?.Model), ToolEffort(settings.ClaudeCli?.Effort, ClaudeEfforts, choice, job));
                 case ProviderIds.AntigravityCli:
-                    return (First(settings.Antigravity?.Model), ToolEffort(settings.Antigravity?.Effort, AntigravityEfforts, choice, job));
+                    return (First(choice.Model, settings.Antigravity?.Model), ToolEffort(settings.Antigravity?.Effort, AntigravityEfforts, choice, job));
                 default:
                     return ("", "");
             }
@@ -279,7 +279,9 @@ namespace SmartRetail.AI.Settings
             var choice = settings.Choice(job);
             settings.Codex.Model = First(choice.Model, settings.Codex.Model);
             settings.Codex.ReasoningEffort = CodexEffort(settings, choice, job);
+            settings.ClaudeCli.Model = First(choice.Model, settings.ClaudeCli.Model);
             settings.ClaudeCli.Effort = ToolEffort(settings.ClaudeCli.Effort, ClaudeEfforts, choice, job);
+            settings.Antigravity.Model = First(choice.Model, settings.Antigravity.Model);
             settings.Antigravity.Effort = ToolEffort(settings.Antigravity.Effort, AntigravityEfforts, choice, job);
         }
 

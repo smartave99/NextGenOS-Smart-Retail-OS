@@ -97,7 +97,7 @@ namespace SmartRetail.AI.Tests
             Assert.False(Directory.Exists(call.WorkingDirectory), "the working folder is cleaned up");
 
             var prompt = call.StandardInput;
-            Assert.Contains("a small shop in India, Sharma General Store.", prompt);
+            Assert.Contains("a small shop, Sharma General Store.", prompt);
             Assert.Contains("- Format: Square post, for Instagram, Facebook and WhatsApp posts, 1080 x 1080 pixels. Make the image 1024 x 1024 (square)", prompt);
             Assert.Contains("- Style: Festive: rich colours, marigolds and warm lights.", prompt);
             Assert.Contains("its colours are #E4572E and #FFC914; Friendly and family-run; its logo is logo.png: show it small and clear, exactly as it is.", prompt);
@@ -308,7 +308,8 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("- Show no words at all.", prompt);
             Assert.DoesNotContain("price tag", prompt);
             Assert.Contains("\"price_areas\" lists nothing (an empty list)", prompt);
-            Assert.Contains("a small shop in India.\n", prompt);
+            Assert.Contains("a small shop.\n", prompt);
+            Assert.DoesNotContain("India", prompt); // no country unless the customer's profile names one
         }
 
         private sealed class ListProgress : IProgress<string>

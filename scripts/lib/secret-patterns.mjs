@@ -15,3 +15,6 @@ export const SECRET_PATTERNS = [
 ];
 // Test and example files may hold obviously fake values; these exact fakes are allowed.
 export const SECRET_ALLOW = [/Password=your_password/, /Password=not-a-real-password/, /sk-test-0+/, /postgres:\/\/user:secret@host/, /postgres:\/\/authenticator:\$\{/, /sk-abc/, /secret_test/];
+
+// Files that may hold long random-looking strings that are not secrets (licence texts, lock files, minified libraries).
+export const SECRET_SKIP_PATH = /^(licenses\/|.*package-lock\.json$|.*\.min\.js$|apps\/pos-dashboard-service\/owner-app\/vendor\/|apps\/storefront-web-mobile\/android\/gradle)/;

@@ -130,6 +130,37 @@ public class AiGatewayTests
     }
 
     [Fact]
+    public async Task An_email_address_or_phone_number_in_a_text_makes_it_personal_data_whatever_the_caller_called_it()
+    {
+        using var f = new AiFixture();
+        var online = f.Connect("online", ProviderLocation.Api);
+        f.Allow(FlagKey.AiAssistant, FlagKey.RemoteAi);
+        f.Ai.Providers.Grant("online", DataClass.Internal, null, 1);   // allowed to receive internal figures, not personal data
+
+        var plain = await Ask(f, Ctx(DataClass.Internal), "What sold best this week?");
+        Assert.True(plain.Ok);
+        Assert.Equal(1, online.Calls);
+
+        foreach (var text in new[] { "Remind maria.santos@example.com that her order is ready", "Call +91 98765 43210 about the order" })
+        {
+            var refused = await Ask(f, Ctx(DataClass.Internal), text);
+            Assert.False(refused.Ok, text);
+            Assert.Equal(DataClass.Personal, f.Ai.Usage.Recent(1).Single().DataClass);
+        }
+
+        Assert.Equal(1, online.Calls);
+        f.Ai.Providers.Grant("online", DataClass.Personal, null, 1);   // now the owner has allowed personal data too
+        Assert.True((await Ask(f, Ctx(DataClass.Internal), "Remind maria.santos@example.com that her order is ready")).Ok);
+        Assert.Equal(2, online.Calls);
+
+        // On this computer it needs no permission at all.
+        var here = f.Connect("here", ProviderLocation.Local);
+        var answered = await Ask(f, Ctx(DataClass.Public), "Call +91 98765 43210");
+        Assert.Equal("here", answered.ProviderId);
+        Assert.Equal(1, here.Calls);
+    }
+
+    [Fact]
     public async Task When_the_best_service_fails_the_next_allowed_one_is_tried_and_both_are_written_down()
     {
         using var f = new AiFixture();

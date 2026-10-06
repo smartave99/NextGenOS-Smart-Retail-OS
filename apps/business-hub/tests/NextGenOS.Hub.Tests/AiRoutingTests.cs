@@ -208,6 +208,26 @@ public class EndpointAndTextGuardTests
     public void A_payment_card_number_in_a_text_is_found_and_ordinary_numbers_are_not(string text, bool found) => Assert.Equal(found, TextGuard.ContainsCardNumber(text));
 }
 
+public class ContactDetailsTests
+{
+    [Theory]
+    [InlineData("Write to maria.santos@example.com about the order", true)]
+    [InlineData("a@b.co", true)]
+    [InlineData("Call +91 98765 43210 today", true)]
+    [InlineData("Call +63 917 123 4567", true)]
+    [InlineData("Call (555) 123-4567 now", true)]
+    [InlineData("555-123-4567", true)]
+    [InlineData("555.123.4567", true)]
+    [InlineData("Barcode 8901000000019 is on the shelf", false)]
+    [InlineData("Invoice INV-2026-000012 for 1,250.00", false)]
+    [InlineData("Sold 12 units between 10:30 and 11:45", false)]
+    [InlineData("Version 2.10.3 shipped", false)]
+    [InlineData("the price is 25 @ 3 for 2", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void An_email_address_or_a_phone_number_is_found_and_a_barcode_or_an_invoice_number_is_not(string? text, bool found) => Assert.Equal(found, TextGuard.ContainsContactDetails(text));
+}
+
 public class BudgetTests
 {
     [Fact]

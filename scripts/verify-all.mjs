@@ -188,6 +188,7 @@ const NOT_VERIFIED = [
   'The dashboard tests that need a live SQL Server with a POS database or the DINOv2 model (skipped here), and the AI test that needs the real Codex program.',
   'Real printers, barcode scanners, cash drawers, Bluetooth devices and cameras, and the Windows print spooler (the device layer is tested with virtual devices and loop-back connections).',
   'The Android app (.apk and .aab): built and signed only by the release workflow (there is no Android SDK here), and never run on a real phone.',
+  'The customer website packages: the Linux one is built, audited, started with its own Node.js and refused without a licence here; the Windows one (and the ARM one, which is not built) is only built and started by the release workflow on a Windows runner, never run on a real PC, with a real database, sign-in or picture storage.',
   'Code signing of installers (needs your certificate), and the Windows SmartScreen reputation.',
   'Name hiding on a real Windows build (it was run on the Windows build files from Linux, and the protected Linux build was fully tested), and whether determined reverse engineering can still read the protected programs (name hiding is a deterrent, not a lock: docs/SECURITY-MODEL.md).',
   "Each country's tax and invoicing law (the packs are data, to be reviewed by a local adviser before use).",

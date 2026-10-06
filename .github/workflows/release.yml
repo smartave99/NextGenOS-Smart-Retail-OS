@@ -87,19 +87,21 @@ jobs:
   prepare:
     # The build jobs hand their files to the publishing job on a DRAFT release, not through the workflow's artifact storage: that storage has a small
     # quota per account and a release of this size can fill it. A draft is seen only by people who can write to the repository.
+    # This runs at the very start, beside the gate: GitHub lets the workflow's token make a tag or a release only at the newest commit of the branch,
+    # and only at the start of a run is that certainly this run's commit. The tag is made now; the release is published by the last job.
     name: Make the draft release the build jobs put their files on
-    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       release_id: ${{ steps.draft.outputs.release_id }}
       tag: ${{ steps.draft.outputs.tag }}
+      tag_made: ${{ steps.draft.outputs.tag_made }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Make the draft release
+      - name: Make the draft release (and the tag, for a trial)
         id: draft
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -109,14 +111,38 @@ jobs:
           PUBLISH_TRIAL: ${{ inputs.publish_trial }}
         run: |
           set -euo pipefail
-          # A tag the owner pushed names the release. A trial started from a branch makes its own tag (at the commit that was built) when it is published.
+          # A tag the owner pushed names the release (it exists already). A trial started from a branch makes its own tag, at the commit that is being built.
           # A run started by hand keeps a draft that nobody but people who can write to the repository can see.
+          MAKE=""
           if [ "${REF_TYPE}" = "tag" ]; then TAG="${REF_NAME}"
-          elif [ "${PUBLISH_TRIAL}" = "true" ]; then TAG="v${VERSION_NAME}-trial${RUN_NUMBER}"
+          elif [ "${PUBLISH_TRIAL}" = "true" ]; then TAG="v${VERSION_NAME}-trial${RUN_NUMBER}"; MAKE="--make-tag"
           else TAG="v${VERSION_NAME}-manual${RUN_NUMBER}"; fi
           PRE=""
           case "${TAG}" in *-rc*|*-beta*|*-alpha*|*-trial*|*-manual*) PRE="--prerelease";; esac
-          node scripts/release-assets.mjs create --tag "${TAG}" --target "${GITHUB_SHA}" --title "Smart Retail POS ${TAG}" ${PRE}
+          node scripts/release-assets.mjs create --tag "${TAG}" --target "${GITHUB_SHA}" --title "Smart Retail POS ${TAG}" ${PRE} ${MAKE}
+
+  cleanup:
+    # When the gate does not pass nothing is built and nothing is released: the draft and the tag this run made are taken away again.
+    name: Take the draft away when the gate did not pass
+    needs: [gate, prepare]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.gate.result != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Remove the draft, and the tag if this run made it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TAG_MADE: ${{ needs.prepare.outputs.tag_made }}
+        run: |
+          set -euo pipefail
+          if [ "${TAG_MADE}" = "true" ]; then node scripts/release-assets.mjs discard --release "${RELEASE_ID}" --tag "${TAG}"
+          else node scripts/release-assets.mjs discard --release "${RELEASE_ID}"; fi
 
   android:
     name: Android app (APK and AAB)

@@ -11,10 +11,10 @@ import { fileURLToPath } from 'node:url';
 const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'release-assets.mjs');
 const REPO = 'acme/shop';
 let server; let base; let work;
-let releases; let nextId; let calls; let failFirstUpload;
+let releases; let nextId; let calls; let failFirstUpload; let refs; let tagsRefused;
 
 function reset() {
-  releases = []; nextId = 100; calls = []; failFirstUpload = false;
+  releases = []; nextId = 100; calls = []; failFirstUpload = false; refs = new Map(); tagsRefused = false;
 }
 
 async function body(req) { const chunks = []; for await (const c of req) chunks.push(c); return Buffer.concat(chunks); }
@@ -36,10 +36,23 @@ before(async () => {
       releases.push(r);
       return send(201, { ...r, files: undefined });
     }
+    if ((m = path.match(new RegExp(`^/repos/${REPO}/git/ref/tags/(.+)$`))) && req.method === 'GET') {
+      return refs.has(decodeURIComponent(m[1])) ? send(200, { ref: `refs/tags/${m[1]}`, object: { sha: refs.get(decodeURIComponent(m[1])) } }) : send(404, { message: 'Not Found' });
+    }
+    if (req.method === 'POST' && path === `/repos/${REPO}/git/refs`) {
+      const input = JSON.parse((await body(req)).toString());
+      if (tagsRefused) return send(403, { message: 'Resource not accessible by integration' });
+      refs.set(input.ref.replace('refs/tags/', ''), input.sha);
+      return send(201, { ref: input.ref });
+    }
+    if ((m = path.match(new RegExp(`^/repos/${REPO}/git/refs/tags/(.+)$`))) && req.method === 'DELETE') {
+      return refs.delete(decodeURIComponent(m[1])) ? send(204) : send(422, { message: 'Reference does not exist' });
+    }
     if ((m = path.match(new RegExp(`^/repos/${REPO}/releases/(\\d+)$`)))) {
       const r = releases.find((x) => x.id === Number(m[1]));
       if (!r) return send(404, { message: 'not found' });
       if (req.method === 'GET') return send(200, { ...r, files: undefined });
+      if (req.method === 'DELETE') { releases.splice(releases.indexOf(r), 1); return send(204); }
       if (req.method === 'PATCH') { Object.assign(r, JSON.parse((await body(req)).toString())); return send(200, { ...r, files: undefined }); }
     }
     if ((m = path.match(new RegExp(`^/repos/${REPO}/releases/(\\d+)/assets$`))) && req.method === 'GET') {
@@ -101,7 +114,7 @@ test('the number is written for the next jobs when the runner gives an output fi
   writeFileSync(out, '');
   const r = await exec(['create', '--tag', 'v2.0.0', '--target', 'abc'], { GITHUB_TOKEN: 'test-token', GITHUB_OUTPUT: out });
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(readFileSync(out, 'utf8'), 'release_id=100\ntag=v2.0.0\n');
+  assert.equal(readFileSync(out, 'utf8'), 'release_id=100\ntag=v2.0.0\ntag_made=false\n');
 });
 
 test('files go up, a file with the same name is replaced, and they come down the same', async () => {
@@ -151,6 +164,48 @@ test('a name that is not just a file name is refused on the way down', async () 
   assert.match(r.stderr, /not allowed/);
   assert.equal(existsSync(join(out, '..evil')), false);
   assert.deepEqual(existsSync(out) ? readdirSync(out) : [], []);
+});
+
+test('the tag is made at the commit in the first seconds when asked, and left alone when it is there', async () => {
+  reset();
+  const first = await run('create', '--tag', 'v1.0.0-trial5', '--target', 'abc123', '--make-tag');
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /Made the tag v1.0.0-trial5 at abc123/);
+  assert.equal(refs.get('v1.0.0-trial5'), 'abc123');
+  const out = join(work, 'github-output-2.txt');
+  writeFileSync(out, '');
+  const again = await exec(['create', '--tag', 'v1.0.0-trial5', '--target', 'abc123', '--make-tag'], { GITHUB_TOKEN: 'test-token', GITHUB_OUTPUT: out });
+  assert.equal(again.status, 0, again.stderr);
+  assert.doesNotMatch(again.stdout, /Made the tag/);
+  assert.match(readFileSync(out, 'utf8'), /tag_made=false/);
+  assert.equal(releases.length, 1);
+});
+
+test('when GitHub refuses the tag it says plainly why and what to do', async () => {
+  reset();
+  tagsRefused = true;
+  const r = await run('create', '--tag', 'v1.0.0-trial6', '--target', 'abc123def', '--make-tag');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /newest commit of the branch/);
+  assert.match(r.stderr, /Start the run again/);
+  assert.equal(releases.length, 0);
+});
+
+test('an unwanted draft and the tag made for it are removed, a published release never is', async () => {
+  reset();
+  await run('create', '--tag', 'v1.0.0-trial7', '--target', 'abc', '--make-tag');
+  const gone = await run('discard', '--release', '100', '--tag', 'v1.0.0-trial7');
+  assert.equal(gone.status, 0, gone.stderr);
+  assert.equal(releases.length, 0);
+  assert.equal(refs.has('v1.0.0-trial7'), false);
+
+  await run('create', '--tag', 'v1.0.0-trial8', '--target', 'abc', '--make-tag');
+  await run('publish', '--release', '101');
+  const refused = await run('discard', '--release', '101', '--tag', 'v1.0.0-trial8');
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /is published; it is not removed/);
+  assert.equal(releases.length, 1);
+  assert.equal(refs.has('v1.0.0-trial8'), true);
 });
 
 test('without a token or a repository it says so in plain words and does nothing', async () => {

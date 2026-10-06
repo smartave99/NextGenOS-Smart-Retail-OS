@@ -4,8 +4,12 @@
  * (that storage has a small quota per account, and a release of this size fills it). The files are only visible to people who can write to the repository until the
  * last job publishes the release.
  *
- *   node scripts/release-assets.mjs create   --tag v1.0.0-trial3 --target <commit> --title "..." [--prerelease] [--notes-file file]
- *       makes the draft (or finds the release that already has this tag, drafts included), prints its number and writes release_id= to $GITHUB_OUTPUT
+ *   node scripts/release-assets.mjs create   --tag v1.0.0-trial3 --target <commit> --title "..." [--prerelease] [--notes-file file] [--make-tag]
+ *       makes the draft (or finds the release that already has this tag, drafts included), prints its number and writes release_id= to $GITHUB_OUTPUT.
+ *       --make-tag also makes the tag at the commit when it does not exist yet. GitHub lets the workflow's token make a tag or a release only at the newest commit of the
+ *       branch, so this is done in the first seconds of a run, while its commit is that commit, and not after the long build.
+ *   node scripts/release-assets.mjs discard  --release <number> [--tag v1.0.0-trial3]
+ *       removes a draft that is not wanted (never a published release) and the tag named, but only a tag that points at no other release
  *   node scripts/release-assets.mjs upload   --release <number> <file>...      a file with the same name on the release is replaced
  *   node scripts/release-assets.mjs download --release <number> --out <folder>
  *   node scripts/release-assets.mjs publish  --release <number> [--notes-file file]    the draft becomes a published release
@@ -57,18 +61,37 @@ async function listAll(path) {
 
 const flag = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 
+/** Makes the tag at the commit when there is none. Says what to do when GitHub refuses (the branch has moved on since the run began). */
+async function makeTag(tag, target) {
+  try {
+    await call('GET', `/repos/${repo}/git/ref/tags/${encodeURIComponent(tag)}`);
+    return false;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+  try {
+    await call('POST', `/repos/${repo}/git/refs`, { body: JSON.stringify({ ref: `refs/tags/${tag}`, sha: target }), extra: { 'content-type': 'application/json' } });
+  } catch (e) {
+    if (e.status === 403) throw new Error(`GitHub does not let this run make the tag ${tag} at ${target.slice(0, 7)}. It only allows the newest commit of the branch: something was pushed to the branch after this run began. Start the run again and push nothing for the first minute.\n${e.message}`);
+    throw e;
+  }
+  console.log(`Made the tag ${tag} at ${target.slice(0, 7)}.`);
+  return true;
+}
+
 async function create(args) {
   const tag = flag(args, '--tag'); const target = flag(args, '--target'); const title = flag(args, '--title') || tag;
   if (!tag || !target) fail('Say the tag and the commit: --tag v1.0.0 --target <commit>');
   const notesFile = flag(args, '--notes-file');
   const body = notesFile ? readFileSync(notesFile, 'utf8') : 'The release files are being built. This page is complete when the release is published.';
+  const tagMade = args.includes('--make-tag') ? await makeTag(tag, target) : false;
   const existing = (await listAll(`/repos/${repo}/releases`)).find((r) => r.tag_name === tag);
   const release = existing ?? await call('POST', `/repos/${repo}/releases`, {
     body: JSON.stringify({ tag_name: tag, target_commitish: target, name: title, body, draft: true, prerelease: args.includes('--prerelease') }),
     extra: { 'content-type': 'application/json' },
   });
   console.log(`${existing ? 'Using the release that already has' : 'Made a draft release for'} ${tag}: number ${release.id}${release.draft ? ' (draft)' : ' (published)'}.`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `release_id=${release.id}\ntag=${tag}\n`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `release_id=${release.id}\ntag=${tag}\ntag_made=${tagMade}\n`);
   else console.log(release.id);
 }
 
@@ -104,6 +127,20 @@ async function download(args) {
   }
 }
 
+async function discard(args) {
+  const id = flag(args, '--release'); const tag = flag(args, '--tag');
+  if (!id) fail('Say the release: --release <number>');
+  const release = await call('GET', `/repos/${repo}/releases/${id}`).catch((e) => { if (e.status === 404) return null; throw e; });
+  if (release && !release.draft) fail(`Release ${release.tag_name} is published; it is not removed.`);
+  if (release) { await call('DELETE', `/repos/${repo}/releases/${id}`); console.log(`Removed the draft release ${release.tag_name}.`); }
+  if (tag) {
+    // Only when no release uses the tag any more.
+    const used = (await listAll(`/repos/${repo}/releases`)).some((r) => r.tag_name === tag);
+    if (used) { console.log(`The tag ${tag} stays: a release still uses it.`); return; }
+    await call('DELETE', `/repos/${repo}/git/refs/tags/${encodeURIComponent(tag)}`).then(() => console.log(`Removed the tag ${tag}.`)).catch((e) => { if (e.status !== 404 && e.status !== 422) throw e; });
+  }
+}
+
 async function publish(args) {
   const id = flag(args, '--release');
   if (!id) fail('Say the release: --release <number>');
@@ -116,6 +153,6 @@ async function publish(args) {
 const [command, ...args] = process.argv.slice(2);
 if (!token) fail('There is no GITHUB_TOKEN, so nothing can be put on a release.');
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) fail('GITHUB_REPOSITORY must look like owner/name.');
-const commands = { create, upload, download, publish };
-if (!commands[command]) fail('Use one of: create, upload, download, publish.');
+const commands = { create, upload, download, publish, discard };
+if (!commands[command]) fail('Use one of: create, upload, download, publish, discard.');
 await commands[command](args).catch((e) => fail(String(e.message || e)));

@@ -50,7 +50,7 @@ WHAT TO TELL US
 
 NOT BUILT YET
 -------------
- - A built website for a customer: the pack carries its public settings and the steps only.
+ - A website for every customer: the release holds the website of ONE customer (the brand kit of the build). Another customer's website is built from that customer's public settings; the Studio's pack says how. The Windows website was only checked by the build machine, not on a real PC.
  - The AI assistant's setup is not part of this release. It reads the Windows POS database, not the new Hub's data.
  - A signed list of release files: the Studio checks files against fingerprints, which catches damaged downloads, not forged ones.
  - Code signing of the setup (needs the owner's certificate).

@@ -189,7 +189,13 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("--node-app", workflow);
             Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows, linux, studio, website\]\s*\n", workflow);
             // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
-            Assert.Matches(@"(?m)^  prepare:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            // The draft and the tag are made at the very start, beside the gate (GitHub lets the token make them only at the newest commit of the branch), and taken away when the gate fails.
+            var prepare = System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  prepare:\s*\n(.*?)^  cleanup:").Groups[1].Value;
+            Assert.DoesNotContain("needs:", prepare);
+            Assert.Contains("--make-tag", prepare);
+            Assert.Matches(@"(?m)^  cleanup:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            Assert.Contains("needs.gate.result != 'success'", workflow);
+            Assert.Contains("node scripts/release-assets.mjs discard", workflow);
             Assert.DoesNotContain("upload-artifact", workflow);
             Assert.DoesNotContain("download-artifact", workflow);
             Assert.Contains("node scripts/release-assets.mjs create", workflow);

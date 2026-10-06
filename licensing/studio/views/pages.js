@@ -396,7 +396,7 @@ function audit(ctx, { rows }) {
   return page('History', body, ctx, 'audit');
 }
 
-function settings(ctx, { settings, keys }) {
+function settings(ctx, { settings, keys, releaseKeys = [] }) {
   const body = html`
   <h1>Settings</h1>
   <form method="post" action="/settings" class="card">${csrfField(ctx.csrf)}<h2>Your company</h2>
@@ -424,6 +424,15 @@ function settings(ctx, { settings, keys }) {
       ${keys.filter((k) => k.status === 'pending').map((k) => html`<form method="post" action="/settings/key/switch" data-confirm="Switch to key ${k.kid}? Only do this after every app has been released with this key built in.">${csrfField(ctx.csrf)}<input type="hidden" name="kid" value="${k.kid}"><button class="btn danger" type="submit">Start signing with ${k.kid}</button></form>`)}
     </div>
     <p class="hint">To change keys safely: prepare the key, build it into the next release of the apps, wait until customers have updated, then switch.</p>
+  </section>
+  <section class="card"><h2>For a release build (GitHub)</h2>
+    <p class="muted">A release can only be activated when it carries your public keys and this server's address. Copy each box into the repository's settings on GitHub: <span class="mono">Settings, Secrets and variables, Actions, Variables</span>, with the name written above the box. These are public values: no private key is shown here and none is ever needed by the build.</p>
+    ${releaseKeys.length === 0 ? '' : html`<label for="rel-keys">Variable <span class="mono">NGOS_PUBLIC_KEYS</span></label>
+    <textarea id="rel-keys" class="mono" rows="6" readonly>${JSON.stringify({ keys: releaseKeys }, null, 2)}</textarea>
+    <p><button class="btn" type="button" data-copy="#rel-keys">Copy</button></p>`}
+    <label for="rel-url">Variable <span class="mono">NGOS_LICENCE_URL</span></label>
+    ${settings.public_url ? html`<input id="rel-url" class="mono" type="text" readonly value="${settings.public_url.replace(/\/+$/, '')}"><p><button class="btn" type="button" data-copy="#rel-url">Copy</button></p>`
+      : html`<p class="flash err" role="alert">Fill in "This server's public address" above and save it first: a release must know where to activate.</p>`}
   </section>
   <section class="card"><h2>Backup</h2>
     <p class="muted">Download a copy of the licence database. Also keep a copy of the <span class="mono">keys</span> folder and the passphrase, in a safe place that is not on this server.</p>

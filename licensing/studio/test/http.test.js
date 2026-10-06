@@ -242,6 +242,24 @@ test('password change signs the person out; a temporary password must be replace
   } finally { await s.stop(); }
 });
 
+test('settings: the release box shows the public keys and the address, never a private key, and asks for the address first', async () => {
+  const s = await start();
+  try {
+    const admin = new Browser(s.base);
+    await admin.login('boss@example.com');
+    const first = await (await admin.fetch('/settings')).text();
+    assert.match(first, /NGOS_PUBLIC_KEYS/);
+    assert.match(first, /public address[^<]*above and save it first/, 'no address yet: it says to fill it in');
+    const shown = JSON.parse(first.match(/<textarea id="rel-keys"[^>]*>([\s\S]*?)<\/textarea>/)[1].replace(/&quot;/g, '"'));
+    assert.deepEqual(shown.keys, JSON.parse(JSON.stringify(s.app.studio.trustedKeys())), 'exactly what "export-public-keys" prints');
+    assert.doesNotMatch(first, /"d"\s*:|privateKey|private_key/, 'nothing private is shown');
+    await admin.post('/settings', { public_url: 'https://licence.example.com/' }, '/settings');
+    const second = await (await admin.fetch('/settings')).text();
+    assert.match(second, /<input id="rel-url"[^>]*value="https:\/\/licence\.example\.com"/, 'the address, without the closing slash');
+    assert.doesNotMatch(second, /above and save it first/);
+  } finally { await s.stop(); }
+});
+
 test('settings: key rotation prepares a key first and only then switches', async () => {
   const s = await start();
   try {

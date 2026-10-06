@@ -5,12 +5,9 @@ For the owner of **NextGenOS**. A release is built by GitHub, not on your PC: th
 ## What you need once
 
 1. **The Licence Studio running** with its signing key made (`licensing/README.md`). Without it nothing can be licensed.
-2. **Your public keys given to the build.** In the Studio folder:
-   ```
-   node src/cli.js export-public-keys        # prints {"keys":[...]}: public keys only
-   ```
+2. **Your public keys given to the build.** Open the Licence Studio, **Settings**, and fill in "This server's public address" (save it). The box **For a release build (GitHub)** below it shows the two values with a *Copy* button each; no command is needed. (The command `node src/cli.js export-public-keys`, in the Studio folder, prints the same keys.)
    In GitHub: *Settings → Secrets and variables → Actions → Variables* (the **Variables** tab, not Secrets: these are public by design):
-   - `NGOS_PUBLIC_KEYS` = the whole text printed above;
+   - `NGOS_PUBLIC_KEYS` = the first box (the whole text);
    - `NGOS_LICENCE_URL` = your Studio's address, for example `https://licence.yourcompany.com`. For a trial on your own PC use `http://127.0.0.1:8080` (the Studio on the same PC that tests the setup).
 3. *(Optional, for stores and for no Windows warning)* **Secrets**: `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (a release key for the Android app; without them a one-off test key signs it) and `WINDOWS_CERT_B64`, `WINDOWS_CERT_PASSWORD` (a code-signing certificate as a base64 `.pfx`; without it the Windows setup is unsigned and Windows shows "unknown publisher").
 4. **The repository stays private.** Anyone who can open it can read the source.

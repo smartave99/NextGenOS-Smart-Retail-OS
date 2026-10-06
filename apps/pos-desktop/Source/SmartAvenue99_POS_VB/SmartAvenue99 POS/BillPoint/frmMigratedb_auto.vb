@@ -27,7 +27,7 @@ Namespace BillPoint
 		Public Sub New()
 			AddHandler MyBase.Load, AddressOf Me.frmMigratedb_auto_Load
 			Me.localConnStr = ModCS.cs
-			Me.onlineConnStr = "Server=103.86.177.172,1433;Initial Catalog=Raintech_DB9_20250629155123;User ID=sa;Password=%$nI4dSXxF90j9@$5#Jhx;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+			Me.onlineConnStr = NextGenOS.Licensing.CloudSettings.Secret("migration")
 			Me.colTypes = New Dictionary(Of String, Type)()
 			Me.InitializeComponent()
 		End Sub
@@ -340,7 +340,12 @@ Namespace BillPoint
 
 		' Token: 0x0600346E RID: 13422 RVA: 0x00204758 File Offset: 0x00202958
 		Private Sub Button1_Click(sender As Object, e As EventArgs)
-			Dim text As String = "Server=103.86.177.172,1433;User ID=sa;Password=%$nI4dSXxF90j9@$5#Jh;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;Initial Catalog=master"
+			' The online migration server is now the customer's own (cloud.json, "migration_master"); nothing is built in.
+			Dim text As String = NextGenOS.Licensing.CloudSettings.Secret("migration_master")
+			If String.IsNullOrEmpty(text) Then
+				MessageBox.Show("Online migration is not set up for this shop. Please ask your supplier.", "Not set up", MessageBoxButtons.OK, MessageBoxIcon.Information)
+				Return
+			End If
 			Dim text2 As String = "admin_testdb1"
 			Me.CreateDatabaseIfNotExists(text, text2)
 		End Sub

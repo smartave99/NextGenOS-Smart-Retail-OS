@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "country": "CA",
+  "name": "Canada",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "CAD",
+    "symbol": "$",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-CA",
+  "languages": [
+    "en",
+    "fr"
+  ],
+  "timezone": "America/Toronto",
+  "phoneCode": "+1",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "GST/HST",
+    "model": "regional",
+    "pricesIncludeTaxDefault": false,
+    "rates": [
+      {
+        "code": "TAXABLE",
+        "label": "Taxable",
+        "taxable": true
+      },
+      {
+        "code": "ZERO",
+        "label": "Zero-rated (basic groceries and similar)",
+        "zero": true
+      },
+      {
+        "code": "EXEMPT",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "TAXABLE",
+      "zero": "ZERO",
+      "exempt": "EXEMPT"
+    },
+    "regions": {
+      "label": "Province",
+      "list": [
+        {
+          "code": "AB",
+          "name": "Alberta",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            }
+          ]
+        },
+        {
+          "code": "BC",
+          "name": "British Columbia",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            },
+            {
+              "name": "PST",
+              "percent": "7"
+            }
+          ]
+        },
+        {
+          "code": "MB",
+          "name": "Manitoba",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            },
+            {
+              "name": "RST",
+              "percent": "7"
+            }
+          ]
+        },
+        {
+          "code": "NB",
+          "name": "New Brunswick",
+          "components": [
+            {
+              "name": "HST",
+              "percent": "15"
+            }
+          ]
+        },
+        {
+          "code": "NL",
+          "name": "Newfoundland and Labrador",
+          "components": [
+            {
+              "name": "HST",
+              "percent": "15"
+            }
+          ]
+        },
+        {
+          "code": "NS",
+          "name": "Nova Scotia",
+          "components": [
+            {
+              "name": "HST",
+              "percent": "14"
+            }
+          ]
+        },
+        {
+          "code": "NT",
+          "name": "Northwest Territories",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            }
+          ]
+        },
+        {
+          "code": "NU",
+          "name": "Nunavut",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            }
+          ]
+        },
+        {
+          "code": "ON",
+          "name": "Ontario",
+          "components": [
+            {
+              "name": "HST",
+              "percent": "13"
+            }
+          ]
+        },
+        {
+          "code": "PE",
+          "name": "Prince Edward Island",
+          "components": [
+            {
+              "name": "HST",
+              "percent": "15"
+            }
+          ]
+        },
+        {
+          "code": "QC",
+          "name": "Quebec",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            },
+            {
+              "name": "QST",
+              "percent": "9.975"
+            }
+          ]
+        },
+        {
+          "code": "SK",
+          "name": "Saskatchewan",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            },
+            {
+              "name": "PST",
+              "percent": "6"
+            }
+          ]
+        },
+        {
+          "code": "YT",
+          "name": "Yukon",
+          "components": [
+            {
+              "name": "GST",
+              "percent": "5"
+            }
+          ]
+        }
+      ]
+    },
+    "businessId": {
+      "label": "GST/HST number",
+      "pattern": "^[0-9]{9}RT[0-9]{4}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.05",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Invoice",
+    "requiredFields": [
+      "Seller name and business number",
+      "Date and invoice number",
+      "Description of each item and its price",
+      "GST/HST (and PST or QST) amounts or the rate that applies",
+      "Buyer's name above the set amount for large sales"
+    ],
+    "eInvoice": null,
+    "retentionYears": 6
+  },
+  "notes": [
+    "Rates are the standard rate of the province or territory where the shop is. Some goods have special rules (children's clothing, restaurant meals, books); give them a different tax code or ask your accountant.",
+    "Pick the shop's province as the region."
+  ]
+}

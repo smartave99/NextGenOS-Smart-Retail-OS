@@ -1,0 +1,89 @@
+@inherits LayoutComponentBase
+@inject HubApp App
+@inject Session Sess
+@inject NextGenOS.Licensing.AspNetCore.BrandService Brand
+@inject IJSRuntime Js
+
+<div class="shell">
+    <nav class="side" aria-label="Main">
+        <div class="brand">
+            @if (Brand.Logo is { } logo) { <img class="brand-logo" src="@logo" alt="" /> }
+            <span class="brand-name">@Brand.Name</span>
+            @if (Brand.By is { } by) { <span class="brand-by">@by</span> }
+        </div>
+        <ul>
+            @foreach (var link in Links())
+            {
+                <li><NavLink href="@link.Href" title="@link.Label" Match="@(link.Href == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><Icon Name="@link.Icon" /><span>@link.Label</span></NavLink></li>
+            }
+        </ul>
+    </nav>
+    <div class="main">
+        <header class="top">
+            <span class="top-brand">@Brand.Name@if (Brand.By is { } topBy) { <small>@topBy</small> }</span>
+            <span class="shop-name">@Shop.Settings.Name</span>
+            <span class="spacer"></span>
+            @if (me is not null)
+            {
+                <span class="who" title="@Roles.Label(me.Role)">@me.Name</span>
+            }
+            <button type="button" class="btn ghost small" @onclick="ToggleTheme" aria-label="Switch between light and dark">@(dark ? "Light" : "Dark")</button>
+            <button type="button" class="btn ghost small" @onclick="SignOut">Sign out</button>
+        </header>
+        <main id="content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private Me? me;
+    private bool dark;
+
+    private ShopContext Shop => App.Shop.Current;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { me = await Sess.GetAsync(); } catch (InvalidOperationException) { me = null; }
+    }
+
+    private record Link(string Href, string Label, string Icon);
+
+    private IEnumerable<Link> Links()
+    {
+        var f = Shop.Features;
+        bool Can(string p) => me?.Can(p) == true;
+        yield return new Link("", "Today", "home");
+        if (f.CounterSale && Can(Perm.Sell)) yield return new Link("sell", Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant(), "cart");
+        if (f.Tables && Can(Perm.Orders)) yield return new Link("tables", "Tables", "table");
+        if (f.Kitchen && Can(Perm.Kitchen)) yield return new Link("kitchen", "Kitchen", "flame");
+        if (f.Lending && Can(Perm.Loans)) yield return new Link("loans", "Desk", "book");
+        if (f.Projects && Can(Perm.Projects)) yield return new Link("projects", "Projects", "hammer");
+        if (f.Appointments && Can(Perm.Appointments)) yield return new Link("appointments", "Bookings", "calendar");
+        if (Can(Perm.Catalog)) yield return new Link("items", Shop.Plural("item"), "box");
+        if (Can(Perm.Catalog) && !Shop.Features.Lending) yield return new Link("posters", "Price tags", "tag");
+        if (Can(Perm.Parties)) yield return new Link("people", "People", "people");
+        if (f.Purchases && Can(Perm.Purchases)) yield return new Link("purchases", "Buying", "truck");
+        if (Can(Perm.Sell) || Can(Perm.Reports) || Can(Perm.Loans)) yield return new Link("documents", Shop.Plural("invoice"), "receipt");
+        if (Can(Perm.Reports)) yield return new Link("reports", "Reports", "chart");
+        if (Can(Perm.Settings)) yield return new Link("settings", "Settings", "gear");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = await Js.InvokeAsync<string>("hub.theme");
+            dark = theme == "dark";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        dark = !dark;
+        await Js.InvokeVoidAsync("hub.setTheme", dark ? "dark" : "light");
+    }
+
+    private Task SignOut() => Js.InvokeVoidAsync("hub.signOut").AsTask();
+}

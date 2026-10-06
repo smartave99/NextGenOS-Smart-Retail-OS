@@ -179,6 +179,7 @@ namespace SmartRetail.AI.Desktop
             _claudePath = PathRow(grid, _settings.ClaudeCli.ExecutablePath, "claude");
             _claudeModel = FormLayout.Row(grid, "Model", FormLayout.Text(_settings.ClaudeCli.Model, 200));
             _claudeEffort = FormLayout.Row(grid, "Effort", FormLayout.Choice(_settings.ClaudeCli.Effort, "", "low", "medium", "high", "xhigh", "max"));
+            FormLayout.Row(grid, "", ToolButtons(ProviderIds.ClaudeCli, _claudeModel, _claudeEffort));
             _claudeTimeout = FormLayout.Row(grid, "Timeout (seconds)", FormLayout.Number(_settings.ClaudeCli.TimeoutSeconds, 15, 1800));
             FormLayout.Note(grid, "Install Claude Code (PowerShell: irm https://claude.ai/install.ps1 | iex). It runs with the Anthropic API key from the API keys tab: Anthropic does not allow apps to use a Claude.ai subscription sign-in.");
 
@@ -186,6 +187,7 @@ namespace SmartRetail.AI.Desktop
             _agyPath = PathRow(grid, _settings.Antigravity.ExecutablePath, "agy");
             _agyModel = FormLayout.Row(grid, "Model", FormLayout.Text(_settings.Antigravity.Model, 200));
             _agyEffort = FormLayout.Row(grid, "Effort", FormLayout.Choice(_settings.Antigravity.Effort, "", "low", "medium", "high"));
+            FormLayout.Row(grid, "", ToolButtons(ProviderIds.AntigravityCli, _agyModel, _agyEffort));
             _agyTimeout = FormLayout.Row(grid, "Timeout (seconds)", FormLayout.Number(_settings.Antigravity.TimeoutSeconds, 15, 1800));
             _agyUseKey = new CheckBox { Text = "Use the Gemini API key instead of the Google sign-in", AutoSize = true, Checked = _settings.Antigravity.UseGeminiApiKey };
             FormLayout.Row(grid, "", _agyUseKey);
@@ -558,6 +560,163 @@ namespace SmartRetail.AI.Desktop
         {
             _dbResult.Text = text;
             _dbResult.ForeColor = ok ? Color.FromArgb(22, 120, 72) : Color.FromArgb(180, 40, 40);
+        }
+
+        private static readonly System.Net.Http.HttpClient ToolHttp = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+
+        private ICliToolCare ToolCare()
+        {
+            ApplyToSettings();
+            return new CliToolCare(new ProcessCliRunner(), () => _settings, _secrets, ToolHttp);
+        }
+
+        /// <summary>Two buttons under a tool's model and effort: choose a model from the tool's own list (with the thinking levels it takes), and look at the version and update.</summary>
+        private Control ToolButtons(string providerId, TextBox model, ComboBox effort)
+        {
+            var choose = new Button { Text = "Choose a model from the list…", AutoSize = true };
+            var update = new Button { Text = "Version and updates…", AutoSize = true };
+            choose.Click += async (sender, args) => await ChooseModelAsync(providerId, model, effort, choose);
+            update.Click += async (sender, args) => await ToolUpdateAsync(providerId, update);
+            return FormLayout.Inline(choose, update);
+        }
+
+        private async Task ChooseModelAsync(string providerId, TextBox model, ComboBox effort, Button button)
+        {
+            button.Enabled = false;
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                var list = await ToolCare().ModelsAsync(providerId, CancellationToken.None);
+                Cursor = Cursors.Default;
+                if (list.Models.Count == 0)
+                {
+                    MessageBox.Show(this, list.Note, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    FillEfforts(effort, list.DefaultEfforts);
+                    return;
+                }
+
+                using (var dialog = new ModelListForm(list))
+                {
+                    if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Chosen != null)
+                    {
+                        model.Text = dialog.Chosen.Id;
+                        FillEfforts(effort, dialog.Chosen.Efforts);
+                    }
+                }
+            }
+            catch (CliToolException ex)
+            {
+                MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
+                button.Enabled = true;
+            }
+        }
+
+        /// <summary>The thinking levels of the chosen model: what was chosen stays when the model has it, else it is cleared (the tool's own default).</summary>
+        private static void FillEfforts(ComboBox effort, System.Collections.Generic.IEnumerable<string> levels)
+        {
+            var current = effort.Text.Trim();
+            var list = levels.ToList();
+            effort.Items.Clear();
+            effort.Items.Add("");
+            effort.Items.AddRange(list.Cast<object>().ToArray());
+            effort.Text = list.Contains(current) ? current : "";
+            effort.Enabled = list.Count > 0;
+        }
+
+        private async Task ToolUpdateAsync(string providerId, Button button)
+        {
+            button.Enabled = false;
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                var care = ToolCare();
+                var check = await care.CheckUpdateAsync(providerId, CancellationToken.None);
+                Cursor = Cursors.Default;
+                var name = check.Status.Name;
+                if (check.Update == "install")
+                {
+                    MessageBox.Show(this, name + " is not on this PC. " + check.Status.InstallHint, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                var version = check.Status.Version.Length > 0 ? "Version " + check.Status.Version + " is installed." : name + " is installed; it does not say its version.";
+                var line = check.Update == "available" ? version + " A newer one, " + check.Latest + ", is out."
+                    : check.Update == "current" ? version + " That is the newest (" + check.Latest + ")."
+                    : version + " The newest version could not be found out just now.";
+                if (!check.CanUpdate || check.Update == "current")
+                {
+                    MessageBox.Show(this, line + "\r\n\r\n" + check.How, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                var ask = MessageBox.Show(this, line + "\r\n\r\n" + check.How + "\r\n\r\nUpdate " + name + " now? Please do not start an AI task until it is done.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (ask != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                Cursor = Cursors.WaitCursor;
+                var done = await care.UpdateAsync(providerId, CancellationToken.None);
+                Cursor = Cursors.Default;
+                MessageBox.Show(this, done.Changed ? "Updated from " + done.Before + " to " + done.After + "." : (done.After.Length > 0 ? "Version " + done.After + " is installed; the update did not change it." : "The update finished."), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (CliToolException ex)
+            {
+                MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
+                button.Enabled = true;
+            }
+        }
+
+        /// <summary>A short list to choose a model from, with the thinking levels each takes.</summary>
+        private sealed class ModelListForm : Form
+        {
+            private readonly ListBox _list = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+
+            public ModelListForm(CliModelList models)
+            {
+                Text = "Choose a model";
+                StartPosition = FormStartPosition.CenterParent;
+                Size = new Size(620, 460);
+                MinimizeBox = false;
+                MaximizeBox = false;
+                ShowInTaskbar = false;
+                foreach (var model in models.Models)
+                {
+                    _list.Items.Add(new Entry(model));
+                }
+
+                var note = new Label { Text = models.Note, Dock = DockStyle.Top, AutoSize = false, Height = 52, ForeColor = Color.DimGray, Padding = new Padding(8, 8, 8, 0) };
+                var ok = new Button { Text = "Use this model", DialogResult = DialogResult.OK, AutoSize = true };
+                var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true };
+                var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, Height = 44, Padding = new Padding(8) };
+                bar.Controls.AddRange(new Control[] { cancel, ok });
+                Controls.Add(_list);
+                Controls.Add(note);
+                Controls.Add(bar);
+                AcceptButton = ok;
+                CancelButton = cancel;
+                _list.DoubleClick += (sender, args) => { if (_list.SelectedItem != null) { DialogResult = DialogResult.OK; } };
+            }
+
+            public CliModel Chosen => (_list.SelectedItem as Entry)?.Model;
+
+            private sealed class Entry
+            {
+                public Entry(CliModel model) { Model = model; }
+
+                public CliModel Model { get; }
+
+                public override string ToString() =>
+                    Model.Label + " (" + Model.Id + ")  —  " + (Model.Efforts.Count == 0 ? "no thinking level" : "thinking: " + string.Join(", ", Model.Efforts.Select(AiJobs.EffortName)));
+            }
         }
 
         private async Task SignInCodexAsync(Button button)

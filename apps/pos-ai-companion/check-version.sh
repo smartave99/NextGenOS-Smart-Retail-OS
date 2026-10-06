@@ -11,8 +11,13 @@ set -euo pipefail
 version="${1:-}"
 [[ "$version" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || { echo "check-version: the version must be three numbers, like 2.10.0" >&2; exit 2; }
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-for props in SmartRetailAI/Directory.Build.props SmartRetailPOS/Directory.Build.props; do
+# The repository root is the nearest folder above this script that holds CHANGELOG.md. The two products live in SmartRetailAI and
+# SmartRetailPOS (the old layout) or in apps/pos-ai-companion and apps/pos-dashboard-service (the monorepo).
+root="$(cd "$(dirname "$0")" && pwd)"
+while [ "$root" != "/" ] && [ ! -f "$root/CHANGELOG.md" ]; do root="$(dirname "$root")"; done
+[ -f "$root/CHANGELOG.md" ] || root="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -d "$root/SmartRetailAI" ]; then ai=SmartRetailAI; pos=SmartRetailPOS; else ai=apps/pos-ai-companion; pos=apps/pos-dashboard-service; fi
+for props in "$ai/Directory.Build.props" "$pos/Directory.Build.props"; do
   [ -f "$root/$props" ] || { echo "check-version: $props is not there" >&2; exit 1; }
   built="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' "$root/$props" | head -n 1)"
   if [ "$built" != "$version" ]; then
@@ -28,7 +33,7 @@ if [ "$newest" != "$version" ]; then
   echo "check-version: the release is asked for as $version, but the newest entry of CHANGELOG.md is ${newest:-missing}: add '## $version · <day>' with what changed." >&2
   exit 1
 fi
-changes="$(bash "$root/SmartRetailAI/changelog-entry.sh" "$version" | grep -c '^[-*] ' || true)"
+changes="$(bash "$root/$ai/changelog-entry.sh" "$version" | grep -c '^[-*] ' || true)"
 if [ "$changes" -lt 1 ]; then
   echo "check-version: the entry for $version in CHANGELOG.md lists no change: write what is new, improved or fixed." >&2
   exit 1

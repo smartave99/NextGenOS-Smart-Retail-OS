@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using SmartRetail.AI.Cli;
 using SmartRetail.AI.Providers;
 using SmartRetail.AI.Settings;
+using SmartRetail.Pos.Core.Posters;
 
 namespace SmartRetail.Pos.Web.Services;
 
@@ -20,6 +21,7 @@ public sealed class AiEnvironment : IDisposable
     {
         _options = options.Value;
         _gate = gate;
+        _shop = new Lazy<ShopProfile>(() => ShopProfile.LoadNear(ProfileFolder ?? AppContext.BaseDirectory));
     }
 
     public string SettingsFile => _options.SettingsFilePath;
@@ -30,7 +32,20 @@ public sealed class AiEnvironment : IDisposable
     /// </summary>
     public UsageLimitPause LimitPause { get; } = new();
 
-    public AssistantSettings LoadSettings() => new SettingsStore(SettingsFile).Load();
+    private string? ProfileFolder => string.IsNullOrWhiteSpace(_options.ProfileFolder) ? null : _options.ProfileFolder;
+
+    public AssistantSettings LoadSettings() => new SettingsStore(SettingsFile, ProfileFolder).Load();
+
+    private readonly Lazy<ShopProfile> _shop;
+
+    /// <summary>
+    /// What the customer's profile says about its pictures and posters (country, kind of business, who the model photos show, festivals, second language).
+    /// Read once: it is installed with the program, and the owner's settings cannot change it. Neutral when the customer has none.
+    /// </summary>
+    public ShopProfile Shop => _shop.Value;
+
+    /// <summary>The same, as the poster code needs it.</summary>
+    public PosterLocale PosterLocale => PosterLocales.From(Shop);
 
     /// <summary>Raised when Codex finished a task well, which proves it is installed and signed in.</summary>
     public event Action? CodexAnswered;
@@ -72,6 +87,14 @@ public sealed class AiEnvironment : IDisposable
             }
         });
         return new ProviderRouter(ProviderCatalog.CreateAll(() => settings, secrets, runner, _http, gate: _gate), () => settings);
+    }
+
+    /// <summary>Looks after Claude Code and Antigravity: their models and thinking levels, their version, and bringing them up to date. Reads the settings and the saved Anthropic key fresh each time.</summary>
+    public ICliToolCare CreateToolCare()
+    {
+        var settings = LoadSettings();
+        ISecretProtector protector = OperatingSystem.IsWindows() ? new DpapiSecretProtector() : new NoSecretProtector();
+        return new CliToolCare(new ProcessCliRunner(), () => settings, new SecretStore(() => settings, protector), _http);
     }
 
     /// <summary>Codex CLI as set up in the side panel; it is the tool that can make images.</summary>

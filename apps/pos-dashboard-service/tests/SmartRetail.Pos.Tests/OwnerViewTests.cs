@@ -93,7 +93,7 @@ public class OwnerViewTests
             new[] { new TrendPoint(today, 750m, 2, 0m), new TrendPoint(today.AddDays(-7), 500m, 1, 0m) }, times);
         return new OwnerLiveInputs
         {
-            ShopName = " Smart Avenue 99 ",
+            ShopName = " Demo Mart 99 ",
             Now = new DateTimeOffset(2026, 9, 27, 19, 2, 0, TimeSpan.FromHours(5.5)),
             Figures = figures,
             CreditToday = 150m,
@@ -123,7 +123,7 @@ public class OwnerViewTests
     {
         var live = OwnerLive.From(Inputs());
 
-        Assert.Equal(("Smart Avenue 99", false, 750m, 2, 150m), (live.Shop, live.Demo, live.Today.Sales, live.Today.Bills, live.Today.Credit));
+        Assert.Equal(("Demo Mart 99", false, 750m, 2, 150m), (live.Shop, live.Demo, live.Today.Sales, live.Today.Bills, live.Today.Credit));
         Assert.Equal(("18:57", "19:02", 500m), (live.Today.LastBillAt, live.Today.ComparedAt, live.Today.LastWeekSales));
         Assert.Equal(0.5m, live.Today.VsLastWeek);
         // Rounded, so the page gets a share, not a long fraction.
@@ -156,7 +156,7 @@ public class OwnerViewTests
     {
         var inputs = Inputs() with
         {
-            ShopName = "Smart Avenue 9876543210",
+            ShopName = "Demo Mart 9876543210",
             ProductNames = new Dictionary<int, string> { [7] = "Milk (call 9876543210)", [8] = "Basmati Rice 5 kg" },
             LowStock = new[] { new StockLevel { ProductId = 7, Name = "Milk (call 9876543210)", InHand = 3, MinStock = 24 } },
         };
@@ -171,7 +171,7 @@ public class OwnerViewTests
         var json = JsonSerializer.Serialize(live, Web) + JsonSerializer.Serialize(day, Web);
 
         Assert.DoesNotContain("9876543210", json);
-        Assert.Equal("Smart Avenue 98••••••10", live.Shop);
+        Assert.Equal("Demo Mart 98••••••10", live.Shop);
         Assert.Contains(live.Top, p => p.Name == "Milk (call 98••••••10)");
         Assert.Equal("Milk (call 98••••••10)", live.LowStock[0].Name);
         Assert.Contains(day[0].Top, p => p.Name == "Milk (call 98••••••10)");
@@ -241,13 +241,13 @@ public class OwnerViewTests
     [Fact]
     public async Task Connecting_calls_the_project_with_the_public_key_and_the_code()
     {
-        var handler = new SupabaseStub().Answer(HttpStatusCode.OK, "{\"key\":\"" + new string('k', 64) + "\",\"shop_id\":\"5b8f\",\"shop_name\":\"Smart Avenue 99\"}");
+        var handler = new SupabaseStub().Answer(HttpStatusCode.OK, "{\"key\":\"" + new string('k', 64) + "\",\"shop_id\":\"5b8f\",\"shop_name\":\"Demo Mart 99\"}");
         var client = new OwnerViewClient(new HttpClient(handler));
         var anon = Jwt("anon");
 
         var connection = await client.ConnectAsync("https://abcd.supabase.co", anon, "ABCDEFGH", "Shop PC (TILL-1)", default);
 
-        Assert.Equal((new string('k', 64), "5b8f", "Smart Avenue 99"), (connection.Key, connection.ShopId, connection.ShopName));
+        Assert.Equal((new string('k', 64), "5b8f", "Demo Mart 99"), (connection.Key, connection.ShopId, connection.ShopName));
         var (request, body) = Assert.Single(handler.Requests);
         Assert.Equal("https://abcd.supabase.co/rest/v1/rpc/connect_shop_pc", request.RequestUri!.ToString());
         Assert.Equal(anon, Assert.Single(request.Headers.GetValues("apikey")));

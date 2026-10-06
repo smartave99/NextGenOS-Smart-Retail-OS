@@ -1,3 +1,4 @@
+import { LOCALE } from "@/lib/region/lite";
 // The shop's AI answers in simple Markdown (headings, lists, **bold**). It is read here into plain parts that the
 // page shows as text: nothing in an answer is ever put on the page as HTML.
 
@@ -62,9 +63,9 @@ export function inline(text: string): Inline[] {
     return parts;
 }
 
-const figure = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+const figure = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
 
-/** A table cell as text: numbers the Indian way (1,23,456.5), yes/no, and nothing for an empty cell. */
+/** A table cell as text: numbers the way the shop's country writes them (in India 1,23,456.5), yes/no, and nothing for an empty cell. */
 export function answerCell(value: string | number | boolean | null | undefined): string {
     if (value === null || value === undefined) return "";
     if (typeof value === "number") return Number.isFinite(value) ? figure.format(value) : "";

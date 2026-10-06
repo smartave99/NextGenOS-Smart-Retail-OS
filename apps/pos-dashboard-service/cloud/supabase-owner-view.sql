@@ -1,4 +1,4 @@
--- Smart Retail POS by NextGen OS: the owner's live view, kept in the owner's own Supabase project.
+-- Smart Retail POS by NextGenOS: the owner's live view, kept in the owner's own Supabase project.
 --
 -- Run it once in Supabase: SQL Editor > New query > paste this whole file > Run. Running it again is safe.
 --

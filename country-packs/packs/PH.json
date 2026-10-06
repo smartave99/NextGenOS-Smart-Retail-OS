@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "country": "PH",
+  "name": "Philippines",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "PHP",
+    "symbol": "₱",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-PH",
+  "languages": [
+    "en",
+    "fil"
+  ],
+  "timezone": "Asia/Manila",
+  "phoneCode": "+63",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT12",
+        "label": "VAT 12%",
+        "percent": "12"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "VAT-exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "VAT12",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
+    "businessId": {
+      "label": "TIN",
+      "pattern": "^[0-9]{3}-?[0-9]{3}-?[0-9]{3}(-?[0-9]{3,5})?$"
+    },
+    "customerDiscounts": [
+      {
+        "code": "SENIOR",
+        "label": "Senior citizen",
+        "percent": "20",
+        "vatExempt": true,
+        "law": "Republic Act 9994 (Expanded Senior Citizens Act), as amended"
+      },
+      {
+        "code": "PWD",
+        "label": "Person with a disability",
+        "percent": "20",
+        "vatExempt": true,
+        "law": "Republic Act 10754"
+      }
+    ],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Sales Invoice",
+    "requiredFields": [
+      "Registered business name and address",
+      "TIN with branch code, marked VAT REG or NON-VAT REG",
+      "Invoice serial number and date",
+      "Description, quantity and unit price of each item",
+      "VATable sales, VAT-exempt sales, zero-rated sales and the amount of VAT",
+      "For a senior citizen or person with a disability discount: the customer's name, ID number and signature",
+      "The BIR permit or accreditation details of the system that prints the invoices",
+      "The words THIS SERVES AS YOUR SALES INVOICE"
+    ],
+    "eInvoice": "The BIR is phasing in electronic invoicing (EIS) for large taxpayers and online sellers. Check whether your business is in scope.",
+    "retentionYears": 10
+  },
+  "notes": [
+    "A shop that is not VAT-registered (yearly sales not above ₱3,000,000) charges no VAT and pays percentage tax itself (3% of its gross sales since 1 July 2023). Mark the shop as not VAT-registered and the receipt must say NON-VAT.",
+    "Senior citizens and persons with a disability get 20% off and no VAT on the goods and services the law covers (for example basic necessities and medicines). The program cannot know which items qualify: the cashier marks them.",
+    "Retail prices in the Philippines include VAT."
+  ]
+}

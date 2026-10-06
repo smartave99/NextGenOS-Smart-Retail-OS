@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, ReactNode } from "react";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 interface Props {
     children: ReactNode;
@@ -36,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 border border-red-200">
                         <h2 className="mb-2 text-xl font-bold text-red-800">Couldn’t load this page</h2>
                         <p className="text-gray-600 mb-4">
-                            A page component stopped responding. Reload the page to try again; if it continues, contact the Smart Avenue team.
+                            A page component stopped responding. Reload the page to try again; if it continues, contact the {SHOP_NAME} team.
                         </p>
                         {process.env.NODE_ENV === "development" && (
                             <div className="bg-gray-100 p-3 rounded text-sm font-mono overflow-auto max-h-40 mb-4">

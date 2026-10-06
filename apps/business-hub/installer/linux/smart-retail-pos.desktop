@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Smart Retail POS
+Comment=The counter, stock, bills and reports of the business
+Exec=/usr/bin/smart-retail-pos
+Icon=smart-retail-pos
+Terminal=false
+Categories=Office;Finance;
+StartupNotify=false

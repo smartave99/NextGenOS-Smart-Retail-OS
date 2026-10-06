@@ -1,0 +1,3002 @@
+{
+  "description": "Shared by the AI assistant (apps/pos-ai-companion: Settings/ShopProfile.cs) and the Setup Studio (tools/setup-studio/lib/aiprofile.mjs): how profile/ai.json is read, and what the Studio writes. \"read\": \"input\" (a JSON value) or \"raw\" (text) is the file; \"value\" is what the program ends up with (models as it names them, \"Model 1\" when a photo has no title) and \"problems\" are the things it leaves out, in order, in its own words. \"build\": \"intake\" is the part of a customer's details the file is made from, \"file\" is what the Studio writes, \"problems\" are things the Studio could not write, and \"read\" is what the program ends up with when it reads that file (with no problem). Made by tools/setup-studio/scripts/make-ai-profile-vectors.mjs.",
+  "read": [
+    {
+      "name": "a complete, good file",
+      "input": {
+        "schema": 1,
+        "country": {
+          "code": "PH",
+          "name": "the Philippines"
+        },
+        "shopKind": "a small shop",
+        "images": {
+          "models": [
+            {
+              "title": "Filipino model",
+              "looks": "Filipino, in her late twenties"
+            },
+            {
+              "title": "Chinese-Filipino model",
+              "looks": "Chinese-Filipino"
+            },
+            {
+              "title": "Visayan model",
+              "looks": "Visayan, in his forties"
+            }
+          ],
+          "festivals": [
+            "Christmas",
+            "Sinulog",
+            "christmas"
+          ],
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": "fil"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "the Philippines",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Filipino model",
+              "looks": "Filipino, in her late twenties"
+            },
+            {
+              "title": "Chinese-Filipino model",
+              "looks": "Chinese-Filipino"
+            },
+            {
+              "title": "Visayan model",
+              "looks": "Visayan, in his forties"
+            }
+          ],
+          "festivals": [
+            "Christmas",
+            "Sinulog"
+          ],
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": "fil"
+          },
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "nothing at all",
+      "raw": "",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile is not a JSON object; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "only spaces",
+      "raw": "   ",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile is not a JSON object; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "not JSON",
+      "raw": "{ not json",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile is not a JSON object; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "a list is not a profile",
+      "raw": "[1,2,3]",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile is not a JSON object; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "a text is not a profile",
+      "raw": "\"text\"",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile is not a JSON object; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "null is not a profile",
+      "raw": "null",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile is not a JSON object; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "an empty object has no schema",
+      "raw": "{}",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile does not say \"schema\": 1; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "a newer schema is refused",
+      "raw": "{\"schema\": 2}",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile does not say \"schema\": 1; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "schema as text is refused",
+      "raw": "{\"schema\": \"1\"}",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile does not say \"schema\": 1; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "schema with a fraction is refused",
+      "raw": "{\"schema\": 1.5}",
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The AI profile does not say \"schema\": 1; the neutral one is used."
+        ]
+      }
+    },
+    {
+      "name": "only the schema is the neutral profile, and nothing is said",
+      "input": {
+        "schema": 1
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "unknown parts are ignored without a word",
+      "input": {
+        "schema": 1,
+        "password": "x",
+        "country": {
+          "code": "PH",
+          "name": "the Philippines",
+          "flag": "x"
+        },
+        "other": [
+          1
+        ],
+        "images": {
+          "sparkle": true
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "the Philippines",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "words are trimmed",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": "  the Philippines  "
+        },
+        "shopKind": "  a small restaurant ",
+        "images": {
+          "festivals": [
+            "  Sinulog "
+          ],
+          "models": [
+            {
+              "title": "  Visayan model ",
+              "looks": " in his forties "
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "the Philippines",
+          "shopKind": "a small restaurant",
+          "models": [
+            {
+              "title": "Visayan model",
+              "looks": "in his forties"
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Sinulog"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "markup, quotes and a backslash are never kept",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": "<script>alert(1)</script>"
+        },
+        "shopKind": "a \"quoted\" shop",
+        "images": {
+          "models": [
+            {
+              "title": "Back\\slash",
+              "looks": "a > b"
+            }
+          ],
+          "festivals": [
+            "A",
+            "B\"C",
+            "D",
+            "E<F",
+            "G"
+          ],
+          "localLanguage": {
+            "name": "Hin<di>",
+            "tag": "hi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "A",
+            "D",
+            "G"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as the country's name; it is left out.",
+          "Something in the AI profile is not usable as the kind of business; it is left out.",
+          "Something in the AI profile is not usable as a model's title; it is left out.",
+          "Something in the AI profile is not usable as a model's looks; it is left out.",
+          "Something in the AI profile is not usable as a festival; it is left out.",
+          "Something in the AI profile is not usable as a festival; it is left out.",
+          "Something in the AI profile is not usable as the second language; it is left out.",
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "control characters are never kept",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": "Bell\u0007land"
+        },
+        "shopKind": "a\tshop",
+        "images": {
+          "models": [
+            {
+              "title": "Ok model",
+              "looks": "line one\nline two"
+            },
+            {
+              "title": "Delete",
+              "looks": "next\u0085line"
+            }
+          ],
+          "festivals": [
+            "A",
+            "B\u0007",
+            "C"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Ok model",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "A",
+            "C"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as the country's name; it is left out.",
+          "Something in the AI profile is not usable as the kind of business; it is left out.",
+          "Something in the AI profile is not usable as a model's looks; it is left out.",
+          "Something in the AI profile is not usable as a model's title; it is left out.",
+          "Something in the AI profile is not usable as a model's looks; it is left out.",
+          "Something in the AI profile is not usable as a festival; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a quote mark that is only an apostrophe, an ampersand and words in any script are kept",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": "Türkiye"
+        },
+        "shopKind": "a children's clothes shop",
+        "images": {
+          "festivals": [
+            "Valentine's Day",
+            "Eid & Co",
+            "दीवाली",
+            "วันสงกรานต์",
+            "عيد"
+          ],
+          "models": [
+            {
+              "title": "Thai model",
+              "looks": "ไทย"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "Türkiye",
+          "shopKind": "a children's clothes shop",
+          "models": [
+            {
+              "title": "Thai model",
+              "looks": "ไทย"
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Valentine's Day",
+            "Eid & Co",
+            "दीवाली",
+            "วันสงกรานต์",
+            "عيد"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "the country and the kind of business: 60 letters are kept, 61 are not",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "shopKind": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expect": {
+        "value": {
+          "countryName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as the kind of business; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a model's title: 40 letters are kept, 41 are not; its looks: 120 are kept, 121 are not",
+      "input": {
+        "schema": 1,
+        "images": {
+          "models": [
+            {
+              "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "looks": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "looks": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "looks": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as a model's title; it is left out.",
+          "Something in the AI profile is not usable as a model's looks; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a festival: 40 letters are kept, 41 are not",
+      "input": {
+        "schema": 1,
+        "images": {
+          "festivals": [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "Ok"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "Ok"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as a festival; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "the length counts UTF-16 units: twenty party poppers are 40, twenty-one are 42",
+      "input": {
+        "schema": 1,
+        "images": {
+          "festivals": [
+            "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉",
+            "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉",
+            "🎉"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉",
+            "🎉"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as a festival; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "at most three model photos are read; one that is not an object is neutral",
+      "input": {
+        "schema": 1,
+        "images": {
+          "models": [
+            {
+              "title": "One"
+            },
+            5,
+            null,
+            {
+              "title": "Four"
+            },
+            {
+              "title": "Five"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "One",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a model with only a title, or only a look",
+      "input": {
+        "schema": 1,
+        "images": {
+          "models": [
+            {
+              "title": "Only title"
+            },
+            {
+              "looks": "only looks"
+            },
+            {}
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Only title",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": "only looks"
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "models, festivals and a language that are the wrong kind of thing are ignored without a word",
+      "input": {
+        "schema": 1,
+        "images": {
+          "models": "many",
+          "festivals": 5,
+          "localLanguage": "hi"
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "images that is not an object is ignored",
+      "input": {
+        "schema": 1,
+        "images": [
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "text that is the wrong kind of thing is ignored without a word",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": 5
+        },
+        "shopKind": true,
+        "images": {
+          "festivals": [
+            1,
+            true,
+            null,
+            {},
+            []
+          ],
+          "models": [
+            {
+              "title": 7,
+              "looks": false
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "blank text is nothing, without a word",
+      "input": {
+        "schema": 1,
+        "country": {
+          "name": "   "
+        },
+        "shopKind": "",
+        "images": {
+          "festivals": [
+            "  ",
+            ""
+          ],
+          "models": [
+            {
+              "title": " ",
+              "looks": " "
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "festivals: a repeat in other letters is one, and a bad one is named",
+      "input": {
+        "schema": 1,
+        "images": {
+          "festivals": [
+            "Diwali",
+            "DIWALI",
+            "diwali ",
+            "Holi",
+            "B\u0007d",
+            "Eid"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Diwali",
+            "Holi",
+            "Eid"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as a festival; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "only capitals make a repeat: a sharp s and a dotless i are letters of their own",
+      "input": {
+        "schema": 1,
+        "images": {
+          "festivals": [
+            "Straße",
+            "STRASSE",
+            "strasse",
+            "ı",
+            "I",
+            "i",
+            "ſ",
+            "s",
+            "S",
+            "ǆ",
+            "Ǆ"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Straße",
+            "STRASSE",
+            "ı",
+            "I",
+            "ſ",
+            "s",
+            "ǆ"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "white space at the ends is trimmed as the program trims it: a next-line mark and a wide space go, a byte-order mark stays",
+      "input": {
+        "schema": 1,
+        "shopKind": "\u0085a shop\u3000",
+        "images": {
+          "festivals": [
+            "\u00a0Eid\u0085",
+            "\ufeffHoli",
+            "Holi"
+          ],
+          "models": [
+            {
+              "title": "\u0085\u0085",
+              "looks": "\u3000"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Eid",
+            "\ufeffHoli",
+            "Holi"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "at most 24 festivals; the rest are not used",
+      "input": {
+        "schema": 1,
+        "images": {
+          "festivals": [
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15",
+            "Festival 16",
+            "Festival 17",
+            "Festival 18",
+            "Festival 19",
+            "Festival 20",
+            "Festival 21",
+            "Festival 22",
+            "Festival 23",
+            "Festival 24",
+            "Festival 25",
+            "Festival 26",
+            "Festival 27",
+            "Festival 28",
+            "Festival 29",
+            "Festival 30"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15",
+            "Festival 16",
+            "Festival 17",
+            "Festival 18",
+            "Festival 19",
+            "Festival 20",
+            "Festival 21",
+            "Festival 22",
+            "Festival 23",
+            "Festival 24"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a repeat does not take one of the 24 places",
+      "input": {
+        "schema": 1,
+        "images": {
+          "festivals": [
+            "A",
+            "a",
+            "B",
+            "b",
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15",
+            "Festival 16",
+            "Festival 17",
+            "Festival 18",
+            "Festival 19",
+            "Festival 20",
+            "Festival 21",
+            "Festival 22",
+            "Festival 23",
+            "Festival 24",
+            "Festival 25",
+            "Festival 26"
+          ]
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "A",
+            "B",
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15",
+            "Festival 16",
+            "Festival 17",
+            "Festival 18",
+            "Festival 19",
+            "Festival 20",
+            "Festival 21",
+            "Festival 22"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a second language: its name and tag",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi"
+          },
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "language tags: two or three small letters, then dashes and more",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Chinese",
+            "tag": "zh-TW"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Chinese",
+            "tag": "zh-TW"
+          },
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "language tags: a region with a script",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Serbian",
+            "tag": "sr-Latn-RS"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Serbian",
+            "tag": "sr-Latn-RS"
+          },
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a language tag of 12 letters is kept",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Long",
+            "tag": "fil-abcdefgh"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Long",
+            "tag": "fil-abcdefgh"
+          },
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a language tag of 13 letters is not usable, so the language is left out",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Long",
+            "tag": "fil-abcdefghi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as the language tag; it is left out.",
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a language tag with capital letters first is not a tag",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "Hi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a language tag that is a whole word is not a tag",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hindi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a language tag with an underscore is not a tag",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi_IN"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a language with a name and no tag is left out, and said",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a language with a tag and no name is left out, and said",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "tag": "hi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "a language with neither is nothing, without a word",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {}
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a language name of 40 letters is kept, of 41 is not",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "tag": "hi"
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": [
+          "Something in the AI profile is not usable as the second language; it is left out.",
+          "The second language needs a name and a tag like hi or fil; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "ready-made second-language lines are read for the poster kinds only, and only with a second language",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi",
+            "lines": {
+              "clearance": "भारी छूट",
+              "best-sellers": "सबकी पसंद",
+              "diwali": "x",
+              "new-arrivals": "<b>नया</b>",
+              "festival-offer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi"
+          },
+          "posterLines": {
+            "clearance": "भारी छूट",
+            "best-sellers": "सबकी पसंद"
+          }
+        },
+        "problems": [
+          "Something in the AI profile is not usable as a poster line; it is left out.",
+          "Something in the AI profile is not usable as a poster line; it is left out."
+        ]
+      }
+    },
+    {
+      "name": "ready-made lines of all four kinds",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": "fil",
+            "lines": {
+              "clearance": "Malaking bawas",
+              "new-arrivals": "Bagong dating",
+              "best-sellers": "Paborito ng lahat",
+              "festival-offer": "Espesyal na presyo",
+              "extra": "no"
+            }
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": "fil"
+          },
+          "posterLines": {
+            "clearance": "Malaking bawas",
+            "new-arrivals": "Bagong dating",
+            "best-sellers": "Paborito ng lahat",
+            "festival-offer": "Espesyal na presyo"
+          }
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "ready-made lines with no second language are not used",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "lines": {
+              "clearance": "भारी छूट"
+            }
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "ready-made lines that are not an object are ignored",
+      "input": {
+        "schema": 1,
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi",
+            "lines": [
+              "x"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "value": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi"
+          },
+          "posterLines": {}
+        },
+        "problems": []
+      }
+    }
+  ],
+  "build": [
+    {
+      "name": "nothing typed: only what the country pack and the industry pack say",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop"
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "a country and a kind of business the packs do not know: the file says nothing",
+      "intake": {
+        "business": {
+          "country": "ZZ",
+          "industry": "spaceship"
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1
+        },
+        "problems": [],
+        "read": {
+          "countryName": "",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "the country and the business named by hand",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "countryName": "the Philippines",
+          "shopKind": "a small shop"
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "the Philippines"
+          },
+          "shopKind": "a small shop"
+        },
+        "problems": [],
+        "read": {
+          "countryName": "the Philippines",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "another country and another trade",
+      "intake": {
+        "business": {
+          "country": "JP",
+          "industry": "restaurant"
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "JP",
+            "name": "Japan"
+          },
+          "shopKind": "a restaurant or café"
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Japan",
+          "shopKind": "a restaurant or café",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "a lending library, in a country the pack names in full",
+      "intake": {
+        "business": {
+          "country": "AE",
+          "industry": "library"
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "AE",
+            "name": "United Arab Emirates"
+          },
+          "shopKind": "a lending library"
+        },
+        "problems": [],
+        "read": {
+          "countryName": "United Arab Emirates",
+          "shopKind": "a lending library",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "all three model photos",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "models": [
+            {
+              "title": "Filipino model",
+              "looks": "Filipino, in her late twenties"
+            },
+            {
+              "title": "Chinese-Filipino model",
+              "looks": "Chinese-Filipino"
+            },
+            {
+              "title": "Visayan model",
+              "looks": "Visayan, in his forties"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "models": [
+              {
+                "title": "Filipino model",
+                "looks": "Filipino, in her late twenties"
+              },
+              {
+                "title": "Chinese-Filipino model",
+                "looks": "Chinese-Filipino"
+              },
+              {
+                "title": "Visayan model",
+                "looks": "Visayan, in his forties"
+              }
+            ]
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Filipino model",
+              "looks": "Filipino, in her late twenties"
+            },
+            {
+              "title": "Chinese-Filipino model",
+              "looks": "Chinese-Filipino"
+            },
+            {
+              "title": "Visayan model",
+              "looks": "Visayan, in his forties"
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "only the second photo is typed: the first and the third stay neutral",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "models": [
+            {
+              "title": "",
+              "looks": ""
+            },
+            {
+              "title": "Visayan model",
+              "looks": ""
+            }
+          ]
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "models": [
+              {},
+              {
+                "title": "Visayan model"
+              }
+            ]
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Visayan model",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "a photo with only a look keeps its neutral title",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "models": [
+            {
+              "title": "",
+              "looks": "in her sixties"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "models": [
+              {
+                "looks": "in her sixties"
+              }
+            ]
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": "in her sixties"
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "festivals: a repeat in other letters is one",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "festivals": [
+            "Christmas",
+            "Sinulog",
+            "christmas",
+            "Valentine's Day"
+          ]
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "festivals": [
+              "Christmas",
+              "Sinulog",
+              "Valentine's Day"
+            ]
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Christmas",
+            "Sinulog",
+            "Valentine's Day"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "a second language with its name and tag",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": "fil"
+          }
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "localLanguage": {
+              "name": "Filipino",
+              "tag": "fil"
+            }
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": "fil"
+          },
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "a second language with ready-made lines",
+      "intake": {
+        "business": {
+          "country": "IN",
+          "industry": "retail"
+        },
+        "images": {
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi",
+            "lines": {
+              "clearance": "भारी छूट · सीमित स्टॉक",
+              "best-sellers": "सबकी पसंद"
+            }
+          }
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "IN",
+            "name": "India"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "localLanguage": {
+              "name": "Hindi",
+              "tag": "hi",
+              "lines": {
+                "clearance": "भारी छूट · सीमित स्टॉक",
+                "best-sellers": "सबकी पसंद"
+              }
+            }
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "India",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi"
+          },
+          "posterLines": {
+            "clearance": "भारी छूट · सीमित स्टॉक",
+            "best-sellers": "सबकी पसंद"
+          }
+        }
+      }
+    },
+    {
+      "name": "a second language with only a name is left out of the file, and said",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "localLanguage": {
+            "name": "Filipino",
+            "tag": ""
+          }
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop"
+        },
+        "problems": [
+          "The second language needs a name and a tag like hi or fil."
+        ],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "ready-made lines without a second language are not written",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "localLanguage": {
+            "name": "",
+            "tag": "",
+            "lines": {
+              "clearance": "Malaking bawas"
+            }
+          }
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop"
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    },
+    {
+      "name": "a customer with models, many festivals and a second language with lines",
+      "intake": {
+        "business": {
+          "country": "IN",
+          "industry": "retail"
+        },
+        "images": {
+          "countryName": "India",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model A",
+              "looks": "a first look"
+            },
+            {
+              "title": "Model B",
+              "looks": "a second look, with a comma"
+            },
+            {
+              "title": "Model C",
+              "looks": "a third look"
+            }
+          ],
+          "festivals": [
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15"
+          ],
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi",
+            "lines": {
+              "clearance": "भारी छूट · सीमित स्टॉक",
+              "new-arrivals": "नया माल आ गया है",
+              "best-sellers": "सबकी पसंद",
+              "festival-offer": "त्योहार पर खास दाम"
+            }
+          }
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "IN",
+            "name": "India"
+          },
+          "shopKind": "a small shop",
+          "images": {
+            "models": [
+              {
+                "title": "Model A",
+                "looks": "a first look"
+              },
+              {
+                "title": "Model B",
+                "looks": "a second look, with a comma"
+              },
+              {
+                "title": "Model C",
+                "looks": "a third look"
+              }
+            ],
+            "festivals": [
+              "Festival 1",
+              "Festival 2",
+              "Festival 3",
+              "Festival 4",
+              "Festival 5",
+              "Festival 6",
+              "Festival 7",
+              "Festival 8",
+              "Festival 9",
+              "Festival 10",
+              "Festival 11",
+              "Festival 12",
+              "Festival 13",
+              "Festival 14",
+              "Festival 15"
+            ],
+            "localLanguage": {
+              "name": "Hindi",
+              "tag": "hi",
+              "lines": {
+                "clearance": "भारी छूट · सीमित स्टॉक",
+                "new-arrivals": "नया माल आ गया है",
+                "best-sellers": "सबकी पसंद",
+                "festival-offer": "त्योहार पर खास दाम"
+              }
+            }
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "India",
+          "shopKind": "a small shop",
+          "models": [
+            {
+              "title": "Model A",
+              "looks": "a first look"
+            },
+            {
+              "title": "Model B",
+              "looks": "a second look, with a comma"
+            },
+            {
+              "title": "Model C",
+              "looks": "a third look"
+            }
+          ],
+          "festivals": [
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15"
+          ],
+          "localLanguage": {
+            "name": "Hindi",
+            "tag": "hi"
+          },
+          "posterLines": {
+            "clearance": "भारी छूट · सीमित स्टॉक",
+            "new-arrivals": "नया माल आ गया है",
+            "best-sellers": "सबकी पसंद",
+            "festival-offer": "त्योहार पर खास दाम"
+          }
+        }
+      }
+    },
+    {
+      "name": "the most festivals the program uses",
+      "intake": {
+        "business": {
+          "country": "PH",
+          "industry": "retail"
+        },
+        "images": {
+          "festivals": [
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15",
+            "Festival 16",
+            "Festival 17",
+            "Festival 18",
+            "Festival 19",
+            "Festival 20",
+            "Festival 21",
+            "Festival 22",
+            "Festival 23",
+            "Festival 24"
+          ]
+        }
+      },
+      "expect": {
+        "file": {
+          "schema": 1,
+          "country": {
+            "code": "PH",
+            "name": "Philippines"
+          },
+          "shopKind": "a retail shop",
+          "images": {
+            "festivals": [
+              "Festival 1",
+              "Festival 2",
+              "Festival 3",
+              "Festival 4",
+              "Festival 5",
+              "Festival 6",
+              "Festival 7",
+              "Festival 8",
+              "Festival 9",
+              "Festival 10",
+              "Festival 11",
+              "Festival 12",
+              "Festival 13",
+              "Festival 14",
+              "Festival 15",
+              "Festival 16",
+              "Festival 17",
+              "Festival 18",
+              "Festival 19",
+              "Festival 20",
+              "Festival 21",
+              "Festival 22",
+              "Festival 23",
+              "Festival 24"
+            ]
+          }
+        },
+        "problems": [],
+        "read": {
+          "countryName": "Philippines",
+          "shopKind": "a retail shop",
+          "models": [
+            {
+              "title": "Model 1",
+              "looks": ""
+            },
+            {
+              "title": "Model 2",
+              "looks": ""
+            },
+            {
+              "title": "Model 3",
+              "looks": ""
+            }
+          ],
+          "festivals": [
+            "Festival 1",
+            "Festival 2",
+            "Festival 3",
+            "Festival 4",
+            "Festival 5",
+            "Festival 6",
+            "Festival 7",
+            "Festival 8",
+            "Festival 9",
+            "Festival 10",
+            "Festival 11",
+            "Festival 12",
+            "Festival 13",
+            "Festival 14",
+            "Festival 15",
+            "Festival 16",
+            "Festival 17",
+            "Festival 18",
+            "Festival 19",
+            "Festival 20",
+            "Festival 21",
+            "Festival 22",
+            "Festival 23",
+            "Festival 24"
+          ],
+          "localLanguage": null,
+          "posterLines": {}
+        }
+      }
+    }
+  ]
+}

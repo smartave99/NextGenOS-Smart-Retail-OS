@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { getSiteContent, updateSiteContent, ProductsPageContent } from "@/app/actions";
-import { Loader2, ArrowLeft, Save, Search, ListFilter, IndianRupee, Layers, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, Save, Search, ListFilter, Coins, Layers, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
 
@@ -157,7 +157,7 @@ export default function ProductsPageEditor() {
                                 />
                                 <FilterToggle
                                     label="Price Range"
-                                    icon={<IndianRupee className="w-4 h-4" />}
+                                    icon={<Coins className="w-4 h-4" />}
                                     checked={content.showPriceRange ?? true}
                                     onChange={(val) => setContent({ ...content, showPriceRange: val })}
                                 />

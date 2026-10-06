@@ -1,5 +1,6 @@
 import { extractBarcodeCandidate } from "./barcode";
 import type { IntentAnalysis, RecommendationResponse } from "@/types/assistant-types";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export type AssistantScope = "shopping" | "greeting" | "out_of_scope";
 
@@ -16,7 +17,7 @@ const OFF_TOPIC_PATTERN = /\b(?:poem|essay|story|joke|lyrics?|song|homework|codi
 
 const GENERIC_ANSWER_REQUEST_PATTERN = /\b(?:write|compose|draft|tell(?:\s+me)?|explain|solve|teach|translate|summari[sz]e|calculate|diagnose|predict)\b/i;
 
-const SHOPPING_SIGNAL_PATTERN = /(?:\b(?:smart\s*avenue|product|products|item|items|shop|store|visit|department|category|categories|browse|find|show|search|recommend|recommendation|compare|comparison|gift|present|offer|offers|deal|deals|discount|sale|price|cost|budget|available|availability|stock|arrival|arrivals|trending|popular|barcode|ean|upc|sku|scan|image|photo|camera|colour|color|size|brand|material|feature|variant|quality|delivery|order|purchase|buy|pickup|reservation|reserve|address|location|timings?|hours|open|close|contact|whatsapp)\b|₹|\brs\.?\s*\d)/i;
+const SHOPPING_SIGNAL_PATTERN = /(?:\b(?:product|products|item|items|shop|store|visit|department|category|categories|browse|find|show|search|recommend|recommendation|compare|comparison|gift|present|offer|offers|deal|deals|discount|sale|price|cost|budget|available|availability|stock|arrival|arrivals|trending|popular|barcode|ean|upc|sku|scan|image|photo|camera|colour|color|size|brand|material|feature|variant|quality|delivery|order|purchase|buy|pickup|reservation|reserve|address|location|timings?|hours|open|close|contact|whatsapp)\b|[\u20B9$\u20AC\u00A3\u00A5\u20B1]|\b(?:rs|inr|usd|eur|gbp|php)\.?\s*\d)/i;
 
 // Covers direct catalogue-style searches, including the concise phrases Groq
 // Vision returns after reading a product photo. Customers can still ask for an
@@ -71,7 +72,7 @@ function scopeIntent(scope: AssistantScope): IntentAnalysis {
         requirements: [],
         budget: { min: null, max: null },
         preferences: [],
-        useCase: scope === "greeting" ? "Storefront greeting" : "Outside Smart Avenue shopping scope",
+        useCase: scope === "greeting" ? "Storefront greeting" : `Outside ${SHOP_NAME} shopping scope`,
         searchTerm: null,
         confidence: 1,
         // The client uses this flag to avoid offering a product-request link
@@ -96,8 +97,8 @@ export function createScopedAssistantResponse(
         intent: scopeIntent(decision.scope),
         recommendations: [],
         summary: isGreeting
-            ? "Hi, I’m Genie, Smart Avenue’s shopping assistant. I can help you find products, compare options, check current offers, plan a store visit, or request an item. What are you shopping for?"
-            : "I can help only with Smart Avenue products, current offers, store visits, availability, comparisons, and product requests. Tell me what you’re shopping for.",
+            ? `Hi, I’m Genie, ${SHOP_NAME}’s shopping assistant. I can help you find products, compare options, check current offers, plan a store visit, or request an item. What are you shopping for?`
+            : `I can help only with ${SHOP_NAME} products, current offers, store visits, availability, comparisons, and product requests. Tell me what you’re shopping for.`,
         processingTime,
     };
 }

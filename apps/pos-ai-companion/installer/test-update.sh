@@ -8,7 +8,9 @@
 #     if someone had switched an earlier copy off; an update leaves that as it was;
 #   - it gives up (and installs nothing) when the app does not quit in time, and without /UPDATE a quiet setup still stops
 #     at once when the app is running;
-#   - the version, the files and the uninstaller are the new ones, and its uninstaller removes exactly them.
+#   - the version, the files and the uninstaller are the new ones, and its uninstaller removes exactly them;
+#   - a setup prepared for one business (a folder "profile" with ai.json beside it) copies that file into the install folder, a quiet
+#     update that brings no profile keeps the one already installed, a new profile replaces the old one, and the uninstaller removes it.
 # Needs makensis (NSIS 3, with its 64-bit stub), wine64 and Xvfb: apt-get install nsis wine64 xvfb. No .NET, no WebView2.
 #   SmartRetailAI/installer/test-update.sh
 set -euo pipefail
@@ -114,6 +116,11 @@ run_setup() { # setup [options]
   shift
   (cd "$work" && wine cmd /c "$setup $* /D=C:\\App") > "$work/setup.log" 2>&1
 }
+run_setup_in() { # folder setup [options]: the setup is run from another folder, which may hold a "profile" folder beside it
+  local folder="$1" setup="$2"
+  shift 2
+  (cd "$folder" && wine cmd /c "$setup $* /D=C:\\App") > "$work/setup.log" 2>&1
+}
 has_run_value() { wine reg query "$runkey" /v "$runvalue" > /dev/null 2>&1; }
 # Windows keeps a value like this in its list of start-up apps when someone switches an entry off (Task Manager).
 switch_off_in_windows() { wine reg add "$approvedkey" /v "$runvalue" /t REG_BINARY /d 030000000000000000000000 /f > /dev/null 2>&1; }
@@ -158,6 +165,22 @@ wineserver -w
 check "the update keeps the desktop shortcut and start with Windows" '[ -f "$desktop" ] && has_run_value && [ "$(version_installed)" = "2.0.0" ]'
 check "and does not switch it on again against what was chosen in Windows" 'is_switched_off_in_windows'
 
+echo "== a setup prepared for one business copies its profile in; a quiet update that brings none keeps it; a new one replaces it"
+mkdir -p "$work/prepared/profile"
+cp "$work/setup-1.0.0.exe" "$work/setup-2.0.0.exe" "$work/prepared/"
+echo '{ "schema": 1, "country": { "name": "Testland" } }' > "$work/prepared/profile/ai.json"
+check "the plain setups so far left no profile" '[ ! -e "$app/profile/ai.json" ]'
+run_setup_in "$work/prepared" setup-1.0.0.exe /S /CurrentUser || true
+wineserver -w
+check "the profile beside the setup is in the install folder" '[ "$(version_installed)" = "1.0.0" ] && grep -q Testland "$app/profile/ai.json"'
+run_setup setup-2.0.0.exe /S /UPDATE /CurrentUser || true   # the setups in $work have no profile folder beside them, like a downloaded update
+wineserver -w
+check "an update with no profile beside it installs the new version and keeps the profile" '[ "$(version_installed)" = "2.0.0" ] && grep -q Testland "$app/profile/ai.json"'
+echo '{ "schema": 1, "country": { "name": "Otherland" } }' > "$work/prepared/profile/ai.json"
+run_setup_in "$work/prepared" setup-2.0.0.exe /S /UPDATE /CurrentUser || true
+wineserver -w
+check "a new profile beside the setup replaces the old one" 'grep -q Otherland "$app/profile/ai.json" && ! grep -q Testland "$app/profile/ai.json"'
+
 echo "== when the app does not quit in time, nothing is installed"
 run_setup setup-1.0.0.exe /S /CurrentUser || true   # back to version 1
 wineserver -w
@@ -185,5 +208,6 @@ wineserver -w
 check "the program's files and the uninstaller are gone" '[ ! -f "$app/version.txt" ] && [ ! -f "$app/SmartRetailAI.exe" ] && [ ! -d "$app/sql" ]'
 check "a folder of the owner's in the same place is left alone" '[ -f "$app/keep/notes.txt" ]'
 check "the shortcuts and the entries are gone" '[ ! -f "$desktop" ] && [ ! -f "$menu" ] && ! has_run_value'
+check "the profile and its folder are gone too" '[ ! -e "$app/profile" ]'
 
 echo "All $pass checks passed."

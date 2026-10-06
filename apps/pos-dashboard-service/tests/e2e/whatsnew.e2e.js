@@ -22,10 +22,10 @@ fs.writeFileSync(settingsFile, JSON.stringify({ PreferredProvider: 'codex-cli' }
 fs.writeFileSync(path.join(work, 'storage.json'), JSON.stringify({ DataFolder: path.join(work, 'data') }));
 
 // What the project says about itself: the newest entry is what the app is built as.
-const root = path.join(__dirname, '../../..');
+const root = path.join(__dirname, '../../../..'); // the repository's root: CHANGELOG.md is there; the dashboard's own folder is apps/pos-dashboard-service
 const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
 const newest = /^## (\d+\.\d+\.\d+)/m.exec(log)[1];
-const built = /<Version>([^<]+)<\/Version>/.exec(fs.readFileSync(path.join(root, 'SmartRetailPOS/Directory.Build.props'), 'utf8'))[1];
+const built = /<Version>([^<]+)<\/Version>/.exec(fs.readFileSync(path.join(__dirname, '../../Directory.Build.props'), 'utf8'))[1];
 assert.strictEqual(newest, built, 'the newest entry of CHANGELOG.md is the version the dashboard is built as');
 const releases = [...log.matchAll(/^## (\d+\.\d+\.\d+)/gm)].map(m => m[1]);
 // The kinds of change the newest entry lists (New, Improved, Fixed): the page shows each of them.
@@ -38,11 +38,17 @@ async function startApp() {
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
+  let last = 'no answer';
   for (let i = 0; i < 180; i++) {
-    try { if ((await fetch(BASE + '/')).ok) return app; } catch { /* not up yet */ }
+    try {
+      const answer = await fetch(BASE + '/');
+      if (answer.ok) return app;
+      last = answer.status + ' ' + (await answer.text()).replace(/\s+/g, ' ').slice(0, 160);
+    } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error('The app did not start on ' + BASE);
+  stopApp(app); // never leave it running, holding the port for the next try
+  throw new Error('The app did not start on ' + BASE + ' (last answer: ' + last + '). A 402 means the licence gate is closed: run the test through with-licence.mjs.');
 }
 
 function stopApp(app) {

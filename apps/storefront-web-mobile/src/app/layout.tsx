@@ -8,6 +8,10 @@ import { DEFAULT_SITE_CONFIG } from "@/types/site-config";
 import { Suspense } from "react";
 import Script from "next/script";
 
+// The licence brand and the licence gate depend on the licence at run time, not on the build: every page is rendered per request
+// (the shop's own data stays cached for an hour by getSiteConfig).
+export const dynamic = "force-dynamic";
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -25,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const config = await getSiteConfig();
 
   return {
-    metadataBase: new URL('https://smartavenue99.com'),
+    metadataBase: new URL(config.seo.jsonLd.url || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
     title: {
       default: config.seo.siteTitle,
       template: config.seo.titleTemplate,
@@ -35,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: config.seo.siteTitle,
       description: config.seo.metaDescription,
-      url: 'https://smartavenue99.com',
+      url: config.seo.jsonLd.url || undefined,
       siteName: config.branding.siteName,
       images: [
         {
@@ -44,7 +48,6 @@ export async function generateMetadata(): Promise<Metadata> {
           height: 630,
         },
       ],
-      locale: 'en_IN',
       type: 'website',
     },
     twitter: {
@@ -125,7 +128,8 @@ async function ConfigLoader({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
-      {config.system.scripts.googleAnalyticsId && (
+      {/* Only a plain measurement id (G-XXXX, UA-…) goes into a script: anything else is ignored. */}
+      {/^[A-Za-z0-9-]{3,30}$/.test(config.system.scripts.googleAnalyticsId ?? "") && (
         <>
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${config.system.scripts.googleAnalyticsId}`}

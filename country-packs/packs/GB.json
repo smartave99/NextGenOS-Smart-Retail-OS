@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "country": "GB",
+  "name": "United Kingdom",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "GBP",
+    "symbol": "£",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-GB",
+  "languages": [
+    "en"
+  ],
+  "timezone": "Europe/London",
+  "phoneCode": "+44",
+  "fiscalYearStart": {
+    "month": 4,
+    "day": 6
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT20",
+        "label": "VAT 20%",
+        "percent": "20"
+      },
+      {
+        "code": "VAT5",
+        "label": "VAT 5%",
+        "percent": "5"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "VAT20",
+      "reduced": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
+    "businessId": {
+      "label": "VAT number",
+      "pattern": "^(GB)?[0-9]{9}([0-9]{3})?$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "VAT Invoice",
+    "requiredFields": [
+      "Seller name, address and VAT number",
+      "Invoice number and date",
+      "Description, quantity and price of each item",
+      "VAT rate and amount",
+      "Buyer name and address (full invoice); a simplified invoice is allowed for sales up to £250"
+    ],
+    "eInvoice": "Making Tax Digital rules apply to VAT records: keep them in a compatible form.",
+    "retentionYears": 6
+  },
+  "notes": [
+    "VAT registration is required above the yearly sales threshold (£90,000 since April 2024).",
+    "Compulsory service charges are subject to VAT; voluntary tips are not."
+  ]
+}

@@ -12,8 +12,9 @@
 @inject WhatsNewService News
 @inject TimeProvider Clock
 @inject ILogger<Home> Log
+@inject BrandService Brand
 
-<PageTitle>Today · Smart Retail POS</PageTitle>
+<PageTitle>Today · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
@@ -57,7 +58,7 @@
     @* After an update: what changed, once. Opening What's new, or Got it, counts the version as seen. *@
     <div class="news-banner" role="status">
         <Icon Name="news" />
-        <span><strong>Smart Retail POS @News.CurrentVersion.</strong> @(now.Summary.Length > 0 ? now.Summary : "See what changed in this update.")</span>
+        <span><strong>@Brand.Name @News.CurrentVersion.</strong> @(now.Summary.Length > 0 ? now.Summary : "See what changed in this update.")</span>
         <a class="setup-banner-go" href="whats-new">What's new ›</a>
         <button type="button" class="btn btn-sm btn-link" @onclick="News.MarkSeen">Got it</button>
     </div>
@@ -228,12 +229,7 @@ else
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
-    private string Greeting => Clock.GetLocalNow().Hour switch
-    {
-        < 12 => "Good morning",
-        < 17 => "Good afternoon",
-        _ => "Good evening",
-    };
+    private string Greeting => Clock.GetLocalNow().Hour < 12 ? "Good morning" : Clock.GetLocalNow().Hour < 17 ? "Good afternoon" : "Good evening";
 
     protected override void OnInitialized()
     {
@@ -358,12 +354,9 @@ else
         var tips = new List<Suggestion>();
         if (report.ReorderNow.FirstOrDefault() is { } reorder)
         {
-            var when = reorder.DaysOfStock switch
-            {
-                < 1m => "today",
-                < 2m => "tomorrow",
-                _ => $"in about {Formats.Days(reorder.DaysOfStock)} days",
-            };
+            var when = reorder.DaysOfStock < 1m ? "today"
+                : reorder.DaysOfStock < 2m ? "tomorrow"
+                : $"in about {Formats.Days(reorder.DaysOfStock)} days";
             tips.Add(new("stock", "orange", $"{reorder.Name} may run out {when}",
                 $"{Money.FormatQty(reorder.StockInHand)} left, and it sells about {Formats.Days(reorder.QtyPerDay)} a day. Reorder soon.",
                 "Low stock", "stock"));

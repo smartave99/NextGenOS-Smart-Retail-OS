@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "country": "IT",
+  "name": "Italy",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "EUR",
+    "symbol": "€",
+    "decimals": 2,
+    "symbolPosition": "after",
+    "symbolSpace": true,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": "."
+  },
+  "locale": "it-IT",
+  "languages": [
+    "it",
+    "en"
+  ],
+  "timezone": "Europe/Rome",
+  "phoneCode": "+39",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "IVA",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "IVA22",
+        "label": "IVA 22%",
+        "percent": "22"
+      },
+      {
+        "code": "IVA10",
+        "label": "IVA 10%",
+        "percent": "10"
+      },
+      {
+        "code": "IVA5",
+        "label": "IVA 5%",
+        "percent": "5"
+      },
+      {
+        "code": "IVA4",
+        "label": "IVA 4%",
+        "percent": "4"
+      },
+      {
+        "code": "IVA0",
+        "label": "IVA 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "IVAEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "IVA22",
+      "reduced": "IVA10",
+      "zero": "IVA0",
+      "exempt": "IVAEX"
+    },
+    "businessId": {
+      "label": "Partita IVA",
+      "pattern": "^IT[0-9]{11}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Fattura",
+    "requiredFields": [
+      "Seller name, address and Partita IVA",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "Tax rate and amount"
+    ],
+    "eInvoice": "Electronic invoices through SDI and daily electronic receipts (corrispettivi) are compulsory.",
+    "retentionYears": 10
+  },
+  "notes": [
+    "Shops must send receipts electronically to the tax office with an approved register."
+  ]
+}

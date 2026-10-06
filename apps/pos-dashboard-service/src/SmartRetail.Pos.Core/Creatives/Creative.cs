@@ -26,7 +26,7 @@ public sealed record CreativeStyle(string Id, string Name, string Brief)
 {
     public static CreativeStyle Clean { get; } = new("clean", "Clean and modern", "clean and modern, with plenty of space, one bold accent colour and crisp product shots");
 
-    public static CreativeStyle Festive { get; } = new("festive", "Festive", "festive, for an Indian festival: rich colours, marigolds, diyas and warm lights");
+    public static CreativeStyle Festive { get; } = new("festive", "Festive", "festive, for a festival: rich, warm colours, decorations and lights");
 
     public static CreativeStyle Sale { get; } = new("sale", "Big sale", "a bold sale: energetic colours, strong shapes and big, confident type");
 
@@ -54,6 +54,9 @@ public sealed record CreativeBrief
     public string Format { get; init; } = CreativeFormat.Square.Id;
 
     public string Style { get; init; } = CreativeStyle.Clean.Id;
+
+    /// <summary>Who the advertisement is for, in the owner's words. Empty when not given, also in a creative saved before this was asked.</summary>
+    public string Audience { get; init; } = "";
 
     public string Headline { get; init; } = "";
 

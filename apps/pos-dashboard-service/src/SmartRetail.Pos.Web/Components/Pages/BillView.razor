@@ -1,8 +1,9 @@
 @page "/bills/{Id:long}"
 @inject IInvoiceRepository Invoices
 @inject ILogger<BillView> Log
+@inject BrandService Brand
 
-<PageTitle>@(bill is null ? "Bill" : "Bill " + bill.Summary.Number) · Smart Retail POS</PageTitle>
+<PageTitle>@(bill is null ? "Bill" : "Bill " + bill.Summary.Number) · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

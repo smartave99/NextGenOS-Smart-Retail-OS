@@ -4,8 +4,9 @@
 @inject ISalesFactsRepository Facts
 @inject TimeProvider Clock
 @inject ILogger<Sales> Log
+@inject BrandService Brand
 
-<PageTitle>Sales · Smart Retail POS</PageTitle>
+<PageTitle>Sales · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
@@ -400,10 +401,8 @@ else
         : "No purchase prices recorded";
 
     /// <summary>"3 a day", "2 a week" or "1.5 a month", whichever reads naturally.</summary>
-    private static string Rate(decimal perDay) => perDay switch
-    {
-        >= 1m => perDay.ToString("0.#", CultureInfo.InvariantCulture) + "/day",
-        >= 1m / 7 => (perDay * 7).ToString("0.#", CultureInfo.InvariantCulture) + "/week",
-        _ => (perDay * 30).ToString("0.#", CultureInfo.InvariantCulture) + "/month",
-    };
+    private static string Rate(decimal perDay) =>
+        perDay >= 1m ? perDay.ToString("0.#", CultureInfo.InvariantCulture) + "/day"
+        : perDay >= 1m / 7 ? (perDay * 7).ToString("0.#", CultureInfo.InvariantCulture) + "/week"
+        : (perDay * 30).ToString("0.#", CultureInfo.InvariantCulture) + "/month";
 }

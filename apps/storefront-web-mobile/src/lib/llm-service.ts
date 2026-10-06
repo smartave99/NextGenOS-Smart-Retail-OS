@@ -23,6 +23,9 @@ import {
 } from "./groq-config";
 import { withAIResponseCache } from "./ai-response-cache";
 import { z } from "zod";
+import { SHOP_NAME } from "@/lib/shop-name";
+import { COUNTRY_NAME, money } from "@/lib/region/lite";
+import { languageList } from "@/lib/shop-facts";
 
 // Extended intent response to include product requests
 interface GenericIntentResponse extends LLMIntentResponse {
@@ -541,7 +544,7 @@ async function callLLM(
 
 /**
  * LLM call with dynamic generation settings from admin configuration.
- * Provider priority is deliberately ignored because SmartAvenue now has one
+ * Provider priority is deliberately ignored because the shop now has one
  * LLM provider: Groq. Gemini remains isolated to vector embeddings only.
  */
 async function callLLMWithConfig(prompt: string, overrideProvider?: LLMProvider | "auto", overrideModel?: string): Promise<string> {
@@ -740,7 +743,7 @@ export async function rankProducts(
         tags: p.tags,
     }));
 
-    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at Smart Avenue.
+    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at ${SHOP_NAME}.
 
 Customer query: "${query}"
 
@@ -748,7 +751,7 @@ Intent analysis:
 - Use case: ${intent.useCase}
 - Requirements: ${intent.requirements.join(", ") || "none specified"}
 - Preferences: ${intent.preferences.join(", ") || "none specified"}
-- Budget: ${intent.budgetMin ? `₹${intent.budgetMin}` : "any"} - ${intent.budgetMax ? `₹${intent.budgetMax}` : "any"}
+- Budget: ${intent.budgetMin ? money(intent.budgetMin) : "any"} - ${intent.budgetMax ? money(intent.budgetMax) : "any"}
 
 Available products:
 ${JSON.stringify(productList, null, 2)}
@@ -799,7 +802,7 @@ export async function generateSummary(
     const config = await getAIConfig();
     const persona = config.personaName;
 
-    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at Smart Avenue.
+    const prompt = `Hi, I'm ${persona}, your personal Shopping Master at ${SHOP_NAME}.
 
 Customer asked: "${query}"
 
@@ -827,7 +830,7 @@ export async function generateNoProductFoundResponse(
 
 CRITICAL INSTRUCTION:
 - You MUST detect the language of the Customer Query.
-- You MUST reply in the SAME language as the query (Hindi, Urdu, Hinglish, or English).
+- You MUST reply in the SAME language as the query (${languageList()}, or whatever language they write in).
 - Be the helpful Master ${persona}.
 
 Customer query: "${query}"
@@ -974,7 +977,7 @@ export async function rankAndSummarize(
     const prompt = `${config.systemPrompt}
 
 CRITICAL INSTRUCTION:
-- You MUST reply in the SAME language as the query (English, Hindi, Urdu, or Hinglish).
+- You MUST reply in the SAME language as the query (${languageList()}, or whatever language they write in).
 - Be charming and speak as ${persona}, the Shopping Master.
 
 Customer query: "${query}"
@@ -983,7 +986,7 @@ Intent analysis:
 - Use case: ${intent.useCase}
 - Requirements: ${intent.requirements.join(", ") || "none specified"}
 - Preferences: ${intent.preferences.join(", ") || "none specified"}
-- Budget: ${intent.budgetMin ? `₹${intent.budgetMin}` : "any"} - ${intent.budgetMax ? `₹${intent.budgetMax}` : "any"}
+- Budget: ${intent.budgetMin ? money(intent.budgetMin) : "any"} - ${intent.budgetMax ? money(intent.budgetMax) : "any"}
 
 Available products:
 ${JSON.stringify(productList, null, 2)}
@@ -1055,37 +1058,18 @@ export async function generateDealExplanation(
     const savings = product.originalPrice ? product.originalPrice - product.price : 0;
     const savingsPercent = product.originalPrice ? Math.round((savings / product.originalPrice) * 100) : 0;
 
-    const prompt = `You are a charismatic sales associate at Smart Avenue.
+    const prompt = `You are a charismatic sales associate at ${SHOP_NAME}.
 Explain why the current deal on "${product.name}" is amazing for the customer.
 
 Product Info:
-- Current Price: ₹${product.price}
-- Original Price: ${product.originalPrice ? `₹${product.originalPrice}` : "N/A"}
-- Savings: ${savings > 0 ? `₹${savings} (${savingsPercent}% off)` : "Best value in category"}
+- Current Price: ${money(product.price)}
+- Original Price: ${product.originalPrice ? money(product.originalPrice) : "N/A"}
+- Savings: ${savings > 0 ? `${money(savings)} (${savingsPercent}% off)` : "Best value in category"}
 ${userIntent ? `- User's Goal: ${userIntent}` : ""}
 
-Provide a persuasive, 1-2 sentence "pitch" that makes the user feel they are getting a great deal. Be friendly and culturally relevant to India.`;
+Provide a persuasive, 1-2 sentence "pitch" that makes the user feel they are getting a great deal. Be friendly and culturally relevant to ${COUNTRY_NAME}.`;
 
     // Use light model for simple creative text
-    const response = await callGroqAPI(prompt);
-    return response.trim().replace(/^["']|["']$/g, "");
-}
-
-/**
- * AI Social Proof Generator: Generates trending snippets for products
- */
-export async function generateSocialProof(
-    product: { name: string; categoryId: string; tags: string[] },
-    salesStats?: { salesInLastMonth: number; popularInCity?: string }
-): Promise<string> {
-    const stats = salesStats ? `${salesStats.salesInLastMonth} people bought this recently${salesStats.popularInCity ? ` in ${salesStats.popularInCity}` : ""}` : "Currently trending";
-
-    const prompt = await getPrompt("social-proof", {
-        productName: product.name,
-        categoryId: product.categoryId,
-        stats
-    });
-
     const response = await callGroqAPI(prompt);
     return response.trim().replace(/^["']|["']$/g, "");
 }
@@ -1103,7 +1087,7 @@ export async function generateDealInsight(
     const prompt = await getPrompt("deal-insight", {
         productName: product.name,
         price: product.price,
-        discount: discount > 0 ? `(was ₹${product.originalPrice}, ${discount}% OFF)` : "",
+        discount: discount > 0 ? `(was ${money(product.originalPrice)}, ${discount}% OFF)` : "",
         description: product.description.substring(0, 100) + "..."
     });
 
@@ -1331,7 +1315,7 @@ export async function generateBackInStockMessage(
     productName: string,
     customerName: string
 ): Promise<{ subject: string; body: string; discountCode?: string }> {
-    const prompt = `You are a customer loyalty bot for Smart Avenue.
+    const prompt = `You are a customer loyalty bot for ${SHOP_NAME}.
     Context:
     - Customer: ${customerName}
     - Item Back in Stock: ${productName}
@@ -1360,7 +1344,7 @@ export async function generateBackInStockMessage(
 
 /**
  * Multilingual Local Language Assistant
- * Handles general queries, product advice, and store info in Indian context.
+ * Handles general queries, product advice, and store info in the shop's local context.
  */
 export async function chatWithAssistant(
     message: string,

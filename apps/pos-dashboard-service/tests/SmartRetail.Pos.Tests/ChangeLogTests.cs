@@ -45,7 +45,7 @@ public sealed class ChangeLogTests
     private static string Root()
     {
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !(File.Exists(Path.Combine(folder.FullName, "CHANGELOG.md")) && Directory.Exists(Path.Combine(folder.FullName, "SmartRetailAI"))))
+        while (folder is not null && !(File.Exists(Path.Combine(folder.FullName, "CHANGELOG.md")) && Directory.Exists(Path.Combine(folder.FullName, "apps", "pos-ai-companion"))))
         {
             folder = folder.Parent;
         }
@@ -164,8 +164,8 @@ public sealed class ChangeLogTests
         var newest = ChangeLog.Parse(File.ReadAllText(Path.Combine(Root(), "CHANGELOG.md")))[0].Version;
 
         // A release cannot go out without its entry: the log names what the app and the dashboard are built as.
-        Assert.Equal(BuiltVersion("SmartRetailAI/Directory.Build.props"), newest);
-        Assert.Equal(BuiltVersion("SmartRetailPOS/Directory.Build.props"), newest);
+        Assert.Equal(BuiltVersion("apps/pos-ai-companion/Directory.Build.props"), newest);
+        Assert.Equal(BuiltVersion("apps/pos-dashboard-service/Directory.Build.props"), newest);
     }
 
     [Fact]

@@ -189,6 +189,8 @@ namespace SmartRetail.AI.Providers
                 throw new AiProviderException(Id, problem, canFallback: false);
             }
 
+            // The customer's own picture settings (its profile), never the owner's: who the photos show, where, in which language.
+            request.Shop = Settings().Shop ?? ShopProfile.Neutral;
             var executable = RequireExecutable();
             using var turn = await TakeImageTurnAsync(progress, cancellationToken).ConfigureAwait(false);
             using (var workspace = new RunWorkspace(WorkspaceRoot))
@@ -212,7 +214,7 @@ namespace SmartRetail.AI.Providers
                     StandardInput = ProductPhotoPrompt.CodexPrompt(request),
                     Timeout = PhotoTimeout,
                 };
-                var schema = request.Describe ? workspace.WriteFile(PhotoSchemaFile, ProductPhotoPrompt.UnderstandingSchema) : null;
+                var schema = request.Describe ? workspace.WriteFile(PhotoSchemaFile, ProductPhotoPrompt.SchemaFor(request.Shop)) : null;
                 invocation.Arguments.AddRange(BuildPhotoArguments(workspace.DirectoryPath, photos, schema, workspace.PathOf(LastMessageFile)));
                 invocation.Environment["NO_COLOR"] = "1";
 
@@ -345,6 +347,8 @@ namespace SmartRetail.AI.Providers
                 throw new AiProviderException(Id, "The poster needs a theme.", canFallback: false);
             }
 
+            // The customer's own picture settings (its profile), never the owner's: who the photos show, where, in which language.
+            request.Shop = Settings().Shop ?? ShopProfile.Neutral;
             var executable = RequireExecutable();
             using var turn = await TakeImageTurnAsync(progress, cancellationToken).ConfigureAwait(false);
             using (var workspace = new RunWorkspace(WorkspaceRoot))
@@ -396,6 +400,8 @@ namespace SmartRetail.AI.Providers
                 throw new AiProviderException(Id, problem, canFallback: false);
             }
 
+            // The customer's own picture settings (its profile), never the owner's: who the photos show, where, in which language.
+            request.Shop = Settings().Shop ?? ShopProfile.Neutral;
             var executable = RequireExecutable();
             using var turn = await TakeImageTurnAsync(progress, cancellationToken).ConfigureAwait(false);
             using (var workspace = new RunWorkspace(WorkspaceRoot))

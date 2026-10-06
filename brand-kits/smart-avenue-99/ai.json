@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "country": { "code": "IN", "name": "India" },
+  "shopKind": "a small shop",
+  "images": {
+    "models": [
+      { "title": "European model", "looks": "European" },
+      { "title": "Indian model", "looks": "Indian, with a fair complexion" },
+      { "title": "East Asian model", "looks": "East Asian" }
+    ],
+    "festivals": [
+      "Diwali",
+      "Navratri",
+      "Dussehra",
+      "Durga Puja",
+      "Dhanteras",
+      "Chhath",
+      "Christmas",
+      "New Year",
+      "Makar Sankranti",
+      "Pongal",
+      "Holi",
+      "Eid",
+      "Raksha Bandhan",
+      "Ganesh Chaturthi",
+      "Onam"
+    ],
+    "localLanguage": {
+      "name": "Hindi",
+      "tag": "hi",
+      "lines": {
+        "clearance": "भारी छूट · सीमित स्टॉक",
+        "new-arrivals": "नया माल आ गया है",
+        "best-sellers": "सबकी पसंद",
+        "festival-offer": "त्योहार पर खास दाम"
+      }
+    }
+  }
+}

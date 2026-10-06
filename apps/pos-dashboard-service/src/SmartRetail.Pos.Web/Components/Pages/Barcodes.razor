@@ -11,8 +11,9 @@
 @inject NavigationManager Nav
 @inject IJSRuntime Js
 @inject ILogger<Barcodes> Log
+@inject BrandService Brand
 
-<PageTitle>Barcodes · Smart Retail POS</PageTitle>
+<PageTitle>Barcodes · @Brand.Name</PageTitle>
 
 <div class="barcodes-page">
     <div class="page-head">
@@ -269,12 +270,7 @@
     private int Unprintable => chosen.Count(c => Sticker.Fits(c.Batch.Code, Sheet) is not null);
 
     /// <summary>Taller stickers get bigger writing: one line of name on small ones, more room on big ones.</summary>
-    private string? StickerSize => paper.LabelHeightMm switch
-    {
-        < 24 => "small",
-        >= 30 => "large",
-        _ => null,
-    };
+    private string? StickerSize => paper.LabelHeightMm < 24 ? "small" : paper.LabelHeightMm >= 30 ? "large" : null;
 
     private sealed class Choice
     {

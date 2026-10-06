@@ -1,7 +1,8 @@
 {
-  "name": "smart_avenue",
+  "name": "smart-retail-storefront",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "main": "main.js",
   "scripts": {
     "desktop": "electron .",
@@ -12,14 +13,13 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "track": "node scripts/track-cli.js",
     "generate-version": "node scripts/generate-version.js",
     "test": "vitest",
     "verify:ai": "ts-node -P tsconfig.scripts.json scripts/verify-all-api-keys.ts"
   },
   "build": {
-    "appId": "com.smartavenue.app",
-    "productName": "Smart Avenue",
+    "appId": "com.nextgenos.smartretail",
+    "productName": "Smart Retail POS",
     "directories": {
       "output": "dist-electron"
     },
@@ -47,9 +47,9 @@
     }
   },
   "dependencies": {
-    "@capacitor/android": "^8.3.4",
-    "@capacitor/core": "^8.3.4",
-    "@capacitor/ios": "^8.3.4",
+    "@capacitor/android": "^8.4.3",
+    "@capacitor/core": "^8.4.3",
+    "@capacitor/ios": "^8.4.3",
     "@langchain/core": "^1.2.3",
     "@langchain/langgraph": "^1.4.8",
     "@opentelemetry/api": "^1.9.0",
@@ -61,21 +61,22 @@
     "cloudinary": "^2.9.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "firebase": "^12.9.0",
-    "firebase-admin": "^13.6.1",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^14.5.0",
     "framer-motion": "^12.33.0",
     "lucide-react": "^0.563.0",
-    "next": "15.5.22",
+    "next": "^15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "read-excel-file": "^9.3.10",
+    "sanitize-html": "^2.18.0",
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "xlsx": "^0.18.5",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.3.4",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@eslint/eslintrc": "^3",
@@ -85,25 +86,32 @@
     "@types/node": "^20",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/xlsx": "^0.0.35",
+    "@types/sanitize-html": "^2.16.2",
     "@vitejs/plugin-react": "^5.1.4",
     "dotenv": "^17.2.4",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "eslint": "^9",
-    "eslint-config-next": "15.5.22",
+    "eslint-config-next": "^15.5.27",
     "jsdom": "^28.1.0",
     "postcss": "^8.5.23",
     "prisma": "6.19.3",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "next": {
-      "sharp": "0.35.3"
-    }
+      "sharp": "^0.35.4",
+      "postcss": "^8.5.23"
+    },
+    "nanoid": "^3.3.18",
+    "deepmerge-ts": "^8.0.0",
+    "@grpc/grpc-js": "^1.14.5",
+    "uuid": "^11.1.1",
+    "@fastify/busboy": "^3.2.2"
   }
 }

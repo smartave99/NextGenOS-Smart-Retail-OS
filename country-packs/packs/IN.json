@@ -1,0 +1,282 @@
+{
+  "schema": 1,
+  "country": "IN",
+  "name": "India",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "INR",
+    "symbol": "₹",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "indian",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-IN",
+  "languages": [
+    "en",
+    "hi"
+  ],
+  "timezone": "Asia/Kolkata",
+  "phoneCode": "+91",
+  "fiscalYearStart": {
+    "month": 4,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "GST",
+    "model": "gst-india",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "GST0",
+        "label": "GST 0% (nil rated)",
+        "percent": "0"
+      },
+      {
+        "code": "GST0P25",
+        "label": "GST 0.25% (rough diamonds)",
+        "percent": "0.25"
+      },
+      {
+        "code": "GST1P5",
+        "label": "GST 1.5% (cut and polished diamonds)",
+        "percent": "1.5"
+      },
+      {
+        "code": "GST3",
+        "label": "GST 3% (gold, silver)",
+        "percent": "3"
+      },
+      {
+        "code": "GST5",
+        "label": "GST 5%",
+        "percent": "5"
+      },
+      {
+        "code": "GST18",
+        "label": "GST 18%",
+        "percent": "18"
+      },
+      {
+        "code": "GST40",
+        "label": "GST 40% (sin and luxury goods)",
+        "percent": "40"
+      },
+      {
+        "code": "GSTEX",
+        "label": "Exempt",
+        "exempt": true
+      },
+      {
+        "code": "GST12",
+        "label": "GST 12% (old rate, until 21 Sep 2025)",
+        "percent": "12",
+        "legacy": true
+      },
+      {
+        "code": "GST28",
+        "label": "GST 28% (old rate, until 21 Sep 2025)",
+        "percent": "28",
+        "legacy": true
+      }
+    ],
+    "classes": {
+      "standard": "GST18",
+      "reduced": "GST5",
+      "zero": "GST0",
+      "exempt": "GSTEX"
+    },
+    "regions": {
+      "label": "State",
+      "list": [
+        {
+          "code": "01",
+          "name": "Jammu and Kashmir"
+        },
+        {
+          "code": "02",
+          "name": "Himachal Pradesh"
+        },
+        {
+          "code": "03",
+          "name": "Punjab"
+        },
+        {
+          "code": "04",
+          "name": "Chandigarh"
+        },
+        {
+          "code": "05",
+          "name": "Uttarakhand"
+        },
+        {
+          "code": "06",
+          "name": "Haryana"
+        },
+        {
+          "code": "07",
+          "name": "Delhi"
+        },
+        {
+          "code": "08",
+          "name": "Rajasthan"
+        },
+        {
+          "code": "09",
+          "name": "Uttar Pradesh"
+        },
+        {
+          "code": "10",
+          "name": "Bihar"
+        },
+        {
+          "code": "11",
+          "name": "Sikkim"
+        },
+        {
+          "code": "12",
+          "name": "Arunachal Pradesh"
+        },
+        {
+          "code": "13",
+          "name": "Nagaland"
+        },
+        {
+          "code": "14",
+          "name": "Manipur"
+        },
+        {
+          "code": "15",
+          "name": "Mizoram"
+        },
+        {
+          "code": "16",
+          "name": "Tripura"
+        },
+        {
+          "code": "17",
+          "name": "Meghalaya"
+        },
+        {
+          "code": "18",
+          "name": "Assam"
+        },
+        {
+          "code": "19",
+          "name": "West Bengal"
+        },
+        {
+          "code": "20",
+          "name": "Jharkhand"
+        },
+        {
+          "code": "21",
+          "name": "Odisha"
+        },
+        {
+          "code": "22",
+          "name": "Chhattisgarh"
+        },
+        {
+          "code": "23",
+          "name": "Madhya Pradesh"
+        },
+        {
+          "code": "24",
+          "name": "Gujarat"
+        },
+        {
+          "code": "26",
+          "name": "Dadra and Nagar Haveli and Daman and Diu"
+        },
+        {
+          "code": "27",
+          "name": "Maharashtra"
+        },
+        {
+          "code": "29",
+          "name": "Karnataka"
+        },
+        {
+          "code": "30",
+          "name": "Goa"
+        },
+        {
+          "code": "31",
+          "name": "Lakshadweep"
+        },
+        {
+          "code": "32",
+          "name": "Kerala"
+        },
+        {
+          "code": "33",
+          "name": "Tamil Nadu"
+        },
+        {
+          "code": "34",
+          "name": "Puducherry"
+        },
+        {
+          "code": "35",
+          "name": "Andaman and Nicobar Islands"
+        },
+        {
+          "code": "36",
+          "name": "Telangana"
+        },
+        {
+          "code": "37",
+          "name": "Andhra Pradesh"
+        },
+        {
+          "code": "38",
+          "name": "Ladakh"
+        },
+        {
+          "code": "97",
+          "name": "Other Territory"
+        }
+      ]
+    },
+    "businessId": {
+      "label": "GSTIN",
+      "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and GSTIN",
+      "Invoice number (unique, in sequence, up to 16 characters) and date",
+      "Buyer name, address and GSTIN (a registered buyer; an unregistered buyer when the invoice is above ₹50,000)",
+      "HSN code of goods or SAC of services (the number of digits depends on the seller's yearly turnover)",
+      "Description, quantity, unit and value of each item",
+      "Taxable value after discount",
+      "Rate and amount of CGST and SGST, or IGST, and cess",
+      "Place of supply (state name and code) when the sale is between states",
+      "Signature of the seller or the authorised person"
+    ],
+    "eInvoice": "E-invoicing (an IRN and a QR code from the government portal) is compulsory for businesses above the yearly turnover limit that GSTN sets and lowers from time to time. A shop below it does not need it. Check the current limit with your accountant.",
+    "retentionYears": 6
+  },
+  "notes": [
+    "Since 22 September 2025 most goods are taxed at 5% or 18%, with 40% for sin and luxury goods; the 12% and 28% rates ended and are kept only so that old stock and old bills still read correctly.",
+    "Compensation cess is entered on the line (cessPercent); it is no longer charged on most goods.",
+    "The region of a bill is the GST state code (for example 27 for Maharashtra). Sales between two states are charged IGST, sales inside one state are charged CGST and SGST.",
+    "Prices in India are normally printed with the tax already included."
+  ]
+}

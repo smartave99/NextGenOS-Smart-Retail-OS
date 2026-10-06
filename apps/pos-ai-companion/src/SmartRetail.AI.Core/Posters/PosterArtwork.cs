@@ -1,4 +1,5 @@
 using System;
+using SmartRetail.AI.Settings;
 
 namespace SmartRetail.AI.Posters
 {
@@ -7,6 +8,9 @@ namespace SmartRetail.AI.Posters
     {
         /// <summary>The poster's theme and colours, e.g. "a clearance sale: energetic red, coral and orange".</summary>
         public string Theme { get; set; } = "";
+
+        /// <summary>The customer's business (from its profile): the poster is made for it, in its country. Neutral when not given.</summary>
+        public ShopProfile Shop { get; set; } = ShopProfile.Neutral;
     }
 
     public sealed class PosterArtworkResult
@@ -33,7 +37,7 @@ namespace SmartRetail.AI.Posters
                 throw new ArgumentException("The poster needs a theme.", nameof(request));
             }
 
-            return "You are making the artwork for an A4 shop poster, for a small shop in India.\n"
+            return "You are making the artwork for an A4 shop poster, for " + (request.Shop ?? ShopProfile.Neutral).Shop + ".\n"
                 + "Use your image generation tool to make one tall portrait image (2:3, for example 1024 x 1536) with this theme: "
                 + request.Theme.Trim().TrimEnd('.') + ".\n"
                 + "Layout: the top 40% is a bold, rich area where a big white headline will be printed, so keep it dark enough "

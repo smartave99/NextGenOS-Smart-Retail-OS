@@ -4,6 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { requireAdminSession } from "@/lib/auth-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { headers } from "next/headers";
+import { UPLOAD_FOLDER_ROOT } from "@/lib/shop-name";
 
 /**
  * Cloudinary Multi-Account Rotation
@@ -141,7 +142,7 @@ export async function getCloudinarySignature(folder: string, transformation?: st
             const timestamp = Math.round(new Date().getTime() / 1000);
             const params: Record<string, string | number> = {
                 timestamp,
-                folder: `smart-avenue/${safeFolder}`,
+                folder: `${UPLOAD_FOLDER_ROOT}/${safeFolder}`,
             };
 
             if (transformation) {
@@ -155,7 +156,9 @@ export async function getCloudinarySignature(folder: string, transformation?: st
                 signature,
                 timestamp,
                 cloudName: config.cloud_name,
-                apiKey: config.api_key
+                apiKey: config.api_key,
+                // The folder that was signed: the upload must name exactly this one.
+                folder: String(params.folder),
             };
         } catch (error) {
             if (isLimitError(error) && i < cloudinaryConfigs.length - 1) {
@@ -211,7 +214,7 @@ export async function uploadToCloudinary(base64Image: string, folder: string, re
             applyConfig(cloudinaryConfigs[i]);
 
             const result = await cloudinary.uploader.upload(base64Image, {
-                folder: `smart-avenue/${folder}`,
+                folder: `${UPLOAD_FOLDER_ROOT}/${folder}`,
                 resource_type: resourceType,
             });
 

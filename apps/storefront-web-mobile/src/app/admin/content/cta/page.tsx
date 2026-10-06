@@ -11,10 +11,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import ImageUpload, { UploadedFile } from "@/components/ImageUpload";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 const defaultCTA: CTAContent = {
     title: "Ready to experience the new standard?",
-    text: "Join thousands of smart shoppers transforming their lifestyle with Smart Avenue.",
+    text: `Join thousands of smart shoppers transforming their lifestyle with ${SHOP_NAME}.`,
     ctaPrimary: "Start Shopping",
     ctaLink: "/products",
     ctaSecondary: "Chat with Us",

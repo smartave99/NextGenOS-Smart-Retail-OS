@@ -24,13 +24,6 @@ public static class PosterKinds
     /// <summary>How many products a poster can show; the A4 layouts are made for these.</summary>
     public static IReadOnlyList<int> ProductCounts { get; } = new[] { 1, 2, 4, 6 };
 
-    /// <summary>Festivals to suggest for a festival offer.</summary>
-    public static IReadOnlyList<string> Festivals { get; } = new[]
-    {
-        "Diwali", "Navratri", "Dussehra", "Durga Puja", "Dhanteras", "Chhath", "Christmas", "New Year", "Makar Sankranti",
-        "Pongal", "Holi", "Eid", "Raksha Bandhan", "Ganesh Chaturthi", "Onam",
-    };
-
     public static string Title(this PosterKind kind) => kind switch
     {
         PosterKind.Clearance => "Clearance",
@@ -73,20 +66,27 @@ public static class PosterKinds
         _ => 0m,
     };
 
-    /// <summary>The poster's words when no AI writes them.</summary>
-    public static PosterWords DefaultWords(this PosterKind kind, string? festival = null) => kind switch
+    /// <summary>
+    /// The poster's words when no AI writes them: neutral English, and the second-language line the customer's profile gives for this kind
+    /// (none without one).
+    /// </summary>
+    public static PosterWords DefaultWords(this PosterKind kind, string? festival = null, PosterLocale? locale = null)
     {
-        PosterKind.Clearance => new PosterWords("Clearance sale", "भारी छूट · सीमित स्टॉक", "Grab them before they're gone"),
-        PosterKind.NewArrivals => new PosterWords("New arrivals", "नया माल आ गया है", "Just in at the shop"),
-        PosterKind.BestSellers => new PosterWords("Best sellers", "सबकी पसंद", "Our customers' favourites"),
-        PosterKind.FestivalOffer => new PosterWords(
-            FestivalHeadline(festival), "त्योहार पर खास दाम", "Celebrate with special prices"),
-        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-    };
+        locale ??= PosterLocale.Neutral;
+        return kind switch
+        {
+            PosterKind.Clearance => new PosterWords("Clearance sale", locale.LocalLineFor(kind), "Grab them before they're gone"),
+            PosterKind.NewArrivals => new PosterWords("New arrivals", locale.LocalLineFor(kind), "Just in at the shop"),
+            PosterKind.BestSellers => new PosterWords("Best sellers", locale.LocalLineFor(kind), "Our customers' favourites"),
+            PosterKind.FestivalOffer => new PosterWords(FestivalHeadline(festival), locale.LocalLineFor(kind), "Celebrate with special prices"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }
 
-    /// <summary>What the poster's artwork should look like, for the AI that makes it (no words or products: the app adds those).</summary>
-    public static string ArtworkTheme(this PosterKind kind, string? festival = null)
+    /// <summary>What the poster's artwork should look like, for the AI that makes it (no words or products: the app adds those). The place comes from the customer's profile.</summary>
+    public static string ArtworkTheme(this PosterKind kind, string? festival = null, PosterLocale? locale = null)
     {
+        locale ??= PosterLocale.Neutral;
         var name = PosterWords.Tidy(festival, PosterWords.MaxFestivalLength);
         return kind switch
         {
@@ -94,8 +94,8 @@ public static class PosterKinds
             PosterKind.NewArrivals => "new arrivals: fresh teal, mint and sky-blue gradients with soft light rays and a few gentle sparkles",
             PosterKind.BestSellers => "best sellers: deep royal blue with warm gold accents, a subtle star burst and soft sparkles",
             PosterKind.FestivalOffer => name.Length == 0
-                ? "the Indian festive season: warm saffron, marigold and deep red, with diyas, marigold garlands and rangoli patterns around the edges"
-                : "the festival of " + name + " in India: its traditional colours and decorations, placed around the edges",
+                ? "the festive season" + locale.InCountry + ": warm, celebratory colours with the decorations people there put up for festivals, placed around the edges"
+                : "the festival of " + name + locale.InCountry + ": its traditional colours and decorations, placed around the edges",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
     }

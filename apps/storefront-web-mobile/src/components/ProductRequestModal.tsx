@@ -6,6 +6,8 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { createProductRequest, ProductRequestInput } from "@/app/actions/request-actions";
 import ImageUpload from "./CloudinaryUpload";
 import { useDialogFocus } from "@/components/ui/useDialogFocus";
+import { SHOP_NAME } from "@/lib/shop-name";
+import { CURRENCY } from "@/lib/region/lite";
 
 interface ProductRequestModalProps {
     isOpen: boolean;
@@ -199,7 +201,7 @@ export default function ProductRequestModal({
                                                 <div>
                                                     <label htmlFor="request-min-price" className="mb-2 block text-sm font-semibold text-slate-700">Minimum price <span className="font-normal text-slate-500">(optional)</span></label>
                                                     <div className="relative">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₹</span>
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">{CURRENCY.symbol}</span>
                                                         <input
                                                             id="request-min-price"
                                                             type="number"
@@ -215,7 +217,7 @@ export default function ProductRequestModal({
                                                 <div>
                                                     <label htmlFor="request-max-price" className="mb-2 block text-sm font-semibold text-slate-700">Maximum price <span className="font-normal text-slate-500">(optional)</span></label>
                                                     <div className="relative">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₹</span>
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">{CURRENCY.symbol}</span>
                                                         <input
                                                             id="request-max-price"
                                                             type="number"
@@ -267,7 +269,7 @@ export default function ProductRequestModal({
 
                                         <div className="pt-4">
                                             <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs font-medium leading-5 text-amber-900">
-                                                Suggestions do not reserve products. All purchases happen in person at the Smart Avenue store.
+                                                Suggestions do not reserve products. All purchases happen in person at the {SHOP_NAME} store.
                                             </p>
                                             <button
                                                 type="submit"

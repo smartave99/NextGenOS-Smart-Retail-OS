@@ -1,4 +1,4 @@
-// End-to-end check of Live shop, the owner's section of the website's admin panel (smartave99/smart_avenue,
+// End-to-end check of Live shop, the owner's section of the website's admin panel (smartave99/demo_shop,
 // /admin/live), in Chromium, against a real local Supabase with sign-in, the authenticator app and live updates:
 // the owner creates the account and the shop, makes a code, the shop PC (this app on demo data) connects with it,
 // the figures appear by themselves and a new bill follows within seconds; the owner turns on the authenticator
@@ -123,7 +123,7 @@ function stop(child) {
     await owner.fill('#live-password', password);
     await owner.getByRole('button', { name: 'Create account' }).click();
     await owner.getByRole('heading', { name: 'Name your shop' }).waitFor({ timeout: 30000 });
-    await owner.fill('#live-shop-name', 'Smart Avenue 99');
+    await owner.fill('#live-shop-name', 'Demo Mart 99');
     await owner.getByRole('button', { name: 'Create the shop' }).click();
     await owner.getByRole('heading', { name: 'No figures yet' }).waitFor({ timeout: 30000 });
     step('the owner created the account and the shop on the website\'s Live shop');
@@ -139,7 +139,7 @@ function stop(child) {
     await pc.fill('#owner-key', status.PUBLISHABLE_KEY);
     await pc.fill('#owner-code', code);
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor({ timeout: 20000 });
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor({ timeout: 20000 });
     await owner.getByText(/is connected\. Its figures show here within a minute\./).waitFor({ timeout: 20000 });
     await owner.getByTestId('live-sales').waitFor({ timeout: 60000 });
     assert.match(await owner.getByTestId('live-state').innerText(), /^Live · /);

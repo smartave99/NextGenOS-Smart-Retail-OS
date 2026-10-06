@@ -28,11 +28,17 @@ async function startApp() {
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
+  let last = 'no answer';
   for (let i = 0; i < 180; i++) {
-    try { if ((await fetch(BASE + '/')).ok) return app; } catch { /* not up yet */ }
+    try {
+      const answer = await fetch(BASE + '/');
+      if (answer.ok) return app;
+      last = answer.status + ' ' + (await answer.text()).replace(/\s+/g, ' ').slice(0, 160);
+    } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error('The app did not start on ' + BASE);
+  stopApp(app); // never leave it running, holding the port for the next try
+  throw new Error('The app did not start on ' + BASE + ' (last answer: ' + last + '). A 402 means the licence gate is closed: run the test through with-licence.mjs.');
 }
 
 /** Focus in a search box: the box draws one thin ring and the input inside draws none (both together made a thick glow). */
@@ -168,10 +174,14 @@ function stopApp(app) {
     assert.ok(screens > 2, `the page is not long enough to test (${screens} screens)`);
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.waitForFunction(() => window.scrollY > window.innerHeight);
-    assert.deepStrictEqual(await page.evaluate(() => ({
+    const tops = await page.evaluate(() => ({
       bar: document.querySelector('.window-bar').getBoundingClientRect().top,
       sidebar: document.querySelector('.sidebar').getBoundingClientRect().top,
-    })), { bar: 0, sidebar: 40 });
+    }));
+    // At the very bottom the page's height has a fraction of a pixel (text lines are not whole pixels) while scrolling stops at a whole one, so the
+    // sticky sidebar can sit up to half a pixel above its place (measured: 39.83 on /sales). Anything more is a real move.
+    assert.strictEqual(tops.bar, 0);
+    assert.ok(Math.abs(tops.sidebar - 40) <= 0.5, 'the sidebar stays at 40 px, within half a pixel: ' + tops.sidebar);
     step('scrolled far down a long page, the top bar and the sidebar stay in place');
 
     // Get started: just the name and the window buttons.

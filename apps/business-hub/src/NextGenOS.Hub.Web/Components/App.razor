@@ -1,0 +1,50 @@
+@using Microsoft.AspNetCore.Antiforgery
+@using NextGenOS.Licensing.AspNetCore
+@inject BrandService Brand
+@inject NextGenOS.Hub.Web.Branding.ThemeService Themes
+@inject IAntiforgery Antiforgery
+<!DOCTYPE html>
+@{ var theme = Themes.Current; }
+<html lang="en" data-mode="@theme.Mode" data-surface="@theme.Surface" data-shape="@theme.Shape" data-density="@theme.Density" data-font="@theme.Font" data-scale="@Scale(theme.FontScale)" data-nav="@theme.Nav" data-nav-labels="@theme.NavLabels" data-cart="@theme.Cart" data-depth="@theme.Depth">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="csrf" content="@RequestToken" />
+    <base href="/" />
+    <title>@Brand.Name</title>
+    <script src="theme.js"></script>
+    <ResourcePreloader />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="@Assets["hub.css"]" />
+    @* No import map: it is an inline script, which the page's content policy does not allow. *@
+    @if (Brand.Style.Length > 0)
+    {
+        @* The licence's brand colour in place of the default accent (BrandService lets through plain hex only). *@
+        <style>@((MarkupString)Brand.Style)</style>
+    }
+    <HeadOutlet @rendermode="PageMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageMode" />
+    <script src="@Assets["hub.js"]"></script>
+    <script src="@Assets["scan.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    private static string Scale(double? value) => (value ?? 1).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+    [CascadingParameter] private HttpContext? Http { get; set; }
+
+    private string? RequestToken => Http is null ? null : Antiforgery.GetAndStoreTokens(Http).RequestToken;
+
+    // Every screen is live in the browser, except the sign-in page, which is an ordinary form (the cookie is set by the answer to it).
+    private static readonly IComponentRenderMode Live = new InteractiveServerRenderMode(prerender: false);
+
+    private IComponentRenderMode? PageMode => Http?.Request.Path.StartsWithSegments("/login") == true ? null : Live;
+}

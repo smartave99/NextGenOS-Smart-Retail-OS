@@ -137,17 +137,6 @@ export async function getDashboardStats() {
     }
 }
 
-// ==================== TEST CONNECTION ====================
-
-export async function testFirebaseConnection() {
-    await requireAdminSession();
-    return {
-        success: true,
-        message: "Firebase connection is deprecated. Data is mostly stored in Postgres/Blob via Prisma now.",
-        collections: []
-    };
-}
-
 // ==================== SITE CONTENT ====================
 
 export interface HeroContent {
@@ -450,8 +439,8 @@ export async function getStaffData(email: string) {
         if (identity.email !== email.toLowerCase() && !identity.permissions.includes("*")) {
             return null;
         }
-        // Hardcoded super admin
-        if (email === "admin@smartavenue99.com") {
+        // The owner named in OWNER_ADMIN_EMAILS (verified e-mail only, see requireAdminSession)
+        if (isOwnerAdmin(email)) {
             return {
                 role: "Admin",
                 permissions: ["*"] // All permissions
@@ -603,6 +592,7 @@ export interface Product {
 }
 
 import { Prisma } from "@prisma/client";
+import { isOwnerAdmin } from "@/lib/owner-admins";
 
 async function _fetchProducts(
     categoryId?: string,
@@ -1360,8 +1350,8 @@ async function _fetchAdminProfile(email: string): Promise<AdminProfile | null> {
                 photoUrl: staff.photoUrl || "",
             };
         }
-        // Let the true super admin bypass all checks
-        if (email === "admin@smartavenue99.com") {
+        // The owner named in OWNER_ADMIN_EMAILS
+        if (isOwnerAdmin(email)) {
             return {
                 name: "Super Admin",
                 email,

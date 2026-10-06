@@ -1,0 +1,107 @@
+@page "/tables"
+@attribute [Authorize(Policy = Perm.Orders)]
+@implements IDisposable
+@inherits HubPage
+
+<PageTitle>Tables</PageTitle>
+<h1>Tables</h1>
+<p class="sub">Tap a free table to seat guests, or a busy one to open its order.</p>
+<Notice Error="@Error" />
+
+<div class="row wrap no-print">
+    <button type="button" class="btn secondary" id="takeaway" @onclick="Takeaway">New takeaway order</button>
+</div>
+
+@foreach (var zone in floor.GroupBy(t => t.Table.Zone ?? "").OrderBy(g => g.Key, StringComparer.Ordinal))
+{
+    <h2 class="zone">@(zone.Key.Length > 0 ? zone.Key : "Tables")</h2>
+    <div class="floor">
+        @foreach (var t in zone)
+        {
+            <button type="button" class="tile @(t.Occupied ? "busy" : "")" aria-label="Table @t.Table.Name, @(t.Occupied ? "in use" : "free")" @onclick="() => Tap(t)">
+                <span class="nm">@t.Table.Name</span>
+                @if (t.Occupied)
+                {
+                    <span>@t.Guests @(t.Guests == 1 ? "guest" : "guests") · @t.ItemCount @(t.ItemCount == 1 ? "item" : "items")</span>
+                    <span class="muted small">@Money(t.TotalMinor) · since @(t.Since is { } s ? Shop.Time.ToLocal(s).ToString("HH:mm") : "")</span>
+                }
+                else
+                {
+                    <span class="muted">Free · seats @t.Table.Seats</span>
+                }
+            </button>
+        }
+    </div>
+}
+
+@if (takeaways.Count > 0)
+{
+    <h2 class="zone">Takeaway and counter</h2>
+    <div class="floor">
+        @foreach (var o in takeaways)
+        {
+            <a class="tile busy" href="order/@o.Document.Id">
+                <span class="nm">@(o.Document.Meta.GetValueOrDefault("name") ?? "Takeaway")</span>
+                <span>@o.Lines.Count @(o.Lines.Count == 1 ? "item" : "items")</span>
+                <span class="muted small">@Money(o.Document.TotalMinor)</span>
+            </a>
+        }
+    </div>
+}
+
+@if (seating is not null)
+{
+    <div class="sheet-back" @onclick="() => seating = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Seat guests at table @seating.Table.Name" @onclick:stopPropagation="true">
+            <h2>Table @seating.Table.Name</h2>
+            <label for="guests">How many guests?</label>
+            <input id="guests" type="number" min="1" max="50" @bind="guests" />
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => seating = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="seat" @onclick="Seat">Seat them</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<Restaurant.FloorTable> floor = Array.Empty<Restaurant.FloorTable>();
+    private IReadOnlyList<DocumentView> takeaways = Array.Empty<DocumentView>();
+    private Restaurant.FloorTable? seating;
+    private int guests = 2;
+    private Timer? timer;
+
+    protected override Task LoadAsync()
+    {
+        floor = App.Restaurant.Floor();
+        takeaways = App.Restaurant.OpenOrders().Where(o => o.Document.TableId is null).ToList();
+        return Task.CompletedTask;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Other tills and the kitchen change the floor: look again every few seconds while nobody is typing.
+        if (firstRender) timer = new Timer(_ => InvokeAsync(async () => { if (seating is null) { await Reload(); StateHasChanged(); } }), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private void Tap(Restaurant.FloorTable t)
+    {
+        if (t.Occupied) { Nav.NavigateTo("/order/" + t.OrderId); return; }
+        seating = t;
+        guests = Math.Min(t.Table.Seats, 2);
+    }
+
+    private Task Seat() => Run(() =>
+    {
+        var order = App.Restaurant.OpenOrder(seating!.Table.Id, Math.Max(1, guests), Me.Id);
+        Nav.NavigateTo("/order/" + order.Document.Id);
+    });
+
+    private Task Takeaway() => Run(() =>
+    {
+        var order = App.Restaurant.OpenTakeaway(null, Me.Id);
+        Nav.NavigateTo("/order/" + order.Document.Id);
+    });
+
+    public void Dispose() => timer?.Dispose();
+}

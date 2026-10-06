@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Business Hub's domain: shop settings, items, parties, documents (invoices, quotes, orders), payments, stock, and the workflows of each
+       kind of business (counter sales, restaurant tables and kitchen, library loans, construction projects, appointments). Data lives in one SQLite
+       file per shop. Money is whole minor units; every tax figure comes from NextGenOS.Tax and the country pack. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>NextGenOS.Hub</RootNamespace>
+    <AssemblyName>NextGenOS.Hub.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <!-- The SQLite engine itself: newer than the one Microsoft.Data.Sqlite pulls in, which has a known vulnerability. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
+    <ProjectReference Include="..\..\..\..\libs\dotnet\NextGenOS.Tax\NextGenOS.Tax.csproj" />
+    <ProjectReference Include="..\..\..\..\libs\dotnet\NextGenOS.Devices\NextGenOS.Devices.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\..\industry-packs\packs\*.json" LogicalName="NextGenOS.Hub.industries.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Data\Migrations\*.sql" LogicalName="NextGenOS.Hub.migrations.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

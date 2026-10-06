@@ -24,6 +24,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SmartRetail.AI.Core\SmartRetail.AI.Core.csproj" />
+    <!-- The signed licence and its activation window: the app starts only on a PC with a valid licence that includes "ai". -->
+    <ProjectReference Include="..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
+    <ProjectReference Include="..\..\..\..\licensing\clients\dotnet\NextGenOS.Licensing.Windows\NextGenOS.Licensing.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>

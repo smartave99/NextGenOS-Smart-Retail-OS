@@ -1,0 +1,318 @@
+{
+  "schema": 1,
+  "id": "construction",
+  "name": "Construction and contracting",
+  "summary": "Clients, projects, quotes and bills of quantities, progress billing with retention and advances, costs against budget and variations.",
+  "icon": "hard-hat",
+  "vocabulary": {
+    "customer": [
+      "Client",
+      "Clients"
+    ],
+    "item": [
+      "Rate item",
+      "Rate items"
+    ],
+    "sale": [
+      "Progress bill",
+      "Progress bills"
+    ],
+    "invoice": [
+      "Invoice",
+      "Invoices"
+    ],
+    "staff": [
+      "Site staff",
+      "Site staff"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Stock",
+      "Stock"
+    ]
+  },
+  "features": {
+    "counterSale": false,
+    "tables": false,
+    "kitchen": false,
+    "lending": false,
+    "projects": true,
+    "appointments": false,
+    "credit": true,
+    "purchases": true,
+    "stockTracking": "optional",
+    "weighedItems": false
+  },
+  "itemKinds": [
+    {
+      "id": "material",
+      "label": "Material",
+      "tracksStock": true
+    },
+    {
+      "id": "labour",
+      "label": "Labour",
+      "tracksStock": false
+    },
+    {
+      "id": "subcontract",
+      "label": "Subcontract work",
+      "tracksStock": false
+    },
+    {
+      "id": "plant",
+      "label": "Plant and equipment",
+      "tracksStock": false
+    },
+    {
+      "id": "other",
+      "label": "Other",
+      "tracksStock": false
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    },
+    {
+      "id": "subcontractor",
+      "label": "Subcontractor"
+    },
+    {
+      "id": "staff",
+      "label": "Staff"
+    }
+  ],
+  "defaults": {
+    "adjustments": [
+      {
+        "code": "RET",
+        "kind": "retention",
+        "label": "Retention",
+        "percent": "5",
+        "base": "taxable",
+        "optional": true
+      }
+    ],
+    "paymentMethods": [
+      "bank",
+      "cash",
+      "card",
+      "cheque"
+    ]
+  },
+  "rules": {
+    "retentionPercent": "5",
+    "retentionBase": "taxable",
+    "paymentTermsDays": 30,
+    "quoteValidDays": 30,
+    "costKinds": [
+      "material",
+      "labour",
+      "subcontract",
+      "plant",
+      "other"
+    ],
+    "advancePercent": "0"
+  },
+  "reports": [
+    "project-status",
+    "project-costs",
+    "outstanding",
+    "retention-held",
+    "tax-summary"
+  ],
+  "demo": {
+    "company": "Demo Builders",
+    "tagline": "Residential and commercial contractors",
+    "items": [
+      {
+        "name": "Cement (50 kg bag)",
+        "kind": "material",
+        "category": "Materials",
+        "price": "390.00",
+        "class": "standard",
+        "unit": "bag",
+        "stock": "200"
+      },
+      {
+        "name": "Steel rebar 12 mm",
+        "kind": "material",
+        "category": "Materials",
+        "price": "68.00",
+        "class": "standard",
+        "unit": "kg",
+        "stock": "3000"
+      },
+      {
+        "name": "Bricks (per 1000)",
+        "kind": "material",
+        "category": "Materials",
+        "price": "9500.00",
+        "class": "standard",
+        "unit": "1000",
+        "stock": "40"
+      },
+      {
+        "name": "Mason (per day)",
+        "kind": "labour",
+        "category": "Labour",
+        "price": "1100.00",
+        "class": "standard",
+        "unit": "day"
+      },
+      {
+        "name": "Helper (per day)",
+        "kind": "labour",
+        "category": "Labour",
+        "price": "700.00",
+        "class": "standard",
+        "unit": "day"
+      },
+      {
+        "name": "Electrical sub-contract",
+        "kind": "subcontract",
+        "category": "Subcontract",
+        "price": "180000.00",
+        "class": "standard",
+        "unit": "lump sum"
+      },
+      {
+        "name": "Excavator hire (per day)",
+        "kind": "plant",
+        "category": "Plant",
+        "price": "7500.00",
+        "class": "standard",
+        "unit": "day"
+      }
+    ],
+    "parties": [
+      {
+        "kind": "client",
+        "name": "R. Singh (house extension)",
+        "phone": "+910000000021"
+      },
+      {
+        "kind": "client",
+        "name": "Bright Retail Pvt Ltd (shop fit-out)",
+        "phone": "+910000000022"
+      },
+      {
+        "kind": "supplier",
+        "name": "Metro Building Supplies",
+        "phone": "+910000000023"
+      },
+      {
+        "kind": "subcontractor",
+        "name": "Spark Electricals",
+        "phone": "+910000000024"
+      }
+    ],
+    "projects": [
+      {
+        "code": "P-001",
+        "name": "House extension, two rooms",
+        "client": "R. Singh (house extension)",
+        "site": "12 Garden Lane",
+        "contract": "850000.00",
+        "retention": "5",
+        "boq": [
+          {
+            "code": "1.1",
+            "description": "Foundation and plinth",
+            "unit": "lump sum",
+            "qty": "1",
+            "rate": "180000.00",
+            "kind": "material"
+          },
+          {
+            "code": "2.1",
+            "description": "Brickwork walls",
+            "unit": "1000",
+            "qty": "12",
+            "rate": "22000.00",
+            "kind": "material"
+          },
+          {
+            "code": "3.1",
+            "description": "Roof slab",
+            "unit": "lump sum",
+            "qty": "1",
+            "rate": "250000.00",
+            "kind": "subcontract"
+          },
+          {
+            "code": "4.1",
+            "description": "Electrical and finishing",
+            "unit": "lump sum",
+            "qty": "1",
+            "rate": "156000.00",
+            "kind": "subcontract"
+          }
+        ]
+      },
+      {
+        "code": "P-002",
+        "name": "Shop fit-out, ground floor",
+        "client": "Bright Retail Pvt Ltd (shop fit-out)",
+        "site": "Unit 4, Market Road",
+        "contract": "420000.00",
+        "retention": "10",
+        "boq": [
+          {
+            "code": "1",
+            "description": "Partition walls",
+            "unit": "m2",
+            "qty": "60",
+            "rate": "1800.00",
+            "kind": "labour"
+          },
+          {
+            "code": "2",
+            "description": "Flooring",
+            "unit": "m2",
+            "qty": "120",
+            "rate": "1650.00",
+            "kind": "material"
+          },
+          {
+            "code": "3",
+            "description": "Lighting",
+            "unit": "lump sum",
+            "qty": "1",
+            "rate": "114000.00",
+            "kind": "subcontract"
+          }
+        ]
+      }
+    ]
+  },
+  "aiContext": "a construction contractor: clients, projects, bills of quantities, progress billing with retention, job costs",
+  "coverage": {
+    "works": [
+      "Clients and projects with a contract value and a retention percentage",
+      "Quotes and a bill of quantities (materials, labour, subcontract, plant) per project",
+      "Progress bills: each bill is a cumulative percent complete per line; the previous bills are taken off; retention is held back and tax is charged in full",
+      "Advances taken at the start and recovered across bills",
+      "Costs entered against a project and compared with the budget; profit so far",
+      "Variations (changes to the contract) that join the contract value once approved",
+      "Releasing retention at the end with its own invoice",
+      "Client statements: what was billed, paid, held and is outstanding"
+    ],
+    "notYet": [
+      "A time schedule (Gantt chart)",
+      "Payroll and timesheets",
+      "Payment certificates from subcontractors",
+      "Storing drawings and site photos",
+      "Tax rules that move the liability to the buyer (reverse charge): record these with a zero-rated code and a note until supported"
+    ]
+  }
+}

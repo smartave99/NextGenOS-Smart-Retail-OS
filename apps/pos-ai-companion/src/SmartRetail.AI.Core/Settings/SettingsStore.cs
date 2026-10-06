@@ -14,9 +14,13 @@ namespace SmartRetail.AI.Settings
             Formatting = Formatting.Indented,
         };
 
-        public SettingsStore(string filePath)
+        private readonly string _profileFolder;
+
+        /// <param name="profileFolder">Where the customer's AI profile (ai.json) is looked for: this folder, and the one above it. Default: the program's own folder.</param>
+        public SettingsStore(string filePath, string profileFolder = null)
         {
             FilePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
+            _profileFolder = profileFolder ?? AppContext.BaseDirectory;
         }
 
         public string FilePath { get; }
@@ -45,6 +49,8 @@ namespace SmartRetail.AI.Settings
 
             settings = settings ?? new AssistantSettings();
             settings.Normalize();
+            // The customer's picture settings come from its profile, never from this file: the owner's settings cannot change them.
+            settings.Shop = ShopProfile.LoadNear(_profileFolder);
             return settings;
         }
 

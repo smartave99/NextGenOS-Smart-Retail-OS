@@ -30,11 +30,17 @@ async function startApp(env = {}) {
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
+  let last = 'no answer';
   for (let i = 0; i < 180; i++) {
-    try { if ((await fetch(BASE + '/')).ok) return app; } catch { /* not up yet */ }
+    try {
+      const answer = await fetch(BASE + '/');
+      if (answer.ok) return app;
+      last = answer.status + ' ' + (await answer.text()).replace(/\s+/g, ' ').slice(0, 160);
+    } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error('The app did not start on ' + BASE);
+  stopApp(app); // never leave it running, holding the port for the next try
+  throw new Error('The app did not start on ' + BASE + ' (last answer: ' + last + '). A 402 means the licence gate is closed: run the test through with-licence.mjs.');
 }
 
 function stopApp(app) {
@@ -66,7 +72,7 @@ async function until(check, timeout, what) {
 
     // The owner signs up on the website, creates the shop and makes a code.
     project.psql(`insert into auth.users (id, email) values ('${OWNER}', 'owner@example.com');`);
-    const shop = project.asUser(OWNER, "select public.create_shop('Smart Avenue 99');");
+    const shop = project.asUser(OWNER, "select public.create_shop('Demo Mart 99');");
     const code = project.asUser(OWNER, `select public.new_pairing_code('${shop}');`);
     assert.match(code, /^[A-HJ-NP-Z2-9]{8}$/);
 
@@ -91,7 +97,7 @@ async function until(check, timeout, what) {
 
     await page.fill('#owner-code', code.slice(0, 4).toLowerCase() + '-' + code.slice(4).toLowerCase());
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     await section.locator('.owner-state', { hasText: /Last sent at \d/ }).waitFor({ timeout: 30000 });
     await page.screenshot({ path: `${OUT}/owner-1-connected.png` });
     step(`connected with the website's code (typed as ${code.slice(0, 4).toLowerCase()}-…), and the figures went at once`);
@@ -157,7 +163,7 @@ async function until(check, timeout, what) {
     assert.strictEqual(await page.inputValue('#owner-url'), project.url);
     await page.fill('#owner-code', again);
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     assert.strictEqual(project.asUser(OWNER, 'select count(*) from public.shop_devices;'), '1');
     await section.getByRole('button', { name: 'Disconnect' }).click();
     await section.getByRole('heading', { name: 'See the shop from anywhere' }).waitFor();
@@ -167,7 +173,7 @@ async function until(check, timeout, what) {
     const third = project.asUser(OWNER, `select public.new_pairing_code('${shop}');`);
     await page.fill('#owner-code', third);
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     await section.locator('.owner-state', { hasText: /Last sent at \d/ }).waitFor({ timeout: 30000 });
 
     // A PC that finds no POS database when it starts (Pos:Mode Auto falls back to the demo shop, e.g. while SQL
@@ -179,7 +185,7 @@ async function until(check, timeout, what) {
     app = await startApp({ Pos__Mode: 'Auto' });
     await page.goto(BASE + '/settings');
     errors.splice(beforeRestart); // the open page tried to reconnect while the app was stopped
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     await section.locator('.owner-state.problem', { hasText: 'did not find the POS database' }).waitFor({ timeout: 30000 });
     await section.getByRole('button', { name: 'Send now' }).click();
     await page.waitForTimeout(8000); // the app's first look is 5 seconds after it starts

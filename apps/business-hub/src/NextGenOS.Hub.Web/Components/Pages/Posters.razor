@@ -1,0 +1,105 @@
+@page "/posters"
+@attribute [Authorize(Policy = Perm.Catalog)]
+@inherits HubPage
+@inject IJSRuntime Js
+
+<PageTitle>Posters and price tags</PageTitle>
+<div class="no-print">
+    <h1>Posters and price tags</h1>
+    <p class="sub">Choose what to print, then print from the browser: any printer works, from a small office printer to a large-format one.</p>
+    <Notice Error="@Error" Info="@Info" />
+
+    <div class="cols">
+        <section class="card">
+            <h2>1. Choose the items</h2>
+            <input type="search" class="search" placeholder="Search" aria-label="Search" @bind="query" @bind:event="oninput" @onkeydown="SearchKey" />
+            <div class="tbl-wrap pick-list">
+                <table class="tbl"><tbody>
+                @foreach (var i in results)
+                {
+                    <tr>
+                        <td><label class="check"><input type="checkbox" checked="@picked.ContainsKey(i.Id)" @onchange="e => Toggle(i, e)" aria-label="Print @i.Name" /> @i.Name</label></td>
+                        <td class="num">@Money(i.PriceMinor)</td>
+                    </tr>
+                }
+                </tbody></table>
+            </div>
+            <p class="muted small">@picked.Count chosen</p>
+        </section>
+
+        <section class="card">
+            <h2>2. Choose the look</h2>
+            <div class="stack">
+                <label for="po-layout">Layout</label>
+                <select id="po-layout" @bind="look">
+                    <option value="shelf">Shelf labels: 24 on an A4 page</option>
+                    <option value="cards">Price cards: 8 on an A4 page</option>
+                    <option value="a4">Poster: one item on an A4 page</option>
+                    <option value="a3">Poster: one item on an A3 page</option>
+                </select>
+                <label for="po-head">Words above the name (optional)</label>
+                <input id="po-head" @bind="headline" @bind:event="oninput" maxlength="40" placeholder="Special offer, New, Fresh today" />
+                <label class="check"><input type="checkbox" @bind="showBarcode" /> Show the barcode</label>
+                <label for="po-copies">Copies of each</label>
+                <input id="po-copies" type="number" min="1" max="50" @bind="copies" @bind:event="oninput" />
+            </div>
+            <div class="row"><button type="button" class="btn primary" id="print-posters" disabled="@(picked.Count == 0)" @onclick="PrintIt">Print</button></div>
+        </section>
+    </div>
+</div>
+
+@if (picked.Count > 0)
+{
+    <h2 class="no-print zone">Preview</h2>
+    <div class="paper @look">
+        @foreach (var i in Sheets())
+        {
+            <div class="tag">
+                @if (headline.Trim().Length > 0) { <div class="tag-head">@headline</div> }
+                <div class="tag-name">@i.Name</div>
+                <div class="tag-price">@Money(i.PriceMinor)</div>
+                @if (showBarcode && !string.IsNullOrWhiteSpace(i.Barcode ?? i.Sku) && Kind(i) is { } kind)
+                {
+                    <img class="tag-code" alt="Barcode @(i.Barcode ?? i.Sku)" src="barcode/@(kind).png?data=@Uri.EscapeDataString(i.Barcode ?? i.Sku!)&w=@(look is "a4" or "a3" ? 600 : 300)&h=@(look is "a4" or "a3" ? 160 : 80)" />
+                    <div class="tag-num">@(i.Barcode ?? i.Sku)</div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string query = "", look = "shelf", headline = "";
+    private bool showBarcode = true;
+    private int copies = 1;
+    private IReadOnlyList<Item> results = Array.Empty<Item>();
+    private readonly Dictionary<long, Item> picked = new();
+
+    protected override Task LoadAsync()
+    {
+        Find();
+        return Task.CompletedTask;
+    }
+
+    private void SearchKey(KeyboardEventArgs e) => Find();
+
+    private void Find() => results = App.Catalog.Search(string.IsNullOrWhiteSpace(query) ? null : query, null, null, 120);
+
+    private void Toggle(Item item, ChangeEventArgs e)
+    {
+        if (e.Value is true) picked[item.Id] = item; else picked.Remove(item.Id);
+    }
+
+    private IEnumerable<Item> Sheets() => picked.Values.SelectMany(i => Enumerable.Repeat(i, Math.Clamp(copies, 1, 50)));
+
+    private static string? Kind(Item i)
+    {
+        var code = i.Barcode ?? i.Sku ?? "";
+        return NextGenOS.Devices.Barcodes.Barcode.KindFor(code) switch
+        {
+            NextGenOS.Devices.Barcodes.BarcodeKind.Ean13 => "ean13", NextGenOS.Devices.Barcodes.BarcodeKind.Ean8 => "ean8", NextGenOS.Devices.Barcodes.BarcodeKind.UpcA => "upca", _ => code.All(c => c < 128) ? "code128" : null,
+        };
+    }
+
+    private async Task PrintIt() => await Js.InvokeVoidAsync("hub.print");
+}

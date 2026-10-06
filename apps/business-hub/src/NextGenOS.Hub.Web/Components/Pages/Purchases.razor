@@ -1,0 +1,201 @@
+@page "/purchases"
+@attribute [Authorize(Policy = Perm.Purchases)]
+@inherits HubPage
+@using NextGenOS.Hub.Purchasing
+
+<PageTitle>Buying</PageTitle>
+<h1>Buying</h1>
+<p class="sub">Orders to suppliers: when the goods arrive, stock goes up and the cost is updated.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <div class="seg" role="group" aria-label="Show">
+        @foreach (var (key, label) in new[] { ("open", "To receive"), ("owed", "To pay"), ("all", "All") })
+        {
+            <button type="button" class="@(tab == key ? "on" : "")" aria-pressed="@(tab == key)" @onclick="() => OpenTab(key)">@label</button>
+        }
+    </div>
+    <span class="spacer"></span>
+    <button type="button" class="btn primary" id="new-order" @onclick="NewOrder">New order</button>
+</div>
+
+<div class="card tbl-wrap">
+    @if (rows.Count == 0) { <div class="empty">Nothing here.</div> }
+    else
+    {
+        <table class="tbl">
+            <thead><tr><th>Order</th><th>Supplier</th><th>Date</th><th class="num">Total</th><th class="num">To pay</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var d in rows)
+            {
+                <tr>
+                    <td><a href="documents/@d.Id">@d.Number</a></td>
+                    <td>@(d.PartyId is { } pid ? Name(pid) : "")</td>
+                    <td>@Day(d.IssuedAt ?? d.CreatedAt)</td>
+                    <td class="num">@Money(d.TotalMinor)</td>
+                    <td class="num">@(d.BalanceMinor > 0 ? Money(d.BalanceMinor) : "")</td>
+                    <td class="right nowrap">
+                        @if (d.Status == DocStatus.Open) { <button type="button" class="btn secondary small" @onclick="() => Receive(d)">Goods arrived</button> }
+                        @if (d.BalanceMinor > 0) { <button type="button" class="btn ghost small" @onclick="() => OpenPay(d)">Pay</button> }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (ordering)
+{
+    <div class="sheet-back" @onclick="() => ordering = false">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="New order" @onclick:stopPropagation="true">
+            <h2>New order</h2>
+            <Notice Error="@formError" />
+            <label for="po-supplier">Supplier</label>
+            <select id="po-supplier" @bind="supplierId"><option value="">Choose…</option>@foreach (var s in suppliers) { <option value="@s.Id">@s.Name</option> }</select>
+            @if (suppliers.Count == 0) { <p class="muted small">Add a supplier under People first.</p> }
+            <label for="po-item">What</label>
+            <div class="inline-form">
+                <div><select id="po-item" @bind="itemId" @bind:after="PickItem"><option value="">Choose…</option>@foreach (var i in items) { <option value="@i.Id">@i.Name</option> }</select></div>
+                <div><input class="qty" aria-label="How many" inputmode="decimal" placeholder="How many" @bind="qty" /></div>
+                <div><input class="qty" aria-label="Cost of each" inputmode="decimal" placeholder="Cost each" @bind="cost" /></div>
+                <button type="button" class="btn secondary" id="add-order-line" @onclick="AddLine">Add</button>
+            </div>
+            @foreach (var (l, n) in lines.Select((l, n) => (l, n)))
+            {
+                <div class="total-row"><span>@Qty(l.QtyMilli) × @(items.FirstOrDefault(i => i.Id == l.ItemId)?.Name)</span><span>@Money(l.CostMinor * l.QtyMilli / 1000) <button type="button" class="btn ghost small" aria-label="Take off this line" @onclick="() => lines.RemoveAt(n)">×</button></span></div>
+            }
+            <div class="row"><button type="button" class="btn secondary" @onclick="() => ordering = false">Cancel</button><button type="button" class="btn primary grow" id="save-order" @onclick="SaveOrder">Place the order</button></div>
+        </div>
+    </div>
+}
+
+@if (paying is not null)
+{
+    <div class="sheet-back" @onclick="() => paying = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Pay the supplier" @onclick:stopPropagation="true">
+            <h2>Pay for @paying.Number</h2>
+            <p>Owed: <strong>@Money(paying.BalanceMinor)</strong></p>
+            <Notice Error="@formError" />
+            <label for="pp-amt">Amount</label><input id="pp-amt" inputmode="decimal" placeholder="@Shop.Text(paying.BalanceMinor)" @bind="payAmount" />
+            <label for="pp-method">Paid by</label><select id="pp-method" @bind="payMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select>
+            <label for="pp-ref">Reference</label><input id="pp-ref" @bind="payRef" maxlength="60" />
+            <div class="row"><button type="button" class="btn secondary" @onclick="() => paying = null">Cancel</button><button type="button" class="btn primary grow" id="save-supplier-payment" @onclick="Pay">Save the payment</button></div>
+        </div>
+    </div>
+}
+
+@code {
+    private string tab = "open";
+    private IReadOnlyList<NextGenOS.Hub.Documents.Document> rows = Array.Empty<NextGenOS.Hub.Documents.Document>();
+    private IReadOnlyList<Party> suppliers = Array.Empty<Party>();
+    private IReadOnlyList<Item> items = Array.Empty<Item>();
+    private readonly Dictionary<long, string> names = new();
+    private bool ordering;
+    private string supplierId = "", itemId = "", qty = "1", cost = "", formError = "", payAmount = "", payMethod = "bank", payRef = "";
+    private readonly List<PurchaseLine> lines = new();
+    private NextGenOS.Hub.Documents.Document? paying;
+
+    protected override Task LoadAsync()
+    {
+        Read();
+        return Task.CompletedTask;
+    }
+
+    private void OpenTab(string key)
+    {
+        tab = key;
+        Read();
+    }
+
+    private void Read()
+    {
+        rows = tab switch
+        {
+            "open" => App.Documents.List(new DocumentFilter { Type = DocTypes.Purchase, Status = DocStatus.Open, Limit = 300 }),
+            "owed" => App.Purchasing.Payable(),
+            _ => App.Documents.List(new DocumentFilter { Type = DocTypes.Purchase, Limit = 300 }),
+        };
+    }
+
+    private string Name(long id)
+    {
+        if (!names.TryGetValue(id, out var n)) names[id] = n = App.Parties.Get(id)?.Name ?? "";
+        return n;
+    }
+
+    private void NewOrder()
+    {
+        suppliers = App.Parties.Search("supplier", null, 300);
+        items = App.Catalog.Search(null, null, null, 500).Where(i => i.Kind is not ("service" or "title")).ToList();
+        lines.Clear();
+        supplierId = itemId = cost = formError = "";
+        qty = "1";
+        ordering = true;
+    }
+
+    private void PickItem()
+    {
+        if (long.TryParse(itemId, out var id) && items.FirstOrDefault(i => i.Id == id) is { } item && item.CostMinor > 0) cost = Shop.Text(item.CostMinor);
+    }
+
+    private void AddLine()
+    {
+        formError = "";
+        try
+        {
+            if (!long.TryParse(itemId, out var id)) throw new HubException("item", "Please choose what you are buying.");
+            long q;
+            try { q = ShopContext.QtyMilli(qty.Trim()); } catch (FormatException) { throw new HubException("qty", "Please type how many, like 20."); }
+            if (q <= 0) throw new HubException("qty", "Please type how many, like 20.");
+            if (!TryMoney(Shop, cost, out var c) || c < 0) throw new HubException("cost", "Please type what one costs, like 120.50.");
+            lines.Add(new PurchaseLine { ItemId = id, QtyMilli = q, CostMinor = c });
+            itemId = cost = "";
+            qty = "1";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void SaveOrder()
+    {
+        formError = "";
+        try
+        {
+            if (!long.TryParse(supplierId, out var s)) throw new HubException("supplier", "Please choose the supplier.");
+            App.Purchasing.CreateOrder(s, lines.ToList(), null, Me.Id);
+            ordering = false;
+            tab = "open";
+            Read();
+            Info = "The order is placed. When the goods arrive, press “Goods arrived”.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private Task Receive(NextGenOS.Hub.Documents.Document d) => Run(() =>
+    {
+        App.Purchasing.Receive(d.Id, Me.Id);
+        Read();
+    }, "Stock is updated.");
+
+    private void OpenPay(NextGenOS.Hub.Documents.Document d)
+    {
+        paying = d;
+        payAmount = payRef = formError = "";
+        payMethod = Shop.PaymentMethods.Contains("bank") ? "bank" : Shop.PaymentMethods[0];
+    }
+
+    private void Pay()
+    {
+        formError = "";
+        try
+        {
+            var amount = paying!.BalanceMinor;
+            if (payAmount.Trim().Length > 0 && (!TryMoney(Shop, payAmount, out amount) || amount <= 0)) throw new HubException("amount", "Please type the amount as a number, like 5000.");
+            App.Purchasing.Pay(paying.Id, amount, payMethod, string.IsNullOrWhiteSpace(payRef) ? null : payRef.Trim(), Me.Id);
+            paying = null;
+            Read();
+            Info = "Payment saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

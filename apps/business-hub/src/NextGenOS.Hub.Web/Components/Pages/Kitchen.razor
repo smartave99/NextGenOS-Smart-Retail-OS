@@ -1,0 +1,76 @@
+@page "/kitchen"
+@attribute [Authorize(Policy = Perm.Kitchen)]
+@implements IDisposable
+@inherits HubPage
+
+<PageTitle>Kitchen</PageTitle>
+<h1>Kitchen</h1>
+<p class="sub">New orders arrive here when the waiter sends them. Tap to move each one along.</p>
+<Notice Error="@Error" />
+
+<div class="tabs" role="tablist">
+    <button type="button" role="tab" class="@(station is null ? "on" : "")" @onclick="() => station = null">Everything</button>
+    @foreach (var s in stations) { <button type="button" role="tab" class="@(station == s ? "on" : "")" @onclick="() => station = s">@s</button> }
+</div>
+
+@if (shown.Count == 0)
+{
+    <div class="card"><div class="empty">Nothing to cook right now.</div></div>
+}
+else
+{
+    <div class="tickets">
+        @foreach (var t in shown)
+        {
+            <div class="ticket @t.Status" data-status="@t.Status">
+                <div class="head"><strong>@(t.TableName is { Length: > 0 } ? "Table " + t.TableName : t.OrderNumber)</strong><span class="chip">@t.Station</span></div>
+                <div class="muted small">@Minutes(t) min ago · @StatusLabel(t.Status)</div>
+                <ul>
+                    @foreach (var l in t.Lines)
+                    {
+                        <li>@Qty(l.QtyMilli) × @l.Description@if (!string.IsNullOrEmpty(l.Note)) { <span class="nt">@l.Note</span> }</li>
+                    }
+                </ul>
+                <button type="button" class="btn @(t.Status == "new" ? "primary" : "secondary") wide" @onclick="() => Advance(t)">@NextLabel(t.Status)</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<Restaurant.KitchenTicket> tickets = Array.Empty<Restaurant.KitchenTicket>();
+    private IReadOnlyList<string> stations = Array.Empty<string>();
+    private string? station;
+    private Timer? timer;
+
+    private IReadOnlyList<Restaurant.KitchenTicket> shown => tickets.Where(t => station is null || t.Station == station).ToList();
+
+    protected override Task LoadAsync()
+    {
+        tickets = App.Restaurant.Tickets();
+        stations = tickets.Select(t => t.Station).Concat(StationNames()).Distinct().OrderBy(s => s, StringComparer.Ordinal).ToList();
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<string> StationNames() => Shop.Industry.Rules.ValueKind == System.Text.Json.JsonValueKind.Object && Shop.Industry.Rules.TryGetProperty("stations", out var s)
+        ? s.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0) : Array.Empty<string>();
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) timer = new Timer(_ => InvokeAsync(async () => { await Reload(); StateHasChanged(); }), null, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(4));
+    }
+
+    private int Minutes(Restaurant.KitchenTicket t) => Math.Max(0, (int)(App.Clock.UtcNow - t.FiredAt).TotalMinutes);
+
+    private static string StatusLabel(string s) => s switch { "new" => "waiting", "preparing" => "being made", "ready" => "ready to serve", _ => s };
+
+    private static string NextLabel(string s) => s switch { "new" => "Start", "preparing" => "Ready", "ready" => "Served", _ => "Done" };
+
+    private Task Advance(Restaurant.KitchenTicket t) => Run(() =>
+    {
+        App.Restaurant.Advance(t.Id);
+        tickets = App.Restaurant.Tickets();
+    });
+
+    public void Dispose() => timer?.Dispose();
+}

@@ -2,6 +2,7 @@
    preview, as a thumbnail and on paper. The words, photos and prices are the app's; the artwork only sits behind. *@
 @using System.Globalization
 @using SmartRetail.Pos.Core.Posters
+@inject SmartRetail.Pos.Web.Services.AiEnvironment Ai
 
 <div class="sheet-frame @Class">
     <article class="sheet kind-@Poster.Kind.Slug() @Layout @(Poster.Artwork is null ? null : "has-art")"
@@ -13,9 +14,9 @@
                 <div class="sheet-shop">@Poster.ShopName</div>
             }
             <h2 class="sheet-headline" style="@HeadlineStyle">@Poster.Words.Headline</h2>
-            @if (Poster.Words.HindiLine.Length > 0)
+            @if (Poster.Words.LocalLine.Length > 0)
             {
-                <p class="sheet-hindi @(Poster.Words.HindiLine.Length > 26 ? "long" : null)" lang="hi">@Poster.Words.HindiLine</p>
+                <p class="sheet-local @(Poster.Words.LocalLine.Length > 26 ? "long" : null)" lang="@(Ai.PosterLocale.LocalLanguageTag.Length > 0 ? Ai.PosterLocale.LocalLanguageTag : null)">@Poster.Words.LocalLine</p>
             }
             @if (Poster.Words.Subline.Length > 0)
             {
@@ -76,13 +77,7 @@
     /// <summary>"print-me" on the one sheet the Print button prints.</summary>
     [Parameter] public string? Class { get; set; }
 
-    private string Layout => Poster.Items.Count switch
-    {
-        <= 1 => "n1",
-        2 => "n2",
-        <= 4 => "n4",
-        _ => "n6",
-    };
+    private string Layout => Poster.Items.Count <= 1 ? "n1" : Poster.Items.Count == 2 ? "n2" : Poster.Items.Count <= 4 ? "n4" : "n6";
 
     /// <summary>As big as the headline can be: its longest word fits one line, and all of it fits two lines,
     /// beside the offer badge when there is one. Heavy capitals are about 0.7 of their size wide.</summary>

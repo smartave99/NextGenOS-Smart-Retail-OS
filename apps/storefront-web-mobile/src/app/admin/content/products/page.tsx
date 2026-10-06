@@ -21,7 +21,6 @@ import {
     Category,
     Offer
 } from "@/app/actions";
-import * as XLSX from "xlsx";
 import {
     Loader2,
     ArrowLeft,
@@ -47,6 +46,7 @@ import Link from "next/link";
 import Image from "next/image";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
 import ExcelImportModal from "@/components/admin/ExcelImportModal";
+import { CURRENCY, money } from "@/lib/region/lite";
 
 export default function ProductsManager() {
     const { user, loading: authLoading } = useAuth();
@@ -450,29 +450,21 @@ export default function ProductsManager() {
                 "Created At": p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ""
             }));
 
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Products");
-
-            // Auto-width columns
-            const colWidths = [
-                { wch: 20 }, // ID
-                { wch: 30 }, // Name
-                { wch: 40 }, // Description
-                { wch: 15 }, // Category
-                { wch: 15 }, // Subcategory
-                { wch: 10 }, // Price
-                { wch: 10 }, // Original Price
-                { wch: 10 }, // Available
-                { wch: 10 }, // Featured
-                { wch: 20 }, // Offer
-                { wch: 20 }, // Tags
-                { wch: 50 }, // Image URL
-                { wch: 15 }, // Created At
+            const { default: writeXlsxFile } = await import("write-excel-file/browser");
+            const headers = Object.keys(exportData[0] ?? { ID: "", Name: "" });
+            // Text that starts with = + - @ would run as a formula when the sheet is opened: it is saved as plain text.
+            const plain = (v: unknown) => (typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
+            const rows = [
+                headers.map((h) => ({ value: h, fontWeight: "bold" as const })),
+                ...exportData.map((row) => headers.map((h) => {
+                    const v = plain((row as Record<string, unknown>)[h]);
+                    return typeof v === "number" ? { value: v, type: Number } : { value: v == null ? "" : String(v), type: String };
+                })),
             ];
-            ws['!cols'] = colWidths;
-
-            XLSX.writeFile(wb, `smart_avenue_products_${new Date().toISOString().split('T')[0]}.xlsx`);
+            await writeXlsxFile(rows, {
+                sheet: "Products",
+                columns: [20, 30, 40, 15, 15, 10, 10, 10, 10, 20, 20, 50, 15].map((width) => ({ width })),
+            }).toFile(`products_${new Date().toISOString().split('T')[0]}.xlsx`);
         } catch (error) {
             console.error("Export failed:", error);
             alert("Failed to export products. Please try again.");
@@ -690,7 +682,7 @@ export default function ProductsManager() {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Price ({CURRENCY.symbol}) *</label>
                                     <input
                                         type="number"
                                         value={formData.price}
@@ -701,7 +693,7 @@ export default function ProductsManager() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Original Price (₹)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Original Price ({CURRENCY.symbol})</label>
                                     <input
                                         type="number"
                                         value={formData.originalPrice}
@@ -991,9 +983,9 @@ export default function ProductsManager() {
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
-                                                    <div className="font-semibold text-gray-900">₹{product.price}</div>
+                                                    <div className="font-semibold text-gray-900">{money(product.price)}</div>
                                                     {product.originalPrice && (
-                                                        <div className="text-xs text-gray-400 line-through">₹{product.originalPrice}</div>
+                                                        <div className="text-xs text-gray-400 line-through">{money(product.originalPrice)}</div>
                                                     )}
                                                 </td>
                                                 <td className="p-4 text-center">

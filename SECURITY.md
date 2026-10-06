@@ -4,7 +4,8 @@
 
 Please report a security problem privately, not in a public issue:
 
-- On GitHub, open this repository's **Security** tab and choose **Report a vulnerability**.
+- By e-mail to **smartave99@gmail.com** (subject "Security"), or by phone/WhatsApp on **+91 6123115368**. Customers cannot open this private repository, so e-mail is the way.
+- Staff with access to the repository can also use its **Security** tab and choose **Report a vulnerability**.
 - Say what you found, how to repeat it, and the version (Settings → About in the app shows it).
 - Do not include real shop data, keys or passwords. A made-up example, or the demo shop (`Pos__Mode=Demo`), is enough.
 

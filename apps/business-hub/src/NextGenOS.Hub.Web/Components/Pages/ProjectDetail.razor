@@ -1,0 +1,345 @@
+@page "/projects/{Id:long}"
+@attribute [Authorize(Policy = Perm.Projects)]
+@inherits HubPage
+@using NextGenOS.Hub.Projects
+
+<PageTitle>@(status?.Project.Name ?? "Project")</PageTitle>
+@if (status is null)
+{
+    <h1>Not found</h1>
+    <a class="btn primary" href="projects">Back to the projects</a>
+}
+else
+{
+    var p = status.Project;
+    <p><a href="projects">← Projects</a></p>
+    <h1>@p.Code · @p.Name</h1>
+    <p class="sub">@status.ClientName@(p.Site is { Length: > 0 } ? " · " + p.Site : "") · <span class="chip @(p.Status == "active" ? "ok" : "")">@(p.Status switch { "quoted" => "Quoted", "active" => "Running", "complete" => "Finished", _ => "Closed" })</span></p>
+    <Notice Error="@Error" Info="@Info" />
+
+    <div class="tabs" role="tablist">
+        @foreach (var (key, label) in new[] { ("overview", "Overview"), ("boq", "Items of work"), ("bill", "New progress bill"), ("bills", "Bills"), ("costs", "Costs"), ("variations", "Changes") })
+        {
+            <button type="button" role="tab" class="@(tab == key ? "on" : "")" aria-selected="@(tab == key)" @onclick="() => OpenTab(key)">@label</button>
+        }
+    </div>
+
+    @if (tab == "overview")
+    {
+        <div class="grid">
+            <div class="card stat"><span class="label">Contract</span><span class="value">@Money(status.ContractMinor + status.VariationsMinor)</span><span class="note">@(status.VariationsMinor != 0 ? Money(status.VariationsMinor) + " of agreed changes" : "before tax")</span></div>
+            <div class="card stat"><span class="label">Billed so far</span><span class="value" id="billed">@Money(status.BilledGrossMinor)</span><span class="note">@Money(status.PaidMinor) paid</span></div>
+            <div class="card stat"><span class="label">Still to come in</span><span class="value" id="owed">@Money(status.OutstandingMinor)</span><span class="note">@Money(status.RetentionHeldMinor) held back as retention</span></div>
+            <div class="card stat"><span class="label">Spent</span><span class="value">@Money(status.CostsMinor)</span><span class="note">@(status.ProfitSoFarMinor >= 0 ? "ahead by " : "behind by ")@Money(Math.Abs(status.ProfitSoFarMinor)) so far</span></div>
+        </div>
+        <section class="card">
+            <h2>How far along</h2>
+            <div class="bar"><span style="width:@(Math.Min(100, status.PercentCompleteMilli / 1000))%"></span></div>
+            <p class="muted">@(status.PercentCompleteMilli / 1000)% of the contract is built and billed.</p>
+            <div class="row wrap">
+                @if (p.Status == "quoted") { <button type="button" class="btn secondary" id="make-quote" @onclick="MakeQuote">Make the quote for the client</button><button type="button" class="btn primary" @onclick="Start">Start the project</button> }
+                @if (p.Status == "active") { <button type="button" class="btn secondary" @onclick="Finish">Mark as finished</button> }
+                @if (p.Status == "complete") { <button type="button" class="btn secondary" @onclick="CloseIt">Close it</button> }
+                @if (status.RetentionHeldMinor > 0 && p.Status is "complete" or "closed") { <button type="button" class="btn primary" id="release" @onclick="ReleaseRetention">Release the retention (@Money(status.RetentionHeldMinor))</button> }
+            </div>
+        </section>
+        <section class="card">
+            <h2>Advance</h2>
+            <p>Received: <strong>@Money(status.AdvanceReceivedMinor)</strong> · taken off the bills so far: <strong>@Money(status.AdvanceRecoveredMinor)</strong></p>
+            <div class="inline-form">
+                <div><label for="adv-amt">Amount received</label><input id="adv-amt" inputmode="decimal" @bind="advAmount" /></div>
+                <div><label for="adv-method">Paid by</label><select id="adv-method" @bind="advMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div>
+                <button type="button" class="btn secondary" id="save-advance" @onclick="ReceiveAdvance">Record the advance</button>
+            </div>
+        </section>
+        @if (status.CostsByKind.Count > 0)
+        {
+            <section class="card"><h2>Costs by kind</h2>
+                <table class="tbl"><tbody>@foreach (var kv in status.CostsByKind.OrderByDescending(k => k.Value)) { <tr><td>@Cap(kv.Key)</td><td class="num">@Money(kv.Value)</td></tr> }</tbody></table>
+            </section>
+        }
+    }
+    else if (tab == "boq")
+    {
+        <section class="card tbl-wrap">
+            <table class="tbl">
+                <thead><tr><th>No.</th><th>Work</th><th>Kind</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Amount</th><th class="num">Done</th></tr></thead>
+                <tbody>
+                @foreach (var b in status.Items)
+                {
+                    <tr><td>@b.Item.Code</td><td>@b.Item.Description@if (b.Item.VariationId is not null) { <span class="chip">Change</span> }</td><td>@Cap(b.Item.Kind)</td><td class="num">@Qty(b.Item.QtyMilli) @b.Item.Unit</td><td class="num">@Money(b.Item.RateMinor)</td><td class="num">@Money(b.Item.AmountMinor)</td><td class="num">@(b.CumulativePctMilli / 1000)%</td></tr>
+                }
+                </tbody>
+                <tfoot><tr><th colspan="5">Total before tax</th><th class="num">@Money(status.ContractMinor + status.VariationsMinor)</th><th></th></tr></tfoot>
+            </table>
+        </section>
+        @if (p.Status != "closed")
+        {
+            <section class="card">
+                <h2>Add an item of work</h2>
+                <Notice Error="@formError" />
+                <div class="field-row">
+                    <div><label for="b-code">No.</label><input id="b-code" @bind="bCode" maxlength="20" /></div>
+                    <div><label for="b-kind">Kind</label><select id="b-kind" @bind="bKind">@foreach (var k in Shop.Industry.ItemKinds) { <option value="@k.Id">@k.Label</option> }</select></div>
+                    <div><label for="b-tax">Tax</label><select id="b-tax" @bind="bTax">@foreach (var c in Shop.TaxClasses()) { <option value="@c">@c</option> }</select></div>
+                </div>
+                <label for="b-desc">Description</label><input id="b-desc" @bind="bDesc" maxlength="160" />
+                <div class="field-row">
+                    <div><label for="b-unit">Unit</label><input id="b-unit" @bind="bUnit" maxlength="20" /></div>
+                    <div><label for="b-qty">Quantity</label><input id="b-qty" inputmode="decimal" @bind="bQty" /></div>
+                    <div><label for="b-rate">Rate</label><input id="b-rate" inputmode="decimal" @bind="bRate" /></div>
+                </div>
+                <div class="row"><button type="button" class="btn primary" id="add-boq" @onclick="AddBoq">Add</button></div>
+            </section>
+        }
+    }
+    else if (tab == "bill")
+    {
+        <section class="card">
+            <h2>New progress bill</h2>
+            <p class="muted">Type how much of each item is built in total, up to today. The bill is for the part that was not billed before@(p.RetentionPctMilli > 0 ? $", less {Qty(p.RetentionPctMilli)}% retention" : "").</p>
+            <Notice Error="@formError" />
+            <div class="tbl-wrap">
+            <table class="tbl">
+                <thead><tr><th>Work</th><th class="num">Amount</th><th class="num">Billed so far</th><th class="num">Built to date (%)</th></tr></thead>
+                <tbody>
+                @foreach (var b in status.Items)
+                {
+                    var id = b.Item.Id;
+                    <tr><td>@b.Item.Code @b.Item.Description</td><td class="num">@Money(b.Item.AmountMinor)</td><td class="num">@(b.CumulativePctMilli / 1000)%</td>
+                        <td class="num"><input class="qty" inputmode="decimal" aria-label="Built to date: @b.Item.Description" value="@Progress(id)" @onchange="e => SetProgress(id, e)" /></td></tr>
+                }
+                </tbody>
+            </table>
+            </div>
+            <label for="b-notes">Note on the bill</label><input id="b-notes" @bind="billNote" maxlength="160" />
+            <div class="row"><button type="button" class="btn primary" id="make-bill" @onclick="MakeBill">Make the bill</button></div>
+        </section>
+    }
+    else if (tab == "bills")
+    {
+        <section class="card tbl-wrap">
+            @if (bills.Count == 0) { <div class="empty">No bills yet.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>Bill</th><th>Date</th><th class="num">Total</th><th class="num">To pay</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var b in bills)
+                    {
+                        <tr><td><a href="documents/@b.Id">@b.Number</a></td><td>@(b.IssuedAt is { } at ? Day(at) : "")</td><td class="num">@Money(b.PayableMinor)</td><td class="num">@(b.BalanceMinor > 0 ? Money(b.BalanceMinor) : "")</td>
+                            <td class="right">@if (b.BalanceMinor > 0) { <button type="button" class="btn ghost small" @onclick="() => paying = b">Payment received</button> }</td></tr>
+                    }
+                    </tbody></table>
+            }
+        </section>
+        @if (paying is not null)
+        {
+            <section class="card">
+                <h2>Payment for @paying.Number</h2>
+                <div class="inline-form">
+                    <div><label for="pb-amt">Amount</label><input id="pb-amt" inputmode="decimal" placeholder="@Shop.Text(paying.BalanceMinor)" @bind="payAmount" /></div>
+                    <div><label for="pb-method">Paid by</label><select id="pb-method" @bind="payMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div>
+                    <div><label for="pb-ref">Reference</label><input id="pb-ref" @bind="payRef" maxlength="60" /></div>
+                    <button type="button" class="btn primary" id="save-bill-payment" @onclick="ReceivePayment">Save</button>
+                </div>
+            </section>
+        }
+    }
+    else if (tab == "costs")
+    {
+        <section class="card tbl-wrap">
+            @if (costs.Count == 0) { <div class="empty">No costs yet.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>Date</th><th>Kind</th><th>What</th><th class="num">Amount</th></tr></thead>
+                    <tbody>@foreach (var c in costs) { <tr><td>@Day(c.At)</td><td>@Cap(c.Kind)</td><td>@c.Description@if (c.Reference is { Length: > 0 }) { <span class="muted small"> · @c.Reference</span> }</td><td class="num">@Money(c.AmountMinor)</td></tr> }</tbody></table>
+            }
+        </section>
+        <section class="card">
+            <h2>Add a cost</h2>
+            <Notice Error="@formError" />
+            <div class="field-row">
+                <div><label for="c-kind">Kind</label><select id="c-kind" @bind="cKind">@foreach (var k in CostKinds()) { <option value="@k">@Cap(k)</option> }</select></div>
+                <div><label for="c-amt">Amount</label><input id="c-amt" inputmode="decimal" @bind="cAmount" /></div>
+                <div><label for="c-ref">Bill or reference</label><input id="c-ref" @bind="cRef" maxlength="60" /></div>
+            </div>
+            <label for="c-desc">What was it for</label><input id="c-desc" @bind="cDesc" maxlength="160" />
+            <div class="row"><button type="button" class="btn primary" id="add-cost" @onclick="AddCost">Add</button></div>
+        </section>
+    }
+    else
+    {
+        <section class="card tbl-wrap">
+            @if (variations.Count == 0) { <div class="empty">No changes to the contract.</div> }
+            else
+            {
+                <table class="tbl"><thead><tr><th>No.</th><th>Change</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+                    <tbody>@foreach (var v in variations) { <tr><td>@v.No</td><td>@v.Description</td><td class="num">@Money(v.AmountMinor)</td><td><span class="chip @(v.Status == "approved" ? "ok" : v.Status == "rejected" ? "bad" : "warn")">@v.Status</span></td>
+                        <td class="right">@if (v.Status == "proposed") { <button type="button" class="btn ghost small" @onclick="() => Approve(v)">Client agreed</button><button type="button" class="btn ghost small" @onclick="() => Reject(v)">Declined</button> }</td></tr> }</tbody></table>
+            }
+        </section>
+        <section class="card">
+            <h2>Propose a change</h2>
+            <Notice Error="@formError" />
+            <label for="v-desc">What changes</label><input id="v-desc" @bind="vDesc" maxlength="160" />
+            <div class="field-row">
+                <div><label for="v-amt">Amount (before tax)</label><input id="v-amt" inputmode="decimal" @bind="vAmount" /></div>
+                <div><label for="v-tax">Tax</label><select id="v-tax" @bind="vTax">@foreach (var c in Shop.TaxClasses()) { <option value="@c">@c</option> }</select></div>
+            </div>
+            <div class="row"><button type="button" class="btn primary" id="add-variation" @onclick="AddVariation">Add</button></div>
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private ProjectStatus? status;
+    private string tab = "overview";
+    private string? formError;
+    private IReadOnlyList<NextGenOS.Hub.Documents.Document> bills = Array.Empty<NextGenOS.Hub.Documents.Document>();
+    private IReadOnlyList<Cost> costs = Array.Empty<Cost>();
+    private IReadOnlyList<Variation> variations = Array.Empty<Variation>();
+    private NextGenOS.Hub.Documents.Document? paying;
+    private readonly Dictionary<long, string> progress = new();
+    private string advAmount = "", advMethod = "bank", payAmount = "", payMethod = "bank", payRef = "", billNote = "";
+    private string bCode = "", bKind = "material", bTax = "standard", bDesc = "", bUnit = "lump sum", bQty = "1", bRate = "";
+    private string cKind = "material", cAmount = "", cRef = "", cDesc = "";
+    private string vDesc = "", vAmount = "", vTax = "standard";
+
+    protected override Task LoadAsync()
+    {
+        status = App.Projects.Status(Id);
+        bills = App.Projects.Bills(Id);
+        costs = App.Projects.Costs(Id);
+        variations = App.Projects.Variations(Id);
+        var method = Shop.PaymentMethods.Contains("bank") ? "bank" : Shop.PaymentMethods[0];
+        advMethod = payMethod = method;
+        progress.Clear();
+        foreach (var b in status.Items) progress[b.Item.Id] = b.CumulativePctMilli == 0 ? "" : Qty(b.CumulativePctMilli);
+        return Task.CompletedTask;
+    }
+
+    private void OpenTab(string key)
+    {
+        tab = key;
+        formError = null;
+        Error = Info = null;
+    }
+
+    private static string Cap(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
+
+    private IEnumerable<string> CostKinds() => Shop.Industry.Rules.ValueKind == System.Text.Json.JsonValueKind.Object && Shop.Industry.Rules.TryGetProperty("costKinds", out var k)
+        ? k.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0) : new[] { "material", "labour", "other" };
+
+    private string Progress(long boqId) => progress.GetValueOrDefault(boqId) ?? "";
+
+    private void SetProgress(long boqId, ChangeEventArgs e) => progress[boqId] = e.Value?.ToString() ?? "";
+
+    private long Amount(string text, string what) => TryMoney(Shop, text, out var m) && m > 0 ? m : throw new HubException("amount", $"Please type the {what} as a number, like 25000.");
+
+    private Task MakeQuote() => Run(() =>
+    {
+        var quote = App.Projects.CreateQuote(Id, Me.Id);
+        Nav.NavigateTo("/documents/" + quote.Document.Id);
+    });
+
+    private Task Start() => SetStatus("active");
+
+    private Task Finish() => SetStatus("complete");
+
+    private Task CloseIt() => SetStatus("closed");
+
+    private Task SetStatus(string next) => Run(() =>
+    {
+        App.Projects.SetStatus(Id, next);
+        status = App.Projects.Status(Id);
+    });
+
+    private Task ReleaseRetention() => Run(() =>
+    {
+        var bill = App.Projects.ReleaseRetention(Id, null, Me.Id);
+        Nav.NavigateTo("/documents/" + bill.Document.Id);
+    });
+
+    private Task ReceiveAdvance() => Run(() =>
+    {
+        App.Projects.ReceiveAdvance(Id, Amount(advAmount, "advance"), advMethod, null, Me.Id);
+        advAmount = "";
+        _ = Reload();
+    }, "The advance is recorded. The next bills take it off.");
+
+    private Task AddBoq() => Run(() =>
+    {
+        formError = null;
+        try
+        {
+            long qty;
+            try { qty = ShopContext.QtyMilli(bQty.Trim()); } catch (FormatException) { throw new HubException("qty", "Please type the quantity as a number."); }
+            App.Projects.AddBoq(Id, bCode, bDesc, bUnit, qty, Amount(bRate, "rate"), bKind, bTax);
+            bCode = bDesc = bRate = "";
+            bQty = "1";
+            _ = Reload();
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    });
+
+    private Task MakeBill() => Run(() =>
+    {
+        formError = null;
+        var lines = new List<ProgressInput>();
+        foreach (var b in status!.Items)
+        {
+            var text = progress[b.Item.Id].Trim();
+            if (text.Length == 0) continue;
+            long pct;
+            try { pct = ShopContext.QtyMilli(text); } catch (FormatException) { throw new HubException("pct", $"Please type a percent for {b.Item.Description}."); }
+            if (pct != b.CumulativePctMilli) lines.Add(new ProgressInput { BoqId = b.Item.Id, CumulativePctMilli = pct });
+        }
+        if (lines.Count == 0) throw new HubException("nothing", "Change at least one percent: nothing new is built since the last bill.");
+        var bill = App.Projects.CreateProgressBill(Id, lines, string.IsNullOrWhiteSpace(billNote) ? null : billNote.Trim(), Me.Id);
+        Nav.NavigateTo("/documents/" + bill.Document.Id);
+    });
+
+    private Task ReceivePayment() => Run(() =>
+    {
+        var amount = payAmount.Trim().Length == 0 ? paying!.BalanceMinor : Amount(payAmount, "payment");
+        App.Projects.ReceivePayment(paying!.Id, amount, payMethod, string.IsNullOrWhiteSpace(payRef) ? null : payRef.Trim(), Me.Id);
+        paying = null;
+        payAmount = payRef = "";
+        _ = Reload();
+    }, "Payment saved.");
+
+    private Task AddCost() => Run(() =>
+    {
+        formError = null;
+        try
+        {
+            App.Projects.AddCost(Id, cKind, cDesc, Amount(cAmount, "amount"), null, null, string.IsNullOrWhiteSpace(cRef) ? null : cRef.Trim());
+            cDesc = cAmount = cRef = "";
+            _ = Reload();
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    });
+
+    private Task AddVariation() => Run(() =>
+    {
+        formError = null;
+        try
+        {
+            App.Projects.AddVariation(Id, vDesc, Amount(vAmount, "amount"), vTax);
+            vDesc = vAmount = "";
+            _ = Reload();
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    });
+
+    private Task Approve(Variation v) => Run(() => { App.Projects.Approve(v.Id); _ = Reload(); }, "Agreed: it is now part of the contract.");
+
+    private Task Reject(Variation v) => Run(() => { App.Projects.Reject(v.Id); _ = Reload(); });
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (status is not null && status.Project.Id != Id) { tab = "overview"; await Reload(); }
+    }
+}

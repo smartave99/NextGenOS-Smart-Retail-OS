@@ -1,0 +1,37 @@
+#!/bin/bash
+# Opens Smart Retail POS as a window of its own: no address bar, no tabs, no terminal.
+#   smart-retail-pos                 opens it in its own window. The program runs in the background as a service and keeps running when the window is closed.
+#   smart-retail-pos --fullscreen    opens it full screen, like an appliance (touch-screen tills and kiosks)
+# The address is http://127.0.0.1:5280 (SMART_RETAIL_POS_URL can name another one, for a test).
+url="${SMART_RETAIL_POS_URL:-http://127.0.0.1:5280}"
+hostport="${url#*://}"; hostport="${hostport%%/*}"
+host="${hostport%%:*}"; port="${hostport##*:}"
+browsers="chromium chromium-browser google-chrome google-chrome-stable microsoft-edge microsoft-edge-stable brave-browser"
+
+# The program starts with the PC; if the PC has only just started, give it a moment (up to 40 seconds).
+for _ in $(seq 1 40); do
+  (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null && break
+  sleep 1
+done
+
+if [ "$1" = "--fullscreen" ]; then
+  for browser in $browsers; do
+    if command -v "$browser" > /dev/null 2>&1; then
+      exec "$browser" --kiosk --no-first-run --noerrdialogs --disable-infobars "$url"
+    fi
+  done
+  if command -v firefox > /dev/null 2>&1; then exec firefox --kiosk "$url"; fi
+fi
+
+# A window of its own, with a profile of its own (the program's sign-in does not mix with the person's own browsing).
+profile="${XDG_DATA_HOME:-$HOME/.local/share}/nextgenos/smart-retail-pos-window"
+for browser in $browsers; do
+  if command -v "$browser" > /dev/null 2>&1; then
+    mkdir -p "$profile" 2> /dev/null
+    exec "$browser" --app="$url" --user-data-dir="$profile" --no-first-run --no-default-browser-check
+  fi
+done
+# No browser that can do that: the usual browser, as a tab.
+if command -v xdg-open > /dev/null 2>&1; then exec xdg-open "$url"; fi
+echo "Open a web browser and go to $url"
+exit 1

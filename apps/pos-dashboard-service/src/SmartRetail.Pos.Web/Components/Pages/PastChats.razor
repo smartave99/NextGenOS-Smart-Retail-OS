@@ -2,8 +2,10 @@
 @using SmartRetail.AI.Memory
 @inject ChatHistoryService Chats
 @inject ILogger<PastChats> Log
+@inject BrandService Brand
+@inject AiEnvironment Ai
 
-<PageTitle>Past chats · Smart Retail POS</PageTitle>
+<PageTitle>Past chats · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
@@ -16,7 +18,7 @@
 </div>
 
 <form class="past-search" role="search" @onsubmit="Search">
-    <input class="form-control" type="search" placeholder="Search past chats, e.g. sugar Diwali" aria-label="Search past chats" @bind="term" @bind:event="oninput" />
+    <input class="form-control" type="search" placeholder="@SampleWords.PastChatSearch(Ai.Shop)" aria-label="Search past chats" @bind="term" @bind:event="oninput" />
     <button type="submit" class="btn btn-primary"><Icon Name="search" /> Search</button>
     @if (searched is not null)
     {

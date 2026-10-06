@@ -1,0 +1,315 @@
+@page "/sell"
+@attribute [Authorize(Policy = Perm.Sell)]
+@implements IDisposable
+@inherits HubPage
+@inject IJSRuntime Js
+
+<PageTitle>@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</PageTitle>
+<h1>@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</h1>
+<p class="sub">Scan a barcode, or type a name and press Enter.@if (drawerPrinter) { <button type="button" class="btn ghost small" id="drawer" @onclick="OpenDrawer">Open the cash drawer</button> }</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="pos">
+    <div>
+        <div class="card">
+            <input id="scan" class="big-input-left" placeholder="Scan or search" autocomplete="off" @bind="query" @bind:event="oninput" @onkeydown="OnKey" aria-label="Scan or search" />
+            <div class="row"><CameraScan Id="cam-sell" Label="Scan with the camera" OnScanned="ScanFromCamera" /></div>
+            @if (categories.Count > 0)
+            {
+                <div class="chips" role="group" aria-label="Categories">
+                    <button type="button" class="@(category is null ? "on" : "")" @onclick="() => PickCategory(null)">All</button>
+                    @foreach (var c in categories)
+                    {
+                        <button type="button" class="@(category == c ? "on" : "")" @onclick="() => PickCategory(c)">@c</button>
+                    }
+                </div>
+            }
+            @if (results.Count == 0)
+            {
+                <div class="empty">Nothing found. Check the spelling, or add it under @Shop.Plural("item").</div>
+            }
+            else
+            {
+                <div class="items">
+                    @foreach (var item in results)
+                    {
+                        <button type="button" class="item-btn" @onclick="() => Add(item)">
+                            <span class="nm">@item.Name</span>
+                            <span class="pr">@Money(item.PriceFor(customer?.PriceLevel ?? "retail"))@(item.Unit is "pc" ? "" : " / " + item.Unit)</span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card cart">
+        <h2>@Shop.Singular("sale")</h2>
+        @if (cart is null || cart.Lines.Count == 0)
+        {
+            <div class="empty">Nothing added yet.</div>
+        }
+        else
+        {
+            @foreach (var line in cart.Lines)
+            {
+                var result = cart.Result?.Lines[line.LineNo - 1];
+                <div class="line">
+                    <span class="nm">@line.Description</span>
+                    <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>
+                    <div class="ctl">
+                        <button type="button" class="qbtn" aria-label="One less of @line.Description" @onclick="() => Change(line, -1000)">−</button>
+                        <input class="qty" inputmode="decimal" aria-label="Quantity of @line.Description" value="@Qty(line.QtyMilli)" @onchange="e => SetQty(line, e.Value?.ToString())" />
+                        <button type="button" class="qbtn" aria-label="One more of @line.Description" @onclick="() => Change(line, 1000)">+</button>
+                        <span class="muted small">× @Money(line.UnitPriceMinor)</span>
+                        <span class="spacer"></span>
+                        <button type="button" class="btn ghost small" @onclick="() => Remove(line)">Remove</button>
+                    </div>
+                </div>
+            }
+
+            <div class="total-row"><span>Subtotal</span><span>@Money(cart.Document.SubtotalMinor)</span></div>
+            @foreach (var part in TaxParts())
+            {
+                <div class="total-row muted"><span>@part.Name</span><span>@Shop.Money(Shop.Minor(part.Amount))</span></div>
+            }
+            @if (cart.Result is { } r && Shop.Minor(r.Totals.RoundOff) != 0)
+            {
+                <div class="total-row muted"><span>Rounding</span><span>@Shop.Money(Shop.Minor(r.Totals.RoundOff))</span></div>
+            }
+            <div class="total-row big"><span>Total</span><span id="total">@Money(cart.Document.PayableMinor)</span></div>
+
+            <h3>Customer</h3>
+            @if (customer is not null)
+            {
+                <div class="row"><strong class="grow">@customer.Name</strong><button type="button" class="btn ghost small" @onclick="ClearCustomer">Change</button></div>
+            }
+            else
+            {
+                <input placeholder="Search by name or phone (or leave empty)" aria-label="Customer" @bind="customerQuery" @bind:event="oninput" />
+                @if (customerQuery.Trim().Length >= 2)
+                {
+                    <div class="chips">
+                        @foreach (var p in App.Parties.Search("customer", customerQuery, 6))
+                        {
+                            <button type="button" @onclick="() => PickCustomer(p)">@p.Name</button>
+                        }
+                    </div>
+                }
+            }
+
+            <h3>Payment</h3>
+            <div class="pay-methods" role="group" aria-label="Way of paying">
+                @foreach (var m in Shop.PaymentMethods)
+                {
+                    <button type="button" class="chips-btn @(method == m ? "on" : "")" aria-pressed="@(method == m)" @onclick="() => method = m">@Label(m)</button>
+                }
+            </div>
+            <input class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(Remaining)" @bind="tender" @bind:event="oninput" @onkeydown="OnPayKey" />
+            <div class="row wrap">
+                <button type="button" class="btn secondary" @onclick="AddPayment">Add payment</button>
+                @if (Shop.Features.Credit && customer is { CreditLimitMinor: > 0 })
+                {
+                    <button type="button" class="btn secondary" @onclick="() => Complete(true)">Put on account</button>
+                }
+            </div>
+            @foreach (var (p, i) in payments.Select((p, i) => (p, i)))
+            {
+                <div class="total-row"><span>@Label(p.Method)</span><span>@Money(p.AmountMinor) <button type="button" class="btn ghost small" aria-label="Take off this payment" @onclick="() => payments.RemoveAt(i)">×</button></span></div>
+            }
+            @if (Paid > cart.Document.PayableMinor && payments.Any(p => p.Method == "cash"))
+            {
+                <div class="total-row"><span>Change to give</span><strong id="change">@Money(Paid - cart.Document.PayableMinor)</strong></div>
+            }
+            else if (payments.Count > 0 && Remaining > 0)
+            {
+                <div class="total-row"><span>Still to pay</span><strong>@Money(Remaining)</strong></div>
+            }
+            <div class="row">
+                <button type="button" class="btn primary grow" id="complete" @onclick="() => Complete(false)">Complete @Shop.Singular("sale").ToLowerInvariant()</button>
+                <button type="button" class="btn ghost" @onclick="Cancel">Cancel</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string query = "";
+    private string? category;
+    private IReadOnlyList<Item> results = Array.Empty<Item>();
+    private IReadOnlyList<string> categories = Array.Empty<string>();
+    private DocumentView? cart;
+    private Party? customer;
+    private string customerQuery = "";
+    private string method = "cash";
+    private string tender = "";
+    private readonly List<PaymentInput> payments = new();
+    private bool finished;
+    private bool drawerPrinter;
+
+    private Task OpenDrawer() => Run(async () => { await App.Printing.OpenDrawerAsync(null, Me.Id); });
+
+    private long Paid => payments.Sum(p => p.AmountMinor);
+    private long Remaining => Math.Max(0, (cart?.Document.PayableMinor ?? 0) - Paid);
+
+    private static string Label(string m) => char.ToUpperInvariant(m[0]) + m[1..];
+
+    protected override Task LoadAsync()
+    {
+        method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        categories = App.Catalog.Categories();
+        drawerPrinter = App.PrinterProfiles.For("receipt") is not null;
+        Search();
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.InvokeVoidAsync("hub.focus", "scan");
+    }
+
+    private void Search() => results = App.Catalog.Search(string.IsNullOrWhiteSpace(query) ? null : query, null, category, 60);
+
+    private void PickCategory(string? c)
+    {
+        category = c;
+        Search();
+    }
+
+    private async Task ScanFromCamera(string code)
+    {
+        query = code;
+        await OnKey(new KeyboardEventArgs { Key = "Enter" });
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter") { Search(); return; }
+        await Run(() =>
+        {
+            var text = query.Trim();
+            if (text.Length == 0) return;
+            var item = App.Catalog.FindByCode(text);
+            if (item is null)
+            {
+                Search();
+                if (results.Count == 1) item = results[0];
+            }
+            if (item is null) throw new HubException("not-found", $"Nothing is called \"{text}\".");
+            Add(item);
+        });
+        await Js.InvokeVoidAsync("hub.focus", "scan");
+    }
+
+    private void Add(Item item)
+    {
+        Run(() =>
+        {
+            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && l.DiscountPctMilli == 0 && l.Note is null);
+            if (cart is null)
+                cart = App.Documents.CreateDraft(new DraftOptions { UserId = Me.Id, PartyId = customer?.Id, Lines = { new LineInput { ItemId = item.Id } } });
+            else if (existing is not null)
+                cart = App.Documents.UpdateLine(cart.Document.Id, existing.Id, existing.QtyMilli + 1000);
+            else
+                cart = App.Documents.AddLine(cart.Document.Id, new LineInput { ItemId = item.Id });
+            query = "";
+            Search();
+        });
+    }
+
+    private void Change(DocLine line, long delta)
+    {
+        Run(() =>
+        {
+            var next = line.QtyMilli + delta;
+            cart = next <= 0 ? App.Documents.RemoveLine(cart!.Document.Id, line.Id) : App.Documents.UpdateLine(cart!.Document.Id, line.Id, next);
+        });
+    }
+
+    private void SetQty(DocLine line, string? text)
+    {
+        Run(() =>
+        {
+            long milli;
+            try { milli = ShopContext.QtyMilli((text ?? "").Trim()); }
+            catch (FormatException) { throw new HubException("qty", "Please type a number, like 2 or 0.5."); }
+            cart = milli <= 0 ? App.Documents.RemoveLine(cart!.Document.Id, line.Id) : App.Documents.UpdateLine(cart!.Document.Id, line.Id, milli);
+        });
+    }
+
+    private void Remove(DocLine line) => Run(() => cart = App.Documents.RemoveLine(cart!.Document.Id, line.Id));
+
+    private IEnumerable<NextGenOS.Tax.Component> TaxParts() => cart?.Result?.Totals.Components?.Where(c => Shop.Minor(c.Amount) != 0) ?? Enumerable.Empty<NextGenOS.Tax.Component>();
+
+    private void PickCustomer(Party p)
+    {
+        Run(() =>
+        {
+            customer = p;
+            customerQuery = "";
+            if (cart is not null) cart = App.Documents.SetParty(cart.Document.Id, p.Id);
+            Search();
+        });
+    }
+
+    private void ClearCustomer()
+    {
+        Run(() =>
+        {
+            customer = null;
+            if (cart is not null) cart = App.Documents.SetParty(cart.Document.Id, null);
+            Search();
+        });
+    }
+
+    private void OnPayKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddPayment();
+    }
+
+    private void AddPayment()
+    {
+        Run(() =>
+        {
+            long amount;
+            if (string.IsNullOrWhiteSpace(tender)) amount = Remaining;
+            else if (!TryMoney(Shop, tender, out amount) || amount <= 0) throw new HubException("amount", "Please type the amount as a number, like 250 or 99.50.");
+            if (amount <= 0) throw new HubException("amount", "There is nothing left to pay.");
+            payments.Add(new PaymentInput { Method = method, AmountMinor = amount });
+            tender = "";
+        });
+    }
+
+    private void Complete(bool onAccount)
+    {
+        Run(() =>
+        {
+            if (cart is null) return;
+            if (!onAccount && tender.Trim().Length > 0) AddPayment();
+            if (!onAccount && payments.Count == 0 && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });
+            var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount });
+            finished = true;
+            Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");
+        });
+    }
+
+    private void Cancel()
+    {
+        Run(() =>
+        {
+            if (cart is not null) App.Documents.Discard(cart.Document.Id);
+            cart = null;
+            payments.Clear();
+            tender = "";
+        });
+    }
+
+    public void Dispose()
+    {
+        // A sale left open by closing the page is thrown away, so it does not clutter the day.
+        if (cart is not null && !finished)
+        {
+            try { App.Documents.Discard(cart.Document.Id); } catch (Exception) { /* the daily clean-up will take it */ }
+        }
+    }
+}

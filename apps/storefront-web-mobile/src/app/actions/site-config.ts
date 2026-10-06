@@ -5,6 +5,8 @@ import { SiteConfig, DEFAULT_SITE_CONFIG } from "@/types/site-config";
 import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { getBlobJson, updateBlobJson } from "./blob-json";
 import { requireAdminSession } from "@/lib/auth-server";
+import { getLicenceBrand } from "@/lib/licence/manager";
+import { applyBrand } from "@/lib/licence/brand";
 
 const BLOB_FILENAME = "site_config.json";
 
@@ -74,10 +76,24 @@ async function _fetchSiteConfig(): Promise<SiteConfig> {
     }
 }
 
-export const getSiteConfig = unstable_cache(_fetchSiteConfig, ["site-config"], {
+const cachedSiteConfig = unstable_cache(_fetchSiteConfig, ["site-config"], {
     revalidate: 3600,
     tags: ["site-config"],
 });
+
+/**
+ * The site configuration with the licence's brand applied as far as the licence's white-label level allows
+ * (see src/lib/licence/brand.ts). The brand is applied after the cache, so a new licence shows at once.
+ */
+export async function getSiteConfig(): Promise<SiteConfig> {
+    const config = await cachedSiteConfig();
+    try {
+        const { brand, level } = getLicenceBrand();
+        return applyBrand(config, brand, level, DEFAULT_SITE_CONFIG);
+    } catch {
+        return config;
+    }
+}
 
 
 /**
@@ -86,6 +102,12 @@ export const getSiteConfig = unstable_cache(_fetchSiteConfig, ["site-config"], {
 export async function updateSiteConfig(newConfig: SiteConfig): Promise<{ success: boolean; error?: string }> {
     try {
         await requireAdminSession();
+        // Scripts added to every page of the website run with the visitor's trust: only the owner may change them.
+        const current = await getSiteConfig();
+        const scripts = (c: SiteConfig) => JSON.stringify(c.system?.scripts ?? {});
+        if (scripts(current) !== scripts(newConfig)) {
+            await requireAdminSession("system-scripts");
+        }
         const result = await updateBlobJson(BLOB_FILENAME, newConfig);
 
         if (!result.success) {

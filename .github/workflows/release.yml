@@ -1,0 +1,738 @@
+name: Release
+
+# Builds the release files and publishes them as a GitHub Release.
+#   - push a tag such as v1.0.0 (or v1.0.0-rc1 for a trial release), or
+#   - run it by hand from the Actions tab and choose the brand kit, or
+#   - change .github/trial-release.json on a claude/* branch: trial-release.yml then calls this workflow and, when the gate passes, makes the tag and the GitHub Release itself
+#     (a trial: built without licence keys, marked, never for a customer). A real release always needs a tag made by the owner.
+# Android signing keys (optional, repository secrets): ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
+# Without them the app is signed with a one-off TEST key: fine for trying it on a phone, not for a store.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_call:
+    inputs:
+      kit:
+        type: string
+        default: "example-shop"
+      version_name:
+        type: string
+        default: "1.0.0"
+      version_code:
+        type: string
+        default: "1"
+      trial_without_keys:
+        type: boolean
+        default: false
+      publish_trial:
+        description: "Make the tag and the GitHub Release from this run (only for a trial)."
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      kit:
+        description: "Brand kit folder under brand-kits/"
+        default: "example-shop"
+      version_name:
+        description: "Version shown to people, for example 1.0.0"
+        default: "1.0.0"
+      version_code:
+        description: "Whole number, higher for every release"
+        default: "1"
+      trial_without_keys:
+        description: "Only to try the Windows setup: build it without your licence keys. It can never be activated. Never give it to a customer."
+        type: boolean
+        default: false
+      website_customer:
+        description: "Website for a customer who is NOT in brand-kits/: their short name (small letters, digits, hyphens), for example luzon-fresh-mart. Leave empty to make the website of the brand kit above."
+        default: ""
+      website_settings:
+        description: "Website for that customer: their public settings on ONE line, separated by semicolons, for example NEXT_PUBLIC_SITE_NAME=Luzon Fresh Mart;NEXT_PUBLIC_COUNTRY=PH (the Setup Studio's pack shows the line). No password or key."
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  KIT: ${{ inputs.kit || 'example-shop' }}
+  VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+  VERSION_CODE: ${{ inputs.version_code || '1' }}
+
+jobs:
+  gate:
+    name: Release gate (all checks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # The whole history, so the gate can look for a secret that was committed and later deleted.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - run: npm ci --ignore-scripts
+        working-directory: apps/storefront-web-mobile
+      - run: npx prisma generate
+        working-directory: apps/storefront-web-mobile
+      - uses: ./.github/actions/gate-tools
+      - run: node scripts/verify-all.mjs --full
+
+  prepare:
+    # The build jobs hand their files to the publishing job on a DRAFT release, not through the workflow's artifact storage: that storage has a small
+    # quota per account and a release of this size can fill it. A draft is seen only by people who can write to the repository.
+    # This runs at the very start, beside the gate: GitHub lets the workflow's token make a tag or a release only at the newest commit of the branch,
+    # and only at the start of a run is that certainly this run's commit. The tag is made now; the release is published by the last job.
+    name: Make the draft release the build jobs put their files on
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+      tag: ${{ steps.draft.outputs.tag }}
+      tag_made: ${{ steps.draft.outputs.tag_made }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Make the draft release (and the tag, for a trial)
+        id: draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          PUBLISH_TRIAL: ${{ inputs.publish_trial }}
+        run: |
+          set -euo pipefail
+          # A tag the owner pushed names the release (it exists already). A trial started from a branch makes its own tag, at the commit that is being built.
+          # A run started by hand keeps a draft that nobody but people who can write to the repository can see.
+          MAKE=""
+          if [ "${REF_TYPE}" = "tag" ]; then TAG="${REF_NAME}"
+          elif [ "${PUBLISH_TRIAL}" = "true" ]; then TAG="v${VERSION_NAME}-trial${RUN_NUMBER}"; MAKE="--make-tag"
+          else TAG="v${VERSION_NAME}-manual${RUN_NUMBER}"; fi
+          PRE=""
+          case "${TAG}" in *-rc*|*-beta*|*-alpha*|*-trial*|*-manual*) PRE="--prerelease";; esac
+          node scripts/release-assets.mjs create --tag "${TAG}" --target "${GITHUB_SHA}" --title "Smart Retail POS ${TAG}" ${PRE} ${MAKE}
+
+  cleanup:
+    # When the gate does not pass nothing is built and nothing is released: the draft and the tag this run made are taken away again.
+    name: Take the draft away when the gate did not pass
+    needs: [gate, prepare]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.gate.result != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Remove the draft, and the tag if this run made it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TAG_MADE: ${{ needs.prepare.outputs.tag_made }}
+        run: |
+          set -euo pipefail
+          if [ "${TAG_MADE}" = "true" ]; then node scripts/release-assets.mjs discard --release "${RELEASE_ID}" --tag "${TAG}"
+          else node scripts/release-assets.mjs discard --release "${RELEASE_ID}"; fi
+
+  android:
+    name: Android app (APK and AAB)
+    needs: [gate, prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/storefront-web-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        with:
+          # Its default also asks for the old package "tools", which the current command-line tools no longer have ("Failed to find package 'tools'").
+          packages: platform-tools
+      - name: Install packages
+        run: npm ci
+      - name: Read the brand kit
+        id: kit
+        run: |
+          set -euo pipefail
+          KIT_DIR="../../brand-kits/${KIT}"
+          test -f "${KIT_DIR}/brand.json" || { echo "No such brand kit: ${KIT}"; exit 1; }
+          echo "app_id=$(jq -r '.android.appId' ${KIT_DIR}/brand.json)" >> "$GITHUB_OUTPUT"
+          echo "app_name=$(jq -r '.name' ${KIT_DIR}/brand.json)" >> "$GITHUB_OUTPUT"
+          echo "url=$(jq -r '.android.storefrontUrl' ${KIT_DIR}/brand.json)" >> "$GITHUB_OUTPUT"
+          echo "colour=$(jq -r '.primaryColor' ${KIT_DIR}/brand.json)" >> "$GITHUB_OUTPUT"
+          echo "logo=${KIT_DIR}/$(jq -r '.logo' ${KIT_DIR}/brand.json)" >> "$GITHUB_OUTPUT"
+      - name: Set the app up for this customer
+        env:
+          APP_ID: ${{ steps.kit.outputs.app_id }}
+          APP_NAME: ${{ steps.kit.outputs.app_name }}
+          STOREFRONT_URL: ${{ steps.kit.outputs.url }}
+          BRAND_COLOUR: ${{ steps.kit.outputs.colour }}
+          BRAND_LOGO: ${{ steps.kit.outputs.logo }}
+        run: |
+          node scripts/android-config.mjs --app-id "${APP_ID}" --app-name "${APP_NAME}" --url "${STOREFRONT_URL}" --version-name "${VERSION_NAME}" --version-code "${VERSION_CODE}"
+          node scripts/make-icons.mjs --logo "${BRAND_LOGO}" --colour "${BRAND_COLOUR}" --android
+      - name: Sync Capacitor
+        run: npx cap sync android
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_B64}" ]; then
+            echo "${KEYSTORE_B64}" | base64 -d > "${RUNNER_TEMP}/release.keystore"
+            echo "ANDROID_KEYSTORE_FILE=${RUNNER_TEMP}/release.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${KEY_ALIAS}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${KEY_PASSWORD}" >> "$GITHUB_ENV"
+            echo "SIGNING=release key" >> "$GITHUB_ENV"
+          else
+            PW="$(openssl rand -hex 16)"
+            keytool -genkeypair -v -keystore "${RUNNER_TEMP}/test.keystore" -storepass "${PW}" -keypass "${PW}" -alias test -keyalg RSA -keysize 3072 -validity 3650 -dname "CN=Test build, O=NextGenOS" >/dev/null 2>&1
+            echo "ANDROID_KEYSTORE_FILE=${RUNNER_TEMP}/test.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${PW}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=test" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${PW}" >> "$GITHUB_ENV"
+            echo "SIGNING=one-off TEST key" >> "$GITHUB_ENV"
+          fi
+      - name: Build
+        working-directory: apps/storefront-web-mobile/android
+        run: chmod +x gradlew && ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+      - name: Check the package
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          BT="$(ls -d ${ANDROID_HOME}/build-tools/* | sort -V | tail -1)"
+          "${BT}/apksigner" verify --print-certs "${APK}"
+          # No source files or source maps inside the package.
+          if unzip -l "${APK}" | grep -Ei '\.(ts|tsx|map|java|kt|pdb)$'; then echo "Source files found in the APK"; exit 1; fi
+          # The app must refuse unencrypted traffic.
+          "${BT}/aapt2" dump xmltree --file AndroidManifest.xml "${APK}" | grep -Eq 'usesCleartextTraffic.*(=false|0x0)' || { echo "Cleartext traffic is not disabled"; exit 1; }
+      - name: Name the files
+        run: |
+          mkdir -p ../../dist
+          cp android/app/build/outputs/apk/release/app-release.apk "../../dist/SmartRetailPOS-${KIT}-${VERSION_NAME}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "../../dist/SmartRetailPOS-${KIT}-${VERSION_NAME}.aab"
+          echo "Signed with: ${SIGNING}" > ../../dist/ANDROID-SIGNING.txt
+      - name: Put the files on the draft release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
+  windows-build:
+    # The setup is compiled on Linux: the setup compiler there (the Ubuntu package of NSIS) can make a 64-bit setup, and the one for Windows that Chocolatey installs cannot
+    # ("adequate stub not found"). The program is the same either way: published for Windows (self-contained), its names hidden, audited. The next job tries the result on a real Windows PC.
+    name: Windows setup for the Business Hub (built)
+    needs: [gate, prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the licence keys in (public keys only)
+        # The owner's public keys are public data: repository variables NGOS_PUBLIC_KEYS (the text "export-public-keys" prints) and
+        # NGOS_LICENCE_URL (the Studio's address). Or they were already built in and committed with "sync-clients". With neither, the build stops.
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NGOS_PUBLIC_KEYS}" ]; then
+            printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+            node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+          fi
+      - name: Tools (code obfuscator and setup compiler; build tools, never shipped)
+        run: |
+          set -euo pipefail
+          dotnet tool install --global Obfuscar.GlobalTool --version 2.2.50
+          sudo apt-get update -q
+          sudo apt-get install -y -q nsis
+      - name: Build the setup (publish, hide the names, audit, write the setup and the zip)
+        env:
+          # A tag with -trial in its name (v1.0.0-trial1) does the same as the manual tick: a setup with no keys, to try installing only.
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          node apps/business-hub/installer/build.mjs --version "${VERSION_NAME}" --out dist ${EXTRA}
+          if [ -n "${EXTRA}" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the Windows setup. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
+          ls -la dist
+      - name: Put the files on the draft release
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
+  windows:
+    name: Windows setup for the Business Hub (tried on a Windows PC)
+    needs: [gate, prepare, windows-build]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the setup and the zip from the draft release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs download --release "${RELEASE_ID}" --out dist --match '^(SmartRetailPOS-Hub-|NO-LICENCE-KEYS)'
+      - name: Start the program from the zip and check it refuses to work without a licence
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-*-win-x64.zip' | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP 'hub-zip'
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          & "$env:SystemRoot\System32\tar.exe" -xf $zip.FullName -C $dir
+          if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
+          node scripts/smoke-hub.mjs (Join-Path $dir 'NextGenOS.Hub.exe')
+          if ($LASTEXITCODE -ne 0) { throw 'The published program did not behave.' }
+      - name: Install the setup on this Windows PC, check the service, uninstall, check the shop's data stays
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-Setup-*.exe' | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "The setup ended with code $($p.ExitCode)." }
+          $svc = Get-Service -Name NextGenOSHub -ErrorAction Stop
+          $cfg = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\NextGenOSHub'
+          if ($cfg.ObjectName -ne 'NT AUTHORITY\LocalService') { throw "The service runs as $($cfg.ObjectName)." }
+          if ($cfg.Start -ne 2 -or $cfg.DelayedAutostart -ne 1) { throw 'The service does not start with the PC (delayed automatic start).' }
+          for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 2 }
+          if ((Get-Service NextGenOSHub).Status -ne 'Running') { Get-WinEvent -LogName Application -MaxEvents 20 | Format-List TimeCreated, ProviderName, Message; throw 'The service did not start.' }
+          $code = 0
+          for ($i = 0; $i -lt 30; $i++) {
+            try { $r = Invoke-WebRequest 'http://127.0.0.1:5280/' -UseBasicParsing -Headers @{ Accept = 'text/html' }; $code = [int]$r.StatusCode }
+            catch { if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode; break } }
+            if ($code -ne 0) { break }
+            Start-Sleep -Seconds 2
+          }
+          if ($code -ne 402) { throw "With no licence the Hub should answer 402, not $code." }
+          $acl = (Get-Acl 'C:\ProgramData\NextGenOS\Hub').Access | ForEach-Object { $_.IdentityReference.Value }
+          if ($acl -match 'Users|Everyone|Authenticated Users') { throw "The shop's data folder can be read by: $($acl -join ', ')" }
+          Write-Host 'Installed, the service runs, the Hub answers 402 without a licence, the data folder is closed to ordinary users.'
+          # Something in the data folder must survive the uninstall.
+          Set-Content 'C:\ProgramData\NextGenOS\Hub\keep-me.txt' 'shop data'
+          $un = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\Uninstall.exe'
+          Start-Process -FilePath $un -ArgumentList '/S' -Wait
+          for ($i = 0; $i -lt 60 -and (Test-Path (Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe')); $i++) { Start-Sleep -Seconds 2 }
+          if (Test-Path (Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe')) { throw 'The uninstall left the program behind.' }
+          for ($i = 0; $i -lt 30 -and (Get-Service -Name NextGenOSHub -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 2 }
+          if (Get-Service -Name NextGenOSHub -ErrorAction SilentlyContinue) { throw 'The uninstall left the service behind.' }
+          if (-not (Test-Path 'C:\ProgramData\NextGenOS\Hub\keep-me.txt')) { throw "The uninstall removed the shop's data." }
+          Write-Host "Uninstalled; the service is gone and the shop's data stayed."
+      - name: Sign the setup (only when a code-signing certificate is set up)
+        shell: pwsh
+        env:
+          CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:CERT_B64) { Write-Host 'No signing certificate set (repository secrets WINDOWS_CERT_B64 and WINDOWS_CERT_PASSWORD): the setup is NOT signed; Windows SmartScreen will warn.'; 'NOT signed' | Out-File dist\WINDOWS-SIGNING.txt; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP 'sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
+          $tool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match 'x64' } | Select-Object -Last 1
+          Get-ChildItem dist -Filter '*Setup*.exe' | ForEach-Object { & $tool.FullName sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName; if ($LASTEXITCODE -ne 0) { throw 'Signing failed.' } }
+          Remove-Item $pfx
+          'Signed with the owner certificate' | Out-File dist\WINDOWS-SIGNING.txt
+      - name: Put the signing note (and the signed setup, when it was signed) on the draft release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          FILES=(dist/WINDOWS-SIGNING.txt)
+          if grep -qi '^Signed' dist/WINDOWS-SIGNING.txt; then FILES+=(dist/SmartRetailPOS-Hub-Setup-*.exe); fi
+          node scripts/release-assets.mjs upload --release "${RELEASE_ID}" "${FILES[@]}"
+
+  linux:
+    name: Linux package for the Business Hub
+    needs: [gate, prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the licence keys in (public keys only)
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NGOS_PUBLIC_KEYS}" ]; then
+            printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+            node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+          fi
+      - name: Code obfuscator (a build tool, never shipped)
+        run: dotnet tool install --global Obfuscar.GlobalTool --version 2.2.50
+      - name: Build the packages (publish, hide the names, check prerequisites, audit, write the .deb) for Intel/AMD and ARM
+        env:
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          node apps/business-hub/installer/build-linux.mjs --version "${VERSION_NAME}" --arch x64 --out dist ${EXTRA}
+          node apps/business-hub/installer/build-linux.mjs --version "${VERSION_NAME}" --arch arm64 --out dist ${EXTRA}
+      - name: Install the Intel/AMD package on this runner, start it as its own account, add a profile package, remove it
+        run: node apps/business-hub/installer/test-linux-package.mjs --deb "dist/smart-retail-pos-hub_${VERSION_NAME}-1_amd64.deb"
+      - name: Put the files on the draft release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
+  website:
+    # One website for ONE customer, built on the system it is for (the database engine and the picture library are different files for each system).
+    # The customer is the brand kit above, or (website_customer + website_settings) a customer who is not in the repository. The package carries its own Node.js and is checked
+    # (no source, no secret, nothing a factory-new computer lacks), started from its zip, and must refuse to work without a licence. The licence keys are built in like the Hub's.
+    name: Website for the customer (${{ matrix.os }})
+    needs: [gate, prepare]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the licence keys in (public keys only)
+        shell: bash
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NGOS_PUBLIC_KEYS}" ]; then
+            printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+            node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+          fi
+      - name: Tool for the Windows launcher (NSIS, a build tool, never shipped)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS could not be installed.' }
+      - name: Build the website package (build, check prerequisites, audit, write the zip)
+        id: build
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+          WEBSITE_CUSTOMER: ${{ inputs.website_customer }}
+          WEBSITE_SETTINGS: ${{ inputs.website_settings }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          OUT="${RUNNER_TEMP}/website-out"
+          if [ -n "${WEBSITE_SETTINGS}" ]; then
+            test -n "${WEBSITE_CUSTOMER}" || { echo "Type the customer's short name too (Website customer)."; exit 1; }
+            CUSTOMER="${WEBSITE_CUSTOMER}"
+            # One line becomes one setting per line. The script refuses anything that is not a public setting.
+            printf '%s' "${WEBSITE_SETTINGS}" | tr ';' '\n' > "${RUNNER_TEMP}/website-settings.env"
+            node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --customer "${CUSTOMER}" --settings "${RUNNER_TEMP}/website-settings.env" --download-node 22.22.0 --out "${OUT}" ${EXTRA}
+          else
+            CUSTOMER="${KIT}"
+            node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --kit "${KIT}" --download-node 22.22.0 --out "${OUT}" ${EXTRA}
+          fi
+          echo "customer=${CUSTOMER}" >> "$GITHUB_OUTPUT"
+      - name: Run the two audits again on the folder and the zip
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/website-out"
+          node scripts/audit-package.mjs "${OUT}/website-${CUSTOMER}-${OS}" "${OUT}/website-${CUSTOMER}-${OS}.zip" --node-app
+          node scripts/audit-prerequisites.mjs "${OUT}/website-${CUSTOMER}-${OS}" --os "${OS}"
+      - name: Start the website from the zip and check it refuses to work without a licence (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        env:
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          set -euo pipefail
+          mkdir "${RUNNER_TEMP}/website-zip"
+          unzip -q "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-linux.zip" -d "${RUNNER_TEMP}/website-zip"
+          node scripts/smoke-website.mjs "${RUNNER_TEMP}/website-zip/website-${CUSTOMER}-linux" --os linux
+      - name: Start the website from the zip and check it refuses to work without a licence (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        env:
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'website-zip'
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          & "$env:SystemRoot\System32\tar.exe" -xf (Join-Path $env:RUNNER_TEMP "website-out\website-$($env:CUSTOMER)-windows.zip") -C $dir
+          if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
+          node scripts/smoke-website.mjs (Join-Path $dir "website-$($env:CUSTOMER)-windows") --os windows
+          if ($LASTEXITCODE -ne 0) { throw 'The website package did not behave.' }
+      - name: Open Start Website.exe the way a person does (double-click), check the window, open it again, close the window (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        env:
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pkg = Join-Path (Join-Path $env:RUNNER_TEMP 'website-zip') "website-$($env:CUSTOMER)-windows"
+          $exe = Join-Path $pkg 'Start Website.exe'
+          if (-not (Test-Path $exe)) { throw 'Start Website.exe is not in the package.' }
+          $note = Join-Path (Join-Path (Join-Path $env:APPDATA 'NextGenOS Website') $env:CUSTOMER) 'running.json'
+          Remove-Item $note -ErrorAction SilentlyContinue
+
+          # 1. Opened like a double-click: it must start and answer (a website with no licence answers "not available").
+          Start-Process -FilePath $exe | Out-Null
+          for ($i = 0; $i -lt 120 -and -not (Test-Path $note); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $note)) { throw 'The website did not start within 120 seconds.' }
+          $info = Get-Content $note -Raw | ConvertFrom-Json
+          $status = 0
+          try { $status = (Invoke-WebRequest -Uri $info.url -UseBasicParsing -SkipHttpErrorCheck).StatusCode } catch { throw "The website does not answer at $($info.url)." }
+          Write-Host "The website answers at $($info.url) with status $status."
+          $program = Get-CimInstance Win32_Process -Filter "ProcessId = $($info.pid)"
+          Write-Host $program.CommandLine
+          if ($program.CommandLine -notlike '*start-website.js --app*' -or $program.ExecutablePath -notlike "$pkg*") { throw 'The website is not running from its own folder with its own Node.js.' }
+
+          # 2. A window of its own was opened for it (Edge, in app mode: no address bar).
+          $window = $null
+          for ($i = 0; $i -lt 30 -and -not $window; $i++) {
+            $window = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like "*--app=$($info.url)*" } | Select-Object -First 1
+            if (-not $window) { Start-Sleep -Seconds 1 }
+          }
+          if (-not $window) { throw 'No app window was opened for the website.' }
+          Write-Host 'An Edge app window is open for it.'
+
+          # 3. Opened a second time: still one website.
+          Start-Process -FilePath $exe | Out-Null
+          Start-Sleep -Seconds 15
+          $running = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*start-website.js*' })
+          if ($running.Count -ne 1) { throw "There are $($running.Count) websites running; there must be one." }
+
+          # 4. The window is closed: the website stops and its note is removed.
+          Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*NextGenOS Website*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          for ($i = 0; $i -lt 40 -and (Get-Process -Id $info.pid -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+          if (Get-Process -Id $info.pid -ErrorAction SilentlyContinue) { throw 'The website did not stop when its window was closed.' }
+          if (Test-Path $note) { throw 'The note that the website is running was not removed.' }
+          Write-Host 'The website opened in a window of its own, ran once, and stopped when the window was closed.'
+      - name: Put the website zip in dist
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-${OS}.zip" dist/
+      - name: Put the files on the draft release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
+  studio:
+    name: Setup Studio for NextGenOS staff (Windows and Linux bundles)
+    needs: [gate, prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Tool for the Windows launcher (build tool, never shipped)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q nsis
+      - name: Make the bundles (the Studio, its packs, its one library and Node.js, checked against nodejs.org's fingerprint)
+        run: |
+          set -euo pipefail
+          node tools/setup-studio/scripts/make-bundle.mjs --os windows --out dist --download-node 22.12.0
+          node tools/setup-studio/scripts/make-bundle.mjs --os linux --out dist --download-node 22.12.0
+      - name: Put the files on the draft release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
+  studio-windows:
+    name: Setup Studio opened on a Windows PC
+    needs: [gate, prepare, studio]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the Windows bundle of the Studio from the draft release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs download --release "${RELEASE_ID}" --out dl --match '^NextGenOS-Setup-Studio-.*-windows\.zip$'
+      - name: Open it the way a person does (double-click Setup Studio.exe), check it, open it again, quit it from its page
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Web
+          $zip = Get-ChildItem dl -Filter 'NextGenOS-Setup-Studio-*-windows.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'The Studio zip is not on the draft release.' }
+          # Windows' own tar unpacks zip files reliably (it is what the other Windows jobs use).
+          New-Item -ItemType Directory -Force -Path studio | Out-Null
+          tar -xf $zip.FullName -C studio
+          if ($LASTEXITCODE -ne 0) { throw 'The Studio zip could not be unpacked.' }
+          $top = Join-Path (Get-Location).Path 'studio\NextGenOS Setup Studio'
+          $exe = Join-Path $top 'Setup Studio.exe'
+          if (-not (Test-Path $exe)) { throw 'Setup Studio.exe is not in the zip.' }
+          $env:SETUP_STUDIO_WORKSPACE = Join-Path $env:RUNNER_TEMP 'studio-workspace'
+          $note = Join-Path (Join-Path $env:APPDATA 'NextGenOS Setup Studio') 'running.json'
+          Remove-Item $note -ErrorAction SilentlyContinue
+
+          # 1. Opened like a double-click: it must start, answer, and run from its own folder with its own Node.js.
+          Start-Process -FilePath $exe | Out-Null
+          for ($i = 0; $i -lt 90 -and -not (Test-Path $note); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $note)) { throw 'The Studio did not start within 90 seconds.' }
+          $info = Get-Content $note -Raw | ConvertFrom-Json
+          $uri = [Uri]$info.url
+          $key = [System.Web.HttpUtility]::ParseQueryString($uri.Query)['k']
+          $base = "$($uri.Scheme)://$($uri.Authority)"
+          $headers = @{ 'x-studio-key' = $key }
+          $state = Invoke-RestMethod -Uri "$base/api/state" -Headers $headers
+          Write-Host "The Studio answers: version $($state.version), set up: $($state.initialised)"
+          $program = Get-CimInstance Win32_Process -Filter "ProcessId = $($info.pid)"
+          Write-Host $program.CommandLine
+          if ($program.CommandLine -notlike '*studio.mjs serve --app*' -or $program.ExecutablePath -notlike "$top*") { throw 'The Studio is not running from its own folder with its own Node.js.' }
+
+          # 2. A window of its own was opened for it (Edge, in app mode: no address bar).
+          $window = $null
+          for ($i = 0; $i -lt 30 -and -not $window; $i++) {
+            $window = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like "*--app=$($info.url)*" } | Select-Object -First 1
+            if (-not $window) { Start-Sleep -Seconds 1 }
+          }
+          if (-not $window) { throw 'No app window was opened for the Studio.' }
+          Write-Host 'An Edge app window is open for it.'
+
+          # 3. Opened a second time: there is still one Studio.
+          Start-Process -FilePath $exe | Out-Null
+          Start-Sleep -Seconds 15
+          $running = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*studio.mjs serve*' })
+          if ($running.Count -ne 1) { throw "There are $($running.Count) Studios running; there must be one." }
+
+          # 4. Quit from its page: it stops and says so.
+          Invoke-RestMethod -Method Post -Uri "$base/api/quit" -Headers $headers -ContentType 'application/json' -Body '{}' | Out-Null
+          for ($i = 0; $i -lt 30 -and (Get-Process -Id $info.pid -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+          if (Get-Process -Id $info.pid -ErrorAction SilentlyContinue) { throw 'The Studio did not stop when asked to quit.' }
+          if (Test-Path $note) { throw 'The note that the Studio is running was not removed.' }
+          Write-Host 'The Setup Studio opened in a window of its own, ran once, and quit when asked.'
+
+  publish:
+    name: Publish the GitHub Release
+    needs: [gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website]
+    # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
+    if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the files from the draft release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs download --release "${RELEASE_ID}" --out dist
+      - name: What was built
+        env:
+          ANDROID: ${{ needs.android.result }}
+          WINDOWS_BUILD: ${{ needs.windows-build.result }}
+          WINDOWS: ${{ needs.windows.result }}
+          LINUX: ${{ needs.linux.result }}
+          STUDIO: ${{ needs.studio.result }}
+          STUDIO_WINDOWS: ${{ needs.studio-windows.result }}
+          WEBSITE: ${{ needs.website.result }}
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+        run: |
+          set -euo pipefail
+          test -d dist && [ -n "$(ls -A dist)" ] || { echo "Nothing was built, so there is nothing to release."; exit 1; }
+          {
+            echo "Release gate: success (every check of scripts/verify-all.mjs --full)"
+            echo "Windows setup for the Business Hub: built ${WINDOWS_BUILD}, tried on a Windows PC ${WINDOWS}"
+            echo "Linux packages for the Business Hub: ${LINUX}"
+            echo "Android app: ${ANDROID}"
+            echo "Setup Studio for staff: ${STUDIO}"
+            echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
+            echo "Website for the customer (Linux and Windows): ${WEBSITE}"
+          } > dist/BUILD-STATUS.txt
+          cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
+          cat dist/BUILD-STATUS.txt
+          # A build made without the licence keys is marked so that nothing downstream (the Setup Studio included) can mistake it for a real one.
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the installing. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
+      - name: The list of release files for the Setup Studio (what each file is, and its fingerprint)
+        run: node scripts/make-base-kit.mjs dist
+      - name: Checksums
+        run: cd dist && sha256sum * | grep -v SHA256SUMS > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Put the last files on the release and publish it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # The release page is written from the files that were really built: what to download for each thing a person may try, the steps, and what is not in this release.
+          node scripts/make-release-notes.mjs --dist dist --commit "${GITHUB_SHA}" --tag "${TAG}" --version "${VERSION_NAME}" --out "${RUNNER_TEMP}/notes.md"
+          LAST=()
+          for f in BUILD-STATUS.txt HOW-TO-TRY.txt NO-LICENCE-KEYS-TRIAL-ONLY.txt base-kit.json SHA256SUMS.txt; do [ -f "dist/${f}" ] && LAST+=("dist/${f}"); done
+          node scripts/release-assets.mjs upload --release "${RELEASE_ID}" "${LAST[@]}"
+          node scripts/release-assets.mjs publish --release "${RELEASE_ID}" --notes-file "${RUNNER_TEMP}/notes.md"
+          echo "Release ${TAG} is published."

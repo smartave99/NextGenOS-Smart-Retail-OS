@@ -25,27 +25,6 @@ export const getOffers = unstable_cache(_fetchOffers, ["offers"], {
     tags: ["offers"],
 });
 
-// ==================== TEST CONNECTION ====================
-
-export async function testFirebaseConnection() {
-    try {
-        await getWriteClient().$queryRaw`SELECT 1`;
-        console.log("Successfully connected to Postgres!");
-        return {
-            success: true,
-            message: "Connected to Neon Postgres!",
-        };
-    } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-        console.error("Postgres Connection Error:", errorMessage);
-        return {
-            success: false,
-            message: "Failed to connect to Neon. Check your DATABASE_URL in .env.local.",
-            error: errorMessage
-        };
-    }
-}
-
 // ==================== SITE CONTENT (Vercel Blob / Edge Config) ====================
 
 export interface HeroContent {
@@ -167,7 +146,7 @@ export const getStaffMembers = unstable_cache(_fetchStaffMembers, ["staff-member
 });
 
 export async function getStaffRole(email: string): Promise<string | null> {
-    if (email === "admin@smartavenue99.com") return "Admin";
+    if (isOwnerAdmin(email)) return "Admin";
     console.warn("getStaffRole called, but Staff hasn't been migrated to Clerk yet.");
     return null;
 }
@@ -276,6 +255,7 @@ export async function getProducts(
 }
 
 import { Prisma } from "@prisma/client";
+import { isOwnerAdmin } from "@/lib/owner-admins";
 
 export async function searchProducts(
     searchQuery: string,

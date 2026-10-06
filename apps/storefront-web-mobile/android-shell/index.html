@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Retail POS</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f5f5f7; --text:#1d1d1f; --muted:#6e6e73; --accent:#0071e3; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#000; --text:#f5f5f7; --muted:#98989d; --accent:#2997ff; } }
+  html,body { height:100%; margin:0; background:var(--bg); color:var(--text); font:17px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  main { min-height:100%; display:grid; place-items:center; text-align:center; padding:32px; box-sizing:border-box; }
+  h1 { font-size:26px; letter-spacing:-.02em; margin:0 0 8px; }
+  p { color:var(--muted); margin:0 0 24px; }
+  button { font:inherit; font-weight:600; min-height:48px; padding:0 32px; border-radius:999px; border:0; background:var(--accent); color:#fff; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>You are offline</h1>
+    <p>Please check your Internet connection, then try again.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </div>
+</main>
+</body>
+</html>

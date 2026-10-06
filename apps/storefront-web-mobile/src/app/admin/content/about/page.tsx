@@ -11,52 +11,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
+import { DEFAULT_ABOUT } from "@/lib/default-pages";
 
-const defaultContent: AboutPageContent = {
-    heroTitle: "Smart Avenue",
-    heroSubtitle: "Building the future of retail, right here in your city.",
-    heroImage: "",
-    heroLabel: "Our Story",
-    visionTitle: "Redefining Retail in Patna",
-    visionLabel: "Our Vision",
-    visionText1: "We are not just a store; we are a logistics ecosystem designed for modern living. Smart Avenue bridges the gap between premium global brands and optimal local convenience.",
-    visionText2: "Our platform leverages cutting-edge technology to ensure that quality, affordability, and speed are not mutually exclusive, but the standard for every interaction.",
-    visionImage: "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2301&auto=format&fit=crop",
-    statsCustomers: "10k+",
-    statsCustomersLabel: "Happy Customers",
-    statsSatisfaction: "98%",
-    statsSatisfactionLabel: "Satisfaction Rate",
-    contactTitle: "Visit Our Store",
-    contactSubtitle: "We'd love to see you in person. Here's where you can find us.",
-    valuesTitle: "The Smart Standard",
-    valuesSubtitle: "Driven by innovation, grounded in integrity.",
-    values: [
-        {
-            title: "Verified Quality",
-            desc: "Rigorous quality checks on 100% of inventory.",
-            icon: "ShieldCheck",
-            color: "text-brand-blue"
-        },
-        {
-            title: "Global Access",
-            desc: "Sourcing the best products from around the world.",
-            icon: "Globe",
-            color: "text-brand-lime"
-        },
-        {
-            title: "Instant Service",
-            desc: "Efficient billing and personalized assistance.",
-            icon: "Zap",
-            color: "text-orange-500"
-        },
-        {
-            title: "Total Transparency",
-            desc: "Clear pricing, no hidden fees, honest service.",
-            icon: "CheckCircle2",
-            color: "text-brand-dark"
-        }
-    ]
-};
+const defaultContent: AboutPageContent = { ...DEFAULT_ABOUT, heroImage: "", visionImage: "" };
 
 export default function AboutPageEditor() {
     const { user, loading: authLoading } = useAuth();

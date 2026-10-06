@@ -6,6 +6,7 @@ import { Loader2, Scale, ArrowRightLeft, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { Product } from "@/app/actions";
+import { money } from "@/lib/region/lite";
 
 const ComparisonText = ({ content }: { content: string }) => (
     <div className="whitespace-pre-line">{content}</div>
@@ -136,7 +137,7 @@ export default function CompareInterface({ currentProduct }: CompareInterfacePro
                                                     <Image src={p.imageUrl} alt={p.name} fill quality={90} sizes="(max-width: 640px) 100vw, 320px" className="object-cover group-hover:scale-105 transition-transform" />
                                                 </div>
                                                 <h4 className="font-bold text-slate-900 line-clamp-1">{p.name}</h4>
-                                                <p className="text-brand-dark font-mono mt-1">₹{p.price}</p>
+                                                <p className="text-brand-dark font-mono mt-1">{money(p.price)}</p>
                                                 <span className="mt-3 block w-full rounded-lg bg-slate-100 py-2 text-center text-sm font-bold text-slate-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
                                                     Compare
                                                 </span>

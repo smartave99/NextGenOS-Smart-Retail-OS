@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "country": "NL",
+  "name": "Netherlands",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "EUR",
+    "symbol": "€",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": true,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": "."
+  },
+  "locale": "nl-NL",
+  "languages": [
+    "nl",
+    "en"
+  ],
+  "timezone": "Europe/Amsterdam",
+  "phoneCode": "+31",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "BTW",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "BTW21",
+        "label": "BTW 21%",
+        "percent": "21"
+      },
+      {
+        "code": "BTW9",
+        "label": "BTW 9%",
+        "percent": "9"
+      },
+      {
+        "code": "BTW0",
+        "label": "BTW 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "BTWEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "BTW21",
+      "reduced": "BTW9",
+      "zero": "BTW0",
+      "exempt": "BTWEX"
+    },
+    "businessId": {
+      "label": "BTW-nummer",
+      "pattern": "^NL[0-9]{9}B[0-9]{2}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.05",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Factuur",
+    "requiredFields": [
+      "Seller name, address and BTW number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "Rate and amount of BTW"
+    ],
+    "eInvoice": null,
+    "retentionYears": 7
+  },
+  "notes": [
+    "Cash totals are rounded to 5 cents."
+  ]
+}

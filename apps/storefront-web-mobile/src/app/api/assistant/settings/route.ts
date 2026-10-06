@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { getPublicAISettings } from "@/app/actions/ai-settings-actions";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export async function GET() {
     try {
@@ -19,7 +20,7 @@ export async function GET() {
             {
                 enabled: true,
                 personaName: "Genie",
-                greeting: "Hey there! ✨ I'm Genie, your personal shopping assistant at Smart Avenue 99! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️",
+                greeting: `Hey there! ✨ I'm Genie, your personal shopping assistant at ${SHOP_NAME}! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️`,
                 enableVoiceInput: false,
                 enableProductRequests: true,
             },

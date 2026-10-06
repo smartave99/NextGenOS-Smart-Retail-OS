@@ -5,8 +5,9 @@
 @inject Conversation Chat
 @inject NavigationManager Nav
 @inject ILogger<PastChat> Log
+@inject BrandService Brand
 
-<PageTitle>Past chat · Smart Retail POS</PageTitle>
+<PageTitle>Past chat · @Brand.Name</PageTitle>
 
 @if (chat is null)
 {

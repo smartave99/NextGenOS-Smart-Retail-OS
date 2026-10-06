@@ -1,6 +1,6 @@
 # Third-party notices
 
-Smart Retail POS is released under the MIT License (see [LICENSE](LICENSE)). It includes or uses the third-party software below, each under its own licence. This file is installed with the app, next to `LICENSE.txt`.
+Smart Retail POS is proprietary software of NextGenOS, used under the licence agreement in [EULA.txt](EULA.txt) (see also [LICENSE](LICENSE)). It includes or uses the third-party software below, each under its own licence, which the agreement does not change. This file is installed with the app, next to `EULA.txt`.
 
 ## Libraries in the app and the dashboard
 
@@ -22,18 +22,23 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | Microsoft.IdentityModel.JsonWebTokens | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Logging | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Protocols | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
+| Microsoft.Data.Sqlite / Microsoft.Data.Sqlite.Core | 10.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Protocols.OpenIdConnect | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.IdentityModel.Tokens | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
+| Microsoft.Extensions.Hosting.WindowsServices | 10.0.12 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.ML.OnnxRuntime | 1.30.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.ML.OnnxRuntime.Managed | 1.30.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.SqlServer.Server | 1.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | Microsoft.Web.WebView2 | 1.0.4191.47 | BSD-3-Clause (Microsoft) | © Microsoft Corporation. All rights reserved. |
 | Newtonsoft.Json | 13.0.3 | MIT | Copyright © James Newton-King 2008 |
 | SkiaSharp | 4.152.1 | MIT | © Microsoft Corporation. All rights reserved. |
-| SkiaSharp.NativeAssets.Win32 | 4.152.1 | MIT | © Microsoft Corporation. All rights reserved. |
+| SkiaSharp.NativeAssets.Linux.NoDependencies / .macOS / .Win32 | 4.152.1 | MIT | © Microsoft Corporation. All rights reserved. |
+| SQLitePCLRaw (core, provider and lib.e_sqlite3) | 2.1.13 | Apache-2.0 | Copyright 2014-2024 SourceGear, LLC (SQLite itself is in the public domain) |
 | System.Buffers | 4.6.1 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Collections.Immutable | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Configuration.ConfigurationManager | 9.0.18 | MIT | © Microsoft Corporation. All rights reserved. |
+| System.IO.Ports | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
+| System.Management / System.CodeDom | 8.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IdentityModel.Tokens.Jwt | 8.16.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.IO.Pipelines | 10.0.6 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Memory | 4.6.3 | MIT | © Microsoft Corporation. All rights reserved. |
@@ -49,7 +54,7 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | System.ValueTuple | 4.6.2 | MIT | © Microsoft Corporation. All rights reserved. |
 | ZXing.Net | 0.16.11 | Apache-2.0 | Michael Jahn |
 
-The packages marked MIT are used under the MIT License, whose text is at the end of this file; each keeps its own copyright line above. Markdig is under the BSD 2-Clause License and ZXing.Net under the Apache License 2.0 (full text in [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt)). WebView2's SDK is under Microsoft's BSD-style licence, and the SQL Server client's native network library (`Microsoft.Data.SqlClient.SNI.runtime`) is **not** under the MIT License: it is Microsoft's "Distributable Code" under the terms in [licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt](licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt). It is in the binary downloads only (never in this repository's source), may be passed on only as a part of an application and not by itself, and whoever passes this app on has to keep those terms.
+The packages marked MIT are used under the MIT License, whose text is at the end of this file; each keeps its own copyright line above. Markdig is under the BSD 2-Clause License, and ZXing.Net and SQLitePCLRaw under the Apache License 2.0 (full text in [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt)). WebView2's SDK is under Microsoft's BSD-style licence, and the SQL Server client's native network library (`Microsoft.Data.SqlClient.SNI.runtime`) is **not** under the MIT License: it is Microsoft's "Distributable Code" under the terms in [licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt](licenses/third-party/Microsoft.Data.SqlClient.SNI-LICENSE.txt). It is in the binary downloads only (never in this repository's source), may be passed on only as a part of an application and not by itself, and whoever passes this app on has to keep those terms.
 
 ## Other components
 
@@ -61,6 +66,35 @@ The packages marked MIT are used under the MIT License, whose text is at the end
 | supabase-js, with the `@supabase` packages inside it | The owner's live-view page, `owner-app/vendor` | MIT: `supabase-js.LICENSE` beside it |
 | NSIS | Builds the setup program (`SmartRetailAI-Setup.exe`); its runtime is inside the setup | The NSIS licence (zlib/libpng style, with the licences of the compression code it includes), https://nsis.sourceforge.io/NSIS_License |
 | Microsoft Edge WebView2 Runtime bootstrapper | Inside the setup; run only on a PC that does not have WebView2 | Microsoft's redistribution terms for the WebView2 Runtime |
+
+## The website package
+
+`website-<customer>-<windows|linux>.zip` is the customer's website with the software it runs on. It is not part of the Hub's setup. Its folder `app/node_modules` carries each library with its own licence file; the release checks that every library's licence allows proprietary redistribution (MIT, ISC, BSD, Apache-2.0 and the like), and that nothing under GPL, AGPL, SSPL or a non-commercial licence is inside.
+
+| Component | Where | Licence |
+|---|---|---|
+| Node.js (official build from nodejs.org) | `node/`, with its own `LICENSE` file, which lists the components inside Node.js (V8, OpenSSL, ICU, zlib, and others) | MIT, © Node.js contributors, and the licences listed in that file |
+| Next.js, React | The website's server and pages | MIT, © Vercel, Inc. and Meta Platforms, Inc. |
+| Prisma (client and query engine) | `app/node_modules/@prisma`, `.prisma` | Apache-2.0, © Prisma Data, Inc. |
+| sharp | `app/node_modules/sharp` and `@img/sharp-<system>` | Apache-2.0, © Lovell Fuller and contributors |
+| libvips, inside `@img/sharp-libvips-linux-x64` (Linux) and `@img/sharp-win32-x64` (Windows) | The picture library, a separate file that is loaded when the website runs and can be replaced by the user | LGPL-3.0-or-later; its licence text is in the same folder. NextGenOS has not changed it, and offers its source on request (smartave99@gmail.com) |
+| lightningcss | `app/node_modules/lightningcss`, a style compiler the build tools left in the traced files | MPL-2.0, unchanged |
+| caniuse-lite | A table of browser features | CC-BY-4.0, © Alexis Deveria and Ben Briggs |
+| The other libraries (about 190 packages, listed in each folder's `package.json`) | `app/node_modules` | MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC and BlueOak-1.0.0: each with its own licence file |
+
+## Tools used by NextGenOS staff (never in anything a customer receives)
+
+The Setup Studio (`tools/setup-studio`) is a staff tool. It runs on Node.js and has one dependency, the Anthropic SDK for TypeScript (used only when staff choose the Claude API as their AI tool), with the packages it needs. They are not part of any installer, zip, package or app; they are listed here because the Studio is distributed to NextGenOS staff.
+
+| Package | Version | Licence | Copyright |
+|---|---|---|---|
+| @anthropic-ai/sdk | 0.131.0 | MIT | Copyright 2023 Anthropic, PBC |
+| @babel/runtime | 7.29.7 | MIT | Copyright (c) 2014-present Sebastian McKenzie and other contributors |
+| @stablelib/base64 | 1.0.1 | MIT | Copyright (C) 2016 Dmitry Chestnykh |
+| fast-sha256 | 1.3.0 | Unlicense (public domain) | Dmitry Chestnykh |
+| json-schema-to-ts | 3.1.1 | MIT | Copyright (c) 2020 Thomas Aribart |
+| standardwebhooks | 1.1.1 | MIT | Standard Webhooks (its package states the MIT licence and names no other holder) |
+| ts-algebra | 2.0.0 | MIT | Copyright (c) 2020 Thomas Aribart |
 
 ## The vendors' own notices
 

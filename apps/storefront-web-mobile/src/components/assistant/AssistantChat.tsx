@@ -26,6 +26,8 @@ import dynamic from "next/dynamic";
 import { analyzeImage } from "@/app/actions/image-search-action";
 import { processVoiceSearch } from "@/app/actions/voice-search-action";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { SHOP_NAME } from "@/lib/shop-name";
+import { money } from "@/lib/region/lite";
 
 // Lazy-load ProductRequestModal (18KB) — only needed when user requests a product
 const ProductRequestModal = dynamic(() => import("@/components/ProductRequestModal"), { ssr: false });
@@ -145,7 +147,7 @@ export default function AssistantChat() {
             .catch(() => setAiSettings({
                 enabled: true,
                 personaName: "Genie",
-                greeting: "Hey there! ✨ I'm Genie, your personal shopping assistant at Smart Avenue 99! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️",
+                greeting: `Hey there! ✨ I'm Genie, your personal shopping assistant at ${SHOP_NAME}! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️`,
                 enableVoiceInput: false,
                 enableProductRequests: true,
             }));
@@ -646,11 +648,11 @@ export default function AssistantChat() {
                                                             </p>
                                                             <div className="flex items-baseline gap-2">
                                                                 <span className="font-bold text-sm text-gray-900">
-                                                                    ₹{product.price.toLocaleString()}
+                                                                    {money(product.price)}
                                                                 </span>
                                                                 {product.originalPrice && (
                                                                     <span className="text-xs text-gray-400 line-through">
-                                                                        ₹{product.originalPrice.toLocaleString()}
+                                                                        {money(product.originalPrice)}
                                                                     </span>
                                                                 )}
                                                                 {product.originalPrice && (
@@ -868,7 +870,7 @@ export default function AssistantChat() {
                                     </button>
                                 </div>
                                 <p className="text-xs text-slate-400 text-center mt-3 font-medium tracking-wide">
-                                    Smart Avenue 99 • Product, image, voice & barcode search
+                                    {SHOP_NAME} • Product, image, voice & barcode search
                                 </p>
                             </form>
                         </motion.div>

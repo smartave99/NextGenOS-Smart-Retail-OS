@@ -1,5 +1,9 @@
 import { getSiteConfig } from "@/app/actions/site-config";
 import { NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/site-url";
+import { SHOP_NAME } from "@/lib/shop-name";
+import { COUNTRY } from "@/lib/region/lite";
+import { languageList } from "@/lib/shop-facts";
 
 export const dynamic = "force-dynamic";
 
@@ -12,19 +16,19 @@ export async function GET() {
         const entity = {
             "@context": "https://schema.org",
             "@type": "Organization",
-            "@id": "https://smartavenue99.com/#organization",
-            "name": branding.siteName || "Smart Avenue 99",
-            "url": "https://smartavenue99.com",
+            "@id": `${SITE_URL}/#organization`,
+            "name": branding.siteName || SHOP_NAME,
+            "url": SITE_URL,
             "logo": {
                 "@type": "ImageObject",
-                "url": `https://smartavenue99.com${branding.logoUrl || "/logo.png"}`,
+                "url": `${SITE_URL}${branding.logoUrl || "/logo.png"}`,
             },
             "description": llm?.brandIdentityText || seo.metaDescription,
             "slogan": branding.tagline,
             "address": {
                 "@type": "PostalAddress",
                 "streetAddress": contact.address,
-                "addressCountry": seo.jsonLd.addressCountry || "IN"
+                "addressCountry": seo.jsonLd.addressCountry || COUNTRY
             },
             "contactPoint": [
                 {
@@ -32,7 +36,7 @@ export async function GET() {
                     "telephone": contact.phone,
                     "contactType": "customer service",
                     "email": contact.email,
-                    "availableLanguage": ["English", "Hindi"]
+                    "availableLanguage": languageList().split(", ")
                 }
             ],
             "sameAs": [

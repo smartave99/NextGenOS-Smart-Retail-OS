@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 const mocks = vi.hoisted(() => ({
     syncAPIKeysToManager: vi.fn(),
@@ -38,7 +39,7 @@ beforeEach(() => {
 
 describe("POST /api/assistant/recommend business boundary", () => {
     it("returns a local response without syncing Groq keys or running the agent for off-topic chat", async () => {
-        const request = new NextRequest("https://smartavenue99.com/api/assistant/recommend", {
+        const request = new NextRequest("https://demomart99.com/api/assistant/recommend", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query: "Write a short poem about space" }),
@@ -48,7 +49,7 @@ describe("POST /api/assistant/recommend business boundary", () => {
         const body = await response.json();
 
         expect(response.status).toBe(200);
-        expect(body.summary).toContain("only with Smart Avenue products");
+        expect(body.summary).toContain(`only with ${SHOP_NAME} products`);
         expect(mocks.syncAPIKeysToManager).not.toHaveBeenCalled();
         expect(mocks.runShoppingAgent).not.toHaveBeenCalled();
     });

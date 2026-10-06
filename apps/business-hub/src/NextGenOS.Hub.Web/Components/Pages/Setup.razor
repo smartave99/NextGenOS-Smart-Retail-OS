@@ -1,0 +1,326 @@
+@page "/setup"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@using System.Text.RegularExpressions
+@using NextGenOS.Hub.Demo
+@using NextGenOS.Hub.Setup
+@using NextGenOS.Tax
+@inject HubApp App
+@inject NextGenOS.Hub.Web.Branding.ProfileStore Profiles
+@inject NavigationManager Nav
+@inject SetupState State
+@inject ILogger<Setup> Log
+
+<PageTitle>Set up</PageTitle>
+
+<div class="steps" aria-label="Steps">
+    @for (var i = 1; i <= 4; i++)
+    {
+        <span class="step @(i == step ? "on" : i < step ? "done" : "")">@i</span>
+    }
+</div>
+
+<Notice Error="@error" />
+
+@if (step == 1)
+{
+    <h1 class="public-title">Tell us about your business</h1>
+    @if (prepared)
+    {
+        <div class="notice" id="prepared-note">
+            <span>We have already filled in what we know about your business. Please check it and change anything that is not right.@(profile.Problems.Count > 0 ? " A few prepared details could not be used and were left out." : "")</span>
+        </div>
+    }
+    <p class="muted">Your country decides the money, the tax and the invoice words. You can change the details later, but not the country once you have sold something.</p>
+    <div class="stack">
+        <label for="name">Business name</label>
+        <input id="name" @bind="name" maxlength="80" autocomplete="organization" autofocus />
+
+        <label for="country">Country</label>
+        <select id="country" value="@country" @onchange="CountryChanged">
+            @if (country == "") { <option value="">Choose your country…</option> }
+            @foreach (var c in Countries)
+            {
+                <option value="@c.Country">@c.Name</option>
+            }
+        </select>
+
+        @if (country != "" && pack.Tax.Regions?.List is { Count: > 1 } regions)
+        {
+            <label for="region">@(pack.Tax.Regions.Label ?? "Region")</label>
+            <select id="region" @bind="region">
+                <option value="">Choose…</option>
+                @foreach (var r in regions)
+                {
+                    <option value="@r.Code">@r.Name</option>
+                }
+            </select>
+        }
+
+        @foreach (var part in EditableParts())   // (none until a country is chosen)
+        {
+            <label for="part-@part.Key">@part.Name at your shop (%)</label>
+            <input id="part-@part.Key" inputmode="decimal" @bind="partValues[part.Key]" />
+        }
+
+        @if (country != "" && pack.Tax.Rates.Any(r => r.Taxable))
+        {
+            <label class="check"><input type="checkbox" @bind="registered" /> My business is registered for @pack.Tax.Name</label>
+        }
+
+        @if (country != "" && pack.Tax.BusinessId is { } idRule)
+        {
+            <label for="taxid">@idRule.Label (if you have one)</label>
+            <input id="taxid" @bind="taxId" maxlength="40" autocapitalize="characters" spellcheck="false" />
+        }
+
+        <label for="phone">Phone (shown on bills)</label>
+        <input id="phone" @bind="phone" maxlength="40" autocomplete="tel" />
+        <label for="address">Address (shown on bills)</label>
+        <textarea id="address" @bind="address" rows="2" maxlength="300"></textarea>
+
+        @if (country != "")
+        {
+        <div class="notice warn">
+            @if (pack.IsReviewed)
+            {
+                <span>The @pack.Name tax rules were checked by @pack.Review.By on @pack.Review.On.</span>
+            }
+            else
+            {
+                <span>The @pack.Name tax rules in this program have <strong>not yet been checked by a local tax adviser</strong>. Before you issue real bills, have your accountant confirm the rates and the invoice wording; you can change the rates in Settings.</span>
+            }
+        </div>
+        }
+        <button type="button" class="btn primary wide" @onclick="ToType">Next</button>
+    </div>
+}
+else if (step == 2)
+{
+    <h1 class="public-title">What kind of business is it?</h1>
+    <p class="muted">This sets the words and the screens you see. Everything can be renamed or switched on and off later.</p>
+    <div class="choices">
+        @foreach (var p in Industries)
+        {
+            <button type="button" class="choice @(p.Id == industry ? "on" : "")" aria-pressed="@(p.Id == industry)" @onclick="() => industry = p.Id">
+                <strong>@p.Name</strong>
+                <span>@p.Summary</span>
+            </button>
+        }
+    </div>
+    var chosen = IndustryCatalog.Get(industry);
+    <div class="card flat">
+        <h3>What works today in @chosen.Name</h3>
+        <ul class="ticks">@foreach (var w in chosen.Coverage.Works) { <li>@w</li> }</ul>
+        @if (chosen.Coverage.NotYet.Count > 0)
+        {
+            <h3>Not built yet</h3>
+            <ul class="dashes">@foreach (var w in chosen.Coverage.NotYet) { <li>@w</li> }</ul>
+        }
+    </div>
+    <div class="row">
+        <button type="button" class="btn secondary" @onclick="() => step = 1">Back</button>
+        <button type="button" class="btn primary grow" @onclick="() => step = 3">Next</button>
+    </div>
+}
+else if (step == 3)
+{
+    <h1 class="public-title">Your account</h1>
+    <p class="muted">You will be the owner: you can add the others, and change anything. Choose a password you do not use anywhere else.</p>
+    <div class="stack">
+        <label for="owner-name">Your name</label>
+        <input id="owner-name" @bind="ownerName" maxlength="60" autocomplete="name" />
+        <label for="owner-user">User name</label>
+        <input id="owner-user" @bind="ownerUser" maxlength="40" autocomplete="username" autocapitalize="none" spellcheck="false" />
+        <label for="owner-pass">Password (at least 8 characters)</label>
+        <input id="owner-pass" type="password" @bind="ownerPass" autocomplete="new-password" />
+        <label for="owner-pass2">Password again</label>
+        <input id="owner-pass2" type="password" @bind="ownerPass2" autocomplete="new-password" />
+        <div class="row">
+            <button type="button" class="btn secondary" @onclick="() => step = 2">Back</button>
+            <button type="button" class="btn primary grow" @onclick="ToFinish">Next</button>
+        </div>
+    </div>
+}
+else
+{
+    <h1 class="public-title">Ready</h1>
+    <dl class="facts">
+        <dt>Business</dt><dd>@name</dd>
+        <dt>Country</dt><dd>@pack.Name (@pack.Currency.Code)</dd>
+        <dt>Type</dt><dd>@IndustryCatalog.Get(industry).Name</dd>
+        <dt>Owner</dt><dd>@ownerName (@ownerUser)</dd>
+    </dl>
+    @if (profile.HasStarter)
+    {
+        <p id="starter-note" class="muted">@(StarterSentence()) will be added for you.</p>
+    }
+    <label class="check"><input type="checkbox" @bind="demo" /> Fill with a sample business so I can look around</label>
+    <p class="muted small">The sample is a made-up @IndustryCatalog.Get(industry).Name.ToLowerInvariant() with two weeks of trading, so every screen has something to show. It cannot be taken out afterwards, so choose it only to try the program, not for your real shop.</p>
+    <div class="row">
+        <button type="button" class="btn secondary" @onclick="() => step = 3" disabled="@busy">Back</button>
+        <button type="button" class="btn primary grow" @onclick="Finish" disabled="@busy">@(busy ? "Setting up…" : "Finish")</button>
+    </div>
+}
+
+@code {
+    private int step = 1;
+    private string? error;
+    private bool busy;
+
+    private string name = "";
+    private string country = "";
+    private string region = "";
+    private string taxId = "";
+    private string phone = "";
+    private string address = "";
+    private bool registered = true;
+    private string industry = "retail";
+    private string ownerName = "";
+    private string ownerUser = "";
+    private string ownerPass = "";
+    private string ownerPass2 = "";
+    private bool demo;
+    private readonly Dictionary<string, string> partValues = new();
+    private SetupProfile profile = new();
+    private bool prepared;
+
+    private static IReadOnlyList<CountryPack> Countries => PackCatalog.All().OrderBy(c => c.Name, StringComparer.Ordinal).ToList();
+    private static IReadOnlyList<IndustryPack> Industries => IndustryCatalog.All().OrderBy(p => p.Id == "generic" ? 1 : 0).ThenBy(p => p.Name, StringComparer.Ordinal).ToList();
+
+    private CountryPack pack => PackCatalog.Get(country);
+
+    protected override void OnInitialized()
+    {
+        if (App.Users.Any()) Nav.NavigateTo("/login");
+        SetDefaults();
+        UseProfile();
+    }
+
+    /// <summary>The details NextGenOS prepared for this business (profile/setup.json), if any: they fill the first page, and the owner can change every one.</summary>
+    private void UseProfile()
+    {
+        profile = SetupProfile.Parse(Profiles.ReadText("setup.json"));
+        foreach (var problem in profile.Problems) Log.LogWarning("Prepared setup: {Problem}", problem);
+        if (profile.Name is not null) name = profile.Name;
+        if (profile.Country is not null) { country = profile.Country; SetDefaults(); }
+        if (profile.Region is not null) region = profile.Region;
+        if (profile.TaxRegistered is { } taxed) registered = taxed;
+        if (profile.Industry is not null) industry = profile.Industry;
+        prepared = profile.Name is not null || profile.Country is not null || profile.Industry is not null || profile.HasStarter;
+    }
+
+    private string StarterSentence()
+    {
+        var parts = new List<string>();
+        if (profile.Items.Count > 0) parts.Add(profile.Items.Count == 1 ? "1 item" : $"{profile.Items.Count} items");
+        if (profile.People.Count > 0) parts.Add(profile.People.Count == 1 ? "1 person" : $"{profile.People.Count} people");
+        return "Your first " + string.Join(" and ", parts);
+    }
+
+    private void SetDefaults()
+    {
+        if (country == "") { region = ""; partValues.Clear(); registered = true; return; }
+        region = pack.Tax.Regions?.List is { Count: 1 } one ? one[0].Code : "";
+        partValues.Clear();
+        foreach (var part in EditableParts()) partValues[part.Key] = part.Percent;
+        registered = true;
+    }
+
+    private void CountryChanged(ChangeEventArgs e)
+    {
+        country = e.Value?.ToString() ?? "";
+        SetDefaults();
+    }
+
+    private record Part(string Key, string Name, string Percent);
+
+    /// <summary>Tax parts the shop sets itself (the sales tax of its town, in a country with no single national rate).</summary>
+    private IEnumerable<Part> EditableParts()
+    {
+        if (country == "") yield break;
+        var regionCode = pack.Tax.Regions?.List is { Count: 1 } one ? one[0].Code : region;
+        var r = pack.Tax.Regions?.List?.FirstOrDefault(x => x.Code == regionCode);
+        foreach (var c in r?.Components ?? new List<RegionComponent>())
+            if (c.Editable) yield return new Part(r!.Code + "/" + c.Name, c.Name, c.Percent);
+    }
+
+    private void ToType()
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(name)) { error = "Please type the name of your business."; return; }
+        if (country == "") { error = "Please choose your country."; return; }
+        if (pack.Tax.Regions?.List is { Count: > 1 } && string.IsNullOrEmpty(region)) { error = $"Please choose your {(pack.Tax.Regions.Label ?? "region").ToLowerInvariant()}."; return; }
+        foreach (var part in EditableParts())
+            if (!decimal.TryParse(partValues[part.Key], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var p) || p < 0 || p > 100)
+            { error = $"Please type the {part.Name.ToLowerInvariant()} as a number between 0 and 100."; return; }
+        if (!string.IsNullOrWhiteSpace(taxId) && pack.Tax.BusinessId?.Pattern is { Length: > 0 } pattern)
+        {
+            bool ok;
+            try { ok = Regex.IsMatch(taxId.Trim(), pattern, RegexOptions.None, TimeSpan.FromMilliseconds(200)); } catch (RegexMatchTimeoutException) { ok = false; }
+            if (!ok) { error = $"That does not look like a {pack.Tax.BusinessId.Label}. Leave it empty if you do not have one yet."; return; }
+        }
+        step = 2;
+    }
+
+    private void ToFinish()
+    {
+        error = null;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(ownerName)) throw new HubException("name-missing", "Please type your name.");
+            if (string.IsNullOrWhiteSpace(ownerUser) || ownerUser.Trim().Length < 3 || ownerUser.Any(char.IsWhiteSpace)) throw new HubException("username", "A user name needs at least 3 characters and no spaces.");
+            UserService.CheckPassword(ownerUser.Trim(), ownerPass);
+            if (ownerPass != ownerPass2) throw new HubException("password-match", "The two passwords are not the same.");
+            step = 4;
+        }
+        catch (HubException ex) { error = ex.Message; }
+    }
+
+    private async Task Finish()
+    {
+        error = null;
+        busy = true;
+        await Task.Yield();
+        try
+        {
+            if (App.Users.Any()) throw new HubException("done", "This shop is already set up. Sign in instead.");
+            // The state or province must be one of this country's: a country changed after choosing one leaves a stale choice behind.
+            if (pack.Tax.Regions?.List is { Count: > 0 } known && !known.Any(r => r.Code == region))
+            {
+                if (known.Count == 1) region = known[0].Code;
+                else { step = 1; throw new HubException("region", $"Please choose your {(pack.Tax.Regions.Label ?? "region").ToLowerInvariant()}."); }
+            }
+            else if (pack.Tax.Regions?.List is not { Count: > 0 }) region = "";
+            var settings = new ShopSettings
+            {
+                Name = name.Trim(), Country = country, Region = region, Industry = industry, TaxId = taxId.Trim().ToUpperInvariant(), Phone = phone.Trim(), Address = address.Trim(),
+                PricesIncludeTax = pack.Tax.PricesIncludeTaxDefault, RoundTotal = pack.Tax.Rounding?.DefaultOn ?? false, TaxRegistered = registered, SetupDone = false,
+            };
+            foreach (var part in EditableParts()) settings.ComponentOverrides[part.Key] = partValues[part.Key].Trim();
+            profile.ApplyTo(settings);
+            App.Shop.Save(settings);
+            var owner = App.Users.Create(ownerUser.Trim(), ownerName.Trim(), Roles.Owner, ownerPass);
+            if (demo)
+            {
+                DemoCompany.Fill(App.Db.Path, new DemoOptions { Industry = industry, Country = country, Region = region, Name = name.Trim() });
+                App.Shop.Invalidate();
+            }
+            var starter = !demo && profile.HasStarter ? profile.ApplyStarter(App) : null;
+            var done = App.Shop.Settings;
+            done.SetupDone = true;
+            App.Shop.Save(done);
+            App.Audit.Log(owner.Id, "setup", "shop", null, $"{country}/{industry}{(demo ? "/demo" : "")}{(starter is null ? "" : $"/starter {starter.Items} items {starter.People} people")}");
+            if (starter is not null) foreach (var skipped in starter.Skipped) Log.LogWarning("Prepared setup: {Skipped}", skipped);
+            State.Finished();
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+        catch (HubException ex) { error = ex.Message; busy = false; }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "Setting up the shop failed.");
+            error = "Setting up did not finish, and nothing was lost. Please try again.";
+            busy = false;
+        }
+    }
+}

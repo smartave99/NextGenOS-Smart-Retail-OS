@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { sanitizePageHtml } from "@/lib/sanitize-html";
 import { getPageContent } from "@/app/actions/page-content";
 
 export default async function PrivacyPage() {
@@ -19,7 +20,7 @@ export default async function PrivacyPage() {
                     </h1>
                     <div
                         className="prose prose-lg prose-slate max-w-none text-slate-600 space-y-8"
-                        dangerouslySetInnerHTML={{ __html: page.content }}
+                        dangerouslySetInnerHTML={{ __html: sanitizePageHtml(page.content) }}
                     />
                     {page.lastUpdated && (
                         <p className="text-sm text-slate-400 mt-12 italic">

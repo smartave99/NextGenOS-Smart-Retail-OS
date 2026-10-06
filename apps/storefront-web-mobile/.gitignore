@@ -46,3 +46,10 @@ next-env.d.ts
 # local secrets file
 env
 
+
+# Generated at build time
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js
+public/workbox-*.js
+public/version.json

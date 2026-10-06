@@ -2,6 +2,8 @@
 
 Thank you for helping. This software sits beside a shop's POS and works with real sales, so a few rules matter more than speed. They are written down so that nobody has to guess.
 
+This is a **private, proprietary codebase** of NextGenOS (see [`LICENSE`](LICENSE)). It may be read and changed only by people who have a written agreement with NextGenOS, and nothing in it may be copied, published or shared outside that group: not in a public repository, an issue, a forum, or an AI service that keeps or trains on what it receives.
+
 ## What is here
 
 - [`SmartRetailAI/`](SmartRetailAI/README.md): the Windows app (WinForms on .NET Framework 4.8, showing the dashboard with WebView2), the AI Core library, the setup program and the release scripts.
@@ -27,12 +29,12 @@ Try the dashboard without a shop's database: `Pos__Mode=Demo` starts it on made-
 4. **The dashboard listens on 127.0.0.1 only.**
 5. **No secrets, no shop data.** Never commit API keys, passwords, connection strings, `appsettings.Local.json`, `settings.json`, logs, build output, or anything from a shop's own POS (its program files, installers, database backups, settings files). Never paste them into an issue or a pull request either; use the demo shop.
 6. **Add-on data stays in the data folder** the owner chose, never anywhere else and never in the POS database.
-7. **Keep the notices.** A library added to a project needs its line, with its licence, in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) (a test fails without it), and its licence must allow it to be shipped with software under the MIT License (MIT, BSD, Apache-2.0 and the like). When you change the version of WebView2, the SQL client, SkiaSharp, ONNX Runtime or the .NET runtime, replace the matching file in [`licenses/third-party/`](licenses/third-party) with the one inside the new package.
+7. **Keep the notices.** A library added to a project needs its line, with its licence, in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) (a test fails without it), and its licence must allow it to be shipped inside closed, proprietary, commercially sold software (MIT, BSD, Apache-2.0 and the like are fine; GPL, AGPL, SSPL, "non-commercial" licences and anything that would make this software's source public are not, and an LGPL or MPL library needs a review first). When you change the version of WebView2, the SQL client, SkiaSharp, ONNX Runtime or the .NET runtime, replace the matching file in [`licenses/third-party/`](licenses/third-party) with the one inside the new package.
 
 ## Sending a change
 
 - For anything bigger than a small fix, open an issue first and say what the shop owner or cashier will see change.
 - One thing at a time, with the README or `AGENTS.md` lines that describe it. Match the code around it: naming, comments, idiom.
 - Say what changed in [`CHANGELOG.md`](CHANGELOG.md), under the version being built, in plain words for the shop owner (new, improved or fixed). The owner reads that list in the app, under *What's new*, and a release is refused without its entry.
-- By sending a change you agree that it is licensed under the [MIT License](LICENSE), like the rest of the project.
+- A change is accepted only from a person who has a written agreement with NextGenOS (employment, contract or contributor agreement) that gives NextGenOS the ownership of it. By sending a change you confirm that you wrote it or have the right to give it, and that it holds no code copied from another project whose licence forbids this.
 - To report a security problem, follow [`SECURITY.md`](SECURITY.md) and do not open a public issue.

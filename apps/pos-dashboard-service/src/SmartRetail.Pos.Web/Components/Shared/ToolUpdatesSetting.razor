@@ -1,0 +1,124 @@
+@* Settings: Claude Code or Antigravity, the AI tool the jobs run on, kept up to date. Looking at the version changes nothing; an update runs the tool's own
+   updater (Claude Code) or Google's installer (Antigravity, Windows) and only when the owner presses Update now. Codex has its own card above. *@
+@implements IDisposable
+@using SmartRetail.AI.Providers
+@using SmartRetail.AI.Settings
+@inject AiToolService Tools
+@inject AiEnvironment Ai
+
+@if (tool is not null)
+{
+    <div class="setting updates" id="tool-update-card" data-tool="@tool" data-state="@(check?.Update ?? "none")" data-busy="@(Tools.IsBusy ? "true" : "false")">
+        <div>
+            <h3>@name, the AI tool</h3>
+            @if (Tools.IsBusy)
+            {
+                <p role="status"><span class="spinner"></span> @Tools.Doing @(Tools.Doing.StartsWith("Updating") ? "Please do not start an AI task until it is done." : "")</p>
+            }
+            else
+            {
+                <p>@Line</p>
+            }
+
+            @if (!Tools.IsBusy && Tools.LastProblem is { Length: > 0 } problem)
+            {
+                <p class="update-problem small" role="alert">@problem</p>
+            }
+
+            @if (check is { How.Length: > 0 } && check.Update != "install")
+            {
+                <p class="small muted">@check.How</p>
+            }
+        </div>
+        <div class="setting-actions">
+            @if (check is { CanUpdate: true } && check.Update is "available" or "unknown")
+            {
+                <button type="button" class="btn btn-primary" id="tool-update-now" disabled="@Tools.IsBusy" @onclick="UpdateAsync"><Icon Name="download" /> @(check.Update == "available" ? "Update now" : "Update anyway")</button>
+            }
+            <button type="button" class="btn btn-soft" id="tool-check-now" disabled="@Tools.IsBusy" @onclick="CheckAsync"><Icon Name="refresh" /> @(check is null ? "Check now" : "Check again")</button>
+        </div>
+    </div>
+}
+
+@code {
+    private string? tool;
+    private string name = "";
+    private CliUpdateCheck? check;
+
+    private string Line
+    {
+        get
+        {
+            if (Tools.LastUpdate is { } done && check is null)
+            {
+                return done.Changed ? $"Updated from {done.Before} to {done.After}." : done.After.Length > 0 ? $"Version {done.After} is installed; the update did not change it." : "The update finished.";
+            }
+
+            if (check is null)
+            {
+                return "Not looked at yet. Press Check now.";
+            }
+
+            if (check.Update == "install")
+            {
+                return $"{name} is not on this PC. {check.Status.InstallHint}";
+            }
+
+            var version = check.Status.Version.Length > 0 ? $"Version {check.Status.Version} is installed." : $"{name} is installed; it does not say its version.";
+            return check.Update switch
+            {
+                "available" => $"{version} A newer one, {check.Latest}, is out.",
+                "current" => $"{version} That is the newest ({check.Latest}).",
+                _ => $"{version} The newest version could not be found out just now."
+            };
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var settings = Ai.LoadSettings();
+            var chosen = AiJobs.Tool(settings);
+            if (chosen == ProviderIds.ClaudeCli || chosen == ProviderIds.AntigravityCli)
+            {
+                tool = chosen;
+                name = AiJobs.ToolName(settings);
+                check = Tools.LastCheck(chosen);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            tool = null;
+        }
+
+        Tools.Changed += OnChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Look once when the page opens, so the owner sees the version without pressing anything. Looking changes nothing.
+        if (firstRender && tool is not null && check is null && !Tools.IsBusy)
+        {
+            await CheckAsync();
+        }
+    }
+
+    private async Task CheckAsync()
+    {
+        check = await Tools.CheckAsync(tool!, CancellationToken.None);
+        StateHasChanged();
+    }
+
+    // The page being closed must not cut an update short, so it does not pass its own token.
+    private async Task UpdateAsync()
+    {
+        await Tools.UpdateAsync(tool!, CancellationToken.None);
+        check = null;
+        await CheckAsync();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Tools.Changed -= OnChanged;
+}

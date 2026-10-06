@@ -1,3 +1,4 @@
+@inject BrandService Brand
 <!DOCTYPE html>
 <html lang="en">
 
@@ -21,6 +22,11 @@
     <link rel="stylesheet" href="@Assets["SmartRetail.Pos.Web.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
+    @if (Brand.Style.Length > 0)
+    {
+        @* The licence's brand colour in place of the default accent (checked as plain hex by BrandService). *@
+        <style>@((MarkupString)Brand.Style)</style>
+    }
     <HeadOutlet @rendermode="PageMode" />
 </head>
 

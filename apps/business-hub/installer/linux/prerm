@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs before the files are taken away: stops the Hub.
+set -e
+case "$1" in
+  remove|upgrade|deconfigure)
+    if [ -d /run/systemd/system ]; then
+      systemctl stop nextgenos-hub.service > /dev/null 2>&1 || true
+      if [ "$1" = "remove" ]; then systemctl disable nextgenos-hub.service > /dev/null 2>&1 || true; fi
+    fi
+    ;;
+esac
+exit 0

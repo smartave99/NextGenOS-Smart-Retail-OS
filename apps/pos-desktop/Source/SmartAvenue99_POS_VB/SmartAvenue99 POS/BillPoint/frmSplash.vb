@@ -130,7 +130,6 @@ Namespace BillPoint
 		Public Sub Timer1_Tick(sender As Object, e As EventArgs)
 			' The following expression was wrapped in a checked-statement
 			Try
-				File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "Tick: " + Me.ProgressBar2.Value.ToString() + vbCrLf)
 				Dim flag As Boolean = File.Exists(Application.StartupPath + "\SQLSettings.dat")
 				Dim flag2 As Boolean = flag
 				If flag2 Then
@@ -164,28 +163,22 @@ Namespace BillPoint
 										flag = Me.ProgressBar2.Value = 100
 										Dim flag8 As Boolean = flag
 										If flag8 Then
-											File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "Reached 100, connecting SQL..." + vbCrLf)
 											Me.Timer1.Enabled = False
 											ModCommonClasses.con = New SqlConnection(ModCompanyMasterCS.CompnayMasterCS)
 											ModCommonClasses.con.Open()
-											File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "Connected SQL, querying..." + vbCrLf)
 											Dim text As String = "select * from RaintechMaster"
 											ModCommonClasses.cmd = New SqlCommand(text)
 											ModCommonClasses.cmd.Connection = ModCommonClasses.con
 											ModCommonClasses.rdr = ModCommonClasses.cmd.ExecuteReader()
 											flag = ModCommonClasses.rdr.Read()
 											Dim flag9 As Boolean = flag
-											File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "Read returned: " + flag9.ToString() + vbCrLf)
 											If flag9 Then
 												Dim licenseResponse As LicenseResponse = DevNetLM.DevNet.Validate()
 												Dim flag10 As Boolean = licenseResponse.LicenseData IsNot Nothing
-												File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "Validate returned LicenseData!=null: " + flag10.ToString() + vbCrLf)
 												If flag10 Then
 													Dim licenseData As LicenseData = licenseResponse.LicenseData
-													File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "Showing frmLogin..." + vbCrLf)
 													MyProject.Forms.frmLogin.Show()
 													MyBase.Hide()
-													File.AppendAllText(Application.StartupPath + "\tick_trace.txt", "frmLogin Shown!" + vbCrLf)
 												Else
 													Dim showActivation As Boolean = licenseResponse.ShowActivation
 													If showActivation Then
@@ -291,62 +284,33 @@ Namespace BillPoint
 			End Try
 		End Sub
 
-		' Token: 0x06012262 RID: 74338 RVA: 0x00A7136C File Offset: 0x00A6F56C
+		' The shop's name and logo now come from the signed licence (DevNetLM.CompanyInfo), not from the registry.
 		Public Function getRegistrydata() As frmSplash.LicenseDataNew
 			Dim licenseDataNew As frmSplash.LicenseDataNew = New frmSplash.LicenseDataNew()
 			Try
-				Dim subKeyName As String = "Software\SLM\" + MyProject.Application.Info.ProductName
-				Dim registryKey As RegistryKey = Registry.CurrentUser.OpenSubKey(subKeyName, True)
-				Dim flag As Boolean = registryKey IsNot Nothing
-				If flag Then
-					licenseDataNew.LKey = Me.Decrypt(Conversions.ToString(registryKey.GetValue("LK")))
-					licenseDataNew.issuedby1 = Me.Decrypt(Conversions.ToString(registryKey.GetValue("issuedby")))
-					licenseDataNew.issued_byid1 = Me.Decrypt(Conversions.ToString(registryKey.GetValue("issued_byid")))
-					Me.Label1.Text = Me.Decrypt(Conversions.ToString(registryKey.GetValue("c")))
-					licenseDataNew.company = Me.Decrypt(Conversions.ToString(registryKey.GetValue("c")))
-					licenseDataNew.name = Me.Decrypt(Conversions.ToString(registryKey.GetValue("n")))
-					licenseDataNew.email = Me.Decrypt(Conversions.ToString(registryKey.GetValue("e")))
-					licenseDataNew.phone = Me.Decrypt(Conversions.ToString(registryKey.GetValue("p")))
-					licenseDataNew.address = Me.Decrypt(Conversions.ToString(registryKey.GetValue("a")))
-					licenseDataNew.state = Me.Decrypt(Conversions.ToString(registryKey.GetValue("s")))
-					licenseDataNew.country = Me.Decrypt(Conversions.ToString(registryKey.GetValue("cou")))
-					licenseDataNew.Logo = Me.Decrypt(Conversions.ToString(registryKey.GetValue("Logo")))
-					If Not String.IsNullOrWhiteSpace(licenseDataNew.Logo) Then
-						Dim splashLogo As Image = Me.Base64ToImage(licenseDataNew.Logo)
-						If splashLogo IsNot Nothing Then
-							Me.PictureBox2.Image = splashLogo
-						End If
+				Dim info As DevNetLM.CompanyInfo = DevNetLM.CompanyInfo.Read()
+				licenseDataNew.LKey = info.LicenceKey
+				licenseDataNew.issuedby1 = "NextGenOS"
+				licenseDataNew.issued_byid1 = "NextGenOS"
+				Me.Label1.Text = info.Company
+				licenseDataNew.company = info.Company
+				licenseDataNew.name = info.Name
+				licenseDataNew.email = info.Email
+				licenseDataNew.phone = info.Phone
+				licenseDataNew.address = info.Address
+				licenseDataNew.state = info.State
+				licenseDataNew.country = info.Country
+				licenseDataNew.Logo = info.Logo
+				If Not String.IsNullOrWhiteSpace(licenseDataNew.Logo) Then
+					Dim splashLogo As Image = Me.Base64ToImage(licenseDataNew.Logo)
+					If splashLogo IsNot Nothing Then
+						Me.PictureBox2.Image = splashLogo
 					End If
-					licenseDataNew.MainLogo = Me.Decrypt(Conversions.ToString(registryKey.GetValue("MainLogo")))
-					registryKey.Close()
 				End If
+				licenseDataNew.MainLogo = info.MainLogo
 			Catch ex As Exception
 			End Try
 			Return licenseDataNew
-		End Function
-
-		' Token: 0x06012263 RID: 74339 RVA: 0x00A71570 File Offset: 0x00A6F770
-		Public Function Decrypt(cipherText As String) As String
-			Dim text As String = "b14ca5898a4e4133bbce2ea2315a1916"
-			Dim array As Byte() = New Byte(15) {}
-			Dim flag As Boolean = String.IsNullOrEmpty(cipherText)
-			Dim text2 As String
-			If Not flag Then
-				Dim array2 As Byte() = Convert.FromBase64String(cipherText)
-				Using aes As Aes = Aes.Create()
-					aes.Key = Encoding.UTF8.GetBytes(text)
-					aes.IV = array
-					Dim cryptoTransform As ICryptoTransform = aes.CreateDecryptor(aes.Key, aes.IV)
-					Using memoryStream As MemoryStream = New MemoryStream(array2)
-						Using cryptoStream As CryptoStream = New CryptoStream(memoryStream, cryptoTransform, CryptoStreamMode.Read)
-							Using streamReader As StreamReader = New StreamReader(cryptoStream)
-								text2 = streamReader.ReadToEnd()
-							End Using
-						End Using
-					End Using
-				End Using
-			End If
-			Return text2
 		End Function
 
 		' Token: 0x06012264 RID: 74340 RVA: 0x00A71678 File Offset: 0x00A6F878

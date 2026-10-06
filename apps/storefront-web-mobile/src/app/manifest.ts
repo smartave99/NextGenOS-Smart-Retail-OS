@@ -1,15 +1,18 @@
 
 import { MetadataRoute } from 'next';
 import { getSiteConfig } from "@/app/actions/site-config";
+import { SHOP_NAME } from "@/lib/shop-name";
+
+export const dynamic = "force-dynamic";
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
     const config = await getSiteConfig();
     const manifest = config.manifest;
 
     return {
-        name: manifest.name || 'Smart Avenue 99',
-        short_name: manifest.shortName || 'Smart Avenue 99',
-        description: manifest.description || 'Smart Avenue 99 is a one-stop departmental store.',
+        name: manifest.name || SHOP_NAME,
+        short_name: manifest.shortName || SHOP_NAME,
+        description: manifest.description || `${SHOP_NAME} is a one-stop departmental store.`,
         start_url: manifest.startUrl || '/',
         display: manifest.display || 'standalone',
         background_color: manifest.backgroundColor || '#ffffff',

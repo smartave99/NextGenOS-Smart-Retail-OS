@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Smart Retail POS (full screen)
+Comment=Opens the program full screen, for a touch-screen till or a kiosk
+Exec=/usr/bin/smart-retail-pos --fullscreen
+Icon=smart-retail-pos
+Terminal=false
+Categories=Office;Finance;
+StartupNotify=false

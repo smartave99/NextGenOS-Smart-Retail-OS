@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/app/actions";
+import { money } from "@/lib/region/lite";
 
 interface GiftRecommendationResult {
     thoughtProcess: string;
@@ -207,7 +208,7 @@ export default function GiftConciergeInterface() {
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Budget</label>
                                     <input
                                         type="text"
-                                        placeholder="₹1000 - ₹5000"
+                                        placeholder={`${money(1000)} - ${money(5000)}`}
                                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-rose-200 outline-none"
                                         onChange={(e) => setRecipient({ ...recipient, budget: e.target.value })}
                                     />
@@ -281,9 +282,9 @@ export default function GiftConciergeInterface() {
                                                 <div className="flex-1 min-w-0">
                                                     <h5 className="font-semibold text-sm text-slate-900 truncate">{rec.product.name}</h5>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className="font-bold text-rose-600">₹{rec.product.price}</span>
+                                                        <span className="font-bold text-rose-600">{money(rec.product.price)}</span>
                                                         {rec.product.originalPrice && (
-                                                            <span className="text-xs text-slate-400 line-through">₹{rec.product.originalPrice}</span>
+                                                            <span className="text-xs text-slate-400 line-through">{money(rec.product.originalPrice)}</span>
                                                         )}
                                                     </div>
                                                 </div>

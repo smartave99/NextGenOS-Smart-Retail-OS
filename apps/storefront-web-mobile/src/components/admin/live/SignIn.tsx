@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Activity, Loader2 } from "lucide-react";
 import { Card, Field, Note, inputClass, linkButton, primaryButton } from "./ui";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 /** Where Supabase's e-mails (confirm the account, new password) bring the owner back to. */
 export const backHere = () => `${window.location.origin}/admin/live`;
@@ -174,7 +175,7 @@ export function CreateShop({ db, onCreated, note }: { db: SupabaseClient; onCrea
             <p className="mt-1 text-sm text-brand-gray">Then connect the shop PC with a code, and its figures show here.</p>
             <form onSubmit={submit} className="mt-6 space-y-4">
                 <Field label="Shop name" htmlFor="live-shop-name">
-                    <input id="live-shop-name" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Smart Avenue 99" />
+                    <input id="live-shop-name" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder={SHOP_NAME} />
                 </Field>
                 <button type="submit" className={`${primaryButton} w-full`}>Create the shop</button>
             </form>

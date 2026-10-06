@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "country": "NP",
+  "name": "Nepal",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "NPR",
+    "symbol": "Rs",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "indian",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "ne-NP",
+  "languages": [
+    "ne",
+    "en"
+  ],
+  "timezone": "Asia/Kathmandu",
+  "phoneCode": "+977",
+  "fiscalYearStart": {
+    "month": 7,
+    "day": 16
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT13",
+        "label": "VAT 13%",
+        "percent": "13"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "VAT13",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
+    "businessId": {
+      "label": "PAN",
+      "pattern": "^[0-9]{9}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and PAN",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount"
+    ],
+    "eInvoice": "Billing software must be registered with the tax office (CBMS).",
+    "retentionYears": 6
+  },
+  "notes": []
+}

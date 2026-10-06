@@ -14,11 +14,12 @@ import { categoriesForProject, categoriesSignature, productsMissing, readShopPro
 import type { Shop, ShopProduct, SiteCategory } from "@/lib/live-shop/types";
 import ShopProductCard, { type Decision } from "./ShopProductCard";
 import { Card, Note, Pill, linkButton, softButton } from "./ui";
+import { LOCALE } from "@/lib/region/lite";
 
 /** The shop PC offers a product as soon as it is ready; a look now and then covers a lost connection. */
 const LOOK_EVERY_MS = 5 * 60_000;
 
-const when = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" });
+const when = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short" });
 
 export default function FromTheShop({ db, shop, active, onWaiting }: {
     db: SupabaseClient;

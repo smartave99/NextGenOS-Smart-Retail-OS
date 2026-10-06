@@ -1,7 +1,7 @@
-# Smart Retail OS - by NextGen OS
+# Smart Retail POS - by NextGenOS
 
 ## Executive Overview
-This workspace contains the complete recovered source code for **Smart Retail OS** (by **NextGen OS**), an enterprise retail point-of-sale and ERP system, along with its full ecosystem of 12 companion helper libraries.
+This workspace contains the complete recovered source code for **Smart Retail POS** (by **NextGenOS**), an enterprise retail point-of-sale and ERP system, along with its full ecosystem of 12 companion helper libraries.
 
 All projects have been restored from compiled assembly binaries into clean, human-readable, idiomatic source code. Every single project builds with **0 errors** using the standard Microsoft .NET Framework 4.8 toolchain.
 
@@ -63,7 +63,7 @@ To build the master solution containing all 13 projects:
 
 | Project | Language | Target Framework | Errors | Warnings | Status |
 |---|---|---|---|---|---|
-| **Smart Retail OS** | VB.NET | .NET 4.8 (x86) | **0** | 0 | **SUCCESS** |
+| **Smart Retail POS** | VB.NET | .NET 4.8 (x86) | **0** | 0 | **SUCCESS** |
 | **DevNet.ChromeDriverManager** | C# | .NET 4.8 (AnyCPU) | **0** | 0 | **SUCCESS** |
 | **DevNet.GS** | C# | .NET 4.8 (AnyCPU) | **0** | 0 | **SUCCESS** |
 | **DevNet.PhonePe** | C# | .NET 4.8 (x86) | **0** | 0 | **SUCCESS** |
@@ -87,4 +87,4 @@ To build the master solution containing all 13 projects:
 
 ## License
 
-This project is open-source software licensed under the [MIT License](LICENSE).
+This is proprietary software of NextGenOS. All rights reserved. It is not open source: see [`LICENSE`](../../LICENSE) for the terms that apply to this source code and [`EULA.txt`](../../EULA.txt) for the agreement under which customers use the program. Third-party components keep their own licences, listed in [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md).

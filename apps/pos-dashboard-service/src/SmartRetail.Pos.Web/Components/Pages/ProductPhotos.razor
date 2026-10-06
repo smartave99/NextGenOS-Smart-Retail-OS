@@ -6,17 +6,19 @@
 @using SmartRetail.Pos.Core.Paging
 @inject ISalesFactsRepository Facts
 @inject ProductPhotoService Photos
+@inject AiEnvironment Ai
 @inject StorageService Storage
 @inject TimeProvider Clock
 @inject NavigationManager Nav
 @inject ILogger<ProductPhotos> Log
+@inject BrandService Brand
 
-<PageTitle>Product photos · Smart Retail POS</PageTitle>
+<PageTitle>Product photos · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
         <h1>Product photos</h1>
-        <p class="sub">Add phone photos of a product and the AI makes five photos for your website and Amazon, one by one: white background, in use, and with a European, an Indian and an East Asian model. It also learns what each product is, and writes its listings for Amazon and your website. The POS is not changed.</p>
+        <p class="sub">Add phone photos of a product and the AI makes five photos for your website and Amazon, one by one: white background, in use, and three model photos (@ModelTitles). It also learns what each product is, and writes its listings for Amazon and your website. The POS is not changed.</p>
     </div>
     <div class="actions">
         <AiChoice Job="SmartRetail.AI.Settings.AiJob.Photos" />
@@ -122,6 +124,9 @@ else
 }
 
 @code {
+    /// <summary>The three model photos as the customer's profile names them, e.g. "a Filipino model, a Spanish model"; neutral without a profile.</summary>
+    private string ModelTitles => string.Join(", ", Enumerable.Range(0, SmartRetail.AI.Settings.ShopProfile.ModelPhotos).Select(i => Ai.Shop.ModelAt(i).Title.ToLowerInvariant()));
+
     private static readonly (string Key, string Label)[] Views = { ("best", "Best sellers"), ("with", "With photos"), ("all", "All products") };
 
     [SupplyParameterFromQuery(Name = "view")]

@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import type { SupabaseClient } from "@supabase/supabase-js";
 import WeeklyReview from "./WeeklyReview";
 
-const shop = { id: "shop-1", name: "Smart Avenue" };
+const shop = { id: "shop-1", name: "Demo Mart" };
 
 const week = (from: string, to: string, over: Record<string, unknown> = {}) => ({
     from, to, sales: 0, bills: 0, averageBill: 0, profit: null, margin: null, ...over,

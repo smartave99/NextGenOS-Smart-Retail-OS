@@ -1,4 +1,4 @@
-// Smart Retail POS by NextGen OS: the owner's live view. The shop PC sends the shop's figures to the owner's own
+// Smart Retail POS by NextGenOS: the owner's live view. The shop PC sends the shop's figures to the owner's own
 // Supabase project (cloud/supabase-owner-view.sql); this page signs the owner in and shows them, live, from anywhere.
 // Only figures reach it: never a customer's name or phone number.
 (() => {
@@ -177,7 +177,7 @@
   }
 
   function createShopView(note = null) {
-    const name = h('input', { id: 'shop-name', required: true, maxlength: 120, placeholder: 'Smart Avenue 99' });
+    const name = h('input', { id: 'shop-name', required: true, maxlength: 120, placeholder: 'Demo Mart 99' });
     const message = h('p', { class: note ? 'note problem' : 'note hidden', role: 'status' }, note || '');
     async function submit(event) {
       event.preventDefault();

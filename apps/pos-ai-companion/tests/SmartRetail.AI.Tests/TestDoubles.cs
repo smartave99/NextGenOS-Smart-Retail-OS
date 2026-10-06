@@ -147,14 +147,18 @@ namespace SmartRetail.AI.Tests
         }
     }
 
-    /// <summary>The checked-out repository the tests run in (the folder holding .github/workflows/installer.yml).</summary>
+    /// <summary>
+    /// The checked-out repository the tests run in: the folder that holds SmartRetailSuite.sln (the monorepo) or, in the older
+    /// layout of the two separate products, .github/workflows/installer.yml.
+    /// </summary>
     internal static class Repository
     {
         public static string Root()
         {
             for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder != null; folder = folder.Parent)
             {
-                if (File.Exists(System.IO.Path.Combine(folder.FullName, ".github", "workflows", "installer.yml")))
+                if (File.Exists(System.IO.Path.Combine(folder.FullName, "SmartRetailSuite.sln"))
+                    || File.Exists(System.IO.Path.Combine(folder.FullName, ".github", "workflows", "installer.yml")))
                 {
                     return folder.FullName;
                 }
@@ -162,6 +166,18 @@ namespace SmartRetail.AI.Tests
 
             throw new DirectoryNotFoundException("The repository was not found above " + AppContext.BaseDirectory);
         }
+
+        private static string Product(string oldName, string newPath)
+        {
+            var old = System.IO.Path.Combine(Root(), oldName);
+            return Directory.Exists(old) ? old : System.IO.Path.Combine(Root(), newPath);
+        }
+
+        /// <summary>The AI add-on's folder (SmartRetailAI, or apps/pos-ai-companion).</summary>
+        public static string Ai() => Product("SmartRetailAI", System.IO.Path.Combine("apps", "pos-ai-companion"));
+
+        /// <summary>The dashboard's folder (SmartRetailPOS, or apps/pos-dashboard-service).</summary>
+        public static string Dashboard() => Product("SmartRetailPOS", System.IO.Path.Combine("apps", "pos-dashboard-service"));
     }
 
     /// <summary>A temporary folder deleted after the test.</summary>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { sanitizePageHtml } from "@/lib/sanitize-html";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { getPageContent, updatePageContent } from "@/app/actions/page-content";
@@ -163,7 +164,7 @@ export default function TermsEditor() {
                             </h3>
                             <div
                                 className="prose prose-lg prose-slate max-w-none"
-                                dangerouslySetInnerHTML={{ __html: content }}
+                                dangerouslySetInnerHTML={{ __html: sanitizePageHtml(content) }}
                             />
                         </div>
 

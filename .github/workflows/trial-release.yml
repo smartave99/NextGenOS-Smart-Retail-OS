@@ -1,0 +1,40 @@
+name: Trial release
+
+# Makes a TRIAL release on GitHub (tag and Releases page) from a claude/* branch, without anyone pushing a tag.
+# It starts when .github/trial-release.json changes on such a branch, and it calls the Release workflow, which builds everything,
+# runs the whole gate first, and only then makes the tag and the release. A trial is built WITHOUT licence keys, is marked, and is never for a customer.
+# A real release is still a tag made by the owner (v1.0.0), which needs the licence keys set.
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/trial-release.json"]
+
+permissions:
+  contents: write
+
+jobs:
+  read:
+    name: Read the request
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        run: |
+          set -euo pipefail
+          V="$(jq -r '.version' .github/trial-release.json)"
+          case "${V}" in [0-9]*.[0-9]*.[0-9]*) ;; *) echo "The version in .github/trial-release.json must be three numbers, like 1.0.0."; exit 1;; esac
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Build, run the gate, make the trial release
+    needs: read
+    uses: ./.github/workflows/release.yml
+    with:
+      version_name: ${{ needs.read.outputs.version }}
+      trial_without_keys: true
+      publish_trial: true
+    permissions:
+      contents: write

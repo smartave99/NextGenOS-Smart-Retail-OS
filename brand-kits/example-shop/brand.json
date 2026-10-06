@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "name": "Example Shop",
+  "shortName": "Example",
+  "legalName": "",
+  "tagline": "",
+  "primaryColor": "#0071e3",
+  "theme": "auto",
+  "logo": "logo.png",
+  "contact": { "email": "", "phone": "", "address": "" },
+  "storefront": { "siteUrl": "https://shop.example.com" },
+  "android": { "appId": "com.example.shop", "storefrontUrl": "https://shop.example.com" },
+  "receipt": { "header": "", "footer": "" },
+  "poweredBy": true
+}

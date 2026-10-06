@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "country": "ES",
+  "name": "Spain",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "EUR",
+    "symbol": "€",
+    "decimals": 2,
+    "symbolPosition": "after",
+    "symbolSpace": true,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": "."
+  },
+  "locale": "es-ES",
+  "languages": [
+    "es",
+    "en"
+  ],
+  "timezone": "Europe/Madrid",
+  "phoneCode": "+34",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "IVA",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "IVA21",
+        "label": "IVA 21%",
+        "percent": "21"
+      },
+      {
+        "code": "IVA10",
+        "label": "IVA 10%",
+        "percent": "10"
+      },
+      {
+        "code": "IVA4",
+        "label": "IVA 4%",
+        "percent": "4"
+      },
+      {
+        "code": "IVA0",
+        "label": "IVA 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "IVAEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "IVA21",
+      "reduced": "IVA10",
+      "zero": "IVA0",
+      "exempt": "IVAEX"
+    },
+    "businessId": {
+      "label": "NIF",
+      "pattern": "^[A-Z0-9][0-9]{7}[A-Z0-9]$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Factura",
+    "requiredFields": [
+      "Seller name, address and NIF",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "Tax rate and amount"
+    ],
+    "eInvoice": "Verifactu and electronic invoicing duties are being phased in; check the dates.",
+    "retentionYears": 6
+  },
+  "notes": [
+    "The Canary Islands use IGIC, not IVA: create a pack for them with the rates your adviser gives."
+  ]
+}

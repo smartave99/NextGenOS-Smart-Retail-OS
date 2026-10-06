@@ -1,0 +1,288 @@
+{
+  "schema": 1,
+  "id": "restaurant",
+  "name": "Restaurant, café and food service",
+  "summary": "Tables, orders, a kitchen screen, service charge, tips and split bills; quick-service counter too.",
+  "icon": "utensils",
+  "vocabulary": {
+    "customer": [
+      "Guest",
+      "Guests"
+    ],
+    "item": [
+      "Menu item",
+      "Menu items"
+    ],
+    "sale": [
+      "Order",
+      "Orders"
+    ],
+    "invoice": [
+      "Bill",
+      "Bills"
+    ],
+    "staff": [
+      "Server",
+      "Servers"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Stock",
+      "Stock"
+    ]
+  },
+  "features": {
+    "counterSale": true,
+    "tables": true,
+    "kitchen": true,
+    "lending": false,
+    "projects": false,
+    "appointments": false,
+    "credit": false,
+    "purchases": true,
+    "stockTracking": "optional",
+    "weighedItems": false
+  },
+  "itemKinds": [
+    {
+      "id": "menu",
+      "label": "Menu item",
+      "tracksStock": false
+    },
+    {
+      "id": "ingredient",
+      "label": "Ingredient",
+      "tracksStock": true
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "customer",
+      "label": "Guest"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    }
+  ],
+  "defaults": {
+    "adjustments": [
+      {
+        "code": "SVC",
+        "kind": "surcharge",
+        "label": "Service charge",
+        "percent": "10",
+        "taxed": true,
+        "optional": true
+      }
+    ],
+    "paymentMethods": [
+      "cash",
+      "card",
+      "wallet",
+      "bank"
+    ]
+  },
+  "rules": {
+    "stations": [
+      "Kitchen",
+      "Bar"
+    ],
+    "tipPresets": [
+      "5",
+      "10",
+      "15"
+    ],
+    "splitBill": true
+  },
+  "reports": [
+    "daily-sales",
+    "top-items",
+    "tax-summary",
+    "table-turnover",
+    "payments"
+  ],
+  "demo": {
+    "company": "Demo Café",
+    "tagline": "Coffee, breakfast and light meals",
+    "items": [
+      {
+        "name": "Espresso",
+        "kind": "menu",
+        "category": "Coffee",
+        "price": "120.00",
+        "class": "standard",
+        "unit": "cup",
+        "station": "Bar"
+      },
+      {
+        "name": "Cappuccino",
+        "kind": "menu",
+        "category": "Coffee",
+        "price": "160.00",
+        "class": "standard",
+        "unit": "cup",
+        "station": "Bar"
+      },
+      {
+        "name": "Iced latte",
+        "kind": "menu",
+        "category": "Coffee",
+        "price": "180.00",
+        "class": "standard",
+        "unit": "glass",
+        "station": "Bar"
+      },
+      {
+        "name": "Masala chai",
+        "kind": "menu",
+        "category": "Tea",
+        "price": "80.00",
+        "class": "standard",
+        "unit": "cup",
+        "station": "Bar"
+      },
+      {
+        "name": "Fresh lime soda",
+        "kind": "menu",
+        "category": "Cold drinks",
+        "price": "90.00",
+        "class": "standard",
+        "unit": "glass",
+        "station": "Bar"
+      },
+      {
+        "name": "Butter croissant",
+        "kind": "menu",
+        "category": "Bakery",
+        "price": "110.00",
+        "class": "standard",
+        "unit": "pc",
+        "station": "Kitchen"
+      },
+      {
+        "name": "Veg sandwich",
+        "kind": "menu",
+        "category": "Snacks",
+        "price": "190.00",
+        "class": "standard",
+        "unit": "pc",
+        "station": "Kitchen"
+      },
+      {
+        "name": "Paneer wrap",
+        "kind": "menu",
+        "category": "Snacks",
+        "price": "230.00",
+        "class": "standard",
+        "unit": "pc",
+        "station": "Kitchen"
+      },
+      {
+        "name": "Pasta arrabbiata",
+        "kind": "menu",
+        "category": "Meals",
+        "price": "290.00",
+        "class": "standard",
+        "unit": "plate",
+        "station": "Kitchen"
+      },
+      {
+        "name": "Grilled chicken bowl",
+        "kind": "menu",
+        "category": "Meals",
+        "price": "340.00",
+        "class": "standard",
+        "unit": "bowl",
+        "station": "Kitchen"
+      },
+      {
+        "name": "Chocolate brownie",
+        "kind": "menu",
+        "category": "Dessert",
+        "price": "140.00",
+        "class": "standard",
+        "unit": "pc",
+        "station": "Kitchen"
+      },
+      {
+        "name": "Coffee beans 250 g",
+        "kind": "ingredient",
+        "category": "Pantry",
+        "price": "450.00",
+        "class": "standard",
+        "unit": "pack",
+        "stock": "25"
+      }
+    ],
+    "parties": [
+      {
+        "kind": "customer",
+        "name": "Walk-in guest"
+      },
+      {
+        "kind": "supplier",
+        "name": "Fresh Farm Produce",
+        "phone": "+910000000003"
+      }
+    ],
+    "tables": [
+      {
+        "name": "T1",
+        "seats": 2,
+        "zone": "Inside"
+      },
+      {
+        "name": "T2",
+        "seats": 2,
+        "zone": "Inside"
+      },
+      {
+        "name": "T3",
+        "seats": 4,
+        "zone": "Inside"
+      },
+      {
+        "name": "T4",
+        "seats": 4,
+        "zone": "Inside"
+      },
+      {
+        "name": "T5",
+        "seats": 6,
+        "zone": "Inside"
+      },
+      {
+        "name": "P1",
+        "seats": 4,
+        "zone": "Patio"
+      },
+      {
+        "name": "P2",
+        "seats": 4,
+        "zone": "Patio"
+      }
+    ]
+  },
+  "aiContext": "a restaurant or café: tables, orders, a kitchen, menu items, service charge and tips",
+  "coverage": {
+    "works": [
+      "Tables with open orders, adding and changing items, notes for the kitchen",
+      "A kitchen screen: tickets per station (kitchen, bar) that cooks mark as preparing and ready",
+      "Quick-service counter orders and takeaway",
+      "Service charge and tips, taxed the way the country pack says",
+      "Split a bill by items or equally, and pay by several methods",
+      "Menu with categories; ingredients with stock",
+      "Daily sales, top dishes, table turnover, tax summary reports"
+    ],
+    "notYet": [
+      "Recipe costing and automatic stock use per dish",
+      "Online ordering and delivery-app integration",
+      "A reservations calendar",
+      "Sending tickets to separate kitchen printers by station (tickets show on screen and print from the browser)"
+    ]
+  }
+}

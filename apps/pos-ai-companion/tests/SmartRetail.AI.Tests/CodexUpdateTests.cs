@@ -263,7 +263,7 @@ namespace SmartRetail.AI.Tests
         {
             for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder != null; folder = folder.Parent)
             {
-                if (folder.Name == folderName && Directory.Exists(Path.Combine(folder.FullName, "src")))
+                if ((folder.Name == folderName || (folderName == "SmartRetailAI" && folder.Name == "pos-ai-companion")) && Directory.Exists(Path.Combine(folder.FullName, "src")))
                 {
                     return folder.FullName;
                 }

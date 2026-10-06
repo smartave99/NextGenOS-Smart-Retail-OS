@@ -17,7 +17,7 @@ vi.mock("@/context/auth-context", () => ({ useAuth: () => ({ user: mocks.user.cu
 
 import FromTheShop from "./FromTheShop";
 
-const SHOP = { id: "5b8f1a0e-1111-4222-8333-944455556666", name: "Smart Avenue 99" };
+const SHOP = { id: "5b8f1a0e-1111-4222-8333-944455556666", name: "Demo Mart 99" };
 
 const WEBSITE_CATEGORIES = [
     { id: "c-groc", name: "Grocery", parentId: null },
@@ -124,7 +124,7 @@ beforeEach(() => {
     mocks.findShopProduct.mockResolvedValue({ success: true, byKey: null, byBarcode: null });
     mocks.uploadToCloudinary.mockImplementation(async (data: string) => ({
         success: true,
-        url: `https://res.cloudinary.com/demo/image/upload/v1/smart-avenue/products/${data.length}-${Math.random().toString(36).slice(2, 8)}.jpg`,
+        url: `https://res.cloudinary.com/demo/image/upload/v1/shop/products/${data.length}-${Math.random().toString(36).slice(2, 8)}.jpg`,
         publicId: "x",
     }));
     mocks.publishShopProduct.mockResolvedValue({ success: true, id: "site-1", created: true });

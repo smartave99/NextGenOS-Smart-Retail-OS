@@ -1,0 +1,37 @@
+[Unit]
+Description=Smart Retail POS Hub by NextGenOS
+Documentation=file:///usr/share/doc/smart-retail-pos-hub/
+After=network.target
+
+[Service]
+Type=exec
+User=nextgenos
+Group=nextgenos
+WorkingDirectory=/opt/nextgenos/smart-retail-hub
+ExecStart=/opt/nextgenos/smart-retail-hub/NextGenOS.Hub
+Restart=on-failure
+RestartSec=5
+# The shop's information lives in /var/lib/nextgenos, outside the program folder, so an update or a removal never touches it.
+Environment=Hub__DataFolder=/var/lib/nextgenos/hub
+Environment=XDG_DATA_HOME=/var/lib/nextgenos/data
+Environment=HOME=/var/lib/nextgenos
+Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nextgenos/tmp
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+Environment=DOTNET_gcServer=0
+StateDirectory=nextgenos
+StateDirectoryMode=0750
+# The program may read its own folder and write only to the shop's data. Printers, scanners and cash drawers are devices, so they stay reachable.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -4,10 +4,14 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SmartRetail.AI.Settings;
 
 namespace SmartRetail.AI.Products
 {
-    /// <summary>The five photos made for every product, in the order they are made.</summary>
+    /// <summary>
+    /// The five photos made for every product, in the order they are made. The last three show a person; who, and the titles on the screen, come from the customer's
+    /// profile (<see cref="ShopProfile"/>). The names here are the slots' stable ids, kept because they are in file names and in what the website was sent.
+    /// </summary>
     public enum PhotoKind
     {
         /// <summary>The product alone on pure white: the main image Amazon and online shops ask for.</summary>
@@ -30,15 +34,23 @@ namespace SmartRetail.AI.Products
         /// <summary>1 to 5, the order the photos are made and listed in.</summary>
         public static int Number(this PhotoKind kind) => (int)kind + 1;
 
-        public static string Title(this PhotoKind kind) => kind switch
+        /// <summary>The photo's title with no profile: the neutral one ("Model 1" for the first photo with a person).</summary>
+        public static string Title(this PhotoKind kind) => kind.Title(null);
+
+        /// <summary>The photo's title on the screen: the customer's own for the photos with a person (e.g. "Filipino model"), else "White background" and "In use".</summary>
+        public static string Title(this PhotoKind kind, ShopProfile shop)
         {
-            PhotoKind.WhiteBackground => "White background",
-            PhotoKind.InUse => "In use",
-            PhotoKind.EuropeanModel => "European model",
-            PhotoKind.IndianModel => "Indian model",
-            PhotoKind.EastAsianModel => "East Asian model",
-            _ => kind.ToString(),
-        };
+            switch (kind)
+            {
+                case PhotoKind.WhiteBackground: return "White background";
+                case PhotoKind.InUse: return "In use";
+                default: return (shop ?? ShopProfile.Neutral).ModelAt(kind.ModelIndex()).Title;
+            }
+        }
+
+        /// <summary>0, 1 or 2 for the three photos with a person; throws for the others.</summary>
+        public static int ModelIndex(this PhotoKind kind) =>
+            kind.IsModel() ? (int)kind - (int)PhotoKind.EuropeanModel : throw new ArgumentOutOfRangeException(nameof(kind), "Only photos 3 to 5 have a model.");
 
         /// <summary>How the kind's files start, e.g. "in-use-20260924-101500.png".</summary>
         public static string FilePrefix(this PhotoKind kind) => kind switch
@@ -74,6 +86,9 @@ namespace SmartRetail.AI.Products
         public List<string> RawPhotos { get; set; } = new List<string>();
 
         public PhotoKind Kind { get; set; } = PhotoKind.WhiteBackground;
+
+        /// <summary>The customer's business: its country, kind and who the model photos show (from its profile). Neutral when not given.</summary>
+        public ShopProfile Shop { get; set; } = ShopProfile.Neutral;
 
         /// <summary>The white-background photo made earlier, if any, so every photo shows the same product. Optional.</summary>
         public string CataloguePhoto { get; set; }
@@ -226,7 +241,21 @@ namespace SmartRetail.AI.Products
 
         public List<string> Keywords { get; set; } = new List<string>();
 
-        public string HindiName { get; set; } = "";
+        /// <summary>The product's common name in the second language of the shop's posters (the profile's), in its own script; empty when the shop has none.</summary>
+        public string LocalName { get; set; } = "";
+
+        /// <summary>Product files written before the second language was a setting called it by one language's name: read, never written.</summary>
+        [JsonProperty("HindiName")]
+        private string LegacyLocalName
+        {
+            set
+            {
+                if (string.IsNullOrEmpty(LocalName))
+                {
+                    LocalName = value ?? "";
+                }
+            }
+        }
 
         /// <summary>A real place where the product is used, for the lifestyle photos.</summary>
         public string UseCaseScene { get; set; } = "";
@@ -269,7 +298,7 @@ namespace SmartRetail.AI.Products
                 Material = Text(json, "material"),
                 SizeOrQuantity = Text(json, "size_or_quantity"),
                 Keywords = List(json, "keywords"),
-                HindiName = Text(json, "hindi_name"),
+                LocalName = Text(json, "local_name").Length > 0 ? Text(json, "local_name") : Text(json, "hindi_name"),
                 UseCaseScene = Text(json, "use_case_scene"),
                 ModelPerson = Text(json, "model_person"),
                 Notes = Text(json, "notes"),
@@ -315,10 +344,10 @@ namespace SmartRetail.AI.Products
         public const string ResultFileName = "clean.png";
 
         /// <summary>A strict JSON schema: every field required, nothing else allowed.</summary>
-        public const string UnderstandingSchema = @"{
+        private const string SchemaTemplate = @"{
   ""type"": ""object"",
   ""additionalProperties"": false,
-  ""required"": [""display_name"", ""what_it_is"", ""description"", ""product_type"", ""suggested_category"", ""colours"", ""material"", ""size_or_quantity"", ""keywords"", ""hindi_name"", ""use_case_scene"", ""model_person"", ""notes""],
+  ""required"": [""display_name"", ""what_it_is"", ""description"", ""product_type"", ""suggested_category"", ""colours"", ""material"", ""size_or_quantity"", ""keywords"", ""local_name"", ""use_case_scene"", ""model_person"", ""notes""],
   ""properties"": {
     ""display_name"": { ""type"": ""string"", ""description"": ""A clear product name for customers, with size or pack if visible."" },
     ""what_it_is"": { ""type"": ""string"", ""description"": ""A short phrase saying what the product is, e.g. a pink plastic water bottle with a flip-top lid."" },
@@ -329,12 +358,22 @@ namespace SmartRetail.AI.Products
     ""material"": { ""type"": ""string"" },
     ""size_or_quantity"": { ""type"": ""string"" },
     ""keywords"": { ""type"": ""array"", ""items"": { ""type"": ""string"" }, ""description"": ""Words customers would search for."" },
-    ""hindi_name"": { ""type"": ""string"", ""description"": ""The common Hindi name in Devanagari."" },
+    ""local_name"": { ""type"": ""string"", ""description"": ""{LOCAL_NAME}"" },
     ""use_case_scene"": { ""type"": ""string"", ""description"": ""A real place where the product is used, for a lifestyle photo, e.g. a sunny kitchen counter while cooking dinner."" },
     ""model_person"": { ""type"": ""string"", ""description"": ""The person to show with the product: the gender and age of its typical buyer or user, e.g. a woman in her early 30s. An adult; for a product made for children, a parent."" },
     ""notes"": { ""type"": ""string"", ""description"": ""Anything that could not be seen or read; empty if none."" }
   }
 }";
+
+        /// <summary>The schema with no second language: the local name is to be left empty.</summary>
+        public static string UnderstandingSchema => SchemaFor(null);
+
+        /// <summary>The schema for a shop: the local name is asked for in its second language, in that language's own script, or left empty when it has none.</summary>
+        public static string SchemaFor(ShopProfile shop)
+        {
+            var language = (shop ?? ShopProfile.Neutral).LocalLanguage;
+            return SchemaTemplate.Replace("{LOCAL_NAME}", language.Length > 0 ? "The common " + language + " name, in the script " + language + " is written in." : "Leave empty.");
+        }
 
         private const string KeepTheProduct =
             " Keep the product exactly as it is in the photos: the same shape, proportions, colours, printed text, labels and logos."
@@ -354,19 +393,14 @@ namespace SmartRetail.AI.Products
 
         private static string FrameOf(PhotoShape shape) => (shape == null || !shape.IsKnown ? "square" : shape.Orientation) + " image";
 
-        /// <summary>How the model in photos 3 to 5 looks.</summary>
-        public static string ModelLooks(PhotoKind kind) => kind switch
-        {
-            PhotoKind.EuropeanModel => "European",
-            PhotoKind.IndianModel => "Indian, with a fair complexion",
-            PhotoKind.EastAsianModel => "East Asian",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), "Only photos 3 to 5 have a model."),
-        };
+        /// <summary>How the model in photos 3 to 5 looks, as the customer's profile says; empty when it asks for no look.</summary>
+        public static string ModelLooks(PhotoKind kind, ShopProfile shop = null) => (shop ?? ShopProfile.Neutral).ModelAt(kind.ModelIndex()).Looks;
 
-        public static string ImageInstructions(PhotoKind kind, ProductUnderstanding understanding = null, PhotoShape shape = null)
+        public static string ImageInstructions(PhotoKind kind, ProductUnderstanding understanding = null, PhotoShape shape = null, ShopProfile shop = null)
         {
+            shop = shop ?? ShopProfile.Neutral;
             var scene = string.IsNullOrWhiteSpace(understanding?.UseCaseScene)
-                ? "the most typical real-world place for this product in India, at home, at work or outdoors"
+                ? shop.TypicalPlace
                 : understanding.UseCaseScene.Trim().TrimEnd('.');
             var person = string.IsNullOrWhiteSpace(understanding?.ModelPerson)
                 ? "an adult whose gender and age suit the product's typical buyer or user"
@@ -385,7 +419,8 @@ namespace SmartRetail.AI.Products
                         + " The product is the hero: large, in sharp focus and well lit, with the background softly blurred."
                         + " Hands may appear using the product, but no faces." + LikeARealPhoto(shape) + KeepTheProduct;
                 default:
-                    return "Make an emotional lifestyle photo of one model, " + person + " (" + ModelLooks(kind) + "), using or holding the product in "
+                    var looks = ModelLooks(kind, shop);
+                    return "Make an emotional lifestyle photo of one model, " + person + (looks.Length > 0 ? " (" + looks + ")" : "") + ", using or holding the product in "
                         + scene + ". Capture a genuine moment that shows how the product makes them feel, such as joy, comfort, confidence or"
                         + " pride, with a natural expression rather than a posed stock-photo smile. The product is clearly visible, in focus"
                         + " and at its real size. Modest everyday clothes that suit the scene, with no logos." + LikeARealPhoto(shape) + KeepTheProduct;
@@ -397,7 +432,7 @@ namespace SmartRetail.AI.Products
         {
             var attachments = request.Attachments();
             var category = string.IsNullOrWhiteSpace(request.Category) ? "" : ", category " + request.Category.Trim();
-            var text = "You are making product photos for a small shop in India, for its website and for Amazon.\n"
+            var text = "You are making product photos for " + (request.Shop ?? ShopProfile.Neutral).Shop + ", for its website and for Amazon.\n"
                 + (attachments.Count == 1 ? "The attached photo shows" : "The attached photos show")
                 + " one product from the shop: \"" + request.Name.Trim() + "\" (code " + (request.Code ?? "").Trim() + category + ").\n";
             if (request.IsChange)
@@ -420,7 +455,7 @@ namespace SmartRetail.AI.Products
                 text += "It is " + request.Understanding.WhatItIs.Trim().TrimEnd('.') + ".\n";
             }
 
-            text += "This is photo " + request.Kind.Number() + " of " + PhotoKinds.All.Count + ": " + request.Kind.Title() + ".\n";
+            text += "This is photo " + request.Kind.Number() + " of " + PhotoKinds.All.Count + ": " + request.Kind.Title(request.Shop) + ".\n";
             if (request.Shape.IsKnown)
             {
                 text += "The owner's phone photo is " + request.Shape.Describe() + ": the photo you make has the same shape and orientation.\n";
@@ -434,7 +469,7 @@ namespace SmartRetail.AI.Products
             }
 
             text += "\n1. Use your image generation tool to " + (request.IsChange ? "make the photo again from the first attached photo, with the change. " : request.Kind == PhotoKind.WhiteBackground ? "edit the attached photo. " : "make this photo. ")
-                + ImageInstructions(request.Kind, request.Understanding, request.Shape) + "\n"
+                + ImageInstructions(request.Kind, request.Understanding, request.Shape, request.Shop) + "\n"
                 + "2. Copy the final image into the current folder as " + ResultFileName + ". Do not leave it only in the Codex home folder,"
                 + " and do not create any other files.\n";
             return text + (request.Describe

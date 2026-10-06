@@ -1,0 +1,11 @@
+@inherits LayoutComponentBase
+@inject NextGenOS.Licensing.AspNetCore.BrandService Brand
+
+<div class="public">
+    <div class="public-card">
+        @if (Brand.Logo is { } logo) { <img class="brand-logo" src="@logo" alt="" /> }
+        <div class="public-brand">@Brand.Name</div>
+        @Body
+        @if (Brand.By is { } by) { <div class="public-by">@by</div> }
+    </div>
+</div>

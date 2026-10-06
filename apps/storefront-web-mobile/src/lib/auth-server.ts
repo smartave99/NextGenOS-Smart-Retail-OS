@@ -4,8 +4,9 @@ import type { DecodedIdToken } from "firebase-admin/auth";
 import { cookies } from "next/headers";
 import { getAdminAuth } from "@/lib/firebase-admin";
 import { getWriteClient } from "@/lib/db-manager";
+import { isOwnerAdmin } from "@/lib/owner-admins";
 
-export const ADMIN_SESSION_COOKIE = "smart_avenue_session";
+export const ADMIN_SESSION_COOKIE = "ngos_session";
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 5;
 
 export interface AdminIdentity {
@@ -23,10 +24,11 @@ async function resolveAdminIdentity(token: DecodedIdToken): Promise<AdminIdentit
     const email = normalizedEmail(token);
     if (!email) return null;
 
-    if (email === "admin@smartavenue99.com") {
+    // Everybody, the owner included, must have a verified e-mail address.
+    if (token.email_verified !== true) return null;
+    if (isOwnerAdmin(email)) {
         return { uid: token.uid, email, role: "Admin", permissions: ["*"] };
     }
-    if (token.email_verified === false) return null;
 
     const staff = await getWriteClient().staff.findFirst({
         where: { email: { equals: email, mode: "insensitive" } },
@@ -67,6 +69,12 @@ export async function getAdminIdentityFromRequest(request?: Request): Promise<Ad
     }
 
     return token ? resolveAdminIdentity(token) : null;
+}
+
+/** The shop owner only (full permissions): for settings of the system itself, such as the AI keys and the databases. Staff are refused. */
+export async function getOwnerIdentityFromRequest(request?: Request): Promise<AdminIdentity | null> {
+    const identity = await getAdminIdentityFromRequest(request);
+    return identity && identity.permissions.includes("*") ? identity : null;
 }
 
 export async function requireAdminSession(permission?: string): Promise<AdminIdentity> {

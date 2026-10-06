@@ -11,6 +11,7 @@ import {
     type Category,
     type Product,
 } from "@/app/actions";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 const mocks = vi.hoisted(() => ({
     strictSearch: vi.fn(),
@@ -127,7 +128,7 @@ describe("business-only Genie boundary", () => {
 
         expect(result.success).toBe(true);
         expect(result.recommendations).toEqual([]);
-        expect(result.summary).toContain("only with Smart Avenue products");
+        expect(result.summary).toContain(`only with ${SHOP_NAME} products`);
         expect(result.intent?.isGeneralChat).toBe(true);
         expect(analyzeIntent).not.toHaveBeenCalled();
         expect(rankAndSummarize).not.toHaveBeenCalled();
@@ -139,7 +140,7 @@ describe("business-only Genie boundary", () => {
         const result = await getRecommendations({ query: "Assalam alaikum" });
 
         expect(result.success).toBe(true);
-        expect(result.summary).toContain("Smart Avenue’s shopping assistant");
+        expect(result.summary).toContain(`${SHOP_NAME}’s shopping assistant`);
         expect(analyzeIntent).not.toHaveBeenCalled();
     });
 
@@ -160,7 +161,7 @@ describe("business-only Genie boundary", () => {
         const result = await getRecommendations({ query: "Show me current offers" });
 
         expect(result.success).toBe(true);
-        expect(result.summary).toContain("Smart Avenue products");
+        expect(result.summary).toContain(`${SHOP_NAME} products`);
         expect(rankAndSummarize).not.toHaveBeenCalled();
         expect(handleMissingProduct).not.toHaveBeenCalled();
     });

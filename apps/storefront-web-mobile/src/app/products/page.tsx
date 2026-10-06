@@ -6,6 +6,7 @@ import InfiniteProductGrid from "@/components/InfiniteProductGrid";
 import { constructMetadata } from "@/lib/seo-utils";
 import { Metadata } from "next";
 import { Suspense } from "react";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const config = await getSiteConfig();
     return constructMetadata({
         title: "All Products",
-        description: "Browse our entire catalog of high-quality products across all departments at Smart Avenue 99. Discover great deals and curated selections.",
+        description: `Browse our entire catalog of high-quality products across all departments at ${SHOP_NAME}. Discover great deals and curated selections.`,
         urlPath: "/products",
         config
     });
@@ -22,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 async function ProductsHeader() {
     const pageContent = await getSiteContent<ProductsPageContent>("products-page");
     const heroTitle = pageContent?.heroTitle || "All Products";
-    const heroSubtitle = pageContent?.heroSubtitle || "Explore useful finds across every Smart Avenue department.";
+    const heroSubtitle = pageContent?.heroSubtitle || `Explore useful finds across every ${SHOP_NAME} department.`;
     const heroImage = pageContent?.heroImage || "";
 
     return (

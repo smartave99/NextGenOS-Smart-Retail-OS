@@ -7,6 +7,7 @@ using SmartRetail.Pos.Core.Abstractions;
 using SmartRetail.Pos.Core.Bills;
 using SmartRetail.Pos.Data;
 using SmartRetail.Pos.Web.Components;
+using NextGenOS.Licensing.AspNetCore;
 using SmartRetail.Pos.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,13 +51,14 @@ builder.Services.AddSingleton<UpdateStatusService>();
 builder.Services.AddSingleton<WhatsNewService>();
 builder.Services.Configure<CodexUpdateOptions>(builder.Configuration.GetSection(CodexUpdateOptions.SectionName));
 builder.Services.AddSingleton<CodexUpdateService>();
-builder.Services.AddHostedService<CodexUpdateWorker>();
+builder.Services.AddSingleton<AiToolService>();
+builder.Services.AddLicensedWorker<CodexUpdateWorker>();
 builder.Services.AddSingleton<ProductPhotoService>();
 // Finding a product with the camera: barcodes always, and its look once turned on (DINOv2, on this PC).
 builder.Services.Configure<CameraSearchOptions>(builder.Configuration.GetSection(CameraSearchOptions.SectionName));
 builder.Services.AddSingleton<CameraSearchService>();
-builder.Services.AddHostedService<CameraSearchWorker>();
-builder.Services.AddHostedService<PhotoMakerWorker>();
+builder.Services.AddLicensedWorker<CameraSearchWorker>();
+builder.Services.AddLicensedWorker<PhotoMakerWorker>();
 builder.Services.AddSingleton<GrowthPlanService>();
 builder.Services.AddSingleton<PosterStore>();
 builder.Services.AddSingleton<PosterService>();
@@ -64,16 +66,16 @@ builder.Services.AddSingleton<PosterArtworkWorker>();
 // Creatives: advertisements designed by Codex's image tool from the owner's brief, with the POS's prices added by the app.
 builder.Services.AddSingleton<CreativeStore>();
 builder.Services.AddSingleton<CreativeService>();
-builder.Services.AddHostedService<CreativeWorker>();
+builder.Services.AddLicensedWorker<CreativeWorker>();
 builder.Services.AddSingleton<FixNowService>();
 builder.Services.AddSingleton<PlaybookService>();
 builder.Services.AddSingleton<PriceCheckService>();
 builder.Services.AddSingleton<MemoryService>();
 builder.Services.AddSingleton<ActionService>();
 builder.Services.AddSingleton<ReviewService>();
-builder.Services.AddHostedService<ReviewWorker>();
+builder.Services.AddLicensedWorker<ReviewWorker>();
 builder.Services.AddSingleton<ChatHistoryService>();
-builder.Services.AddHostedService<ChatHistoryCleaner>();
+builder.Services.AddLicensedWorker<ChatHistoryCleaner>();
 
 // The owner's live view: the shop's figures sent to the owner's own Supabase project, for the website.
 builder.Services.AddSingleton<SmartRetail.AI.Settings.ISecretProtector>(
@@ -81,11 +83,11 @@ builder.Services.AddSingleton<SmartRetail.AI.Settings.ISecretProtector>(
 builder.Services.AddSingleton(_ => new OwnerViewClient(
     new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }) { Timeout = TimeSpan.FromSeconds(30) }));
 builder.Services.AddSingleton<OwnerViewService>();
-builder.Services.AddHostedService<OwnerViewWorker>();
-builder.Services.AddHostedService<OwnerQuestionWorker>();
+builder.Services.AddLicensedWorker<OwnerViewWorker>();
+builder.Services.AddLicensedWorker<OwnerQuestionWorker>();
 // Finished products offered to the owner's website: they wait in the owner's Supabase project until the owner approves each one there.
 builder.Services.AddSingleton<WebsiteService>();
-builder.Services.AddHostedService<WebsiteWorker>();
+builder.Services.AddLicensedWorker<WebsiteWorker>();
 
 // Ask AI: one chat for the app window and the side panel. On the POS database it is the side panel's assistant
 // (SqlGuard, a transaction that is rolled back, contact details hidden from the AI); on the demo shop the AI answers
@@ -137,10 +139,14 @@ builder.Services.AddSingleton(services =>
     reviewer.ActionsSuggested += (_, heard) => services.GetRequiredService<ActionService>().Suggest(heard);
     return reviewer;
 });
-builder.Services.AddHostedService<MemoryReviewWorker>();
+builder.Services.AddLicensedWorker<MemoryReviewWorker>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<BillSession>();
 builder.Services.AddScoped<CameraSearchLauncher>();
+
+// The signed licence (one per PC, shared with the Windows app and the POS): the dashboard runs only with a valid one that includes the
+// dashboard module. The gate, the stop of live screens, the check-in and the brand come from NextGenOS.Licensing.AspNetCore.
+builder.Services.AddNextGenOSLicence("dashboard", typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0");
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -158,6 +164,9 @@ app.Lifetime.ApplicationStopping.Register(() =>
     app.Services.GetRequiredService<ChatHistoryService>().Keep(chat);
     app.Services.GetRequiredService<ChatAttachmentStore>().Delete(chat.SelectMany(message => message.Attachments));
 });
+
+// First of all: nothing is served, not even a static file, without a usable licence.
+app.UseLicenceGate();
 
 if (!app.Environment.IsDevelopment())
 {

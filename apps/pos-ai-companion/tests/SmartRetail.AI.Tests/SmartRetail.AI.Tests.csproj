@@ -16,4 +16,10 @@
     <ProjectReference Include="..\..\src\SmartRetail.AI.Core\SmartRetail.AI.Core.csproj" />
   </ItemGroup>
 
+  <!-- The cases the AI assistant's profile reader shares with the Setup Studio (AiProfileVectorTests), and each customer's own profile from its brand kit. -->
+  <ItemGroup>
+    <Content Include="..\vectors\ai-profile.json" Link="ai-profile.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\..\brand-kits\**\ai.json" Link="brand-kits\%(RecursiveDir)ai.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

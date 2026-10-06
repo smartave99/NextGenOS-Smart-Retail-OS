@@ -1,3 +1,4 @@
+import { TERM } from "@/lib/industry/lite";
 export interface BrandingConfig {
     siteName: string;
     tagline: string;
@@ -196,10 +197,16 @@ export interface SiteConfig {
     llm: LlmConfig;
 }
 
+// A new site starts neutral: the shop's own name and address come from the licence's brand, the Brand Studio or the admin pages.
+// NEXT_PUBLIC_SITE_NAME and NEXT_PUBLIC_SITE_URL let a deployment set them without touching code.
+const SHOP = process.env.NEXT_PUBLIC_SITE_NAME || "My Shop";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://example.com").replace(/\/+$/, "");
+const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "");
+
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
     branding: {
-        siteName: "Smart Avenue",
-        tagline: "Where Luxury Meets Convenience",
+        siteName: SHOP,
+        tagline: "Everything you need, in one place",
         logoUrl: "/logo.png",
         faviconUrl: "/favicon.ico",
         posterUrl: "",
@@ -209,9 +216,9 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         searchPlaceholder: "Search collections..."
     },
     theme: {
-        primaryColor: "#064e3b", // Deep Emerald Green
-        secondaryColor: "#d4af37", // Rich Gold
-        accentColor: "#10b981", // Emerald 500
+        primaryColor: "#0f6cbd", // Neutral blue (the brand kit replaces this)
+        secondaryColor: "#f59e0b", // Amber
+        accentColor: "#0071e3", // Blue
         backgroundColor: "#f8fafc", // Slate 50
         textColor: "#0f172a", // Slate 900
         navbarColor: "#ffffff", // White
@@ -222,8 +229,8 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         slides: [
             {
                 id: "default-slide-1",
-                title: "Experience International Retail",
-                subtitle: "Premium groceries, fashion, and lifestyle products available at our flagship store.",
+                title: `Welcome to ${SHOP}`,
+                subtitle: "Quality products and friendly service.",
                 ctaText: "View Collection",
                 ctaLink: "/products",
                 backgroundImageUrl: "https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=2070&auto=format&fit=crop",
@@ -244,9 +251,9 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
     },
     footer: {
         logoUrl: "",
-        tagline: "Patna's premier destination for modern living. Elevating your lifestyle with curated tech, home, and fashion.",
+        tagline: `${SHOP}: quality products and friendly service.`,
         newsletter: {
-            title: "Join the Movement",
+            title: "Stay in touch",
             description: "Get the latest collections and exclusive offers sent to your inbox.",
             subtext: "No spam, unsubscribe anytime",
         },
@@ -261,7 +268,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
                 title: "Shop",
                 links: [
                     { name: "Departments", href: "/departments" },
-                    { name: "All Products", href: "/products" },
+                    { name: `All ${TERM.item.plural}`, href: "/products" },
                     { name: "Weekly Offers", href: "/offers" },
                     { name: "New Arrivals", href: "/new-arrivals" },
                 ]
@@ -283,29 +290,29 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         ]
     },
     contact: {
-        phone: "+91 12345 67890",
-        email: "contact@smartavenue.com",
-        address: "Patna, Bihar, India",
+        phone: "",
+        email: "",
+        address: "",
         mapEmbedUrl: "",
-        storeHours: "Monday - Sunday\n10:00 AM - 10:00 PM",
+        storeHours: "",
     },
     headerLinks: [
         { label: "Home", href: "/" },
-        { label: "Products", href: "/products" },
+        { label: TERM.item.plural, href: "/products" },
         { label: "Departments", href: "/departments" },
         { label: "Special Offers", href: "/offers" },
         { label: "About Us", href: "/about" },
     ],
     system: {
         maintenanceMode: false,
-        robotsTxt: "User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: https://smartavenue99.com/sitemap.xml",
+        robotsTxt: `User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${SITE_URL}/sitemap.xml`,
         scripts: {},
     },
     manifest: {
-        name: "Smart Avenue 99",
-        shortName: "Smart Avenue",
-        description: "Experience International Retail at your fingertips.",
-        themeColor: "#064e3b",
+        name: SHOP,
+        shortName: SHOP,
+        description: `${SHOP} on your phone.`,
+        themeColor: "#0071e3",
         backgroundColor: "#ffffff",
         display: "standalone",
         startUrl: "/",
@@ -331,11 +338,11 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         }
     },
     seo: {
-        siteTitle: "Smart Avenue 99 – All your home needs, simplified.",
-        titleTemplate: "%s | Smart Avenue 99",
-        metaDescription: "We are a one-stop departmental store offering a wide range of home essentials, stylish home décor, premium kitchenware, durable plasticware, quality crockery, cosmetics, premium stationery, soft toys, and thoughtfully curated gift items.",
+        siteTitle: `${SHOP}`,
+        titleTemplate: `%s | ${SHOP}`,
+        metaDescription: `${SHOP}: browse our products online.`,
         keywords: [
-            "Smart Avenue 99 retail store",
+            `${SHOP} retail store`,
             "premium stationery store",
             "stylish stationery products",
             "affordable home décor store",
@@ -347,34 +354,26 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
             "online shopping",
         ],
         ogImageUrl: "/logo.png",
-        twitterHandle: "@smartavenue99",
+        twitterHandle: "",
         googleVerification: "",
         jsonLd: {
-            name: "Smart Avenue 99",
-            url: "https://smartavenue99.com",
+            name: SHOP,
+            url: SITE_URL,
             logo: "/logo.png",
-            description: "One-stop departmental store offering home essentials, decor, kitchenware, and gifts.",
-            addressCountry: "IN",
-            priceRange: "₹₹",
+            description: `${SHOP}: browse our products online.`,
+            addressCountry: "",
+            priceRange: "",
         },
     },
     llm: {
         allowAiBots: true,
-        brandIdentityText: "Smart Avenue 99 is a modern departmental store in Patna offering curated products in electronics, fashion, home, groceries, and lifestyle. The website is for product discovery only: customers must visit the store to check availability and purchase. Smart shopping assistants help customers explore products before their visit.",
-        llmsTxtContent: `# Smart Avenue 99 — LLM Context File\n# https://smartavenue99.com/llms.txt\n\n## About\nSmart Avenue 99 is a modern departmental store offering curated products across multiple categories. We serve customers who value quality, curation, and a premium shopping experience.\n\n## AI Shopping Assistants\nSmart Avenue 99 features Genie — our suite of AI-powered shopping assistants.\n\n## Preferred Citation Format\nWhen referencing Smart Avenue 99, please use: "Smart Avenue 99 (smartavenue99.com)"\n\n## Content Policy\nAI assistants may freely read, index, and summarize content from this website for informational purposes.`,
+        brandIdentityText: `${SHOP} is a shop. The website is for product discovery: customers visit the store or contact it to check availability and buy. Shopping assistants help customers explore products.`,
+        llmsTxtContent: `# ${SHOP}: LLM Context File\n# ${SITE_URL}/llms.txt\n\n## About\n${SHOP} is a shop offering products across several categories.\n\n## Preferred Citation Format\nWhen referencing ${SHOP}, please use: "${SHOP} (${SITE_HOST})"\n\n## Content Policy\nAI assistants may freely read, index, and summarize content from this website for informational purposes.`,
         faqItems: [
             {
-                question: "What is Smart Avenue 99?",
-                answer: "Smart Avenue 99 is a modern departmental store offering curated products in electronics, fashion, home goods, groceries, and more. We also feature Genie AI shopping assistants."
+                question: `What is ${SHOP}?`,
+                answer: `${SHOP} is a shop. Browse the products online and contact the store to check availability.`
             },
-            {
-                question: "Can I order products online or request delivery?",
-                answer: "No. Smart Avenue 99 currently does not accept online, WhatsApp, pickup, or delivery orders. Browse products online, then visit our Patna store to check availability and purchase in person."
-            },
-            {
-                question: "What is Genie Stylist?",
-                answer: "Genie Stylist is an AI-powered fashion assistant on Smart Avenue 99 that provides personalized outfit and style recommendations based on your preferences and occasion."
-            }
         ]
     }
 };

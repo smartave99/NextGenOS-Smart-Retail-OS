@@ -9,8 +9,9 @@
 @inject IJSRuntime JS
 @inject IOptions<ShopOptions> Shop
 @inject ILogger<Billing> Log
+@inject BrandService Brand
 
-<PageTitle>New bill · Smart Retail POS</PageTitle>
+<PageTitle>New bill · @Brand.Name</PageTitle>
 
 @if (Session.LastSaved is { } saved && Session.LastInvoice is { } savedInvoice)
 {

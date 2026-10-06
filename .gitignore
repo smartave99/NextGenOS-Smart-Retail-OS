@@ -8,10 +8,14 @@
 **/*.suo
 **/packages/
 **/TestResults/
-**/[Dd]ebug/
-**/[Rr]elease/
-**/x64/
-**/x86/
+**/bin/[Dd]ebug/
+**/obj/[Dd]ebug/
+**/bin/[Rr]elease/
+**/obj/[Rr]elease/
+**/bin/x64/
+**/bin/x86/
+**/obj/x64/
+**/obj/x86/
 **/*.pdb
 **/*.idb
 **/*.ilk
@@ -57,7 +61,7 @@
 **/*.db-shm
 **/*.db-wal
 **/SmartRetail.db
-**/smart_avenue.db
+**/demo_shop.db
 
 # OS Generated
 Thumbs.db
@@ -69,3 +73,14 @@ $RECYCLE.BIN/
 # Logs
 *.log
 logs/
+
+# Licence Studio: never commit its data, keys, passphrase or settings
+licensing/studio/data/
+licensing/studio/.env
+licensing/studio/node_modules/
+**/passphrase.txt
+**/*.key.json
+*.tsbuildinfo
+
+# What the Brand Studio makes from a kit (made again whenever it is needed)
+brand-exports/

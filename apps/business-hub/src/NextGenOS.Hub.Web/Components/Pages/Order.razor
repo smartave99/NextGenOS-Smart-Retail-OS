@@ -1,0 +1,258 @@
+@page "/order/{Id:long}"
+@attribute [Authorize(Policy = Perm.Orders)]
+@inherits HubPage
+
+<PageTitle>Order</PageTitle>
+@if (view is null)
+{
+    <h1>That order is closed</h1>
+    <Notice Error="@Error" />
+    <a class="btn primary" href="tables">Back to the tables</a>
+}
+else
+{
+    var d = view.Document;
+    <p class="no-print"><a href="tables">← Tables</a></p>
+    <h1>@Title</h1>
+    <p class="sub">@(d.Meta.TryGetValue("guests", out var g) ? g + " guests · " : "")opened @When(d.CreatedAt)</p>
+    <Notice Error="@Error" Info="@Info" />
+
+    <div class="pos">
+        <div class="card">
+            <input id="menu-search" placeholder="Search the menu" aria-label="Search the menu" @bind="query" @bind:event="oninput" />
+            <div class="chips" role="group" aria-label="Categories">
+                <button type="button" class="@(category is null ? "on" : "")" @onclick="() => PickCategory(null)">All</button>
+                @foreach (var c in categories) { <button type="button" class="@(category == c ? "on" : "")" @onclick="() => PickCategory(c)">@c</button> }
+            </div>
+            <div class="items">
+                @foreach (var item in MenuItems())
+                {
+                    <button type="button" class="item-btn" @onclick="() => Add(item)">
+                        <span class="nm">@item.Name</span>
+                        <span class="pr">@Money(item.PriceMinor)</span>
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="card cart">
+            <h2>Order</h2>
+            @if (view.Lines.Count == 0) { <div class="empty">Tap a dish to add it.</div> }
+            @foreach (var line in view.Lines)
+            {
+                var result = view.Result?.Lines.ElementAtOrDefault(line.LineNo - 1);
+                <div class="line">
+                    <span class="nm">@Qty(line.QtyMilli) × @line.Description@if (line.Fired) { <span class="chip ok">Sent</span> }</span>
+                    <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>
+                    <div class="ctl">
+                        @if (!line.Fired)
+                        {
+                            <button type="button" class="qbtn" aria-label="One less of @line.Description" @onclick="() => Change(line, -1000)">−</button>
+                            <button type="button" class="qbtn" aria-label="One more of @line.Description" @onclick="() => Change(line, 1000)">+</button>
+                            <input class="note" placeholder="Note for the kitchen" aria-label="Note for @line.Description" value="@line.Note" @onchange="e => SetNote(line, e)" />
+                        }
+                        else if (line.Note is { Length: > 0 }) { <span class="muted small">“@line.Note”</span> }
+                    </div>
+                </div>
+            }
+
+            @if (view.Lines.Count > 0)
+            {
+                <div class="row">
+                    <button type="button" class="btn secondary grow" id="send" disabled="@(unsent == 0)" @onclick="Send">Send to kitchen@(unsent > 0 ? $" ({unsent})" : "")</button>
+                </div>
+
+                <h3>Bill</h3>
+                @if (App.Restaurant.DefaultAdjustments().Count > 0)
+                {
+                    <label class="check"><input type="checkbox" id="service" checked="@serviceCharge" @onchange="ToggleService" /> @App.Restaurant.DefaultAdjustments()[0].Label (@App.Restaurant.DefaultAdjustments()[0].Percent%)</label>
+                }
+                <div class="chips" role="group" aria-label="Tip">
+                    <button type="button" class="@(tipPercent == 0 && customTip.Length == 0 ? "on" : "")" @onclick="() => SetTip(0)">No tip</button>
+                    @foreach (var p in TipPresets()) { <button type="button" class="@(tipPercent == p ? "on" : "")" @onclick="() => SetTip(p)">@p%</button> }
+                </div>
+                <input inputmode="decimal" placeholder="Tip amount (optional)" aria-label="Tip amount" value="@customTip" @onchange="SetCustomTip" />
+                <div class="total-row"><span>Subtotal</span><span>@Money(d.SubtotalMinor)</span></div>
+                @foreach (var part in view.Result?.Totals.Components?.Where(c => Shop.Minor(c.Amount) != 0) ?? Enumerable.Empty<NextGenOS.Tax.Component>())
+                {
+                    <div class="total-row muted"><span>@part.Name</span><span>@Shop.Money(Shop.Minor(part.Amount))</span></div>
+                }
+                @foreach (var a in view.Result?.Adjustments ?? new List<NextGenOS.Tax.AdjustmentResult>())
+                {
+                    <div class="total-row muted"><span>@a.Label</span><span>@Shop.Money(Shop.Minor(a.Amount))</span></div>
+                }
+                <div class="total-row big"><span>Total</span><span id="total">@Money(d.PayableMinor)</span></div>
+
+                <h3>Pay</h3>
+                <div class="row wrap">
+                    <label class="check" for="split">Split between</label>
+                    <input id="split" class="qty" type="number" min="1" max="20" @bind="people" />
+                    <span class="muted small">people: each @Money(Share())</span>
+                </div>
+                <div class="pay-methods" role="group" aria-label="Way of paying">
+                    @foreach (var m in Shop.PaymentMethods) { <button type="button" class="@(method == m ? "on" : "")" aria-pressed="@(method == m)" @onclick="() => method = m">@(char.ToUpperInvariant(m[0]) + m[1..])</button> }
+                </div>
+                <input class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(Math.Min(Remaining, people > 1 ? Share() : Remaining))" @bind="tender" />
+                <div class="row wrap"><button type="button" class="btn secondary" id="add-payment" @onclick="AddPayment">Add payment</button></div>
+                @foreach (var (p, i) in payments.Select((p, i) => (p, i)))
+                {
+                    <div class="total-row"><span>@p.Method</span><span>@Money(p.AmountMinor) <button type="button" class="btn ghost small" aria-label="Take off this payment" @onclick="() => payments.RemoveAt(i)">×</button></span></div>
+                }
+                @if (Paid > d.PayableMinor && payments.Any(p => p.Method == "cash")) { <div class="total-row"><span>Change to give</span><strong id="change">@Money(Paid - d.PayableMinor)</strong></div> }
+                <div class="row">
+                    <button type="button" class="btn primary grow" id="pay" @onclick="Pay">Close the bill</button>
+                </div>
+            }
+
+            <div class="row wrap">
+                @if (d.TableId is not null) { <button type="button" class="btn ghost small" @onclick="() => moving = !moving">Move to another table</button> }
+                <button type="button" class="btn ghost small" id="cancel-order" @onclick="() => cancelling = !cancelling">Cancel the order</button>
+            </div>
+            @if (moving)
+            {
+                <div class="chips">@foreach (var t in free) { <button type="button" @onclick="() => Move(t.Table.Id)">@t.Table.Name</button> }</div>
+                @if (free.Count == 0) { <p class="muted small">No table is free.</p> }
+            }
+            @if (cancelling)
+            {
+                <label for="why">Why is it cancelled?</label>
+                <input id="why" @bind="why" maxlength="120" />
+                <div class="row"><button type="button" class="btn danger" id="confirm-cancel" @onclick="CancelOrder">Cancel the order</button></div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private DocumentView? view;
+    private string query = "";
+    private string? category;
+    private IReadOnlyList<string> categories = Array.Empty<string>();
+    private IReadOnlyList<Item> menu = Array.Empty<Item>();
+    private IReadOnlyList<Restaurant.FloorTable> free = Array.Empty<Restaurant.FloorTable>();
+    private bool serviceCharge, moving, cancelling;
+    private decimal tipPercent;
+    private string customTip = "", method = "cash", tender = "", why = "";
+    private int people = 1;
+    private readonly List<PaymentInput> payments = new();
+
+    private int unsent => view?.Lines.Count(l => !l.Fired) ?? 0;
+    private long Paid => payments.Sum(p => p.AmountMinor);
+    private long Remaining => Math.Max(0, (view?.Document.PayableMinor ?? 0) - Paid);
+
+    private string Title => view!.Document.TableId is { } tid ? "Table " + (App.Restaurant.Tables(true).FirstOrDefault(t => t.Id == tid)?.Name ?? "") : (view.Document.Meta.GetValueOrDefault("name") ?? "Takeaway order");
+
+    protected override Task LoadAsync()
+    {
+        view = App.Documents.Get(Id);
+        if (view is null || view.Document.Type != DocTypes.Order || view.Document.Status != DocStatus.Open) { view = null; return Task.CompletedTask; }
+        menu = App.Catalog.Search(null, "menu", null, 400);
+        categories = menu.Select(m => m.Category ?? "").Where(c => c.Length > 0).Distinct().OrderBy(c => c, StringComparer.Ordinal).ToList();
+        free = App.Restaurant.Floor().Where(t => !t.Occupied).ToList();
+        serviceCharge = view.Adjustments.Any(a => a.Kind == "surcharge");
+        method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<Item> MenuItems() => menu.Where(m => (category is null || m.Category == category) && (query.Trim().Length == 0 || m.Name.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+    private void PickCategory(string? c) => category = c;
+
+    private IEnumerable<decimal> TipPresets() => Shop.Industry.Rules.ValueKind == System.Text.Json.JsonValueKind.Object && Shop.Industry.Rules.TryGetProperty("tipPresets", out var t)
+        ? t.EnumerateArray().Select(x => decimal.TryParse(x.GetString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0m).Where(v => v > 0) : Array.Empty<decimal>();
+
+    private long Share() => Restaurant.RestaurantService.EqualParts(view!.Document.PayableMinor, Math.Clamp(people, 1, 20))[Math.Min(payments.Count, Math.Clamp(people, 1, 20) - 1)];
+
+    private void Add(Item item) => Run(() =>
+    {
+        // Tapping a dish again adds one more to the line that has not been sent yet.
+        var open = view!.Lines.FirstOrDefault(l => !l.Fired && l.ItemId == item.Id && string.IsNullOrEmpty(l.Note));
+        view = open is null ? App.Restaurant.AddItem(Id, item.Id) : App.Documents.UpdateLine(Id, open.Id, open.QtyMilli + 1000);
+    });
+
+    private void Change(DocLine line, long delta) => Run(() =>
+    {
+        var next = line.QtyMilli + delta;
+        view = next <= 0 ? App.Documents.RemoveLine(Id, line.Id) : App.Documents.UpdateLine(Id, line.Id, next);
+    });
+
+    private void SetNote(DocLine line, ChangeEventArgs e) => Run(() => view = App.Documents.UpdateLine(Id, line.Id, null, null, e.Value?.ToString() ?? ""));
+
+    private Task Send() => Run(async () =>
+    {
+        var tickets = App.Restaurant.Fire(Id, Me.Id);
+        view = App.Documents.Get(Id);
+        Info = tickets.Count == 0 ? "Nothing new to send." : "Sent to " + string.Join(" and ", tickets.Select(t => t.Station.ToLowerInvariant())) + ".";
+        // Kitchen printers, if there are any. A printer that does not answer never holds up the order: the kitchen screen has it.
+        var problems = await App.Printing.PrintTicketsAsync(tickets);
+        if (problems.Count > 0) Error = "The order is on the kitchen screen, but a printer did not print it. " + string.Join(" ", problems);
+    });
+
+    private void ToggleService(ChangeEventArgs e) => Run(() =>
+    {
+        serviceCharge = e.Value is true;
+        ApplyBill();
+    });
+
+    private void SetTip(decimal percent) => Run(() =>
+    {
+        tipPercent = percent;
+        customTip = "";
+        ApplyBill();
+    });
+
+    private void SetCustomTip(ChangeEventArgs e) => Run(() =>
+    {
+        customTip = (e.Value?.ToString() ?? "").Trim();
+        tipPercent = 0;
+        ApplyBill();
+    });
+
+    private void ApplyBill()
+    {
+        long tip = 0;
+        if (customTip.Length > 0)
+        {
+            if (!TryMoney(Shop, customTip, out tip) || tip < 0) throw new HubException("tip", "Please type the tip as a number, like 50.");
+        }
+        else if (tipPercent > 0) tip = App.Restaurant.TipFromPercent(Id, tipPercent);
+        view = App.Restaurant.SetBillOptions(Id, serviceCharge, tip);
+    }
+
+    private void AddPayment() => Run(() =>
+    {
+        long amount;
+        if (string.IsNullOrWhiteSpace(tender)) amount = Math.Min(Remaining, people > 1 ? Share() : Remaining);
+        else if (!TryMoney(Shop, tender, out amount) || amount <= 0) throw new HubException("amount", "Please type the amount as a number, like 250 or 99.50.");
+        if (amount <= 0) throw new HubException("amount", "There is nothing left to pay.");
+        payments.Add(new PaymentInput { Method = method, AmountMinor = amount });
+        tender = "";
+    });
+
+    private void Pay() => Run(() =>
+    {
+        if (tender.Trim().Length > 0) AddPayment();
+        if (payments.Count == 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });
+        var done = App.Restaurant.Pay(Id, payments.ToList(), Me.Id);
+        Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");
+    });
+
+    private void Move(long tableId) => Run(() =>
+    {
+        view = App.Restaurant.Transfer(Id, tableId);
+        moving = false;
+    });
+
+    private void CancelOrder() => Run(() =>
+    {
+        App.Restaurant.CancelOrder(Id, why, Me.Id);
+        Nav.NavigateTo("/tables");
+    });
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (view is not null && view.Document.Id != Id) { payments.Clear(); await Reload(); }
+    }
+}

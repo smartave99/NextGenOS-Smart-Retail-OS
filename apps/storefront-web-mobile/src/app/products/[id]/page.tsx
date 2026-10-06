@@ -10,13 +10,16 @@ import CompareInterface from "@/components/ai/CompareInterface";
 import OOSPredictor from "@/components/ai/OOSPredictor";
 import RestockTracker from "@/components/ai/RestockTracker";
 import DealInsight from "@/components/ai/DealInsight";
-import SocialProofBadge from "@/components/ai/SocialProofBadge";
 import { Suspense } from "react";
 import { getSiteConfig } from "@/app/actions/site-config";
 import { constructMetadata } from "@/lib/seo-utils";
 import { Metadata } from "next";
 import WhatsAppOrderButton from "@/components/WhatsAppOrderButton";
 import BarcodeDisplay from "@/components/BarcodeDisplay";
+import { SITE_URL } from "@/lib/site-url";
+import { CURRENCY, money } from "@/lib/region/lite";
+import { SHOP_PLACE } from "@/lib/region/lite";
+import { TERM } from "@/lib/industry/lite";
 
 export const revalidate = 3600;
 
@@ -42,15 +45,15 @@ async function AvailabilitySection({ product, siteContent }: { product: Product,
 
     // Default fallbacks in case content is not set
     const content: ProductDetailPageContent = {
-        availabilityText: siteContent?.availabilityText || "Available In-Store Only",
-        availabilityBadge: siteContent?.availabilityBadge || "In-Store Only",
-        callToActionNumber: siteContent?.callToActionNumber || "+91-9876543210",
+        availabilityText: siteContent?.availabilityText || "Available in store",
+        availabilityBadge: siteContent?.availabilityBadge || "In store",
+        callToActionNumber: siteContent?.callToActionNumber || "",
         visitStoreLink: siteContent?.visitStoreLink || "/content/contact",
-        authenticityTitle: siteContent?.authenticityTitle || "Authenticity Guaranteed",
-        authenticityText: siteContent?.authenticityText || "Directly from authorized distributors with full manufacturer warranty.",
+        authenticityTitle: siteContent?.authenticityTitle || "",
+        authenticityText: siteContent?.authenticityText || "",
         storeLocationTitle: siteContent?.storeLocationTitle || "Store Location",
-        storeLocationText: siteContent?.storeLocationText || "Patliputra colony, P&M Mall, Patna",
-        storeHoursText: siteContent?.storeHoursText || "Open Daily: 10:00 AM - 9:00 PM"
+        storeLocationText: siteContent?.storeLocationText || SHOP_PLACE,
+        storeHoursText: siteContent?.storeHoursText || ""
     };
 
     return (
@@ -75,13 +78,15 @@ async function AvailabilitySection({ product, siteContent }: { product: Product,
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <a
-                        href={`tel:${content.callToActionNumber}`}
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
-                    >
-                        <Phone className="w-4 h-4" />
-                        Call to Check
-                    </a>
+                    {content.callToActionNumber && (
+                        <a
+                            href={`tel:${content.callToActionNumber.replace(/[^\d+]/g, "")}`}
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                        >
+                            <Phone className="w-4 h-4" />
+                            Call to Check
+                        </a>
+                    )}
                     <Link
                         href={content.visitStoreLink}
                         className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-dark text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
@@ -109,18 +114,20 @@ async function AvailabilitySection({ product, siteContent }: { product: Product,
                 </div>
             </div>
 
-            {/* Store Info Snippet */}
-            <div className="flex items-start gap-4 p-4 border border-slate-100 rounded-xl">
-                <div className="p-3 bg-brand-blue/10 rounded-lg text-brand-blue">
-                    <ShieldCheck className="w-6 h-6" />
+            {/* Store promise: only when the shop has written one */}
+            {(content.authenticityTitle || content.authenticityText) && (
+                <div className="flex items-start gap-4 p-4 border border-slate-100 rounded-xl">
+                    <div className="p-3 bg-brand-blue/10 rounded-lg text-brand-blue">
+                        <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-900">{content.authenticityTitle}</h4>
+                        <p className="text-sm text-slate-600 mt-1">
+                            {content.authenticityText}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h4 className="font-bold text-slate-900">{content.authenticityTitle}</h4>
-                    <p className="text-sm text-slate-600 mt-1">
-                        {content.authenticityText}
-                    </p>
-                </div>
-            </div>
+            )}
         </div>
     );
 }
@@ -154,9 +161,11 @@ async function StoreLocationMini({ siteContent }: { siteContent: ProductDetailPa
 
     const content = {
         storeLocationTitle: siteContent?.storeLocationTitle || "Store Location",
-        storeLocationText: siteContent?.storeLocationText || "Patliputra colony, P&M Mall, Patna",
-        storeHoursText: siteContent?.storeHoursText || "Open Daily: 10:00 AM - 9:00 PM"
+        storeLocationText: siteContent?.storeLocationText || SHOP_PLACE,
+        storeHoursText: siteContent?.storeHoursText || ""
     };
+
+    if (!content.storeLocationText && !content.storeHoursText) return null;
 
     return (
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
@@ -164,23 +173,36 @@ async function StoreLocationMini({ siteContent }: { siteContent: ProductDetailPa
                 <MapPin className="w-5 h-5 text-brand-dark" />
                 {content.storeLocationTitle}
             </h3>
-            <div className="aspect-video bg-slate-200 rounded-xl mb-4 overflow-hidden relative">
-                {/* Placeholder for map image or embed */}
-                <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-                    Map View
-                </div>
-            </div>
             <div className="space-y-3 text-sm text-slate-600">
-                <div className="flex items-start gap-3">
-                    <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p dangerouslySetInnerHTML={{ __html: content.storeLocationText.replace(/\n|,/g, '<br/>') }} />
-                </div>
-                <div className="flex items-start gap-3">
-                    <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p dangerouslySetInnerHTML={{ __html: content.storeHoursText.replace(/\n/g, '<br/>') }} />
-                </div>
+                {content.storeLocationText && (
+                    <div className="flex items-start gap-3">
+                        <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                        <p><TextLines text={content.storeLocationText} splitOnComma /></p>
+                    </div>
+                )}
+                {content.storeHoursText && (
+                    <div className="flex items-start gap-3">
+                        <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+                        <p><TextLines text={content.storeHoursText} /></p>
+                    </div>
+                )}
             </div>
         </div>
+    );
+}
+
+/** Lines of plain text with a line break between them: the text is shown as text, never as HTML. */
+function TextLines({ text, splitOnComma = false }: { text: string; splitOnComma?: boolean }) {
+    const lines = text.split(splitOnComma ? /\n|,/ : /\n/).map((line) => line.trim()).filter(Boolean);
+    return (
+        <>
+            {lines.map((line, index) => (
+                <span key={index}>
+                    {index > 0 && <br />}
+                    {line}
+                </span>
+            ))}
+        </>
     );
 }
 
@@ -212,7 +234,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <nav className="flex items-center text-sm text-slate-500 gap-2">
                         <Link href="/" className="hover:text-brand-dark transition-colors">Home</Link>
                         <ChevronRight className="w-4 h-4 text-slate-400" />
-                        <Link href="/products" className="hover:text-brand-dark transition-colors">Products</Link>
+                        <Link href="/products" className="hover:text-brand-dark transition-colors">{TERM.item.plural}</Link>
                         {category && (
                             <>
                                 <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -244,8 +266,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         "sku": product.id,
                         "offers": {
                             "@type": "Offer",
-                            "url": `https://smartavenue99.com/products/${product.id}`,
-                            "priceCurrency": "INR",
+                            "url": `${SITE_URL}/products/${product.id}`,
+                            "priceCurrency": CURRENCY.code,
                             "price": product.price,
                             "itemCondition": "https://schema.org/NewCondition",
                             "availability": product.available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
@@ -312,24 +334,23 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                             </div>
 
                             <div className="mb-6">
-                                <SocialProofBadge product={product} />
                             </div>
 
                             {/* Price Section */}
                             <div className="flex items-end gap-4 border-b border-slate-100 pb-8">
                                 <div className="space-y-1">
                                     <span className="text-4xl font-bold text-slate-900 tracking-tight">
-                                        ₹{product.price.toLocaleString()}
+                                        {money(product.price)}
                                     </span>
                                     {discount > 0 && (
                                         <p className="text-sm text-brand-blue font-medium">
-                                            You save ₹{(product.originalPrice! - product.price).toLocaleString()} ({discount}%)
+                                            You save {money(product.originalPrice! - product.price)} ({discount}%)
                                         </p>
                                     )}
                                 </div>
                                 {product.originalPrice && (
                                     <span className="text-xl text-slate-400 line-through mb-1">
-                                        ₹{product.originalPrice.toLocaleString()}
+                                        {money(product.originalPrice)}
                                     </span>
                                 )}
                             </div>

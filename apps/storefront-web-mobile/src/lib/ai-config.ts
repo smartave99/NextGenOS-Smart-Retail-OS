@@ -6,6 +6,7 @@
  */
 
 import { AISettings } from "@/app/actions/ai-settings-actions";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 // In-memory cache
 let cachedConfig: AISettings | null = null;
@@ -41,7 +42,7 @@ export async function getAIConfig(): Promise<AISettings> {
             showVibeSelector: true,
             personaName: "Genie",
             greeting: "Hi, I'm Genie, your personal Shopping Master! 🧞‍♂️ How can I help you today?",
-            systemPrompt: "You are Genie, a charming and helpful AI Shopping Master at Smart Avenue. You help customers find products, give styling advice, and provide excellent shopping assistance. Be friendly, knowledgeable, and persuasive. Support English, Hindi, and Hinglish.",
+            systemPrompt: `You are Genie, a charming and helpful AI Shopping Master at ${SHOP_NAME}. You help customers find products, give styling advice, and provide excellent shopping assistance. Be friendly, knowledgeable, and persuasive. Support English, Hindi, and Hinglish.`,
             temperature: 0.7,
             maxTokens: 2048,
             providerPriority: "groq",

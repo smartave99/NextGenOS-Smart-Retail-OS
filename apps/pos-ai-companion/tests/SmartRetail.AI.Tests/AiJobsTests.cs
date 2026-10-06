@@ -172,5 +172,26 @@ namespace SmartRetail.AI.Tests
                 Assert.Equal(new[] { "Recommended", "Low", "Extra high" }, new[] { "", "low", "xhigh" }.Select(AiJobs.EffortName));
             }
         }
+
+        [Fact]
+        public void A_jobs_own_model_is_used_by_Claude_Code_and_Antigravity_as_well_as_by_Codex()
+        {
+            var settings = new AssistantSettings { PreferredProvider = ProviderIds.ClaudeCli };
+            settings.ClaudeCli.Model = "claude-opus-5";
+            settings.SetChoice(AiJob.Ask, new AiJobChoice { Model = "claude-sonnet-4-6", Effort = "max" });
+
+            Assert.Equal(("claude-sonnet-4-6", "max"), AiJobs.Resolve(settings, AiJob.Ask));
+            Assert.Equal("claude-opus-5", AiJobs.Resolve(settings, AiJob.Plan).Model); // another job keeps the tool's own model
+
+            var applied = new AssistantSettings { PreferredProvider = ProviderIds.ClaudeCli, Jobs = settings.Jobs };
+            applied.ClaudeCli.Model = "claude-opus-5";
+            AiJobs.Apply(applied, AiJob.Ask);
+            Assert.Equal(("claude-sonnet-4-6", "max"), (applied.ClaudeCli.Model, applied.ClaudeCli.Effort));
+
+            settings.PreferredProvider = ProviderIds.AntigravityCli;
+            settings.Antigravity.Model = "";
+            settings.SetChoice(AiJob.Ask, new AiJobChoice { Model = "gemini-3.5-pro", Effort = "high" });
+            Assert.Equal(("gemini-3.5-pro", "high"), AiJobs.Resolve(settings, AiJob.Ask));
+        }
     }
 }

@@ -1,0 +1,212 @@
+{
+  "schema": 1,
+  "id": "services",
+  "name": "Services, salons, clinics and workshops",
+  "summary": "Appointments with staff, walk-ins, services with durations, invoices and the products sold alongside.",
+  "icon": "scissors",
+  "vocabulary": {
+    "customer": [
+      "Client",
+      "Clients"
+    ],
+    "item": [
+      "Service",
+      "Services"
+    ],
+    "sale": [
+      "Visit",
+      "Visits"
+    ],
+    "invoice": [
+      "Invoice",
+      "Invoices"
+    ],
+    "staff": [
+      "Staff",
+      "Staff"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Stock",
+      "Stock"
+    ]
+  },
+  "features": {
+    "counterSale": true,
+    "tables": false,
+    "kitchen": false,
+    "lending": false,
+    "projects": false,
+    "appointments": true,
+    "credit": false,
+    "purchases": true,
+    "stockTracking": "optional",
+    "weighedItems": false
+  },
+  "itemKinds": [
+    {
+      "id": "service",
+      "label": "Service",
+      "tracksStock": false,
+      "hasDuration": true
+    },
+    {
+      "id": "stock",
+      "label": "Product",
+      "tracksStock": true
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "customer",
+      "label": "Client"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    },
+    {
+      "id": "staff",
+      "label": "Staff"
+    }
+  ],
+  "defaults": {
+    "adjustments": [
+      {
+        "code": "TIP",
+        "kind": "tip",
+        "label": "Tip",
+        "optional": true
+      }
+    ],
+    "paymentMethods": [
+      "cash",
+      "card",
+      "wallet",
+      "bank"
+    ]
+  },
+  "rules": {
+    "slotMinutes": 30,
+    "openFrom": "09:00",
+    "openTo": "18:00",
+    "closedWeekdays": [
+      0
+    ],
+    "walkIns": true
+  },
+  "reports": [
+    "daily-sales",
+    "appointments",
+    "staff-sales",
+    "top-items",
+    "tax-summary"
+  ],
+  "demo": {
+    "company": "Demo Studio",
+    "tagline": "Hair and beauty studio",
+    "items": [
+      {
+        "name": "Haircut",
+        "kind": "service",
+        "category": "Hair",
+        "price": "400.00",
+        "class": "standard",
+        "unit": "visit",
+        "duration": 30
+      },
+      {
+        "name": "Hair colour",
+        "kind": "service",
+        "category": "Hair",
+        "price": "1800.00",
+        "class": "standard",
+        "unit": "visit",
+        "duration": 90
+      },
+      {
+        "name": "Beard trim",
+        "kind": "service",
+        "category": "Hair",
+        "price": "200.00",
+        "class": "standard",
+        "unit": "visit",
+        "duration": 15
+      },
+      {
+        "name": "Facial",
+        "kind": "service",
+        "category": "Skin",
+        "price": "1200.00",
+        "class": "standard",
+        "unit": "visit",
+        "duration": 60
+      },
+      {
+        "name": "Manicure",
+        "kind": "service",
+        "category": "Nails",
+        "price": "600.00",
+        "class": "standard",
+        "unit": "visit",
+        "duration": 45
+      },
+      {
+        "name": "Hair serum 100 ml",
+        "kind": "stock",
+        "category": "Products",
+        "price": "750.00",
+        "class": "standard",
+        "unit": "pc",
+        "stock": "18"
+      },
+      {
+        "name": "Shampoo 250 ml",
+        "kind": "stock",
+        "category": "Products",
+        "price": "520.00",
+        "class": "standard",
+        "unit": "pc",
+        "stock": "24"
+      }
+    ],
+    "parties": [
+      {
+        "kind": "customer",
+        "name": "Walk-in client"
+      },
+      {
+        "kind": "customer",
+        "name": "Priya Nair",
+        "phone": "+910000000031"
+      },
+      {
+        "kind": "staff",
+        "name": "Kavya (stylist)"
+      },
+      {
+        "kind": "staff",
+        "name": "Imran (stylist)"
+      }
+    ]
+  },
+  "aiContext": "a service business: appointments, staff, services with durations, invoices",
+  "coverage": {
+    "works": [
+      "A day view of appointments per staff member, with clashes refused",
+      "Walk-ins and bookings; turning a finished appointment into an invoice",
+      "Services with durations and prices, and products sold with them (stock tracked)",
+      "Tips, discounts and several payment methods",
+      "Reports of daily sales, staff sales and top services"
+    ],
+    "notYet": [
+      "An online booking page for customers",
+      "Reminders by text message or WhatsApp",
+      "Packages, memberships and prepaid balances",
+      "Medical records: a clinic needs a specialised system and legal review for patient data"
+    ]
+  }
+}

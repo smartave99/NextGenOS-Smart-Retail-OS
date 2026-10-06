@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The country packs and the tax engine (specification: country-packs/SPEC.md). net48 for the Windows programs, net8.0 for the dashboard and tests.
+       The packs are built into the library from country-packs/packs, the one place they are kept. -->
+  <PropertyGroup>
+    <TargetFrameworks>net48;net8.0</TargetFrameworks>
+    <LangVersion>10.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>NextGenOS.Tax</RootNamespace>
+    <AssemblyName>NextGenOS.Tax</AssemblyName>
+    <Company>NextGenOS</Company>
+    <Product>NextGenOS Tax</Product>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
+    <Version>1.0.0</Version>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\country-packs\packs\*.json" LogicalName="NextGenOS.Tax.packs.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "country": "BD",
+  "name": "Bangladesh",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "BDT",
+    "symbol": "৳",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "indian",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "bn-BD",
+  "languages": [
+    "bn",
+    "en"
+  ],
+  "timezone": "Asia/Dhaka",
+  "phoneCode": "+880",
+  "fiscalYearStart": {
+    "month": 7,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT15",
+        "label": "VAT 15%",
+        "percent": "15"
+      },
+      {
+        "code": "VAT5",
+        "label": "VAT 5%",
+        "percent": "5"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "VAT15",
+      "reduced": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
+    "businessId": {
+      "label": "BIN",
+      "pattern": "^[0-9]{13}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "VAT invoice (Mushak 6.3)",
+    "requiredFields": [
+      "Seller name, address and BIN",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 6
+  },
+  "notes": []
+}

@@ -8,8 +8,10 @@
 @inject NavigationManager Nav
 @inject IJSRuntime Js
 @inject ILogger<Posters> Log
+@inject BrandService Brand
+@inject AiEnvironment Ai
 
-<PageTitle>@(poster is null ? "Posters" : poster.Kind.Title() + " poster") · Smart Retail POS</PageTitle>
+<PageTitle>@(poster is null ? "Posters" : poster.Kind.Title() + " poster") · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
@@ -69,9 +71,10 @@ else
                     @if (kind == PosterKind.FestivalOffer)
                     {
                         <label class="field-label" for="festival">Festival</label>
-                        <input id="festival" class="form-control" list="festivals" maxlength="@PosterWords.MaxFestivalLength" placeholder="For example Diwali" @bind="festival" />
+                        <input id="festival" class="form-control" list="festivals" maxlength="@PosterWords.MaxFestivalLength"
+                               placeholder="@(Locale.Festivals.Count > 0 ? "For example " + Locale.Festivals[0] : "The holiday or season")" @bind="festival" />
                         <datalist id="festivals">
-                            @foreach (var name in PosterKinds.Festivals)
+                            @foreach (var name in Locale.Festivals)
                             {
                                 <option value="@name"></option>
                             }
@@ -214,9 +217,12 @@ else
                     <label class="form-label" for="headline">Headline</label>
                     <input id="headline" class="form-control" value="@poster.Words.Headline" maxlength="@PosterWords.MaxHeadlineLength"
                            @onchange="SetHeadline" />
-                    <label class="form-label" for="hindi">Hindi line</label>
-                    <input id="hindi" class="form-control" lang="hi" value="@poster.Words.HindiLine" maxlength="@PosterWords.MaxHindiLineLength"
-                           @onchange="SetHindiLine" />
+                    @if (Locale.HasLocalLanguage || poster.Words.LocalLine.Length > 0)
+                    {
+                        <label class="form-label" for="local-line">@(Locale.HasLocalLanguage ? Locale.LocalLanguage + " line" : "Second-language line")</label>
+                        <input id="local-line" class="form-control local" lang="@(Locale.LocalLanguageTag.Length > 0 ? Locale.LocalLanguageTag : null)"
+                               value="@poster.Words.LocalLine" maxlength="@PosterWords.MaxLocalLineLength" @onchange="SetLocalLine" />
+                    }
                     <label class="form-label" for="subline">Line under them</label>
                     <input id="subline" class="form-control" value="@poster.Words.Subline" maxlength="@PosterWords.MaxSublineLength"
                            @onchange="SetSubline" />
@@ -332,6 +338,9 @@ else
 }
 
 @code {
+    /// <summary>What the customer's profile says about its posters: festivals, second language.</summary>
+    private PosterLocale Locale => Ai.PosterLocale;
+
     [Parameter] public string? Id { get; set; }
 
     [SupplyParameterFromQuery(Name = "kind")] public string? KindQuery { get; set; }
@@ -524,7 +533,7 @@ else
 
     private void SetHeadline(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { Headline = Text(e) } });
 
-    private void SetHindiLine(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { HindiLine = Text(e) } });
+    private void SetLocalLine(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { LocalLine = Text(e) } });
 
     private void SetSubline(ChangeEventArgs e) => Change(p => p with { Words = p.Words with { Subline = Text(e) } });
 

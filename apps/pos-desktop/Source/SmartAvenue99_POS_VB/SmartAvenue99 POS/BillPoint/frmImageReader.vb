@@ -25,7 +25,7 @@ Namespace BillPoint
 			AddHandler MyBase.Load, AddressOf Me.frmImageReader_Load
 			Me.Photoname = ""
 			Me.IsImageChanged = False
-			Me.apiKey = "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"
+			Me.apiKey = NextGenOS.Licensing.CloudSettings.Secret("openai")
 			Me.InitializeComponent()
 		End Sub
 

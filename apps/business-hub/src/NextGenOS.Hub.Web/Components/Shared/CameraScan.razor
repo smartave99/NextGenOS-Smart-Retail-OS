@@ -1,0 +1,63 @@
+@implements IAsyncDisposable
+@inject IJSRuntime Js
+
+@* A button that opens the camera and reports each barcode it sees. Works with the camera of a PC, a tablet or a phone. *@
+<button type="button" class="btn ghost small" id="@Id" @onclick="Open">@Label</button>
+
+@if (open)
+{
+    <div class="sheet-back" @onclick="Close">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Scan with the camera" @onclick:stopPropagation="true">
+            <h2>Scan with the camera</h2>
+            <p class="muted">Hold the barcode in front of the camera.</p>
+            @if (!string.IsNullOrEmpty(problem)) { <div class="notice error" role="alert">@problem</div> }
+            <video id="@(Id)-video" class="scan-video" playsinline muted></video>
+            @if (!string.IsNullOrEmpty(last)) { <p class="notice ok" role="status">Read: <strong>@last</strong></p> }
+            <div class="row"><button type="button" class="btn secondary grow" @onclick="Close">Done</button></div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "camera";
+    [Parameter] public string Label { get; set; } = "Scan with the camera";
+    [Parameter] public EventCallback<string> OnScanned { get; set; }
+    /// <summary>Close the camera after the first barcode (a sale line) instead of staying open for the next one.</summary>
+    [Parameter] public bool CloseAfterScan { get; set; } = true;
+
+    private bool open;
+    private string? problem, last;
+    private DotNetObjectReference<CameraScan>? self;
+
+    private async Task Open()
+    {
+        open = true;
+        problem = last = null;
+        StateHasChanged();
+        await Task.Yield();
+        self = DotNetObjectReference.Create(this);
+        problem = await Js.InvokeAsync<string>("hubScan.start", Id + "-video", self);
+        if (string.IsNullOrEmpty(problem)) problem = null;
+    }
+
+    [JSInvokable]
+    public async Task OnCode(string text)
+    {
+        last = text;
+        await OnScanned.InvokeAsync(text);
+        if (CloseAfterScan) await Close();
+        StateHasChanged();
+    }
+
+    private async Task Close()
+    {
+        open = false;
+        try { await Js.InvokeVoidAsync("hubScan.stop"); } catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await Js.InvokeVoidAsync("hubScan.stop"); } catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException) { }
+        self?.Dispose();
+    }
+}

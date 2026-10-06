@@ -57,7 +57,7 @@
     --radius: 14px;
     --radius-sm: 10px;
     --font: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Noto Sans Devanagari", "Nirmala UI", sans-serif;
-    --font-hindi: "Noto Sans Devanagari", "Nirmala UI", "Inter", sans-serif;
+    --font-local: "Nirmala UI", "Noto Sans", "Segoe UI", "Inter", sans-serif;
     --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
 }
 
@@ -167,7 +167,8 @@ h1:focus, h1[tabindex]:focus, h1[tabindex]:focus-visible { outline: none; box-sh
 p { margin: 0 0 10px; }
 ul, ol { margin-top: 0; }
 img { max-width: 100%; }
-[lang="hi"], .hi { font-family: var(--font-hindi); }
+/* A line in the customer's second language (any script): the system finds the glyphs; this only keeps the stack wide. */
+.local { font-family: var(--font-local); }
 
 a { color: var(--accent-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -2271,8 +2272,8 @@ a.past-title { display: block; font-weight: 600; }
 .sheet.has-art .sheet-top { border-radius: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.32), rgb(0 0 0 / 0.08) 75%, transparent); }
 .sheet-shop { margin-bottom: 2cqw; font-size: 3cqw; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; opacity: 0.95; }
 .sheet-headline { margin: 0; color: #fff; font-weight: 900; line-height: 0.95; letter-spacing: -0.02em; text-transform: uppercase; text-wrap: balance; text-shadow: 0 0.4cqw 2cqw rgb(0 0 0 / 0.18); }
-.sheet-hindi { margin: 2.6cqw 0 0; font-family: var(--font-hindi); font-size: 5cqw; font-weight: 700; line-height: 1.3; }
-.sheet-hindi.long { font-size: 4.2cqw; }
+.sheet-local { margin: 2.6cqw 0 0; font-family: var(--font-local); font-size: 5cqw; font-weight: 700; line-height: 1.3; }
+.sheet-local.long { font-size: 4.2cqw; }
 .sheet-sub { margin: 1.2cqw 0 0; font-size: 3.1cqw; font-weight: 500; opacity: 0.95; }
 .sheet-badge { position: absolute; top: 9cqw; right: 5cqw; display: grid; place-items: center; align-content: center; width: 21cqw; height: 21cqw; border-radius: 50%; background: #ffd60a; color: #b3261e; line-height: 1; text-align: center; box-shadow: 0 1cqw 3cqw rgb(0 0 0 / 0.2); transform: rotate(-10deg); }
 .sheet-badge small { font-size: 2.6cqw; font-weight: 800; letter-spacing: 0.04em; }

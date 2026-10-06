@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "country": "LK",
+  "name": "Sri Lanka",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "LKR",
+    "symbol": "Rs",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-LK",
+  "languages": [
+    "si",
+    "ta",
+    "en"
+  ],
+  "timezone": "Asia/Colombo",
+  "phoneCode": "+94",
+  "fiscalYearStart": {
+    "month": 4,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT18",
+        "label": "VAT 18%",
+        "percent": "18"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "VAT18",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
+    "businessId": {
+      "label": "VAT number",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and VAT number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount"
+    ],
+    "eInvoice": null,
+    "retentionYears": 6
+  },
+  "notes": []
+}

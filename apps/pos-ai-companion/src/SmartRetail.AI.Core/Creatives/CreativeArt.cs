@@ -1,4 +1,5 @@
 using System;
+using SmartRetail.AI.Settings;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -36,6 +37,9 @@ namespace SmartRetail.AI.Creatives
 
         public const int MaxReferences = 2;
 
+        /// <summary>The customer's business (from its profile): the creative is made for it, in its country. Neutral when not given.</summary>
+        public ShopProfile Shop { get; set; } = ShopProfile.Neutral;
+
         /// <summary>E.g. "Square post".</summary>
         public string FormatName { get; set; } = "";
 
@@ -48,6 +52,10 @@ namespace SmartRetail.AI.Creatives
 
         /// <summary>The look, e.g. "Festive: rich colours, marigolds and warm lights, for an Indian festival".</summary>
         public string Style { get; set; } = "";
+
+        /// <summary>Who the advertisement is for, in the owner's words (e.g. "families with young children"). Empty when not given:
+        /// then the prompt says nothing about it. It is never drawn: it only guides the people, the setting and the mood.</summary>
+        public string Audience { get; set; } = "";
 
         public string ShopName { get; set; } = "";
 
@@ -119,6 +127,7 @@ namespace SmartRetail.AI.Creatives
                 ?? CreativeWords.NameProblem("The shop's name", ShopName, CreativeWords.MaxLine)
                 ?? CreativeWords.Problem("The background", Background, CreativeWords.MaxNotes, allowNumbers: true)
                 ?? CreativeWords.Problem("The instructions", Instructions, CreativeWords.MaxNotes, allowNumbers: true)
+                ?? CreativeWords.Problem("Who it is for", Audience, CreativeWords.MaxNotes, allowNumbers: true)
                 ?? CreativeWords.Problem("The brand notes", BrandNotes, CreativeWords.MaxNotes, allowNumbers: true)
                 ?? CreativeWords.Problem("What to change", Change, CreativeWords.MaxNotes, allowNumbers: true);
         }
@@ -232,7 +241,7 @@ namespace SmartRetail.AI.Creatives
 
         /// <summary>
         /// What is wrong with the shop's own name, for the owner; null when it is fine. A name is the shop's brand, drawn exactly
-        /// as written, and may hold a number ("Smart Avenue 99", "Shop 24"). A ₹ or % sign in it would look like a price or an
+        /// as written, and may hold a number ("Demo Mart 99", "Shop 24"). A ₹ or % sign in it would look like a price or an
         /// offer, which only the app draws, so those are refused.
         /// </summary>
         public static string NameProblem(string label, string name, int maxLength)
@@ -248,9 +257,10 @@ namespace SmartRetail.AI.Creatives
                 : null;
         }
 
-        /// <summary>The words on one line, without quotes that would end them in the prompt.</summary>
+        /// <summary>The words on one line, without quotes that would end them in the prompt, and without line breaks or other
+        /// control characters (each becomes a space), so the owner's words can never start another line of the prompt.</summary>
         public static string Tidy(string words) =>
-            Regex.Replace((words ?? "").Replace('"', '\'').Replace('“', '\'').Replace('”', '\''), @"\s+", " ").Trim();
+            Regex.Replace((words ?? "").Replace('"', '\'').Replace('“', '\'').Replace('”', '\''), @"[\s\p{Cc}]+", " ").Trim();
     }
 
     /// <summary>The task for Codex: one finished advertisement, drawn by its image tool, with room left for prices.</summary>
@@ -311,7 +321,7 @@ namespace SmartRetail.AI.Creatives
 
             var prompt = new StringBuilder();
             var shop = CreativeWords.Tidy(request.ShopName);
-            prompt.Append("You are the designer of an advertising creative for a small shop in India")
+            prompt.Append("You are the designer of an advertising creative for " + (request.Shop ?? ShopProfile.Neutral).Shop)
                 .Append(shop.Length > 0 ? ", " + shop : "").Append(".\n");
             if (request.IsRevision)
             {
@@ -419,6 +429,14 @@ namespace SmartRetail.AI.Creatives
             if (!string.IsNullOrWhiteSpace(request.Background))
             {
                 prompt.Append("- Background: ").Append(CreativeWords.Tidy(request.Background).TrimEnd('.')).Append(".\n");
+            }
+
+            // Who it is for guides the people, the setting and the mood. It is never a word to draw: the list of words above stays the only one.
+            var audience = CreativeWords.Tidy(request.Audience).TrimEnd('.');
+            if (audience.Length > 0)
+            {
+                prompt.Append("- Who it is for: ").Append(audience).Append(". Let the people, the setting and the mood suit them. ")
+                    .Append("Do not write any words about them: the only words are the ones listed above, if any.\n");
             }
 
             if (request.References.Count > 0)

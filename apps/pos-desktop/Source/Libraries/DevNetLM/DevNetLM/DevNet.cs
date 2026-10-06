@@ -1,126 +1,88 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using DevNetLM.Classes;
-using DevNetLM.Forms;
+using NextGenOS.Licensing.Windows;
 using DevNetLM.Models;
-using Microsoft.Win32;
-using Newtonsoft.Json;
+using NextGenOS.Licensing;
 
 namespace DevNetLM
 {
-	// Token: 0x02000002 RID: 2
-	public static class DevNet
-	{
-		// Token: 0x06000001 RID: 1 RVA: 0x00002050 File Offset: 0x00000250
-		public static bool ShowActivation()
-		{
-			return true;
-		}
+    /// <summary>
+    /// The POS asks two things of this class: Validate() at start-up and when the main menu opens, and ShowActivation() when
+    /// Validate() says the program may not run. The answers now come from the signed licence (spec: licensing/spec/LICENCE-FORMAT.md).
+    /// </summary>
+    public static class DevNet
+    {
+        private static LicenceHeartbeat _heartbeat;
+        private static int _closing;
 
-		// Token: 0x06000002 RID: 2 RVA: 0x00002078 File Offset: 0x00000278
-		public static LicenseResponse Validate()
-		{
-			LicenseData licenseData = Utility.RKEY();
-			if (!string.IsNullOrEmpty(licenseData.ProName) && !string.IsNullOrEmpty(licenseData.LKey))
-			{
-				return new LicenseResponse
-				{
-					LicenseData = licenseData,
-					Message = "Validated Successfully",
-					ShowActivation = false
-				};
-			}
+        /// <summary>Looks at the licence. LicenseData is null (and ShowActivation says whether to open the window) when the program may not run.</summary>
+        public static LicenseResponse Validate()
+        {
+            var manager = PosLicence.Manager;
+            var state = manager.Evaluate();
+            var view = LegacyAdapter.From(state, DateTime.UtcNow);
+            if (view.Allowed)
+            {
+                StartHeartbeat(manager);
+                // When it is time, check in quietly in the background: the program never waits for the network.
+                Task.Run(async () => { try { await manager.CheckInAsync().ConfigureAwait(false); } catch (Exception) { } });
+            }
+            return new LicenseResponse
+            {
+                LicenseData = view.Allowed ? ToLegacy(view) : null,
+                Message = view.Message,
+                ShowActivation = view.ShowActivation,
+            };
+        }
 
-			licenseData = new LicenseData
-			{
-				ProName = "Smart Retail OS",
-				LKey = "ACTV99-NEXT01-POSENT-PERM01-FULL99",
-				SYSID = "B53CF3ADA161FFA6A3BEB27491DE2F47",
-				VFrom = DateTime.Now.AddYears(-1),
-				VTill = DateTime.Now.AddYears(50),
-				TStamp = DateTime.Now,
-				CusName = "NextGen OS",
-				CusEmail = "support@nextgenos.com",
-				CusPhone = "9876543210",
-				ProductId = "smart-retail-os"
-			};
-			return new LicenseResponse
-			{
-				LicenseData = licenseData,
-				Message = "Validated Successfully",
-				ShowActivation = false
-			};
-		}
+        /// <summary>Opens the activation window. When it succeeds the program restarts itself, so that it starts with a licence.</summary>
+        public static bool ShowActivation()
+        {
+            using (var window = new ActivationForm(PosLicence.Manager))
+            {
+                window.ShowDialog();
+                if (window.WasActivated)
+                {
+                    MessageBox.Show("Thank you. Smart Retail POS is activated and will start again now.", "Activated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Application.Restart();
+                    return true;
+                }
+            }
+            return false;
+        }
 
-		// Token: 0x06000003 RID: 3 RVA: 0x00002490 File Offset: 0x00000690
-		private static async void RestoreLicense(LicenseData licenseData)
-		{
-			try
-			{
-				using (WebClient wc = new WebClient())
-				{
-					string dbPath = (GlobalValues.FirebaseRealTimeDBPath.EndsWith("/") ? GlobalValues.FirebaseRealTimeDBPath : (GlobalValues.FirebaseRealTimeDBPath + "/"));
-					string text = await wc.DownloadStringTaskAsync(new Uri(dbPath + "licenses/" + licenseData.LKey + ".json"));
-					string json = text.Trim();
-					text = null;
-					if (json != null && json != "null" && json != "")
-					{
-						Dictionary<string, string> data = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-						if (data["system_id"] == licenseData.SYSID)
-						{
-							if (bool.Parse(data["is_active"]))
-							{
-								DateTime valid_from = DateTime.ParseExact(data["valid_from"].Replace(".", ":"), GlobalValues.DateTimeFormat, CultureInfo.InvariantCulture);
-								DateTime valid_till = DateTime.ParseExact(data["valid_till"].Replace(".", ":"), GlobalValues.DateTimeFormat, CultureInfo.InvariantCulture);
-								if (valid_from <= DateTime.Now && DateTime.Now <= valid_till)
-								{
-									Utility.WKEY(new LicenseData
-									{
-										ProName = licenseData.ProName,
-										LKey = licenseData.LKey,
-										SYSID = data["system_id"],
-										VFrom = valid_from,
-										VTill = valid_till,
-										TStamp = DateTime.Now,
-										CusName = licenseData.CusName,
-										CusEmail = licenseData.CusEmail,
-										CusPhone = licenseData.CusPhone,
-										ProductId = data["product_id"]
-									});
-								}
-								else
-								{
-									Utility.DKEY();
-									MessageBox.Show("License Expired", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-									Environment.Exit(0);
-								}
-							}
-							else
-							{
-								Utility.DKEY();
-								MessageBox.Show("License not Active", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-								Environment.Exit(0);
-							}
-						}
-						else
-						{
-							Utility.DKEY();
-							MessageBox.Show("License not Valid", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-							Environment.Exit(0);
-						}
-						data = null;
-					}
-					dbPath = null;
-					json = null;
-				}
-			}
-			catch
-			{
-			}
-		}
-	}
+        private static LicenseData ToLegacy(LegacyView v)
+        {
+            return new LicenseData
+            {
+                ProName = v.ProductName,
+                LKey = v.LicenceId,
+                SYSID = v.SystemId,
+                VFrom = v.From,
+                VTill = v.Till,
+                TStamp = DateTime.Now,
+                CusName = v.CustomerName,
+                CusEmail = v.CustomerEmail,
+                CusPhone = v.CustomerPhone,
+                ProductId = "smart-retail-pos",
+                issuedby = "NextGenOS",
+                issued_byid = "NextGenOS",
+            };
+        }
+
+        /// <summary>Re-checks the licence while the program runs, so a withdrawn or ended licence stops a running shop too.</summary>
+        private static void StartHeartbeat(LicenceManager manager)
+        {
+            if (_heartbeat != null) return;
+            _heartbeat = new LicenceHeartbeat(manager, state =>
+            {
+                if (System.Threading.Interlocked.Exchange(ref _closing, 1) == 1) return;
+                try { MessageBox.Show(state.Message + "\n\nThe program will close now. Please save your work first next time.", "Smart Retail POS licence", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                catch (Exception) { }
+                Environment.Exit(0);
+            });
+            _heartbeat.Start();
+        }
+    }
 }

@@ -19,6 +19,11 @@ namespace SmartRetail.AI.Settings
 
         public List<string> ProviderOrder { get; set; } = new List<string>(ProviderIds.DefaultOrder);
 
+        /// <summary>What the pictures the AI makes need to know about this business: its country, kind, models, festivals, second language. Read from the customer's
+        /// profile (<c>profile/ai.json</c>) when the settings are loaded, never saved here, and neutral when there is no profile.</summary>
+        [JsonIgnore]
+        public ShopProfile Shop { get; set; } = new ShopProfile();
+
         public CodexCliSettings Codex { get; set; } = new CodexCliSettings();
 
         public ClaudeCliSettings ClaudeCli { get; set; } = new ClaudeCliSettings();

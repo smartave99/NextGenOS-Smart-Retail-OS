@@ -1,0 +1,870 @@
+@page "/settings"
+@attribute [Authorize(Policy = Perm.Settings)]
+@inherits HubPage
+@using System.Text.RegularExpressions
+@using NextGenOS.Licensing.AspNetCore
+@inject ProductLicence Licence
+@inject BrandService Brand
+@inject NextGenOS.Hub.Web.Branding.LocalBrandStore Looks
+@inject NextGenOS.Hub.Web.Branding.LocalThemeStore LocalTheme
+@inject NextGenOS.Hub.Web.Branding.ThemeService Themes
+
+<PageTitle>Settings</PageTitle>
+<h1>Settings</h1>
+<p class="sub">How the shop is set up. Changes apply at once.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="tablist">
+    @foreach (var (key, label) in Tabs())
+    {
+        <button type="button" role="tab" class="@(tab == key ? "on" : "")" aria-selected="@(tab == key)" @onclick="() => OpenTab(key)">@label</button>
+    }
+</div>
+
+@if (tab == "shop")
+{
+    <section class="card">
+        <h2>Your business</h2>
+        <div class="stack">
+            <label for="s-name">Business name</label><input id="s-name" @bind="s.Name" maxlength="80" />
+            <label for="s-addr">Address (on bills)</label><textarea id="s-addr" rows="2" @bind="s.Address" maxlength="300"></textarea>
+            <div class="field-row">
+                <div><label for="s-phone">Phone</label><input id="s-phone" @bind="s.Phone" maxlength="40" /></div>
+                <div><label for="s-mail">Email</label><input id="s-mail" @bind="s.Email" maxlength="120" /></div>
+            </div>
+            @if (Shop.Country.Tax.BusinessId is { } idRule)
+            {
+                <label for="s-tax">@idRule.Label</label><input id="s-tax" @bind="s.TaxId" maxlength="40" />
+            }
+            @if (Shop.Country.Tax.Regions?.List is { Count: > 1 } regions)
+            {
+                <label for="s-region">@(Shop.Country.Tax.Regions.Label ?? "Region") of your business</label>
+                <select id="s-region" @bind="s.Region">@foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }</select>
+            }
+            <label for="s-foot">Words at the bottom of every bill</label><input id="s-foot" @bind="s.ReceiptFooter" maxlength="160" />
+            <label for="s-pay">Ways of paying (separated by commas)</label><input id="s-pay" @bind="payText" maxlength="200" />
+            <label class="check"><input type="checkbox" @bind="s.PricesIncludeTax" /> The prices I type already include tax</label>
+            <label class="check"><input type="checkbox" @bind="s.TaxRegistered" /> My business is registered for @Shop.Country.Tax.Name</label>
+            <label class="check"><input type="checkbox" @bind="s.RoundTotal" /> Round every total to the nearest whole unit</label>
+            <label class="check"><input type="checkbox" @bind="s.AllowNegativeStock" /> Allow selling when the count says there is none left</label>
+        </div>
+        <p class="muted small">Country: <strong>@Shop.Country.Name</strong> (@Shop.CurrencyCode). To use another country, set up a new data folder.</p>
+        <div class="row"><button type="button" class="btn primary" id="save-shop" @onclick="SaveShop">Save</button></div>
+    </section>
+}
+else if (tab == "tax")
+{
+    <section class="card">
+        <h2>Tax rates in @Shop.Country.Name</h2>
+        @if (Shop.Country.IsReviewed)
+        {
+            <p class="muted">These rules were checked by @Shop.Country.Review.By on @Shop.Country.Review.On.</p>
+        }
+        else
+        {
+            <div class="notice warn">The tax rules for @Shop.Country.Name in this program (as of @Shop.Country.AsOf) have <strong>not been checked by a local tax adviser</strong>. Rates change: confirm them with your accountant, and correct any below.</div>
+        }
+        @foreach (var note in Shop.Country.Notes ?? new List<string>()) { <p class="muted small">@note</p> }
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Code</th><th>Name</th><th class="num">Rate (%)</th></tr></thead>
+            <tbody>
+            @foreach (var rate in Shop.Country.Tax.Rates.Where(r => r.Percent != null && !r.Legacy && (r.Taxable || !r.Zero && !r.Exempt)))
+            {
+                var key = rate.Code;
+                <tr>
+                    <td>@rate.Code</td><td>@rate.Label</td>
+                    <td class="num"><input class="qty" inputmode="decimal" aria-label="Rate of @rate.Label" value="@RateValue(key, rate.Percent)" @onchange="e => SetRate(key, e)" /></td>
+                </tr>
+            }
+            @foreach (var part in RegionParts())
+            {
+                <tr>
+                    <td>@part.Region</td><td>@part.Name</td>
+                    <td class="num"><input class="qty" inputmode="decimal" aria-label="@part.Name" value="@PartValue(part.Key, part.Percent)" @onchange="e => SetPart(part.Key, e)" /></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="save-tax" @onclick="SaveTax">Save the rates</button><button type="button" class="btn secondary" @onclick="ResetTax">Go back to the program's rates</button></div>
+    </section>
+}
+else if (tab == "parts")
+{
+    <section class="card">
+        <h2>Parts of the program</h2>
+        <p class="muted">Switch off what you do not use. The screens and menus follow.</p>
+        <div class="stack">
+            @foreach (var f in FeatureList())
+            {
+                var name = f.Key;
+                <label class="check"><input type="checkbox" checked="@features[name]" @onchange="e => SetFeature(name, e)" /> @f.Label</label>
+            }
+        </div>
+        <h2>Words</h2>
+        <p class="muted">Change a word to the one your customers use. Leave empty to keep the program's.</p>
+        @foreach (var w in words)
+        {
+            <div class="field-row">
+                <div><label for="w-@w.Term-s">@Shop.Industry.Singular(w.Term) (one)</label><input id="w-@w.Term-s" @bind="w.One" maxlength="30" /></div>
+                <div><label for="w-@w.Term-p">@Shop.Industry.Plural(w.Term) (many)</label><input id="w-@w.Term-p" @bind="w.Many" maxlength="30" /></div>
+            </div>
+        }
+        <div class="row"><button type="button" class="btn primary" id="save-parts" @onclick="SaveParts">Save</button></div>
+    </section>
+}
+else if (tab == "look")
+{
+    <section class="card">
+        <h2>Look</h2>
+        @if (Brand.WhiteLevel == "none")
+        {
+            <p>Your licence has a fixed look: <strong>@Brand.Name</strong>. It cannot be changed here. If you want your own colours or logo, ask the company you bought it from for a licence that allows it.</p>
+        }
+        else
+        {
+            <p class="muted">Your licence lets you change the colours, the logo and the help details@(Brand.WhiteLevel == "full" ? ", and the name of the program" : ""). Changes show on every screen.</p>
+            <div class="stack">
+                <label for="b-file">Got a look file from your supplier? Load it here, then check it and press Save.</label>
+                <InputFile id="b-file" OnChange="LookFileChosen" accept=".json,application/json" />
+                <div class="field-row look-gap">
+                    <div>
+                        <label for="b-main">Main colour</label>
+                        <div class="look-pick">
+                            <input type="color" aria-label="Pick the main colour" value="@Picker(look.PrimaryColor, "#0f6cbd")" @onchange="e => look.PrimaryColor = e.Value?.ToString()" />
+                            <input id="b-main" @bind="look.PrimaryColor" @bind:event="oninput" maxlength="7" placeholder="#0f6cbd" />
+                            <span class="swatch" aria-hidden="true" style="background:@(BrandService.Hex(look.PrimaryColor) ?? "transparent")"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="b-second">Second colour</label>
+                        <div class="look-pick">
+                            <input type="color" aria-label="Pick the second colour" value="@Picker(look.AccentColor, "#f59e0b")" @onchange="e => look.AccentColor = e.Value?.ToString()" />
+                            <input id="b-second" @bind="look.AccentColor" @bind:event="oninput" maxlength="7" placeholder="#f59e0b" />
+                        </div>
+                    </div>
+                </div>
+                <label for="b-logo" class="look-gap">Logo (a PNG or JPEG picture, at most 100 KB)</label>
+                <div class="look-pick wrap">
+                    <InputFile id="b-logo" OnChange="LogoChosen" accept="image/png,image/jpeg" />
+                    @if (!string.IsNullOrEmpty(look.Logo))
+                    {
+                        <img class="brand-logo" src="@look.Logo" alt="Your logo" />
+                        <button type="button" class="btn ghost small nowrap" id="remove-logo" @onclick="() => look.Logo = null">Remove logo</button>
+                    }
+                </div>
+                <div class="field-row look-gap">
+                    <div><label for="b-mail">Help email (shown to your people)</label><input id="b-mail" @bind="look.SupportEmail" maxlength="120" /></div>
+                    <div><label for="b-phone">Help phone</label><input id="b-phone" @bind="look.SupportPhone" maxlength="40" /></div>
+                </div>
+                @if (Brand.WhiteLevel == "full")
+                {
+                    <div class="field-row">
+                        <div><label for="b-name">Name of the program</label><input id="b-name" @bind="look.Name" maxlength="60" /></div>
+                        <div><label for="b-short">Short name</label><input id="b-short" @bind="look.ShortName" maxlength="60" /></div>
+                    </div>
+                    <label class="check"><input type="checkbox" id="b-by" checked="@(look.PoweredBy ?? Brand.By is not null)" @onchange="e => look.PoweredBy = (bool)(e.Value ?? false)" /> Show "by NextGenOS" under the name</label>
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn primary" id="save-look" @onclick="SaveLook">Save</button>
+                <button type="button" class="btn secondary" id="reset-look" @onclick="ResetLook">Go back to the standard look</button>
+            </div>
+        }
+    </section>
+    <section class="card" id="layout-card">
+        <h2>Screen and layout</h2>
+        <p class="muted">How the screens are sized and arranged on this PC. A counter with a touch screen works best with big buttons and the menu along the bottom.</p>
+        <div class="stack">
+            <div class="field-row">
+                <div><label for="t-density">Size of buttons and spacing</label>
+                    <select id="t-density" @bind="layout.Density">
+                        <option value="compact">Compact: more on the screen</option>
+                        <option value="comfortable">Comfortable</option>
+                        <option value="touch">Touch screen: big buttons</option>
+                    </select></div>
+                <div><label for="t-scale">Size of the letters</label>
+                    <select id="t-scale" @bind="scaleText">@foreach (var step in Scales) { <option value="@step">@(step)%</option> }</select></div>
+            </div>
+            <div class="field-row">
+                <div><label for="t-nav">Menu</label>
+                    <select id="t-nav" @bind="layout.Nav">
+                        <option value="left">On the left</option>
+                        <option value="top">Along the top</option>
+                        <option value="bottom">Along the bottom</option>
+                    </select></div>
+                <div><label for="t-labels">Menu words</label>
+                    <select id="t-labels" @bind="layout.NavLabels">
+                        <option value="full">Pictures and words</option>
+                        <option value="icons">Pictures only</option>
+                    </select></div>
+            </div>
+            <label for="t-cart">Cart on the sale screen</label>
+            <select id="t-cart" @bind="layout.Cart">
+                <option value="right">On the right</option>
+                <option value="left">On the left</option>
+                <option value="bottom">Below the items</option>
+            </select>
+            @if (Themes.IdentityAllowed)
+            {
+                <h3>Style (your licence allows this)</h3>
+                <div class="field-row">
+                    <div><label for="t-mode">Light or dark</label>
+                        <select id="t-mode" @bind="layout.Mode">
+                            <option value="auto">Follow the PC</option>
+                            <option value="light">Always light</option>
+                            <option value="dark">Always dark</option>
+                        </select></div>
+                    <div><label for="t-surface">Background</label>
+                        <select id="t-surface" @bind="layout.Surface">
+                            <option value="neutral">Neutral</option>
+                            <option value="warm">Warm</option>
+                            <option value="cool">Cool</option>
+                            <option value="paper">Paper</option>
+                        </select></div>
+                </div>
+                <div class="field-row">
+                    <div><label for="t-shape">Corners</label>
+                        <select id="t-shape" @bind="layout.Shape">
+                            <option value="square">Square</option>
+                            <option value="soft">Soft</option>
+                            <option value="rounded">Rounded</option>
+                            <option value="pill">Very round</option>
+                        </select></div>
+                    <div><label for="t-font">Letters</label>
+                        <select id="t-font" @bind="layout.Font">
+                            <option value="system">Your PC's own</option>
+                            <option value="humanist">Friendly</option>
+                            <option value="serif">With serifs</option>
+                            <option value="rounded">Rounded</option>
+                            <option value="mono">Typewriter</option>
+                        </select></div>
+                </div>
+                <label for="t-depth">Shadows</label>
+                <select id="t-depth" @bind="layout.Depth">
+                    <option value="flat">None</option>
+                    <option value="soft">Soft</option>
+                    <option value="lifted">Strong</option>
+                </select>
+            }
+            else
+            {
+                <p class="muted small">Your licence has a fixed style (colours, corners, letters), set by your supplier.</p>
+            }
+        </div>
+        <div class="row">
+            <button type="button" class="btn primary" id="save-theme" @onclick="SaveLayout">Save</button>
+            <button type="button" class="btn secondary" id="reset-theme" @onclick="ResetLayout">Go back to the standard layout</button>
+        </div>
+    </section>
+}
+else if (tab == "printers")
+{
+    <section class="card">
+        <h2>Printers</h2>
+        <p class="muted">Receipt printers, label printers and kitchen printers of any make: the program speaks ESC/POS (nearly all receipt printers), ZPL, TSPL, EPL and CPCL (label printers).</p>
+        @if (printers.Count == 0) { <div class="empty">No printer is set up. Bills can still be printed from the browser.</div> }
+        else
+        {
+            <div class="tbl-wrap"><table class="tbl">
+                <thead><tr><th>Name</th><th>For</th><th>Connected by</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var p in printers)
+                {
+                    <tr>
+                        <td><strong>@p.Name</strong>@if (p.AutoPrint) { <span class="chip ok">Prints every bill</span> }</td>
+                        <td>@RoleLabel(p.Role)@(p.Role == "label" ? " · " + p.Language.ToString().ToUpperInvariant() : "")</td>
+                        <td>@ConnectionLabel(p.Connection): @p.Address</td>
+                        <td class="right nowrap">
+                            <button type="button" class="btn secondary small" @onclick="() => TestPrinter(p)">Test page</button>
+                            <button type="button" class="btn ghost small" @onclick="() => EditPrinter(p)">Edit</button>
+                            <button type="button" class="btn ghost small" @onclick="() => RemovePrinter(p)">Remove</button>
+                        </td>
+                    </tr>
+                }
+                </tbody></table></div>
+        }
+        <div class="row"><button type="button" class="btn primary" id="add-printer" @onclick="NewPrinter">Add a printer</button></div>
+    </section>
+    @if (printer is not null)
+    {
+        <div class="sheet-back" @onclick="() => printer = null">
+            <div class="sheet" role="dialog" aria-modal="true" aria-label="Printer" @onclick:stopPropagation="true">
+                <h2>@(printerIsNew ? "Add a printer" : "Printer")</h2>
+                <Notice Error="@formError" />
+                <div class="stack">
+                    <label for="pr-name">Name</label><input id="pr-name" @bind="printer.Name" maxlength="40" placeholder="Counter, Bar, Shelf labels" />
+                    <label for="pr-role">It prints</label>
+                    <select id="pr-role" @bind="printer.Role" @bind:after="RoleChanged">
+                        <option value="receipt">Bills and receipts</option>
+                        <option value="label">Labels and price tags</option>
+                        @if (Shop.Features.Kitchen) { <option value="kitchen">Orders for the kitchen or bar</option> }
+                    </select>
+                    @if (printer.Role == "label")
+                    {
+                        <label for="pr-lang">Language of the label printer</label>
+                        <select id="pr-lang" @bind="printer.Language">
+                            <option value="Zpl">ZPL (Zebra and many others)</option>
+                            <option value="Tspl">TSPL (TSC, Xprinter, Gprinter, many low-cost makes)</option>
+                            <option value="Epl">EPL (older Zebra and Eltron)</option>
+                            <option value="Cpcl">CPCL (mobile and Bluetooth label printers)</option>
+                        </select>
+                        <p class="muted small">Not sure? The manual of the printer names the language. Most shop label printers sold now speak TSPL or ZPL.</p>
+                    }
+                    <label for="pr-conn">Connected by</label>
+                    <select id="pr-conn" @bind="printer.Connection" @bind:after="ConnectionChanged">
+                        <option value="network">Network (an address like 192.168.1.50)</option>
+                        <option value="serial">USB or Bluetooth that shows up as a port (COM4, /dev/rfcomm0)</option>
+                        <option value="device">USB printer file (/dev/usb/lp0)</option>
+                        <option value="queue">Print queue of this computer (Linux and Mac)</option>
+                        <option value="spooler">Printer installed in Windows</option>
+                    </select>
+                    <label for="pr-addr">@AddressLabel()</label>
+                    <input id="pr-addr" @bind="printer.Address" maxlength="200" list="found" autocomplete="off" />
+                    <datalist id="found">@foreach (var d in found.Where(d => d.Connection == printer.Connection)) { <option value="@d.Address">@d.Label</option> }</datalist>
+                    <div class="row"><button type="button" class="btn ghost small" @onclick="Detect">Find printers on this computer</button><span class="muted small">@(found.Count == 0 ? "" : found.Count + " found")</span></div>
+                    @if (found.Count > 0)
+                    {
+                        <div class="chips">@foreach (var d in found) { <button type="button" @onclick="() => Pick(d)">@d.Label</button> }</div>
+                    }
+                    @if (printer.Connection == "serial")
+                    {
+                        <label for="pr-baud">Speed of the port (baud)</label>
+                        <select id="pr-baud" @bind="printer.BaudRate">@foreach (var b in new[] { 9600, 19200, 38400, 57600, 115200 }) { <option value="@b">@b</option> }</select>
+                    }
+                    @if (printer.Role != "label")
+                    {
+                        <label for="pr-paper">Paper</label>
+                        <select id="pr-paper" @bind="paper">
+                            <option value="58">58 mm (small receipts)</option>
+                            <option value="80">80 mm (usual receipts)</option>
+                            <option value="80w">80 mm, small print (48 characters)</option>
+                        </select>
+                        <label for="pr-code">Character set</label>
+                        <select id="pr-code" @bind="printer.CodePage">
+                            <option value="Pc858">Western European with euro (PC858): the usual choice</option>
+                            <option value="Pc437">US (PC437)</option>
+                            <option value="Pc850">Western European (PC850)</option>
+                            <option value="Wpc1252">Windows Western (1252)</option>
+                            <option value="Pc852">Central European (PC852)</option>
+                            <option value="Pc866">Cyrillic (PC866)</option>
+                        </select>
+                        <p class="muted small">Letters the printer cannot write (other alphabets, Chinese, Japanese, Korean) are printed as pictures, so any language works.</p>
+                        <label class="check"><input type="checkbox" @bind="printer.Cut" /> Cut the paper after each bill</label>
+                        @if (printer.Role == "receipt")
+                        {
+                            <label class="check"><input type="checkbox" @bind="printer.OpenDrawer" /> Open the cash drawer (connected to this printer) with each bill</label>
+                            <label class="check"><input type="checkbox" @bind="printer.AutoPrint" /> Print every finished bill by itself</label>
+                        }
+                        else
+                        {
+                            <label for="pr-station">Prints the orders of</label>
+                            <input id="pr-station" @bind="printer.Station" maxlength="30" placeholder="Kitchen, Bar (empty for everything)" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="field-row">
+                            <div><label for="pr-w">Label width (mm)</label><input id="pr-w" type="number" step="0.5" @bind="printer.LabelWidthMm" /></div>
+                            <div><label for="pr-h">Label height (mm)</label><input id="pr-h" type="number" step="0.5" @bind="printer.LabelHeightMm" /></div>
+                            <div><label for="pr-gap">Gap between labels (mm)</label><input id="pr-gap" type="number" step="0.5" @bind="printer.LabelGapMm" /></div>
+                            <div><label for="pr-dpi">Detail (dots per inch)</label><select id="pr-dpi" @bind="printer.Dpi"><option value="203">203 (usual)</option><option value="300">300</option><option value="600">600</option></select></div>
+                        </div>
+                    }
+                </div>
+                <div class="row">
+                    <button type="button" class="btn secondary" @onclick="() => printer = null">Cancel</button>
+                    <button type="button" class="btn primary grow" id="save-printer" @onclick="SavePrinter">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+else if (tab == "users")
+{
+    <section class="card">
+        <h2>People who sign in</h2>
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Name</th><th>User name</th><th>Role</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in users)
+            {
+                <tr>
+                    <td><strong>@u.DisplayName</strong>@if (!u.Active) { <span class="chip">Off</span> }</td>
+                    <td>@u.Username</td>
+                    <td>
+                        <select aria-label="Role of @u.DisplayName" value="@u.Role" @onchange="e => ChangeRole(u, e.Value?.ToString())">
+                            @foreach (var r in Roles.All) { <option value="@r">@Roles.Label(r)</option> }
+                        </select>
+                    </td>
+                    <td class="right nowrap">
+                        <button type="button" class="btn ghost small" @onclick="() => ToggleUser(u)">@(u.Active ? "Switch off" : "Switch on")</button>
+                        <button type="button" class="btn ghost small" @onclick="() => resetFor = u">New password</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    </section>
+    <section class="card">
+        <h2>Add a person</h2>
+        <div class="field-row">
+            <div><label for="u-name">Name</label><input id="u-name" @bind="newName" maxlength="60" /></div>
+            <div><label for="u-user">User name</label><input id="u-user" @bind="newUser" maxlength="40" autocomplete="off" autocapitalize="none" /></div>
+            <div><label for="u-role">Role</label><select id="u-role" @bind="newRole">@foreach (var r in Roles.All.Where(r => r != Roles.Owner)) { <option value="@r">@Roles.Label(r)</option> }</select></div>
+            <div><label for="u-pass">Password</label><input id="u-pass" type="password" @bind="newPass" autocomplete="new-password" /></div>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="add-user" @onclick="AddUser">Add</button></div>
+        <p class="muted small">Cashiers can sell and look people up. Managers can also change items and see reports. Only owners change settings and add people.</p>
+    </section>
+    @if (resetFor is not null)
+    {
+        <div class="sheet-back" @onclick="() => resetFor = null">
+            <div class="sheet" role="dialog" aria-modal="true" aria-label="New password" @onclick:stopPropagation="true">
+                <h2>New password for @resetFor.DisplayName</h2>
+                <Notice Error="@formError" />
+                <label for="np">New password</label><input id="np" type="password" @bind="resetPass" autocomplete="new-password" />
+                <div class="row"><button type="button" class="btn secondary" @onclick="() => resetFor = null">Cancel</button><button type="button" class="btn primary grow" @onclick="ResetPassword">Save</button></div>
+            </div>
+        </div>
+    }
+}
+else if (tab == "licence")
+{
+    var state = Licence.State;
+    <section class="card">
+        <h2>Licence</h2>
+        <dl class="facts">
+            <dt>Status</dt><dd><span class="chip @(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "ok" : "warn")">@(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : state.IsUsable ? "Active, please connect to the internet soon" : "Not active")</span></dd>
+            @if (state.Licence is { } claims)
+            {
+                <dt>Licensed to</dt><dd>@(claims.Customer?.Name ?? "")</dd>
+                <dt>Edition</dt><dd>@claims.Edition</dd>
+                <dt>Parts</dt><dd>@string.Join(", ", claims.Modules ?? new List<string>())</dd>
+                @if (state.ExpiresUtc is { } until) { <dt>Valid until</dt><dd>@until.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</dd> }
+                else { <dt>Valid until</dt><dd>No end date</dd> }
+            }
+        </dl>
+        <p class="muted">@state.Message</p>
+        <div class="row"><button type="button" class="btn secondary" @onclick="RecheckLicence">Check again</button></div>
+        <p class="muted small">Need help or a new licence? @(brandHelp())</p>
+    </section>
+}
+else if (tab == "activity")
+{
+    <section class="card">
+        <h2>What people did</h2>
+        <p class="muted small">Voided bills, stock changes by hand, changed settings and sign-ins: kept for you, and never changed.</p>
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+            <tbody>@foreach (var a in App.Audit.Recent(100)) { <tr><td class="nowrap">@When(a.At)</td><td>@(a.Who ?? "")</td><td>@a.Action</td><td>@a.Detail</td></tr> }</tbody>
+        </table>
+        </div>
+    </section>
+}
+
+@code {
+    private string tab = "shop";
+    private NextGenOS.Licensing.LocalBrand look = new();
+    private NextGenOS.Licensing.ThemeSettings layout = new();
+    private string scaleText = "100";
+    private static readonly string[] Scales = { "85", "90", "95", "100", "105", "110", "115", "120", "125", "130", "135" };
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
+    [SupplyParameterFromQuery(Name = "saved")] public string? Saved { get; set; }
+    private ShopSettings s = new();
+    private string payText = "";
+    private readonly Dictionary<string, string> rates = new();
+    private readonly Dictionary<string, string> parts = new();
+    private readonly Dictionary<string, bool> features = new();
+    private sealed class Word { public string Term { get; init; } = ""; public string One { get; set; } = ""; public string Many { get; set; } = ""; }
+    private readonly List<Word> words = new();
+    private IReadOnlyList<User> users = Array.Empty<User>();
+    private string newName = "", newUser = "", newRole = Roles.Cashier, newPass = "", resetPass = "";
+    private User? resetFor;
+    private string? formError;
+
+    private IEnumerable<(string, string)> Tabs()
+    {
+        yield return ("shop", "Business");
+        yield return ("tax", "Tax");
+        yield return ("parts", "Parts and words");
+        yield return ("look", "Look");
+        yield return ("printers", "Printers");
+        if (Me.Can(Perm.Users)) yield return ("users", "People");
+        yield return ("licence", "Licence");
+        yield return ("activity", "Activity");
+    }
+
+    protected override Task LoadAsync()
+    {
+        if (TabName is "look" && !shownTab) { tab = "look"; shownTab = true; if (Saved == "1") Info = "Saved. It shows on every screen."; }
+        look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
+        // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
+        layout = Themes.Current;
+        scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        s = App.Shop.Settings;
+        payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
+        rates.Clear();
+        foreach (var kv in s.RateOverrides) rates[kv.Key] = kv.Value;
+        parts.Clear();
+        foreach (var kv in s.ComponentOverrides) parts[kv.Key] = kv.Value;
+        features.Clear();
+        foreach (var f in FeatureList()) features[f.Key] = FeatureOn(f.Key);
+        words.Clear();
+        foreach (var term in new[] { "customer", "item", "sale", "invoice" })
+        {
+            var has = s.VocabularyOverrides.TryGetValue(term, out var pair) && pair.Length == 2;
+            words.Add(new Word { Term = term, One = has ? pair![0] : "", Many = has ? pair![1] : "" });
+        }
+        users = App.Users.List();
+        printers = App.PrinterProfiles.List();
+        return Task.CompletedTask;
+    }
+
+    private void OpenTab(string key)
+    {
+        tab = key;
+        Error = Info = null;
+        _ = Reload();
+    }
+
+    private bool shownTab;
+
+    private static NextGenOS.Licensing.LocalBrand LocalBrandCopy(NextGenOS.Licensing.LocalBrand b) => NextGenOS.Licensing.LocalBrand.Parse(b.ToJson());
+
+    /// <summary>A colour box needs a full #rrggbb; before one is chosen it shows the standard colour.</summary>
+    private static string Picker(string? chosen, string standard) => BrandService.Hex(chosen) ?? standard;
+
+    private async Task LookFileChosen(InputFileChangeEventArgs e) => await Run(async () =>
+    {
+        var file = e.File;
+        if (file.Size > 250_000) throw new HubException("look-file", "That file is too big to be a look file.");
+        using var reader = new StreamReader(file.OpenReadStream(250_000));
+        var loaded = NextGenOS.Licensing.LocalBrand.Parse(await reader.ReadToEndAsync());
+        if (loaded.IsEmpty) throw new HubException("look-file", "There is no look in that file. Ask for a new one.");
+        // The logo is checked like one chosen here: only a real small PNG or JPEG.
+        if (!string.IsNullOrEmpty(loaded.Logo) && NextGenOS.Hub.Web.Branding.LocalBrandStore.CheckPicture(loaded.Logo) is { } picture) throw new HubException("look-file", picture);
+        look = loaded;
+    }, "Loaded. Look it over, then press Save.");
+
+    private async Task LogoChosen(InputFileChangeEventArgs e) => await Run(async () =>
+    {
+        var file = e.File;
+        if (file.Size > 100_000) throw new HubException("logo", "The logo is too big. Use a picture of at most 100 KB.");
+        using var memory = new MemoryStream();
+        await using (var stream = file.OpenReadStream(100_000)) await stream.CopyToAsync(memory);
+        var uri = NextGenOS.Hub.Web.Branding.LocalBrandStore.FromBytes(memory.ToArray(), out var problem);
+        if (problem is not null) throw new HubException("logo", problem);   // a refused picture never replaces the logo that is there
+        look.Logo = uri;
+    });
+
+    private Task SaveLayout() => Run(() =>
+    {
+        layout.FontScale = double.TryParse(scaleText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent) ? percent / 100 : 1;
+        // Without the licence's leave for style, only the choices about the screen are kept: a style chosen later (or a profile's) must not be overridden by a default saved here.
+        if (!Themes.IdentityAllowed) { layout.Mode = layout.Surface = layout.Shape = layout.Font = layout.Depth = null; }
+        LocalTheme.Save(layout, Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private Task ResetLayout() => Run(() =>
+    {
+        LocalTheme.Reset(Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private Task SaveLook() => Run(() =>
+    {
+        Looks.Save(look, Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private Task ResetLook() => Run(() =>
+    {
+        Looks.Reset(Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private string brandHelp()
+    {
+        var brand = Brand;
+        var bits = new[] { brand.SupportEmail, brand.SupportPhone }.Where(x => !string.IsNullOrEmpty(x));
+        return bits.Any() ? string.Join(" · ", bits) : "Ask the company you bought it from.";
+    }
+
+    private void RecheckLicence()
+    {
+        Licence.Reload();
+        Info = "Checked.";
+    }
+
+    // ---- business ----------------------------------------------------------------------------------------------------------------
+
+    private Task SaveShop() => Run(() =>
+    {
+        if (string.IsNullOrWhiteSpace(s.Name)) throw new HubException("name-missing", "The business needs a name.");
+        if (!string.IsNullOrWhiteSpace(s.TaxId) && Shop.Country.Tax.BusinessId?.Pattern is { Length: > 0 } pattern)
+        {
+            bool ok;
+            try { ok = Regex.IsMatch(s.TaxId.Trim(), pattern, RegexOptions.None, TimeSpan.FromMilliseconds(200)); } catch (RegexMatchTimeoutException) { ok = false; }
+            if (!ok) throw new HubException("tax-id", $"That does not look like a {Shop.Country.Tax.BusinessId.Label}.");
+        }
+        s.Name = s.Name.Trim();
+        s.TaxId = s.TaxId.Trim().ToUpperInvariant();
+        var methods = payText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(m => m.ToLowerInvariant()).Distinct().ToList();
+        if (methods.Count == 0) throw new HubException("pay", "Please give at least one way of paying.");
+        if (methods.Any(m => m.Length > 20 || m.Any(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '-'))) throw new HubException("pay", "Ways of paying should be short words, like cash, card, upi.");
+        s.PaymentMethods = methods;
+        App.Shop.Save(s);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "business details");
+    }, "Saved.");
+
+    // ---- tax ----------------------------------------------------------------------------------------------------------------------
+
+    private void SetRate(string key, ChangeEventArgs e) => rates[key] = e.Value?.ToString() ?? "";
+
+    private void SetPart(string key, ChangeEventArgs e) => parts[key] = e.Value?.ToString() ?? "";
+
+    private void SetFeature(string key, ChangeEventArgs e) => features[key] = e.Value is true;
+
+    private string RateValue(string code, string original) => rates.TryGetValue(code, out var v) ? v : original;
+
+    private string PartValue(string key, string original) => parts.TryGetValue(key, out var v) ? v : original;
+
+    private record Part(string Key, string Region, string Name, string Percent);
+
+    private IEnumerable<Part> RegionParts()
+    {
+        var region = Shop.Country.Tax.Regions?.List?.FirstOrDefault(r => r.Code == Shop.Settings.Region) ?? (Shop.Country.Tax.Regions?.List is { Count: 1 } one ? one[0] : null);
+        foreach (var c in region?.Components ?? new List<NextGenOS.Tax.RegionComponent>())
+            if (c.Editable) yield return new Part(region!.Code + "/" + c.Name, region.Name, c.Name, c.Percent);
+    }
+
+    private static bool ValidPercent(string text, out string clean)
+    {
+        clean = text.Trim();
+        return decimal.TryParse(clean, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var d) && d >= 0 && d <= 100 && Math.Round(d, 3) == d;
+    }
+
+    private Task SaveTax() => Run(() =>
+    {
+        var next = App.Shop.Settings;
+        next.RateOverrides.Clear();
+        next.ComponentOverrides.Clear();
+        var original = PackOriginal();
+        foreach (var (code, text) in rates)
+        {
+            if (!ValidPercent(text, out var clean)) throw new HubException("rate", $"The rate of {code} should be a number between 0 and 100.");
+            if (original.Tax.Rates.FirstOrDefault(r => r.Code == code)?.Percent != clean) next.RateOverrides[code] = clean;
+        }
+        foreach (var (key, text) in parts)
+        {
+            if (!ValidPercent(text, out var clean)) throw new HubException("rate", $"The rate of {key.Split('/')[1]} should be a number between 0 and 100.");
+            var k = key.Split('/');
+            var was = original.Tax.Regions?.List?.FirstOrDefault(r => r.Code == k[0])?.Components?.FirstOrDefault(c => c.Name == k[1])?.Percent;
+            if (was != clean) next.ComponentOverrides[key] = clean;
+        }
+        App.Shop.Save(next);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "tax rates");
+    }, "The rates are saved. New bills use them; bills already made keep theirs.");
+
+    private NextGenOS.Tax.CountryPack PackOriginal() => NextGenOS.Tax.PackCatalog.Get(Shop.Settings.Country);
+
+    private Task ResetTax() => Run(() =>
+    {
+        var next = App.Shop.Settings;
+        next.RateOverrides.Clear();
+        next.ComponentOverrides.Clear();
+        App.Shop.Save(next);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "tax rates reset");
+        rates.Clear();
+        parts.Clear();
+    }, "Back to the program's rates.");
+
+    // ---- parts and words ----------------------------------------------------------------------------------------------------------
+
+    private record Feature(string Key, string Label);
+
+    private IEnumerable<Feature> FeatureList()
+    {
+        yield return new("counterSale", "Selling over the counter, with barcodes");
+        yield return new("tables", "Tables and orders");
+        yield return new("kitchen", "A kitchen screen");
+        yield return new("lending", "Lending (members, loans, fines)");
+        yield return new("projects", "Projects with progress bills");
+        yield return new("appointments", "Bookings with staff");
+        yield return new("credit", "Selling on credit to some customers");
+        yield return new("purchases", "Buying from suppliers");
+        yield return new("weighedItems", "Items sold by weight or volume");
+    }
+
+    private bool FeatureOn(string name) => name switch
+    {
+        "counterSale" => Shop.Features.CounterSale, "tables" => Shop.Features.Tables, "kitchen" => Shop.Features.Kitchen, "lending" => Shop.Features.Lending,
+        "projects" => Shop.Features.Projects, "appointments" => Shop.Features.Appointments, "credit" => Shop.Features.Credit, "purchases" => Shop.Features.Purchases,
+        "weighedItems" => Shop.Features.WeighedItems, _ => false,
+    };
+
+    private Task SaveParts() => Run(() =>
+    {
+        var next = App.Shop.Settings;
+        next.FeatureOverrides.Clear();
+        var pack = Shop.Industry.Features;
+        foreach (var f in FeatureList())
+        {
+            var packValue = f.Key switch
+            {
+                "counterSale" => pack.CounterSale, "tables" => pack.Tables, "kitchen" => pack.Kitchen, "lending" => pack.Lending, "projects" => pack.Projects, "appointments" => pack.Appointments,
+                "credit" => pack.Credit, "purchases" => pack.Purchases, _ => pack.WeighedItems,
+            };
+            if (features[f.Key] != packValue) next.FeatureOverrides[f.Key] = features[f.Key];
+        }
+        next.VocabularyOverrides.Clear();
+        foreach (var w in words)
+        {
+            var one = w.One.Trim();
+            var many = w.Many.Trim();
+            if (one.Length == 0 && many.Length == 0) continue;
+            if (one.Length == 0 || many.Length == 0) throw new HubException("words", $"Please give both the one and the many word for {Shop.Industry.Singular(w.Term).ToLowerInvariant()}.");
+            if (one.Length > 30 || many.Length > 30) throw new HubException("words", "Words should be short.");
+            next.VocabularyOverrides[w.Term] = new[] { one, many };
+        }
+        App.Shop.Save(next);
+        App.Audit.Log(Me.Id, "settings", "shop", null, "parts and words");
+        Nav.NavigateTo("/settings", forceLoad: true);
+    }, "Saved.");
+
+
+    // ---- printers ------------------------------------------------------------------------------------------------------------------
+
+    private IReadOnlyList<NextGenOS.Devices.Printing.PrinterProfile> printers = Array.Empty<NextGenOS.Devices.Printing.PrinterProfile>();
+    private NextGenOS.Devices.Printing.PrinterProfile? printer;
+    private bool printerIsNew;
+    private string paper = "80";
+    private IReadOnlyList<(string Connection, string Address, string Label)> found = Array.Empty<(string, string, string)>();
+
+    private static string RoleLabel(string role) => role switch { "label" => "Labels", "kitchen" => "Kitchen and bar orders", _ => "Bills and receipts" };
+
+    private static string ConnectionLabel(string c) => c switch { "network" => "Network", "serial" => "Port", "device" => "USB file", "queue" => "Print queue", "spooler" => "Windows printer", _ => c };
+
+    private string AddressLabel() => printer?.Connection switch
+    {
+        "network" => "Address of the printer (for example 192.168.1.50 or 192.168.1.50:9100)",
+        "serial" => "Port (for example COM4)",
+        "device" => "Printer file (for example /dev/usb/lp0)",
+        "queue" => "Name of the print queue",
+        "spooler" => "Name of the printer in Windows",
+        _ => "Where",
+    };
+
+    private void NewPrinter()
+    {
+        printer = new NextGenOS.Devices.Printing.PrinterProfile { Role = "receipt" };
+        printerIsNew = true;
+        paper = "80";
+        formError = null;
+        found = Array.Empty<(string, string, string)>();
+    }
+
+    private void EditPrinter(NextGenOS.Devices.Printing.PrinterProfile p)
+    {
+        printer = JsonClone(p);
+        printerIsNew = false;
+        paper = p.Columns <= 34 ? "58" : p.Columns >= 46 ? "80w" : "80";
+        formError = null;
+        found = Array.Empty<(string, string, string)>();
+    }
+
+    private static NextGenOS.Devices.Printing.PrinterProfile JsonClone(NextGenOS.Devices.Printing.PrinterProfile p) =>
+        System.Text.Json.JsonSerializer.Deserialize<NextGenOS.Devices.Printing.PrinterProfile>(System.Text.Json.JsonSerializer.Serialize(p))!;
+
+    private void RoleChanged()
+    {
+        if (printer is null) return;
+        printer.Language = printer.Role == "label" ? NextGenOS.Devices.Printing.PrinterLanguage.Tspl : NextGenOS.Devices.Printing.PrinterLanguage.EscPos;
+    }
+
+    private void ConnectionChanged()
+    {
+        if (printer is not null) printer.Address = "";
+    }
+
+    private void Detect() => found = NextGenOS.Devices.Transport.PrinterTransports.Discover();
+
+    private void Pick((string Connection, string Address, string Label) d)
+    {
+        printer!.Connection = d.Connection;
+        printer.Address = d.Address;
+    }
+
+    private Task SavePrinter() => Run(() =>
+    {
+        formError = null;
+        try
+        {
+            if (printer is null) return;
+            if (printer.Role != "label")
+            {
+                (printer.Columns, printer.PaperDots) = paper switch { "58" => (32, 384), "80w" => (48, 576), _ => (42, 576) };
+                printer.Language = NextGenOS.Devices.Printing.PrinterLanguage.EscPos;
+            }
+            if (printer.Role != "kitchen") printer.Station = null;
+            if (string.IsNullOrWhiteSpace(printer.Station)) printer.Station = null;
+            App.PrinterProfiles.Save(printer, Me.Id);
+            printer = null;
+            printers = App.PrinterProfiles.List();
+            Info = "Saved. Press “Test page” to see that it prints.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    });
+
+    private Task TestPrinter(NextGenOS.Devices.Printing.PrinterProfile p) => Run(async () =>
+    {
+        await App.Printing.TestAsync(p.Id);
+        Info = $"A test page was sent to {p.Name}.";
+    });
+
+    private Task RemovePrinter(NextGenOS.Devices.Printing.PrinterProfile p) => Run(() =>
+    {
+        App.PrinterProfiles.Remove(p.Id, Me.Id);
+        printers = App.PrinterProfiles.List();
+    }, "Removed.");
+
+    // ---- users ---------------------------------------------------------------------------------------------------------------------
+
+    private Task AddUser() => Run(() =>
+    {
+        App.Users.Create(newUser, newName, newRole, newPass, Me.Id);
+        newName = newUser = newPass = "";
+        users = App.Users.List();
+    }, "Added. Tell them their user name and password.");
+
+    private Task ChangeRole(User u, string? role) => Run(() =>
+    {
+        App.Users.SetRole(u.Id, role ?? u.Role, Me.Id);
+        users = App.Users.List();
+    }, "Role changed. It applies the next time they open a screen.");
+
+    private Task ToggleUser(User u) => Run(() =>
+    {
+        App.Users.SetActive(u.Id, !u.Active, Me.Id);
+        users = App.Users.List();
+    });
+
+    private void ResetPassword()
+    {
+        formError = null;
+        try
+        {
+            App.Users.ChangePassword(resetFor!.Id, resetPass, Me.Id);
+            resetFor = null;
+            resetPass = "";
+            Info = "The password was changed.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

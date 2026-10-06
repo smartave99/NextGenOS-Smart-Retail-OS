@@ -1,0 +1,58 @@
+/*
+ * NextGenOS design tokens: one set of values shared by every app (Licence Studio, Brand Studio, dashboard, storefront).
+ * Consumer feel: calm surfaces, large friendly type, generous space, soft depth, pill buttons, motion that explains.
+ * Enterprise feel: dense tables when needed, visible focus, clear roles, readable status colours, full keyboard use.
+ * A brand kit changes only the --ngos-accent* values (and the font, if the licence allows); everything else follows.
+ */
+:root {
+  /* Accent: replaced by the brand kit */
+  --ngos-accent: #0071e3;
+  --ngos-accent-strong: #0058b0;
+  --ngos-accent-contrast: #ffffff;
+  --ngos-accent-soft: #e8f1fc;
+  --ngos-highlight: #f59e0b;
+
+  /* Surfaces and text (light) */
+  --ngos-bg: #f5f5f7;
+  --ngos-surface: #ffffff;
+  --ngos-surface-2: #fafafc;
+  --ngos-text: #1d1d1f;
+  --ngos-text-2: #6e6e73;
+  --ngos-line: rgba(0, 0, 0, 0.09);
+  --ngos-line-strong: rgba(0, 0, 0, 0.18);
+
+  /* Status */
+  --ngos-ok: #1f7a3d; --ngos-ok-bg: #e6f4ea;
+  --ngos-warn: #8a5a00; --ngos-warn-bg: #fdf1d6;
+  --ngos-bad: #b3261e; --ngos-bad-bg: #fbe7e5;
+
+  /* Type: the system font of each platform (San Francisco on Apple, Segoe UI Variable on Windows) */
+  --ngos-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --ngos-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Shape, depth, space, motion */
+  --ngos-radius-sm: 10px; --ngos-radius: 16px; --ngos-radius-lg: 22px; --ngos-pill: 999px;
+  --ngos-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --ngos-shadow-2: 0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --ngos-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ngos-dur: 180ms;
+  --ngos-tap: 44px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ngos-accent: #2997ff; --ngos-accent-strong: #64b5ff; --ngos-accent-contrast: #00111f; --ngos-accent-soft: #0b2540;
+    --ngos-bg: #000000; --ngos-surface: #1c1c1e; --ngos-surface-2: #242426;
+    --ngos-text: #f5f5f7; --ngos-text-2: #98989d; --ngos-line: rgba(255, 255, 255, 0.12); --ngos-line-strong: rgba(255, 255, 255, 0.24);
+    --ngos-ok: #5ad19a; --ngos-ok-bg: #0f2f22; --ngos-warn: #f2b84b; --ngos-warn-bg: #33270b; --ngos-bad: #ff8a80; --ngos-bad-bg: #3a1613;
+    --ngos-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5); --ngos-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  --ngos-accent: #2997ff; --ngos-accent-strong: #64b5ff; --ngos-accent-contrast: #00111f; --ngos-accent-soft: #0b2540;
+  --ngos-bg: #000000; --ngos-surface: #1c1c1e; --ngos-surface-2: #242426;
+  --ngos-text: #f5f5f7; --ngos-text-2: #98989d; --ngos-line: rgba(255, 255, 255, 0.12); --ngos-line-strong: rgba(255, 255, 255, 0.24);
+  --ngos-ok: #5ad19a; --ngos-ok-bg: #0f2f22; --ngos-warn: #f2b84b; --ngos-warn-bg: #33270b; --ngos-bad: #ff8a80; --ngos-bad-bg: #3a1613;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --ngos-dur: 0ms; }
+}

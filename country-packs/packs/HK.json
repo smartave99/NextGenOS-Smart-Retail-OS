@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "country": "HK",
+  "name": "Hong Kong",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "HKD",
+    "symbol": "HK$",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-HK",
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "timezone": "Asia/Hong_Kong",
+  "phoneCode": "+852",
+  "fiscalYearStart": {
+    "month": 4,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "Tax",
+    "model": "none",
+    "pricesIncludeTaxDefault": false,
+    "rates": [
+      {
+        "code": "NONE",
+        "label": "No sales tax",
+        "percent": "0"
+      }
+    ],
+    "classes": {
+      "standard": "NONE",
+      "zero": "NONE"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Receipt",
+    "requiredFields": [
+      "Seller name and address",
+      "Date",
+      "Description and price of each item"
+    ],
+    "eInvoice": null,
+    "retentionYears": 7
+  },
+  "notes": [
+    "Hong Kong has no sales tax or VAT."
+  ]
+}

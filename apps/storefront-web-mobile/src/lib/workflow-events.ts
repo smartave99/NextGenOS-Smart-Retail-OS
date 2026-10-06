@@ -1,5 +1,8 @@
 import "server-only";
 
+/** Who sent the event: the product, not a customer (the shop is named in the data it sends). */
+export const WORKFLOW_SOURCE = "smart-retail-pos" as const;
+
 export type WorkflowEventType =
     | "product.created"
     | "product.updated"
@@ -12,7 +15,7 @@ interface WorkflowEvent<T extends Record<string, unknown>> {
     id: string;
     type: WorkflowEventType;
     occurredAt: string;
-    source: "smart-avenue";
+    source: typeof WORKFLOW_SOURCE;
     data: T;
 }
 
@@ -27,7 +30,7 @@ export async function emitWorkflowEvent<T extends Record<string, unknown>>(
         id: crypto.randomUUID(),
         type,
         occurredAt: new Date().toISOString(),
-        source: "smart-avenue",
+        source: WORKFLOW_SOURCE,
         data,
     };
 

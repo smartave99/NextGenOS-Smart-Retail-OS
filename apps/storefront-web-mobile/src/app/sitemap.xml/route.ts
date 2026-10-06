@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getProducts, getCategories, getDepartments } from "@/app/actions";
+import { SITE_URL } from "@/lib/site-url";
 
 export const revalidate = 3600; // Cache sitemap for 1 hour
 
 export async function GET() {
-    const baseUrl = "https://smartavenue99.com";
+    const baseUrl = SITE_URL;
 
     try {
         const [products, categories, departments] = await Promise.all([

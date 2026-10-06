@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { getSiteConfig } from "@/app/actions/site-config";
+import { SITE_URL } from "@/lib/site-url";
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
     const config = await getSiteConfig();
@@ -10,6 +11,6 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
             allow: config.system.maintenanceMode ? "/admin" : "/",
             disallow: config.system.maintenanceMode ? "/" : "/admin/",
         },
-        sitemap: "https://smartavenue99.com/sitemap.xml",
+        sitemap: `${SITE_URL}/sitemap.xml`,
     };
 }

@@ -1,0 +1,443 @@
+@page "/items"
+@attribute [Authorize(Policy = Perm.Catalog)]
+@inherits HubPage
+
+<PageTitle>@Shop.Plural("item")</PageTitle>
+<h1>@Shop.Plural("item")</h1>
+<p class="sub">@(lending ? "Titles in the catalogue, and how many copies of each." : "What you sell, with its price, tax and stock.")</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Search" aria-label="Search" @bind="text" @bind:event="oninput" @onkeydown="SearchKey" />
+    <select class="narrow" aria-label="Kind" @bind="kind" @bind:after="Find">
+        <option value="">All kinds</option>
+        @foreach (var k in Shop.Industry.ItemKinds)
+        {
+            <option value="@k.Id">@k.Label</option>
+        }
+    </select>
+    @if (stocked)
+    {
+        <label class="check"><input type="checkbox" @bind="lowOnly" @bind:after="Find" /> Running low</label>
+    }
+    <span class="spacer"></span>
+    @if (Me.Can(Perm.Catalog))
+    {
+        <button type="button" class="btn primary" id="add-item" @onclick="NewItem">Add @Shop.Singular("item").ToLowerInvariant()</button>
+    }
+</div>
+
+<div class="card tbl-wrap">
+    @if (rows.Count == 0)
+    {
+        <div class="empty">Nothing here yet. Press “Add @Shop.Singular("item").ToLowerInvariant()”.</div>
+    }
+    else
+    {
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>Name</th><th>Kind</th><th>Category</th>
+                    <th class="num">Price</th>
+                    @if (stocked) { <th class="num">@(lending ? "Copies" : "In stock")</th> }
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td><strong>@r.Item.Name</strong>@if (!r.Item.Active) { <span class="chip">Not sold</span> }@if (r.Item.Barcode is { } b) { <br /><span class="muted small">@b</span> }</td>
+                    <td>@KindLabel(r.Item.Kind)</td>
+                    <td>@r.Item.Category</td>
+                    <td class="num">@(lending ? "" : Money(r.Item.PriceMinor))</td>
+                    @if (stocked)
+                    {
+                        <td class="num">
+                            @if (lending) { <span>@r.Available of @r.OnHand</span> }
+                            else if (r.Item.TrackStock) { <span class="@(r.OnHand <= r.Item.ReorderMilli && r.Item.ReorderMilli > 0 ? "chip warn" : "")">@Qty(r.OnHand) @r.Item.Unit</span> }
+                        </td>
+                    }
+                    <td class="right nowrap">
+                        <button type="button" class="btn ghost small" @onclick="() => Edit(r.Item)">Edit</button>
+                        @if (lending && Me.Can(Perm.Catalog)) { <button type="button" class="btn ghost small" @onclick="() => AddCopies(r.Item)">Copies</button> }
+                        else if (r.Item.TrackStock && Me.Can(Perm.Stock)) { <button type="button" class="btn ghost small" @onclick="() => OpenStock(r.Item)">Stock</button> }
+                        @if (!lending && labelPrinters.Count > 0) { <button type="button" class="btn ghost small" @onclick="() => OpenLabels(r.Item)">Labels</button> }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (form is not null)
+{
+    <div class="sheet-back" @onclick="() => form = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="@(editing is null ? "New" : "Edit") @Shop.Singular("item").ToLowerInvariant()" @onclick:stopPropagation="true">
+            <h2>@(editing is null ? "New " : "Edit ")@Shop.Singular("item").ToLowerInvariant()</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                @if (!lending)
+                {
+                    <label for="f-kind">Kind</label>
+                    <select id="f-kind" @bind="form.Kind">
+                        @foreach (var k in Shop.Industry.ItemKinds) { <option value="@k.Id">@k.Label</option> }
+                    </select>
+                }
+                <label for="f-name">@(lending ? "Title" : "Name")</label>
+                <input id="f-name" @bind="form.Name" maxlength="120" />
+                @if (lending)
+                {
+                    <label for="f-author">Author</label>
+                    <input id="f-author" @bind="author" maxlength="120" />
+                    <label for="f-isbn">ISBN (optional)</label>
+                    <input id="f-isbn" @bind="isbn" maxlength="20" inputmode="numeric" />
+                    @if (editing is null)
+                    {
+                        <label for="f-copies">Copies to add</label>
+                        <input id="f-copies" type="number" min="1" max="500" @bind="copies" />
+                    }
+                }
+                <label for="f-cat">Category</label>
+                <input id="f-cat" @bind="form.Category" maxlength="60" list="cats" />
+                <datalist id="cats">@foreach (var c in App.Catalog.Categories()) { <option value="@c"></option> }</datalist>
+                @if (!lending)
+                {
+                    <div class="field-row">
+                        <div>
+                            <label for="f-price">Price (@Shop.CurrencyCode)</label>
+                            <input id="f-price" inputmode="decimal" @bind="price" />
+                        </div>
+                        @if (Shop.Industry.RuleText("tradePriceLabel", "") is { Length: > 0 } tradeLabel)
+                        {
+                            <div>
+                                <label for="f-trade">@tradeLabel</label>
+                                <input id="f-trade" inputmode="decimal" @bind="tradePrice" />
+                            </div>
+                        }
+                        <div>
+                            <label for="f-unit">Sold by</label>
+                            <input id="f-unit" @bind="form.Unit" maxlength="20" list="units" />
+                            <datalist id="units">@foreach (var u in new[] { "pc", "kg", "g", "L", "pack", "box", "hour", "day", "job" }) { <option value="@u"></option> }</datalist>
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div>
+                            <label for="f-tax">Tax</label>
+                            <select id="f-tax" @bind="form.TaxClass">
+                                @foreach (var c in Shop.TaxClasses()) { <option value="@c">@ClassLabel(c)</option> }
+                            </select>
+                        </div>
+                        <div>
+                            <label for="f-bar">Barcode</label>
+                            <input id="f-bar" @bind="form.Barcode" maxlength="40" autocomplete="off" />
+                            <div class="row"><button type="button" class="btn ghost small" id="make-barcode" @onclick="MakeBarcode">Make a number for me</button><CameraScan Id="cam-item" Label="Scan it" OnScanned="BarcodeFromCamera" /></div>
+                        </div>
+                    </div>
+                    @if (Kind(form.Kind)?.TracksStock == true || Shop.Industry.Features.StockTracking != "never")
+                    {
+                        <div class="field-row">
+                            <div>
+                                <label for="f-cost">Cost price</label>
+                                <input id="f-cost" inputmode="decimal" @bind="cost" />
+                            </div>
+                            <div>
+                                <label for="f-reorder">Tell me when below</label>
+                                <input id="f-reorder" inputmode="decimal" @bind="reorder" />
+                            </div>
+                        </div>
+                        <label class="check"><input type="checkbox" @bind="track" /> Keep count of how many I have</label>
+                    }
+                    @if (Kind(form.Kind)?.HasDuration == true)
+                    {
+                        <label for="f-dur">Takes (minutes)</label>
+                        <input id="f-dur" type="number" min="5" max="1440" step="5" @bind="duration" />
+                    }
+                    @if (Shop.Features.Kitchen && form.Kind == "menu")
+                    {
+                        <label for="f-station">Made at</label>
+                        <select id="f-station" @bind="form.Station">
+                            @foreach (var s in Stations()) { <option value="@s">@s</option> }
+                        </select>
+                    }
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-item" @onclick="Save">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (stockItem is not null)
+{
+    <div class="sheet-back" @onclick="() => stockItem = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Stock of @stockItem.Name" @onclick:stopPropagation="true">
+            <h2>Stock: @stockItem.Name</h2>
+            <p>Now: <strong>@Qty(App.Catalog.OnHandMilli(stockItem.Id)) @stockItem.Unit</strong></p>
+            <Notice Error="@formError" />
+            <label for="s-delta">Add (or take off with a minus)</label>
+            <input id="s-delta" inputmode="decimal" @bind="delta" placeholder="for example 20 or -3" />
+            <label for="s-why">Why</label>
+            <select id="s-why" @bind="why">
+                <option value="delivery">Delivery received</option>
+                <option value="count">Stock count</option>
+                <option value="damaged">Damaged or expired</option>
+                <option value="other">Other</option>
+            </select>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => stockItem = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-stock" @onclick="SaveStock">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (labelFor is not null)
+{
+    <div class="sheet-back" @onclick="() => labelFor = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Print labels" @onclick:stopPropagation="true">
+            <h2>Labels for @labelFor.Name</h2>
+            <Notice Error="@formError" />
+            @if (string.IsNullOrWhiteSpace(labelFor.Barcode)) { <p class="muted">This item has no barcode, so the label will show only its name and price. Edit the item and press “Make a number for me” to give it one.</p> }
+            <label for="lb-copies">How many labels</label>
+            <input id="lb-copies" type="number" min="1" max="500" @bind="labelCopies" />
+            @if (labelPrinters.Count > 1)
+            {
+                <label for="lb-printer">Printer</label>
+                <select id="lb-printer" @bind="labelPrinterId">@foreach (var p in labelPrinters) { <option value="@p.Id">@p.Name</option> }</select>
+            }
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => labelFor = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="print-labels" @onclick="PrintLabels">Print</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (copiesFor is not null)
+{
+    <div class="sheet-back" @onclick="() => copiesFor = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Copies of @copiesFor.Name" @onclick:stopPropagation="true">
+            <h2>Copies of @copiesFor.Name</h2>
+            <Notice Error="@formError" />
+            <table class="tbl" id="copies">
+                <thead><tr><th>Barcode</th><th>State</th></tr></thead>
+                <tbody>@foreach (var c in App.Library.CopiesOf(copiesFor.Id)) { <tr><td>@c.Barcode</td><td><span class="chip @(c.Status == "available" ? "ok" : "")">@c.Status</span></td></tr> }</tbody>
+            </table>
+            <label for="c-n">Add more copies</label>
+            <input id="c-n" type="number" min="1" max="500" @bind="copies" />
+            <p class="muted small">Each copy gets its own barcode, which you stick on the book.</p>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => copiesFor = null">Close</button>
+                <button type="button" class="btn primary grow" id="save-copies" @onclick="SaveCopies">Add the copies</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private record Row(Item Item, long OnHand, int Available);
+
+    private string text = "";
+    private string kind = "";
+    private bool lowOnly;
+    private IReadOnlyList<Row> rows = Array.Empty<Row>();
+    private ItemInput? form;
+    private Item? editing;
+    private Item? stockItem;
+    private Item? copiesFor;
+    private string? formError;
+    private string price = "", tradePrice = "", cost = "", reorder = "", delta = "", why = "delivery";
+    private string author = "", isbn = "";
+    private int copies = 1;
+    private int? duration;
+    private bool track;
+
+    private Item? labelFor;
+    private int labelCopies = 1;
+    private string labelPrinterId = "";
+    private IReadOnlyList<NextGenOS.Devices.Printing.PrinterProfile> labelPrinters = Array.Empty<NextGenOS.Devices.Printing.PrinterProfile>();
+
+    private void OpenLabels(Item item)
+    {
+        labelFor = item;
+        labelCopies = 1;
+        formError = null;
+        labelPrinterId = labelPrinters.FirstOrDefault()?.Id ?? "";
+    }
+
+    private Task PrintLabels() => Run(async () =>
+    {
+        formError = null;
+        try
+        {
+            await App.Printing.PrintLabelsAsync(labelFor!.Id, labelCopies, labelPrinterId.Length > 0 ? labelPrinterId : null, Me.Id);
+            labelFor = null;
+            Info = "Sent to the label printer.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    });
+
+    private void MakeBarcode() => form!.Barcode = App.Printing.NewBarcode();
+
+    private void BarcodeFromCamera(string code) => form!.Barcode = code;
+
+    private bool lending => Shop.Features.Lending;
+    private bool stocked => lending || Shop.Industry.Features.StockTracking != "never";
+
+    protected override Task LoadAsync()
+    {
+        labelPrinters = App.PrinterProfiles.List().Where(p => p.Role == "label").ToList();
+        Find();
+        return Task.CompletedTask;
+    }
+
+    private void SearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Find();
+    }
+
+    private ItemKind? Kind(string id) => Shop.Industry.ItemKinds.FirstOrDefault(k => k.Id == id);
+
+    private string KindLabel(string id) => Kind(id)?.Label ?? id;
+
+    private static string ClassLabel(string c) => c switch { "standard" => "Standard rate", "reduced" => "Reduced rate", "zero" => "Zero rate", "exempt" => "Exempt", _ => c };
+
+    private IEnumerable<string> Stations() => Shop.Industry.Rules.ValueKind == System.Text.Json.JsonValueKind.Object && Shop.Industry.Rules.TryGetProperty("stations", out var s)
+        ? s.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0) : new[] { "Kitchen" };
+
+    private void Find()
+    {
+        var items = App.Catalog.Search(string.IsNullOrWhiteSpace(text) ? null : text, string.IsNullOrEmpty(kind) ? null : kind, null, 300, true);
+        var list = items.Select(i => new Row(i, i.TrackStock ? App.Catalog.OnHandMilli(i.Id) : 0, lending ? App.Library.AvailableCopies(i.Id) : 0)).ToList();
+        if (lending) list = list.Select(r => r with { OnHand = App.Library.CopiesOf(r.Item.Id).Count(c => c.Status != "withdrawn") }).ToList();
+        if (lowOnly) list = list.Where(r => r.Item.TrackStock && r.OnHand <= (r.Item.ReorderMilli > 0 ? r.Item.ReorderMilli : 5000)).ToList();
+        rows = list;
+    }
+
+    private void NewItem()
+    {
+        editing = null;
+        formError = null;
+        var first = Shop.Industry.ItemKinds.FirstOrDefault();
+        form = new ItemInput { Kind = first?.Id ?? "stock", TaxClass = "standard", Unit = "pc", Station = Stations().First() };
+        price = tradePrice = cost = reorder = "";
+        author = isbn = "";
+        copies = 1;
+        duration = first?.HasDuration == true ? 30 : null;
+        track = first?.TracksStock == true && Shop.Industry.Features.StockTracking == "always";
+    }
+
+    private void Edit(Item i)
+    {
+        editing = i;
+        formError = null;
+        form = new ItemInput { Kind = i.Kind, Sku = i.Sku, Barcode = i.Barcode, Name = i.Name, Category = i.Category, Unit = i.Unit, TaxClass = i.TaxCode, Station = i.Station ?? Stations().First() };
+        price = Shop.Text(i.PriceMinor);
+        tradePrice = i.TradePriceMinor is { } t ? Shop.Text(t) : "";
+        cost = Shop.Text(i.CostMinor);
+        reorder = i.ReorderMilli > 0 ? Qty(i.ReorderMilli) : "";
+        track = i.TrackStock;
+        duration = i.DurationMin;
+        author = i.Attrs.GetValueOrDefault("author") ?? "";
+        isbn = i.Attrs.GetValueOrDefault("isbn") ?? "";
+    }
+
+    private string TaxLabelFor(string code) => code;
+
+    private void Save()
+    {
+        formError = null;
+        try
+        {
+            if (form is null) return;
+            if (lending)
+            {
+                if (editing is null)
+                {
+                    var title = App.Library.AddTitle(form.Name, author, isbn, form.Category);
+                    if (copies > 0) App.Library.AddCopies(title.Id, Math.Clamp(copies, 1, 500));
+                }
+                else
+                {
+                    form.Attrs["author"] = author;
+                    form.Attrs["isbn"] = isbn;
+                    App.Catalog.Update(editing.Id, form);
+                }
+            }
+            else
+            {
+                form.PriceMinor = Money(price, "price");
+                form.TradePriceMinor = tradePrice.Trim().Length > 0 ? Money(tradePrice, "trade price") : null;
+                form.CostMinor = cost.Trim().Length > 0 ? Money(cost, "cost price") : 0;
+                form.ReorderMilli = reorder.Trim().Length > 0 ? QtyOf(reorder) : 0;
+                form.TrackStock = track;
+                form.DurationMin = Kind(form.Kind)?.HasDuration == true ? duration : null;
+                if (string.IsNullOrWhiteSpace(form.Barcode)) form.Barcode = null;
+                if (editing is null) App.Catalog.Create(form); else App.Catalog.Update(editing.Id, form);
+            }
+            form = null;
+            Find();
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private long Money(string value, string what)
+    {
+        if (!TryMoney(Shop, value, out var m) || m < 0) throw new HubException("amount", $"Please type the {what} as a number, like 250 or 99.50.");
+        return m;
+    }
+
+    private static long QtyOf(string value)
+    {
+        try { return ShopContext.QtyMilli(value.Trim()); }
+        catch (FormatException) { throw new HubException("qty", "Please type a number, like 5 or 2.5."); }
+    }
+
+    private void OpenStock(Item i)
+    {
+        stockItem = i;
+        delta = "";
+        why = "delivery";
+        formError = null;
+    }
+
+    private void SaveStock()
+    {
+        formError = null;
+        try
+        {
+            var change = QtyOf(delta.Replace("+", ""));
+            if (change == 0) throw new HubException("qty", "Please type how many to add or take off.");
+            App.Catalog.Adjust(stockItem!.Id, change, why, null, Me.Id);
+            stockItem = null;
+            Find();
+            Info = "Stock updated.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void AddCopies(Item i)
+    {
+        copiesFor = i;
+        copies = 1;
+        Info = null;
+        formError = null;
+    }
+
+    private void SaveCopies()
+    {
+        formError = null;
+        try
+        {
+            App.Library.AddCopies(copiesFor!.Id, Math.Clamp(copies, 1, 500));
+            Find();
+            Info = "Copies added.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

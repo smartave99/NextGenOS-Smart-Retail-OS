@@ -1,10 +1,10 @@
-; Script generated for Smart Retail OS by NextGen OS
+; Script generated for Smart Retail POS by NextGenOS
 ; Inno Setup 6 Script
 
-#define MyAppName "Smart Retail OS"
+#define MyAppName "Smart Retail POS"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "NextGen OS"
-#define MyAppURL "https://github.com/smartave99/Smart-Retail-POS-by-NextGen-OS"
+#define MyAppPublisher "NextGenOS"
+#define MyAppURL "mailto:smartave99@gmail.com"
 #define MyAppExeName "SmartAvenue99 POS.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".pos"
@@ -23,7 +23,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=..\LICENSE
+LicenseFile=..\..\..\EULA.txt
 OutputDir=Output
 OutputBaseFilename=SmartRetailOS_v1.0.0_Setup
 SetupIconFile=..\Source\SmartAvenue99_POS_VB\SmartAvenue99 POS\SmartAvenue99 POS.ico
@@ -47,16 +47,19 @@ Source: "..\Fonts\code128.ttf"; DestDir: "{autofonts}"; FontInstall: "Code 128";
 Source: "..\Fonts\IDAutomationHC39M.ttf"; DestDir: "{autofonts}"; FontInstall: "IDAutomationHC39M"; Flags: onlyifdoesntexist uninsneveruninstall
 
 ; Main Application Binaries & Assets
-Source: "..\Source\SmartAvenue99_POS_VB\SmartAvenue99 POS\bin\Debug\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Release build only, and never debug symbols, source or project files.
+Source: "..\Source\SmartAvenue99_POS_VB\SmartAvenue99 POS\bin\Release\*"; DestDir: "{app}"; Excludes: "*.pdb,*.xml,*.vb,*.cs,*.map,*.vbproj,*.csproj,*.sln"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\SmartAvenue99 POS.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\SmartAvenue99 POS.ico"; Tasks: desktopicon
 
+[Dirs]
+; The licence of this PC lives here. Every Windows user of the shop may activate and refresh it; nobody else.
+Name: "{commonappdata}\NextGenOS\SmartRetailPOS"; Permissions: users-modify
+
 [Run]
-; Auto-activate permanent license during installation
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\Activate_POS.ps1"""; StatusMsg: "Configuring system license and registration..."; Flags: runhidden
 ; Optional launch checkbox
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 

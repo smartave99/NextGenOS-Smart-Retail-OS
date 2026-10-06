@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "country": "TR",
+  "name": "Türkiye",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "TRY",
+    "symbol": "₺",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ",",
+    "groupSeparator": "."
+  },
+  "locale": "tr-TR",
+  "languages": [
+    "tr",
+    "en"
+  ],
+  "timezone": "Europe/Istanbul",
+  "phoneCode": "+90",
+  "fiscalYearStart": {
+    "month": 1,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "KDV",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "KDV20",
+        "label": "KDV 20%",
+        "percent": "20"
+      },
+      {
+        "code": "KDV10",
+        "label": "KDV 10%",
+        "percent": "10"
+      },
+      {
+        "code": "KDV1",
+        "label": "KDV 1%",
+        "percent": "1"
+      },
+      {
+        "code": "KDV0",
+        "label": "KDV 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "KDVEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "KDV20",
+      "reduced": "KDV10",
+      "zero": "KDV0",
+      "exempt": "KDVEX"
+    },
+    "businessId": {
+      "label": "Tax number",
+      "pattern": "^[0-9]{10,11}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Fatura",
+    "requiredFields": [
+      "Seller name, address and tax number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "KDV rate and amount"
+    ],
+    "eInvoice": "E-Fatura / E-Arşiv electronic invoices are compulsory for many businesses.",
+    "retentionYears": 5
+  },
+  "notes": []
+}

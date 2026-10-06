@@ -1,0 +1,200 @@
+@page "/documents/{Id:long}"
+@attribute [Authorize(Policy = HubHost.DocumentsPolicy)]
+@inherits HubPage
+@inject IJSRuntime Js
+
+<PageTitle>@(view?.Document.Number ?? "Bill")</PageTitle>
+@if (view is null)
+{
+    <h1>Not found</h1>
+    <Notice Error="@Error" />
+    <a class="btn primary" href="documents">Back to the list</a>
+}
+else
+{
+    var d = view.Document;
+    <div class="no-print">
+        <p><a href="documents">← @Shop.Plural("invoice")</a></p>
+        <h1>@Kind() @(d.Number ?? "")</h1>
+        <p class="sub">
+            @(d.IssuedAt is { } at ? When(at) : "Not finished") ·
+            @if (view.Party is { } p) { <span>@p.Name</span> }
+            @if (d.Status == DocStatus.Void) { <span class="chip bad">Void</span> }
+            else if (d.Status == DocStatus.Issued) { <span class="chip @(d.PaymentState == "paid" ? "ok" : "warn")">@(d.PaymentState == "paid" ? "Paid" : d.PaymentState == "partial" ? "Part paid" : "Unpaid")</span> }
+        </p>
+        <Notice Error="@Error" Info="@Info" />
+        <div class="row wrap">
+            <button type="button" class="btn primary" id="print" @onclick="Print">Print</button>
+            @if (receiptPrinter is not null) { <button type="button" class="btn secondary" id="print-receipt" @onclick="PrintReceipt">Print on @receiptPrinter.Name</button> }
+            @if (d.BalanceMinor > 0 && Me.Can(Perm.Sell)) { <button type="button" class="btn secondary" id="take-payment" @onclick="() => Toggle(PayPanel)">Take payment (@Money(d.BalanceMinor) owed)</button> }
+            @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn">Take something back</button> }
+            @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)">Cancel this bill</button> }
+        </div>
+
+        @if (panel == PayPanel)
+        {
+            <div class="card">
+                <h2>Take payment</h2>
+                <div class="inline-form">
+                    <div><label for="pay-method">Paid by</label><select id="pay-method" @bind="payMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div>
+                    <div><label for="pay-amount">Amount</label><input id="pay-amount" inputmode="decimal" @bind="payAmount" placeholder="@Shop.Text(d.BalanceMinor)" /></div>
+                    <div><label for="pay-ref">Reference (optional)</label><input id="pay-ref" @bind="payRef" maxlength="60" /></div>
+                    <button type="button" class="btn primary" id="save-payment" @onclick="SavePayment">Save</button>
+                </div>
+            </div>
+        }
+        @if (panel == ReturnPanel)
+        {
+            <div class="card">
+                <h2>Take something back</h2>
+                <table class="tbl">
+                    <thead><tr><th>Item</th><th class="num">Bought</th><th class="num">Giving back</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in view.Lines)
+                    {
+                        <tr><td>@l.Description</td><td class="num">@Qty(l.QtyMilli)</td><td class="num"><input class="qty" inputmode="decimal" aria-label="Giving back: @l.Description" @bind="returns[l.Id]" /></td></tr>
+                    }
+                    </tbody>
+                </table>
+                <div class="inline-form">
+                    <div><label for="r-why">Why</label><input id="r-why" @bind="reason" maxlength="120" /></div>
+                    <div><label for="r-how">Money goes back by</label><select id="r-how" @bind="refundMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div>
+                    <button type="button" class="btn primary" id="save-return" @onclick="SaveReturn">Give back</button>
+                </div>
+            </div>
+        }
+        @if (panel == VoidPanel)
+        {
+            <div class="card">
+                <h2>Cancel this bill</h2>
+                <p class="muted">The bill stays in the list as void and the stock goes back. Money taken is given back.</p>
+                <div class="inline-form">
+                    <div><label for="v-why">Why</label><input id="v-why" @bind="reason" maxlength="120" /></div>
+                    <button type="button" class="btn danger" id="save-void" @onclick="SaveVoid">Cancel the bill</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    <Receipt View="view" Shop="Shop" />
+
+    @if (credits.Count > 0)
+    {
+        <div class="card no-print">
+            <h2>Credit notes for this bill</h2>
+            @foreach (var c in credits) { <div><a href="documents/@c.Id">@c.Number</a> · @When(c.IssuedAt ?? c.CreatedAt) · @Money(c.TotalMinor)</div> }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    /// <summary>Set by the screens that just finished a bill: the bill is printed by itself if a printer is set to.</summary>
+    [SupplyParameterFromQuery(Name = "new")] public bool JustMade { get; set; }
+
+    private NextGenOS.Devices.Printing.PrinterProfile? receiptPrinter;
+    private bool autoDone;
+
+    private DocumentView? view;
+    private IReadOnlyList<NextGenOS.Hub.Documents.Document> credits = Array.Empty<Document>();
+    private string? panel;
+    private string payMethod = "cash", payAmount = "", payRef = "", reason = "", refundMethod = "cash";
+    private readonly Dictionary<long, string> returns = new();
+
+    private long loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Going from a bill to its credit note keeps this same screen: read the other bill.
+        if (loaded != 0 && loaded != Id)
+        {
+            panel = null;
+            Error = Info = null;
+            await Reload();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (JustMade && !autoDone && view is not null && App.Printing.AutoPrinter() is { } auto)
+        {
+            autoDone = true;
+            await Run(async () => { await App.Printing.PrintBillAsync(Id, auto.Id, Me.Id); Info = $"Printed on {auto.Name}."; });
+        }
+    }
+
+    protected override Task LoadAsync()
+    {
+        receiptPrinter = App.PrinterProfiles.For("receipt");
+        loaded = Id;
+        view = App.Documents.Get(Id);
+        if (view is null) return Task.CompletedTask;
+        payMethod = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        refundMethod = payMethod;
+        credits = view.Document.Type == DocTypes.Invoice ? App.Documents.List(new DocumentFilter { Type = DocTypes.CreditNote, Limit = 200 }).Where(c => c.RefDocumentId == Id).ToList() : Array.Empty<Document>();
+        returns.Clear();
+        foreach (var l in view.Lines) returns.TryAdd(l.Id, "");
+        return Task.CompletedTask;
+    }
+
+    private string Kind() => view!.Document.Type switch
+    {
+        DocTypes.Invoice => Shop.Singular("invoice"), DocTypes.CreditNote => "Credit note", DocTypes.Quote => "Quote", DocTypes.Order => "Order", DocTypes.Purchase => "Purchase", DocTypes.ProgressBill => "Progress bill", _ => "Bill",
+    };
+
+    private bool CanReturn() => view!.Document is { Type: DocTypes.Invoice, Status: DocStatus.Issued } && Me.Can(Perm.Sell);
+
+    private bool CanVoid() => view!.Document is { Status: DocStatus.Issued } && view.Document.Type is DocTypes.Invoice && Me.Can(Perm.Void);
+
+    private async Task Print() => await Js.InvokeVoidAsync("hub.print");
+
+    private Task PrintReceipt() => Run(async () =>
+    {
+        await App.Printing.PrintBillAsync(Id, receiptPrinter!.Id, Me.Id);
+        Info = $"Printed on {receiptPrinter.Name}.";
+    });
+
+    private const string PayPanel = "pay", ReturnPanel = "return", VoidPanel = "void";
+
+    private void Toggle(string name) => panel = panel == name ? null : name;
+
+    private void OpenReturn()
+    {
+        Toggle(ReturnPanel);
+        reason = "";
+    }
+
+    private Task SavePayment() => Run(() =>
+    {
+        long amount = view!.Document.BalanceMinor;
+        if (payAmount.Trim().Length > 0 && (!TryMoney(Shop, payAmount, out amount) || amount <= 0)) throw new HubException("amount", "Please type the amount as a number, like 250 or 99.50.");
+        view = App.Documents.AddPayment(Id, new PaymentInput { Method = payMethod, AmountMinor = amount, Reference = string.IsNullOrWhiteSpace(payRef) ? null : payRef.Trim() }, Me.Id);
+        panel = null;
+        payAmount = payRef = "";
+    }, "Payment saved.");
+
+    private Task SaveReturn() => Run(() =>
+    {
+        var credit = new List<(long LineId, long QtyMilli)>();
+        foreach (var l in view!.Lines)
+        {
+            var text = returns[l.Id].Trim();
+            if (text.Length == 0) continue;
+            long milli;
+            try { milli = ShopContext.QtyMilli(text); } catch (FormatException) { throw new HubException("qty", $"Please type a number for {l.Description}."); }
+            if (milli > 0) credit.Add((l.Id, milli));
+        }
+        if (credit.Count == 0) throw new HubException("nothing", "Type how many of each are coming back.");
+        var note = App.Documents.CreateCreditNote(Id, credit, string.IsNullOrWhiteSpace(reason) ? "Returned" : reason.Trim(), refundMethod, Me.Id);
+        Nav.NavigateTo("/documents/" + note.Document.Id);
+    });
+
+    private Task SaveVoid() => Run(() =>
+    {
+        App.Documents.Void(Id, reason, Me.Id, refundMethod);
+        view = App.Documents.Get(Id);
+        panel = null;
+    }, "The bill is cancelled.");
+}

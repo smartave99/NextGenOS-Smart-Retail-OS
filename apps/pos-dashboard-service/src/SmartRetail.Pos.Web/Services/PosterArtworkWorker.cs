@@ -74,7 +74,7 @@ public sealed class PosterArtworkWorker
         var cancel = new CancellationTokenSource();
         _running[poster.Id] = cancel;
         Changed?.Invoke(poster.Id);
-        _ = Task.Run(() => MakeAsync(poster.Id, poster.Kind.ArtworkTheme(poster.Festival), cancel));
+        _ = Task.Run(() => MakeAsync(poster.Id, poster.Kind.ArtworkTheme(poster.Festival, _ai.PosterLocale), cancel));
         return true;
     }
 

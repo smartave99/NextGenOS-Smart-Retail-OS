@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "id": "generic",
+  "name": "Any other business",
+  "summary": "Gyms, schools, clubs, workshops, hotels' front desks and everything else: items, invoices, payments and parties. Turn on only the parts you need and rename things.",
+  "icon": "briefcase",
+  "vocabulary": {
+    "customer": [
+      "Customer",
+      "Customers"
+    ],
+    "item": [
+      "Item",
+      "Items"
+    ],
+    "sale": [
+      "Sale",
+      "Sales"
+    ],
+    "invoice": [
+      "Invoice",
+      "Invoices"
+    ],
+    "staff": [
+      "Staff",
+      "Staff"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Stock",
+      "Stock"
+    ]
+  },
+  "features": {
+    "counterSale": true,
+    "tables": false,
+    "kitchen": false,
+    "lending": false,
+    "projects": false,
+    "appointments": false,
+    "credit": true,
+    "purchases": false,
+    "stockTracking": "optional",
+    "weighedItems": false
+  },
+  "itemKinds": [
+    {
+      "id": "stock",
+      "label": "Product",
+      "tracksStock": true
+    },
+    {
+      "id": "service",
+      "label": "Service",
+      "tracksStock": false
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "customer",
+      "label": "Customer"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    },
+    {
+      "id": "staff",
+      "label": "Staff"
+    }
+  ],
+  "defaults": {
+    "adjustments": [],
+    "paymentMethods": [
+      "cash",
+      "card",
+      "wallet",
+      "bank"
+    ]
+  },
+  "rules": {
+    "creditDays": 30
+  },
+  "reports": [
+    "daily-sales",
+    "top-items",
+    "outstanding",
+    "tax-summary",
+    "payments"
+  ],
+  "demo": {
+    "company": "Demo Business",
+    "tagline": "A small business of any kind",
+    "items": [
+      {
+        "name": "Standard service",
+        "kind": "service",
+        "category": "Services",
+        "price": "500.00",
+        "class": "standard",
+        "unit": "job"
+      },
+      {
+        "name": "Monthly membership",
+        "kind": "service",
+        "category": "Memberships",
+        "price": "1500.00",
+        "class": "standard",
+        "unit": "month"
+      },
+      {
+        "name": "Merchandise item",
+        "kind": "stock",
+        "category": "Products",
+        "price": "250.00",
+        "class": "standard",
+        "unit": "pc",
+        "stock": "30"
+      }
+    ],
+    "parties": [
+      {
+        "kind": "customer",
+        "name": "Walk-in customer"
+      },
+      {
+        "kind": "customer",
+        "name": "Sample Customer",
+        "phone": "+910000000051"
+      }
+    ]
+  },
+  "aiContext": "a small business: items, invoices, payments, customers",
+  "coverage": {
+    "works": [
+      "Items (products and services), customers and suppliers",
+      "Invoices and quotes with the country's tax, discounts and payments",
+      "Customer credit and statements",
+      "Rename things in Settings (for example Customer to Member) and switch on only what you need",
+      "Daily sales, top items, outstanding and tax summary reports"
+    ],
+    "notYet": [
+      "Anything specific to your trade: if your business needs tables, lending, projects or appointments, choose that industry instead"
+    ]
+  }
+}

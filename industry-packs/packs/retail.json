@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "id": "retail",
+  "name": "Retail store",
+  "summary": "Shops of every size: counter billing with barcode scanning, stock, returns, suppliers and daily reports.",
+  "icon": "shopping-bag",
+  "vocabulary": {
+    "customer": [
+      "Customer",
+      "Customers"
+    ],
+    "item": [
+      "Product",
+      "Products"
+    ],
+    "sale": [
+      "Sale",
+      "Sales"
+    ],
+    "invoice": [
+      "Invoice",
+      "Invoices"
+    ],
+    "staff": [
+      "Cashier",
+      "Cashiers"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Stock",
+      "Stock"
+    ]
+  },
+  "features": {
+    "counterSale": true,
+    "tables": false,
+    "kitchen": false,
+    "lending": false,
+    "projects": false,
+    "appointments": false,
+    "credit": false,
+    "purchases": true,
+    "stockTracking": "always",
+    "weighedItems": true
+  },
+  "itemKinds": [
+    {
+      "id": "stock",
+      "label": "Product",
+      "tracksStock": true
+    },
+    {
+      "id": "service",
+      "label": "Service",
+      "tracksStock": false
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "customer",
+      "label": "Customer"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    }
+  ],
+  "defaults": {
+    "adjustments": [],
+    "paymentMethods": [
+      "cash",
+      "card",
+      "wallet",
+      "bank"
+    ]
+  },
+  "rules": {
+    "returnDays": 7,
+    "lowStockDefault": "5"
+  },
+  "reports": [
+    "daily-sales",
+    "top-items",
+    "tax-summary",
+    "stock-low",
+    "stock-value",
+    "payments"
+  ],
+  "demo": {
+    "company": "Demo Mart",
+    "tagline": "A neighbourhood general store",
+    "items": [
+      {
+        "name": "Basmati rice 5 kg",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "425.00",
+        "class": "reduced",
+        "unit": "bag",
+        "stock": "40",
+        "barcode": "8901000000019"
+      },
+      {
+        "name": "Sunflower oil 1 L",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "165.00",
+        "class": "reduced",
+        "unit": "bottle",
+        "stock": "60",
+        "barcode": "8901000000026"
+      },
+      {
+        "name": "Loose sugar",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "46.00",
+        "class": "reduced",
+        "unit": "kg",
+        "stock": "120",
+        "barcode": "8901000000033"
+      },
+      {
+        "name": "Fresh milk 500 ml",
+        "kind": "stock",
+        "category": "Dairy",
+        "price": "28.00",
+        "class": "zero",
+        "unit": "pack",
+        "stock": "80",
+        "barcode": "8901000000040"
+      },
+      {
+        "name": "Whole wheat bread",
+        "kind": "stock",
+        "category": "Bakery",
+        "price": "45.00",
+        "class": "reduced",
+        "unit": "loaf",
+        "stock": "30",
+        "barcode": "8901000000057"
+      },
+      {
+        "name": "Tea leaves 250 g",
+        "kind": "stock",
+        "category": "Grocery",
+        "price": "120.00",
+        "class": "reduced",
+        "unit": "pack",
+        "stock": "50",
+        "barcode": "8901000000064"
+      },
+      {
+        "name": "Notebook A5",
+        "kind": "stock",
+        "category": "Stationery",
+        "price": "60.00",
+        "class": "standard",
+        "unit": "pc",
+        "stock": "100",
+        "barcode": "8901000000071"
+      },
+      {
+        "name": "Ball pen (blue)",
+        "kind": "stock",
+        "category": "Stationery",
+        "price": "10.00",
+        "class": "standard",
+        "unit": "pc",
+        "stock": "300",
+        "barcode": "8901000000088"
+      },
+      {
+        "name": "Dish-wash liquid 500 ml",
+        "kind": "stock",
+        "category": "Household",
+        "price": "99.00",
+        "class": "standard",
+        "unit": "bottle",
+        "stock": "45",
+        "barcode": "8901000000095"
+      },
+      {
+        "name": "Toothpaste 150 g",
+        "kind": "stock",
+        "category": "Personal care",
+        "price": "89.00",
+        "class": "standard",
+        "unit": "tube",
+        "stock": "70",
+        "barcode": "8901000000101"
+      },
+      {
+        "name": "LED bulb 9 W",
+        "kind": "stock",
+        "category": "Household",
+        "price": "110.00",
+        "class": "standard",
+        "unit": "pc",
+        "stock": "35",
+        "barcode": "8901000000118"
+      },
+      {
+        "name": "Gift wrapping",
+        "kind": "service",
+        "category": "Services",
+        "price": "25.00",
+        "class": "standard",
+        "unit": "job"
+      }
+    ],
+    "parties": [
+      {
+        "kind": "customer",
+        "name": "Walk-in customer"
+      },
+      {
+        "kind": "customer",
+        "name": "Anita Rao",
+        "phone": "+910000000001"
+      },
+      {
+        "kind": "supplier",
+        "name": "City Wholesale Traders",
+        "phone": "+910000000002"
+      }
+    ]
+  },
+  "aiContext": "a retail shop: products with barcodes and stock, counter sales, returns, suppliers",
+  "coverage": {
+    "works": [
+      "Counter billing with barcode scanning and weighed items",
+      "Discounts, returns and credit notes",
+      "Stock levels, low-stock list and stock value",
+      "Suppliers, purchase orders and receiving stock",
+      "Daily sales, top items, tax summary and payments reports",
+      "Receipts for 80 mm and A4 printers"
+    ],
+    "notYet": [
+      "Batch and expiry tracking (needed for pharmacies)",
+      "Loyalty points",
+      "Moving stock between several shops",
+      "Online orders"
+    ]
+  }
+}

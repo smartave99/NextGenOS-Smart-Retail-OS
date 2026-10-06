@@ -1,14 +1,19 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace SmartRetail.Pos.Core.Posters;
 
-/// <summary>The poster's words: an English headline, a Hindi line and a short English line under them.</summary>
-public sealed record PosterWords(string Headline, string HindiLine, string Subline)
+/// <summary>
+/// The poster's words: an English headline, a line in the customer's second language (when it has one) and a short English line under them.
+/// Saved posters made before the second language became a setting called the line "hindiLine"; they are still read.
+/// </summary>
+[JsonConverter(typeof(PosterWordsJsonConverter))]
+public sealed record PosterWords(string Headline, string LocalLine, string Subline)
 {
     public const int MaxHeadlineLength = 28;
-    public const int MaxHindiLineLength = 40;
+    public const int MaxLocalLineLength = 40;
     public const int MaxSublineLength = 60;
     public const int MaxFestivalLength = 24;
 
@@ -16,23 +21,26 @@ public sealed record PosterWords(string Headline, string HindiLine, string Subli
 
     /// <summary>The words staff typed, tidied and cut to length.</summary>
     public PosterWords Tidied() => new(
-        Tidy(Headline, MaxHeadlineLength), Tidy(HindiLine, MaxHindiLineLength), Tidy(Subline, MaxSublineLength));
+        Tidy(Headline, MaxHeadlineLength), Tidy(LocalLine, MaxLocalLineLength), Tidy(Subline, MaxSublineLength));
 
     /// <summary>
     /// An AI's words, checked: each line is tidied, and a line that is empty, in the wrong script, or has numbers,
-    /// ₹ or % in it (prices and offers are printed by the app from the POS, never taken from an AI) is replaced by
-    /// the matching line of <paramref name="fallback"/>.
+    /// a currency sign or % in it (prices and offers are printed by the app from the POS, never taken from an AI) is replaced by
+    /// the matching line of <paramref name="fallback"/>. Without a second language the poster has no second line. For a second language
+    /// in its own script (Devanagari, Thai, Arabic and the like) the English lines must not be in that script and the second line must be.
     /// </summary>
-    public static PosterWords FromAi(string? headline, string? hindiLine, string? subline, PosterWords fallback)
+    public static PosterWords FromAi(string? headline, string? localLine, string? subline, PosterWords fallback, PosterLocale? locale = null)
     {
         ArgumentNullException.ThrowIfNull(fallback);
+        locale ??= PosterLocale.Neutral;
+        var script = locale.InLocalScript;
         var head = Tidy(headline, MaxHeadlineLength);
-        var hindi = Tidy(hindiLine, MaxHindiLineLength);
+        var local = Tidy(localLine, MaxLocalLineLength);
         var sub = Tidy(subline, MaxSublineLength);
         return new PosterWords(
-            head.Length > 0 && !HasFigures(head) && !HasDevanagari(head) ? head : fallback.Headline,
-            hindi.Length > 0 && !HasFigures(hindi) && HasDevanagari(hindi) ? hindi : fallback.HindiLine,
-            sub.Length > 0 && !HasFigures(sub) && !HasDevanagari(sub) ? sub : fallback.Subline);
+            head.Length > 0 && !HasFigures(head) && !(script is not null && head.Any(script.Invoke)) ? head : fallback.Headline,
+            !locale.HasLocalLanguage ? "" : local.Length > 0 && !HasFigures(local) && (script is null || local.Any(script.Invoke)) ? local : fallback.LocalLine,
+            sub.Length > 0 && !HasFigures(sub) && !(script is not null && sub.Any(script.Invoke)) ? sub : fallback.Subline);
     }
 
     /// <summary>Trims, removes line breaks, control characters and wrapping quotes, and cuts at a word.</summary>
@@ -70,13 +78,53 @@ public sealed record PosterWords(string Headline, string HindiLine, string Subli
         return (space > maxLength / 2 ? cut[..space] : cut).TrimEnd(' ', ',', '·', '-', '–', ':');
     }
 
-    /// <summary>True when the text has digits (Latin or Devanagari), ₹, % or "Rs".</summary>
+    /// <summary>True when the text has digits (in any script), a currency sign, % or "Rs".</summary>
     public static bool HasFigures(string text) =>
-        text.Any(c => char.IsDigit(c) || c is '₹' or '%' or '$')
+        text.Any(c => char.IsDigit(c) || char.GetUnicodeCategory(c) == UnicodeCategory.CurrencySymbol || c == '%')
         || text.Contains("Rs.", StringComparison.OrdinalIgnoreCase)
         || text.Split(' ').Any(word => word.Equals("Rs", StringComparison.OrdinalIgnoreCase));
+}
 
-    public static bool HasDevanagari(string text) => text.Any(c => c is >= 'ऀ' and <= 'ॿ');
+/// <summary>Reads and writes <see cref="PosterWords"/>; also reads the older name "hindiLine".</summary>
+public sealed class PosterWordsJsonConverter : JsonConverter<PosterWords>
+{
+    public override PosterWords Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.StartObject)
+        {
+            throw new JsonException("The poster's words must be an object.");
+        }
+
+        string headline = "", local = "", subline = "";
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+        {
+            var name = reader.GetString() ?? "";
+            reader.Read();
+            var text = reader.TokenType == JsonTokenType.String ? reader.GetString() ?? "" : null;
+            if (text is null)
+            {
+                reader.Skip();
+                continue;
+            }
+
+            if (name.Equals("headline", StringComparison.OrdinalIgnoreCase)) { headline = text; }
+            else if (name.Equals("localLine", StringComparison.OrdinalIgnoreCase)) { local = text; }
+            else if (name.Equals("hindiLine", StringComparison.OrdinalIgnoreCase) && local.Length == 0) { local = text; }
+            else if (name.Equals("subline", StringComparison.OrdinalIgnoreCase)) { subline = text; }
+        }
+
+        return new PosterWords(headline, local, subline);
+    }
+
+    public override void Write(Utf8JsonWriter writer, PosterWords value, JsonSerializerOptions options)
+    {
+        string Name(string pascal) => options.PropertyNamingPolicy?.ConvertName(pascal) ?? pascal;
+        writer.WriteStartObject();
+        writer.WriteString(Name(nameof(PosterWords.Headline)), value.Headline);
+        writer.WriteString(Name(nameof(PosterWords.LocalLine)), value.LocalLine);
+        writer.WriteString(Name(nameof(PosterWords.Subline)), value.Subline);
+        writer.WriteEndObject();
+    }
 }
 
 /// <summary>One product on a poster, with the prices printed for it.</summary>

@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "country": "AU",
+  "name": "Australia",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "AUD",
+    "symbol": "$",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "en-AU",
+  "languages": [
+    "en"
+  ],
+  "timezone": "Australia/Sydney",
+  "phoneCode": "+61",
+  "fiscalYearStart": {
+    "month": 7,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "GST",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "GST10",
+        "label": "GST 10%",
+        "percent": "10"
+      },
+      {
+        "code": "GSTFREE",
+        "label": "GST-free",
+        "zero": true
+      },
+      {
+        "code": "GSTEX",
+        "label": "Input-taxed",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "GST10",
+      "zero": "GSTFREE",
+      "exempt": "GSTEX"
+    },
+    "businessId": {
+      "label": "ABN",
+      "pattern": "^[0-9]{11}$"
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "nearest",
+      "increment": "0.05",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name and ABN",
+      "Invoice date",
+      "Description, quantity and price",
+      "GST amount (when the price is $1,000 or more: the buyer's name or ABN)"
+    ],
+    "eInvoice": null,
+    "retentionYears": 5
+  },
+  "notes": [
+    "Cash totals are rounded to 5 cents."
+  ]
+}

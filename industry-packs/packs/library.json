@@ -1,0 +1,283 @@
+{
+  "schema": 1,
+  "id": "library",
+  "name": "Library and lending",
+  "summary": "Members, a catalogue with copies, issuing and returning, due dates, renewals, reservations and fines.",
+  "icon": "library",
+  "vocabulary": {
+    "customer": [
+      "Member",
+      "Members"
+    ],
+    "item": [
+      "Title",
+      "Titles"
+    ],
+    "sale": [
+      "Loan",
+      "Loans"
+    ],
+    "invoice": [
+      "Receipt",
+      "Receipts"
+    ],
+    "staff": [
+      "Librarian",
+      "Librarians"
+    ],
+    "supplier": [
+      "Supplier",
+      "Suppliers"
+    ],
+    "stock": [
+      "Copies",
+      "Copies"
+    ]
+  },
+  "features": {
+    "counterSale": false,
+    "tables": false,
+    "kitchen": false,
+    "lending": true,
+    "projects": false,
+    "appointments": false,
+    "credit": false,
+    "purchases": true,
+    "stockTracking": "never",
+    "weighedItems": false
+  },
+  "itemKinds": [
+    {
+      "id": "title",
+      "label": "Title",
+      "tracksStock": false
+    }
+  ],
+  "partyKinds": [
+    {
+      "id": "member",
+      "label": "Member"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier"
+    },
+    {
+      "id": "staff",
+      "label": "Staff"
+    }
+  ],
+  "defaults": {
+    "adjustments": [],
+    "paymentMethods": [
+      "cash",
+      "card",
+      "wallet",
+      "bank"
+    ]
+  },
+  "rules": {
+    "memberTypes": [
+      {
+        "id": "adult",
+        "label": "Adult member",
+        "loanDays": 14,
+        "maxLoans": 5
+      },
+      {
+        "id": "child",
+        "label": "Child member",
+        "loanDays": 14,
+        "maxLoans": 3
+      },
+      {
+        "id": "student",
+        "label": "Student",
+        "loanDays": 21,
+        "maxLoans": 8
+      },
+      {
+        "id": "staff",
+        "label": "Staff",
+        "loanDays": 30,
+        "maxLoans": 10
+      }
+    ],
+    "renewals": 2,
+    "graceDays": 0,
+    "finePerDay": "1.00",
+    "fineCap": "0.00",
+    "reservationHoldDays": 3,
+    "lostItemFeeMultiplier": "1"
+  },
+  "reports": [
+    "overdue",
+    "popular-titles",
+    "member-activity",
+    "fines-collected"
+  ],
+  "demo": {
+    "company": "Demo Library",
+    "tagline": "A community lending library",
+    "items": [
+      {
+        "name": "The Hobbit",
+        "kind": "title",
+        "category": "Fiction",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "J. R. R. Tolkien",
+        "isbn": "9780261103344",
+        "copies": 3
+      },
+      {
+        "name": "Pride and Prejudice",
+        "kind": "title",
+        "category": "Classics",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Jane Austen",
+        "isbn": "9780141439518",
+        "copies": 2
+      },
+      {
+        "name": "A Brief History of Time",
+        "kind": "title",
+        "category": "Science",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Stephen Hawking",
+        "isbn": "9780553380163",
+        "copies": 2
+      },
+      {
+        "name": "The Alchemist",
+        "kind": "title",
+        "category": "Fiction",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Paulo Coelho",
+        "isbn": "9780062315007",
+        "copies": 3
+      },
+      {
+        "name": "Sapiens",
+        "kind": "title",
+        "category": "History",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Yuval Noah Harari",
+        "isbn": "9780062316110",
+        "copies": 2
+      },
+      {
+        "name": "Wings of Fire",
+        "kind": "title",
+        "category": "Biography",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "A. P. J. Abdul Kalam",
+        "isbn": "9788173711466",
+        "copies": 2
+      },
+      {
+        "name": "Matilda",
+        "kind": "title",
+        "category": "Children",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Roald Dahl",
+        "isbn": "9780142410370",
+        "copies": 3
+      },
+      {
+        "name": "The Very Hungry Caterpillar",
+        "kind": "title",
+        "category": "Children",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Eric Carle",
+        "isbn": "9780241003008",
+        "copies": 2
+      },
+      {
+        "name": "Introduction to Algorithms",
+        "kind": "title",
+        "category": "Computing",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "Cormen, Leiserson, Rivest, Stein",
+        "isbn": "9780262046305",
+        "copies": 1
+      },
+      {
+        "name": "Atomic Habits",
+        "kind": "title",
+        "category": "Self-help",
+        "price": "0.00",
+        "class": "exempt",
+        "unit": "pc",
+        "author": "James Clear",
+        "isbn": "9780735211292",
+        "copies": 2
+      }
+    ],
+    "parties": [
+      {
+        "kind": "member",
+        "name": "Asha Verma",
+        "phone": "+910000000011",
+        "memberType": "adult"
+      },
+      {
+        "kind": "member",
+        "name": "Ravi Kumar",
+        "phone": "+910000000012",
+        "memberType": "adult"
+      },
+      {
+        "kind": "member",
+        "name": "Meera Joshi",
+        "phone": "+910000000013",
+        "memberType": "student"
+      },
+      {
+        "kind": "member",
+        "name": "Tara (age 9)",
+        "phone": "+910000000014",
+        "memberType": "child"
+      },
+      {
+        "kind": "staff",
+        "name": "Desk librarian",
+        "memberType": "staff"
+      }
+    ]
+  },
+  "aiContext": "a lending library: members, titles with copies, loans, due dates, fines",
+  "coverage": {
+    "works": [
+      "Members with membership types, each with its own loan period and loan limit",
+      "A catalogue of titles, each with any number of physical copies that have their own barcode; ISBN check",
+      "Issuing and returning by scanning the member card and the copy barcode",
+      "Due dates, renewals (up to the limit), reservations that hold a returned copy",
+      "Fines per overdue day (with a grace period and an optional cap), collected with a receipt",
+      "Lists of overdue loans, popular titles and fines collected"
+    ],
+    "notYet": [
+      "Lending between libraries",
+      "E-books and other digital lending",
+      "Importing catalogue records (MARC / Z39.50)",
+      "RFID self-checkout"
+    ]
+  }
+}

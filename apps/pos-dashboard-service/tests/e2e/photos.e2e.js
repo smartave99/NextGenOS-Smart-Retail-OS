@@ -12,6 +12,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { writeShopProfile } = require('./shop-profile');
 const { png, phonePhoto, photoNumber, changed } = require('./png');
 
 const BASE = 'http://127.0.0.1:5080';
@@ -53,7 +54,7 @@ async function startApp() {
       ...process.env,
       ASPNETCORE_ENVIRONMENT: 'Development',
       Pos__Mode: 'Demo',
-      Ai__SettingsFile: settingsFile,
+      Ai__SettingsFile: settingsFile, ...writeShopProfile(work),
       STAND_IN_CODEX_DELAY_MS: '1500',
       STAND_IN_CODEX_STATE: path.join(work, 'codex-listings'),
       STAND_IN_CODEX_PHOTOS_LOG: asked,
@@ -62,11 +63,17 @@ async function startApp() {
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
+  let last = 'no answer';
   for (let i = 0; i < 180; i++) {
-    try { if ((await fetch(BASE + '/')).ok) return app; } catch { /* not up yet */ }
+    try {
+      const answer = await fetch(BASE + '/');
+      if (answer.ok) return app;
+      last = answer.status + ' ' + (await answer.text()).replace(/\s+/g, ' ').slice(0, 160);
+    } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error('The app did not start on ' + BASE);
+  stopApp(app); // never leave it running, holding the port for the next try
+  throw new Error('The app did not start on ' + BASE + ' (last answer: ' + last + '). A 402 means the licence gate is closed: run the test through with-licence.mjs.');
 }
 
 function stopApp(app) {

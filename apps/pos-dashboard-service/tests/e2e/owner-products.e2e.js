@@ -17,6 +17,8 @@ const os = require('os');
 const path = require('path');
 const supabase = require('./local-supabase');
 const { png, phonePhoto } = require('./png');
+// The photos with a person are made for the shop of this profile (India, Hindi): the stand-in Codex checks the task names them so.
+const { writeShopProfile } = require('./shop-profile');
 
 const BASE = 'http://127.0.0.1:5080';
 const OUT = process.argv[2] || 'screenshots';
@@ -60,6 +62,7 @@ async function startApp() {
       ASPNETCORE_ENVIRONMENT: 'Development',
       Pos__Mode: 'Demo',
       Ai__SettingsFile: settingsFile,
+      ...writeShopProfile(work),
       STAND_IN_CODEX_DELAY_MS: '300',
       STAND_IN_CODEX_STATE: path.join(work, 'codex-listings'),
       STAND_IN_CODEX_CATEGORY_FILE: categoryWord,
@@ -68,11 +71,17 @@ async function startApp() {
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
+  let last = 'no answer';
   for (let i = 0; i < 180; i++) {
-    try { if ((await fetch(BASE + '/')).ok) return app; } catch { /* not up yet */ }
+    try {
+      const answer = await fetch(BASE + '/');
+      if (answer.ok) return app;
+      last = answer.status + ' ' + (await answer.text()).replace(/\s+/g, ' ').slice(0, 160);
+    } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error('The app did not start on ' + BASE);
+  stopApp(app); // never leave it running, holding the port for the next try
+  throw new Error('The app did not start on ' + BASE + ' (last answer: ' + last + '). A 402 means the licence gate is closed: run the test through with-licence.mjs.');
 }
 
 function stopApp(app) {
@@ -110,7 +119,7 @@ async function until(check, timeout, what) {
 
     // The owner signs up on the website, creates the shop and makes a code.
     project.psql(`insert into auth.users (id, email) values ('${OWNER}', 'owner@example.com');`);
-    shop = project.asUser(OWNER, "select public.create_shop('Smart Avenue 99');");
+    shop = project.asUser(OWNER, "select public.create_shop('Demo Mart 99');");
     const code = project.asUser(OWNER, `select public.new_pairing_code('${shop}');`);
 
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -132,7 +141,7 @@ async function until(check, timeout, what) {
     await page.fill('#owner-key', project.anonKey);
     await page.fill('#owner-code', code);
     await section.getByRole('button', { name: 'Connect' }).click();
-    await section.getByRole('heading', { name: 'Sending to Smart Avenue 99' }).waitFor();
+    await section.getByRole('heading', { name: 'Sending to Demo Mart 99' }).waitFor();
     await section.locator('.owner-state', { hasText: /Last sent at \d/ }).waitFor({ timeout: 30000 });
     assert.deepStrictEqual((await devices()).map(d => d.main), [true], 'the first PC to connect is the main PC');
     assert.strictEqual(await section.locator('#owner-counter').count(), 0, 'the main PC is not told it is a counter');

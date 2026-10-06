@@ -3,8 +3,9 @@
 @implements IDisposable
 @inject FixNowService Checks
 @inject ILogger<FixNow> Log
+@inject BrandService Brand
 
-<PageTitle>Fix now · Smart Retail POS</PageTitle>
+<PageTitle>Fix now · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>

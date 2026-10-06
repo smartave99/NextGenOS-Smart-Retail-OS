@@ -485,7 +485,7 @@ Namespace BillPoint
 
 		' Token: 0x0600E8FD RID: 59645 RVA: 0x008D442C File Offset: 0x008D262C
 		Private Sub AutoUpdater()
-			Me.Config = New FirebaseConfig() With { .AuthSecret = "9TSon0zKBvGgAX5r8KI1tvv3y4NQdKGntYlrBm3B", .BasePath = "https://androidbillsoftreport-default-rtdb.asia-southeast1.firebasedatabase.app" }
+			Me.Config = New FirebaseConfig() With { .AuthSecret = NextGenOS.Licensing.CloudSettings.Secret("reports"), .BasePath = NextGenOS.Licensing.CloudSettings.Url("reports") }
 			Me.Client = New FirebaseClient(Me.Config)
 			Me.TBoxCompName.Text = Me.Client.[Get](String.Format("comp/{0}/comp_name", Me.TBoxCompId.Text)).ResultAs(Of String)()
 			Me.TBoxAddress.Text = Me.Client.[Get](String.Format("comp/{0}/comp_address", Me.TBoxCompId.Text)).ResultAs(Of String)()

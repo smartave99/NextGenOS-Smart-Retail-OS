@@ -46,13 +46,13 @@ namespace SmartRetail.AI.Tests
             File.WriteAllText(Path.Combine(_tree.Path, "SmartRetailPOS", "Directory.Build.props"), Props(dashboardVersion));
             File.WriteAllText(Path.Combine(_tree.Path, "CHANGELOG.md"), changeLog ?? Log(appVersion));
             var script = Path.Combine(_tree.Path, "SmartRetailAI", "check-version.sh");
-            File.Copy(Path.Combine(Repository.Root(), "SmartRetailAI", "check-version.sh"), script, overwrite: true);
-            File.Copy(Path.Combine(Repository.Root(), "SmartRetailAI", "changelog-entry.sh"), Path.Combine(_tree.Path, "SmartRetailAI", "changelog-entry.sh"), overwrite: true);
+            File.Copy(Path.Combine(Repository.Ai(), "check-version.sh"), script, overwrite: true);
+            File.Copy(Path.Combine(Repository.Ai(), "changelog-entry.sh"), Path.Combine(_tree.Path, "SmartRetailAI", "changelog-entry.sh"), overwrite: true);
             return script;
         }
 
         private static string Props(string version) =>
-            "<Project>\n  <PropertyGroup>\n    <Company>NextGen OS</Company>\n    <Version>" + version + "</Version>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n";
+            "<Project>\n  <PropertyGroup>\n    <Company>NextGenOS</Company>\n    <Version>" + version + "</Version>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n";
 
         private static (int ExitCode, string Output, string Error) Run(string script, string version)
         {
@@ -160,27 +160,96 @@ namespace SmartRetail.AI.Tests
         {
             var root = Repository.Root();
             var version = System.Text.RegularExpressions.Regex.Match(
-                File.ReadAllText(Path.Combine(root, "SmartRetailAI", "Directory.Build.props")), "<Version>([^<]+)</Version>").Groups[1].Value;
+                File.ReadAllText(Path.Combine(Repository.Ai(), "Directory.Build.props")), "<Version>([^<]+)</Version>").Groups[1].Value;
 
-            var (code, output, error) = Run(Path.Combine(root, "SmartRetailAI", "check-version.sh"), version);
+            var (code, output, error) = Run(Path.Combine(Repository.Ai(), "check-version.sh"), version);
 
             Assert.True(code == 0, "SmartRetailAI and SmartRetailPOS build different versions, or CHANGELOG.md does not start with this version: " + error);
             Assert.StartsWith("The release " + version + " is the version of the code, and CHANGELOG.md says what changed (", output);
         }
 
         [Fact]
-        public void The_release_workflow_checks_the_version_in_a_first_job_that_everything_waits_for_and_never_puts_the_input_in_the_script_text()
+        public void The_release_workflow_runs_the_whole_gate_first_and_everything_waits_for_it()
         {
-            var workflow = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "installer.yml"));
+            var workflow = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "release.yml"));
 
-            // The check is the only thing in the first job, and the Windows tests (which the installer job waits for) need that job.
-            Assert.Matches(@"(?m)^jobs:\s*\n(\s*#.*\n)*  version:\s*\n    runs-on: ubuntu-latest\s*\n", workflow);
-            Assert.Matches(@"(?m)^  test-on-windows:\s*\n    needs: version\s*\n", workflow);
-            Assert.Matches(@"(?m)^  installer:\s*\n    needs: test-on-windows\s*\n", workflow);
-            Assert.Equal(1, workflow.Split(new[] { "check-version.sh" }, StringSplitOptions.None).Length - 1);
-            Assert.True(workflow.IndexOf("check-version.sh", StringComparison.Ordinal) < workflow.IndexOf("  test-on-windows:", StringComparison.Ordinal), "the check comes first");
-            Assert.Contains("INPUT_VERSION: ${{ inputs.version }}", workflow);
-            Assert.DoesNotContain("check-version.sh \"${{", workflow);
+            Assert.Matches(@"(?m)^  gate:\s*\n", workflow);
+            Assert.Contains("node scripts/verify-all.mjs --full", workflow);
+            Assert.Matches(@"(?m)^  android:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            // The Windows setup is built after the gate too, and the release is published only when the gate passed (the builds may report their own failure in the notes).
+            // The setup is built on Linux (the Windows setup compiler of Chocolatey has no 64-bit stub) and then tried on a real Windows PC.
+            Assert.Matches(@"(?m)^  windows-build:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n(    .*\n)*?    runs-on: ubuntu-latest\s*\n", workflow);
+            Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: \[gate, prepare, windows-build\]\s*\n(    .*\n)*?    runs-on: windows-latest\s*\n", workflow);
+            // The Hub's setup needs the 64-bit stub of the setup compiler, which only the Ubuntu package has. (The 32-bit launcher of the website is made on the Windows runner with the
+            // Chocolatey one: it needs no 64-bit stub, and a launcher is allowed to be 32-bit, see docs/PREREQUISITES.md.)
+            Assert.Contains("apt-get install -y -q nsis", System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  windows-build:\s*\n(.*?)^  windows:").Groups[1].Value);
+            Assert.DoesNotContain("choco install nsis", System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  windows-build:\s*\n(.*?)^  windows:").Groups[1].Value);
+            // So is the Linux package of the Hub; the release waits for all three builds to report.
+            Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            // And so is the staff bundle of the Setup Studio.
+            Assert.Matches(@"(?m)^  studio:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            // Its Windows bundle is then opened on a real Windows PC the way a person opens it (the program with no terminal window, one Studio, quit from its page).
+            Assert.Matches(@"(?m)^  studio-windows:\s*\n(    .*\n)*?    needs: \[gate, prepare, studio\]\s*\n(    .*\n)*?    runs-on: windows-latest\s*\n", workflow);
+            Assert.Contains("Setup Studio.exe", workflow);
+            // And so is the website of the customer, on Linux and on Windows (each system builds its own, with its own native parts, then starts it from the zip).
+            Assert.Matches(@"(?m)^  website:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            Assert.Contains("node scripts/make-website-package.mjs", workflow);
+            Assert.Contains("node scripts/smoke-website.mjs", workflow);
+            Assert.Contains("--node-app", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website\]\s*\n", workflow);
+            // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
+            // The draft and the tag are made at the very start, beside the gate (GitHub lets the token make them only at the newest commit of the branch), and taken away when the gate fails.
+            var prepare = System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  prepare:\s*\n(.*?)^  cleanup:").Groups[1].Value;
+            Assert.DoesNotContain("needs:", prepare);
+            Assert.Contains("--make-tag", prepare);
+            Assert.Matches(@"(?m)^  cleanup:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            Assert.Contains("needs.gate.result != 'success'", workflow);
+            Assert.Contains("node scripts/release-assets.mjs discard", workflow);
+            Assert.DoesNotContain("upload-artifact", workflow);
+            Assert.DoesNotContain("download-artifact", workflow);
+            Assert.Contains("node scripts/release-assets.mjs create", workflow);
+            Assert.Contains("node scripts/release-assets.mjs publish", workflow);
+            Assert.Contains("needs.gate.result == 'success'", workflow);
+            Assert.Contains("needs.prepare.result == 'success'", workflow);
+        }
+
+        [Fact]
+        public void A_trial_release_started_from_a_branch_is_always_built_without_keys_and_never_from_main_or_a_tag()
+        {
+            var trial = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "trial-release.yml"));
+
+            // It starts only from a claude/* branch, only when the request file changes, and it asks the Release workflow for a keyless, marked trial.
+            Assert.Matches(@"(?m)^    branches: \[""claude/\*\*""\]\s*$", trial);
+            Assert.Contains("paths: [\".github/trial-release.json\"]", trial);
+            Assert.DoesNotContain("tags:", trial);
+            Assert.Matches(@"(?m)^      trial_without_keys: true\s*$", trial);
+            Assert.Matches(@"(?m)^      publish_trial: true\s*$", trial);
+            Assert.Contains("uses: ./.github/workflows/release.yml", trial);
+
+            // And the Release workflow makes a trial's tag only from such a request, after the gate, never a plain release.
+            var release = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "release.yml"));
+            Assert.Contains("inputs.publish_trial == true", release);
+            Assert.Contains("needs.gate.result == 'success'", release);
+            Assert.Contains("TAG=\"v${VERSION_NAME}-trial${RUN_NUMBER}\"", release);
+        }
+
+        [Fact]
+        public void The_release_workflow_never_puts_what_a_person_typed_into_the_text_of_a_script()
+        {
+            var workflow = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "release.yml"));
+
+            foreach (var line in workflow.Split('\n'))
+            {
+                // Typed values (inputs, brand-kit fields) may reach scripts only as environment variables, never inside the script text.
+                var isScriptText = !line.TrimStart().StartsWith("env:") && !line.TrimStart().StartsWith("KIT:") && !line.TrimStart().StartsWith("VERSION_")
+                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:") && !line.TrimStart().StartsWith("TRIAL_") && !line.TrimStart().StartsWith("PUBLISH_TRIAL:") && !line.TrimStart().StartsWith("WEBSITE_")
+                                   && !line.TrimStart().StartsWith("#") && !line.TrimStart().StartsWith("description:") && !line.TrimStart().StartsWith("default:");
+                if (isScriptText)
+                {
+                    Assert.DoesNotContain("${{ inputs.", line);
+                    Assert.DoesNotContain("${{ steps.kit.outputs.", line);
+                }
+            }
         }
     }
 
@@ -204,7 +273,7 @@ namespace SmartRetail.AI.Tests
             Directory.CreateDirectory(Path.Combine(_tree.Path, "SmartRetailAI"));
             File.WriteAllText(Path.Combine(_tree.Path, "CHANGELOG.md"), changeLog);
             var script = Path.Combine(_tree.Path, "SmartRetailAI", "changelog-entry.sh");
-            File.Copy(Path.Combine(Repository.Root(), "SmartRetailAI", "changelog-entry.sh"), script, overwrite: true);
+            File.Copy(Path.Combine(Repository.Ai(), "changelog-entry.sh"), script, overwrite: true);
             return script;
         }
 
@@ -299,33 +368,14 @@ namespace SmartRetail.AI.Tests
         {
             var root = Repository.Root();
             var version = System.Text.RegularExpressions.Regex.Match(
-                File.ReadAllText(Path.Combine(root, "SmartRetailAI", "Directory.Build.props")), "<Version>([^<]+)</Version>").Groups[1].Value;
+                File.ReadAllText(Path.Combine(Repository.Ai(), "Directory.Build.props")), "<Version>([^<]+)</Version>").Groups[1].Value;
 
-            var (code, summary, _) = Run(Path.Combine(root, "SmartRetailAI", "changelog-entry.sh"), version, "--summary");
+            var (code, summary, _) = Run(Path.Combine(Repository.Ai(), "changelog-entry.sh"), version, "--summary");
 
             Assert.Equal(0, code);
             Assert.True(summary.Length > 20 && summary.Length <= 300, "write one sentence under the newest heading of CHANGELOG.md: '" + summary + "'");
         }
 
-        [Fact]
-        public void The_release_workflow_makes_the_releases_text_and_the_notes_from_the_log()
-        {
-            var workflow = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "installer.yml"));
-
-            // The text of the Release starts with the version's entry; no text of its own is typed in the publishing step.
-            Assert.Contains("echo \"## What is new in $version\"", workflow);
-            Assert.Contains("body_path: ${{ runner.temp }}/release-body.md", workflow);
-            Assert.DoesNotContain("body: |", workflow);
-
-            // The update's notes are what was typed, else the entry's sentence.
-            Assert.Contains("if [ -z \"$NOTES\" ]; then", workflow);
-            Assert.Contains("changelog-entry.sh \"$VERSION\" --summary", workflow);
-            Assert.Contains("changelog-entry.sh \"$version\"", workflow);
-
-            // A version, or notes, typed by a person are never put into the text of a script.
-            Assert.DoesNotContain("changelog-entry.sh \"${{", workflow);
-            Assert.Contains("RELEASE_VERSION: ${{ inputs.version != '' && inputs.version || github.ref_name }}", workflow);
-        }
     }
 
     /// <summary>A theory that runs only where bash can run the release scripts.</summary>

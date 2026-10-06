@@ -23,11 +23,12 @@ import {
 } from "@/lib/live-shop/shop-products";
 import type { PhotoKind, Shop, ShopPhoto, ShopProduct, SiteCategory } from "@/lib/live-shop/types";
 import { Note, Pill, inputClass, primaryButton, softButton } from "./ui";
+import { LOCALE } from "@/lib/region/lite";
 
 /** What happened to a product here, so the screen can say so and look at the list again. */
 export type Decision = { kind: "published"; id: string; created: boolean; name: string } | { kind: "declined"; name: string };
 
-const when = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const when = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 interface Existing { byKey: ExistingProduct | null; byBarcode: ExistingProduct | null }
 

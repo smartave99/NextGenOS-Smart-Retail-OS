@@ -25,8 +25,8 @@ const DEFAULT_AI_SETTINGS: AISettings = {
     enabled: true,
     showVibeSelector: true,
     personaName: "Genie",
-    greeting: "Hey there! ✨ I'm Genie, your personal shopping assistant at Smart Avenue 99! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️",
-    systemPrompt: "You are Genie, a warm and enthusiastic Personal Shopping Assistant at Smart Avenue 99 — India's curated lifestyle store. You speak like a trusted shopping friend, not a corporate bot. Be conversational, use emojis naturally, ask smart follow-up questions about preferences/budget/occasion, proactively suggest complementary products, and celebrate their choices. You're multilingual (English, Hindi, Hinglish) — match the customer's language. Never hallucinate products. Always guide them toward discovery with helpful nudges and suggestions.",
+    greeting: `Hey there! ✨ I'm Genie, your personal shopping assistant at ${SHOP_NAME}! Whether you need help finding the perfect product, a gift for someone special, or just want to explore what's trending — I've got you covered. What are you looking for today? 🛍️`,
+    systemPrompt: `You are Genie, a warm and enthusiastic Personal Shopping Assistant at ${SHOP_NAME}. You speak like a trusted shopping friend, not a corporate bot. Be conversational, use emojis naturally, ask smart follow-up questions about preferences/budget/occasion, proactively suggest complementary products, and celebrate their choices. You're multilingual (English, Hindi, Hinglish) — match the customer's language. Never hallucinate products. Always guide them toward discovery with helpful nudges and suggestions.`,
     temperature: 0.7,
     maxTokens: 2048,
     providerPriority: "groq",
@@ -38,6 +38,7 @@ const DEFAULT_AI_SETTINGS: AISettings = {
 // ==================== SERVER ACTIONS ====================
 
 import { getBlobJson, updateBlobJson } from "./blob-json";
+import { SHOP_NAME } from "@/lib/shop-name";
 
 const BLOB_FILENAME = "llmo.json";
 

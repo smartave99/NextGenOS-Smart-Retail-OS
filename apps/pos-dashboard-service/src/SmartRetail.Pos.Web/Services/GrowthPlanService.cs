@@ -17,6 +17,9 @@ public sealed class AiOptions
     public string SettingsFile { get; set; } = "";
 
     public string SettingsFilePath => string.IsNullOrWhiteSpace(SettingsFile) ? SettingsStore.DefaultFilePath : SettingsFile;
+
+    /// <summary>Where the customer's AI profile (profile/ai.json) is looked for. Empty: beside the program, and the folder above it.</summary>
+    public string ProfileFolder { get; set; } = "";
 }
 
 /// <summary>Whether an AI tool can answer: the one that will, or why none can.</summary>

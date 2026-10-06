@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "country": "EG",
+  "name": "Egypt",
+  "asOf": "2026-10-05",
+  "review": null,
+  "currency": {
+    "code": "EGP",
+    "symbol": "E£",
+    "decimals": 2,
+    "symbolPosition": "before",
+    "symbolSpace": false,
+    "grouping": "standard",
+    "decimalSeparator": ".",
+    "groupSeparator": ","
+  },
+  "locale": "ar-EG",
+  "languages": [
+    "ar",
+    "en"
+  ],
+  "timezone": "Africa/Cairo",
+  "phoneCode": "+20",
+  "fiscalYearStart": {
+    "month": 7,
+    "day": 1
+  },
+  "units": {
+    "weight": "kg",
+    "length": "cm"
+  },
+  "tax": {
+    "name": "VAT",
+    "model": "vat",
+    "pricesIncludeTaxDefault": true,
+    "rates": [
+      {
+        "code": "VAT14",
+        "label": "VAT 14%",
+        "percent": "14"
+      },
+      {
+        "code": "VAT5",
+        "label": "VAT 5%",
+        "percent": "5"
+      },
+      {
+        "code": "VAT0",
+        "label": "VAT 0% (zero-rated)",
+        "zero": true
+      },
+      {
+        "code": "VATEX",
+        "label": "Exempt",
+        "exempt": true
+      }
+    ],
+    "classes": {
+      "standard": "VAT14",
+      "reduced": "VAT5",
+      "zero": "VAT0",
+      "exempt": "VATEX"
+    },
+    "businessId": {
+      "label": "Tax registration number",
+      "pattern": null
+    },
+    "customerDiscounts": [],
+    "rounding": {
+      "total": "none",
+      "increment": "1",
+      "defaultOn": false
+    }
+  },
+  "invoice": {
+    "title": "Tax Invoice",
+    "requiredFields": [
+      "Seller name, address and tax registration number",
+      "Invoice number and date",
+      "Description, quantity and price",
+      "VAT amount"
+    ],
+    "eInvoice": "Electronic invoices through the Egyptian Tax Authority are compulsory.",
+    "retentionYears": 5
+  },
+  "notes": []
+}

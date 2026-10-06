@@ -10,8 +10,10 @@
 @inject StorageService Storage
 @inject IOptions<ShopOptions> Shop
 @inject IJSRuntime Js
+@inject ProductLicence Licence
+@inject BrandService Brand
 
-<PageTitle>Settings · Smart Retail POS</PageTitle>
+<PageTitle>Settings · @Brand.Name</PageTitle>
 
 <div class="page-head">
     <div>
@@ -152,15 +154,52 @@
     <section class="panel">
         <UpdatesSetting />
         <CodexUpdatesSetting />
+        <ToolUpdatesSetting />
+    </section>
+
+    <div class="setting-group" id="licence">Licence</div>
+    <section class="panel">
+        <div class="setting">
+            <div>
+                <h3>@(Licence.State.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : Licence.State.IsUsable ? "Active, please check in" : "Not active")</h3>
+                <p>@Licence.State.Message</p>
+                @if (Licence.State.Licence is { } claims)
+                {
+                    <p class="small muted">
+                        @if (claims.Customer?.Name is { Length: > 0 } customer)
+                        {
+                            <span>Licensed to <strong>@customer</strong>. </span>
+                        }
+                        @if (claims.Modules is { Count: > 0 } modules)
+                        {
+                            <span>Includes @string.Join(", ", modules). </span>
+                        }
+                        @if (claims.Limits is { } limits)
+                        {
+                            <span>Up to @limits.Devices device@(limits.Devices == 1 ? "" : "s"), @limits.Stores shop@(limits.Stores == 1 ? "" : "s") and @limits.Users user@(limits.Users == 1 ? "" : "s"). </span>
+                        }
+                        @if (claims.Reseller?.Name is { Length: > 0 } reseller)
+                        {
+                            <span>Supplied by @reseller. </span>
+                        }
+                    </p>
+                }
+                @if (Brand.SupportEmail is not null || Brand.SupportPhone is not null)
+                {
+                    <p class="small muted">Need help? @string.Join(" · ", new[] { Brand.SupportEmail, Brand.SupportPhone }.Where(x => x is not null))</p>
+                }
+            </div>
+            <a class="btn" href="licence-recheck" data-enhance-nav="false">Check again</a>
+        </div>
     </section>
 
     <div class="setting-group">About</div>
     <section class="panel">
         <div class="setting">
             <div>
-                <h3>Smart Retail POS @Version</h3>
-                <p>by NextGen OS. The AI only reads the POS database; nothing here changes the POS.</p>
-                <p>Free, open source software under the MIT License. The licence, and the licences of the software inside it, are in the app's folder: <code>LICENSE.txt</code> and <code>THIRD-PARTY-NOTICES.md</code>.</p>
+                <h3>@Brand.Name @Version</h3>
+                <p>@(Brand.By is null ? "" : Brand.By + ". ")The AI only reads the POS database; nothing here changes the POS.</p>
+                <p>Proprietary software of NextGenOS, used under your licence agreement. The agreement, and the licences of the software inside it, are in the app's folder: <code>EULA.txt</code> and <code>THIRD-PARTY-NOTICES.md</code>.</p>
             </div>
             <AppMark Size="36" />
         </div>

@@ -1,4 +1,4 @@
-; Smart Retail POS AI (NextGen OS): the Windows installer for the AI side panel and its sales dashboard.
+; Smart Retail POS AI (NextGenOS): the Windows installer for the AI side panel and its sales dashboard.
 ;
 ; build.ps1 -Installer builds it with NSIS (makensis) from the package folder, dist\SmartRetailAI:
 ;   makensis -DVERSION=1.1.0 -DSOURCE=<dist\SmartRetailAI> -DUNINSTALL_LIST=<dist\uninstall-files.nsh>
@@ -12,6 +12,12 @@
 ; An update the app starts itself runs quietly: SmartRetailAI-Setup-x.y.z.exe /S /UPDATE /AllUsers (or /CurrentUser). It waits
 ; for the app, which is quitting, instead of asking someone to close it, and keeps what the owner chose: no desktop shortcut or
 ; start with Windows comes back if they were taken away. The app starts itself again afterwards (UpdateInstaller.cs).
+;
+; A setup prepared for one business: NextGenOS's Setup Studio puts a folder called "profile" next to this setup file, with one plain data file in
+; it, ai.json: the business's country, who the people in its product photos look like, its festivals and the second language of its posters. Setup
+; copies it to profile\ai.json in the install folder, where the app and its dashboard read it (SmartRetail.AI.Core: Settings/ShopProfile.cs). With no
+; such file this is the plain setup, and the app is neutral. An update the app starts itself has no profile folder beside it, so the file already
+; installed is kept. Uninstalling removes the file (it belongs to the program's folder), never the shop's own settings.
 ;
 ; The app shows its windows with Microsoft Edge WebView2. With -DWEBVIEW2_BOOTSTRAPPER=<MicrosoftEdgeWebview2Setup.exe>
 ; setup carries Microsoft's bootstrapper and runs it on a PC without WebView2 (never under Wine, where tests run, nor
@@ -42,7 +48,7 @@ SetCompressor /SOLID lzma
 !define /math UPDATE_WAIT_TICKS ${UPDATE_WAIT_SECONDS} * 2
 
 !define APP "Smart Retail POS AI"
-!define COMPANY "NextGen OS"
+!define COMPANY "NextGenOS"
 !define EXE "SmartRetailAI.exe"
 !define DASHBOARD_EXE "SmartRetail.Pos.Web.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NextGenOS.SmartRetailPOS.AI"
@@ -221,6 +227,28 @@ Function CheckFolder
   Delete "$INSTDIR\.setup-write-test"
 FunctionEnd
 
+; The business's own profile (ai.json), when the Setup Studio's folder "profile" is beside this setup. A quiet update has none beside it, so the one that is
+; already installed is set aside before the earlier copy is removed (the uninstaller removes it), and put back after the files are copied.
+Function KeepEarlierProfile
+  InitPluginsDir
+  ${IfNot} ${FileExists} "$EXEDIR\profile\ai.json"
+  ${AndIf} ${FileExists} "$INSTDIR\profile\ai.json"
+    CopyFiles /SILENT "$INSTDIR\profile\ai.json" "$PLUGINSDIR\ai.json.kept"
+  ${EndIf}
+FunctionEnd
+
+Function PutProfileInPlace
+  ${If} ${FileExists} "$EXEDIR\profile\ai.json"
+    DetailPrint "Adding the settings prepared for this business..."
+    CreateDirectory "$INSTDIR\profile"
+    Delete "$INSTDIR\profile\ai.json"
+    CopyFiles /SILENT "$EXEDIR\profile\ai.json" "$INSTDIR\profile\ai.json"
+  ${ElseIf} ${FileExists} "$PLUGINSDIR\ai.json.kept"
+    CreateDirectory "$INSTDIR\profile"
+    CopyFiles /SILENT "$PLUGINSDIR\ai.json.kept" "$INSTDIR\profile\ai.json"
+  ${EndIf}
+FunctionEnd
+
 ; An earlier copy is removed before the new one is copied, so no old file stays behind and the app never exists twice.
 Function RemoveEarlierCopies
   ; Version 1.0 installed only for the current user; a copy in another folder is replaced by this one.
@@ -299,10 +327,12 @@ Section "Program (required)" SecApp
   ; A dashboard left running would keep its files open.
   nsExec::Exec '"$SYSDIR\taskkill.exe" /F /IM ${DASHBOARD_EXE}'
   Pop $0
+  Call KeepEarlierProfile
   Call RemoveEarlierCopies
 
   SetOutPath "$INSTDIR"
   File /r "${SOURCE}\*.*"
+  Call PutProfileInPlace
 !ifdef WEBVIEW2_BOOTSTRAPPER
   Call InstallWebView2
 !endif
@@ -371,9 +401,12 @@ Section "Uninstall"
 
   ; Exactly the files and folders setup installed, wherever the owner put them; nothing else in the folder.
   !include /CHARSET=UTF8 "${UNINSTALL_LIST}"
+  ; The business's own profile, which setup copied in beside the program (not in the list above); the folder only if nothing else is in it.
+  Delete "$INSTDIR\profile\ai.json"
+  RMDir "$INSTDIR\profile"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
-  ; The "NextGen OS" folder around the default place, if nothing else is in it.
+  ; The "NextGenOS" folder around the default place, if nothing else is in it.
   ${GetParent} "$INSTDIR" $0
   ${GetFileName} "$0" $1
   ${If} $1 == "${COMPANY}"

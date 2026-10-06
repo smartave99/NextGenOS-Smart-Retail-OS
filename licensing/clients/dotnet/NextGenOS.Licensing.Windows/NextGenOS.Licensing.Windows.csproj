@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Windows parts every NextGenOS desktop program shares: the activation window and the licence guard. net48 like the programs. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>NextGenOS.Licensing.Windows</RootNamespace>
+    <AssemblyName>NextGenOS.Licensing.Windows</AssemblyName>
+    <Company>NextGenOS</Company>
+    <Product>NextGenOS Licensing</Product>
+    <Copyright>© 2026 NextGenOS. All rights reserved.</Copyright>
+    <Version>1.0.0</Version>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NextGenOS.Licensing\NextGenOS.Licensing.csproj" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+</Project>

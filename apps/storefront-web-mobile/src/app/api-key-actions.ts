@@ -3,7 +3,8 @@
 /**
  * API Key Management Actions
  * 
- * Server actions for managing Gemini API keys in Prisma/PostgreSQL.
+ * Server actions for managing AI service keys in Prisma/PostgreSQL. A key is stored encrypted (see lib/secret-box.ts) and
+ * never sent back to the browser: the admin page only gets a masked form.
  */
 
 import prisma from "@/lib/db";
@@ -16,6 +17,7 @@ import {
     getLightningModel,
 } from "@/lib/lightning-config";
 import { getGroqPrimaryModel } from "@/lib/groq-config";
+import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/secret-box";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -30,7 +32,6 @@ export interface StoredAPIKey {
     id: string;
     name: string;
     provider: LLMProvider;
-    key: string;
     maskedKey: string;
     isActive: boolean;
     isValid: boolean | null;
@@ -55,8 +56,7 @@ export async function getAPIKeys(): Promise<StoredAPIKey[]> {
             id: data.id,
             name: data.name || `Key ${data.id.substring(0, 6)}`,
             provider: (data.provider as LLMProvider) || "google",
-            key: data.key,
-            maskedKey: maskKey(data.key),
+            maskedKey: maskKey(readKey(data.key)),
             isActive: data.isActive,
             isValid: data.isValid,
             lastTested: data.lastTested,
@@ -81,11 +81,9 @@ export async function addAPIKey(name: string, key: string, provider: LLMProvider
 
         const trimmedKey = key.trim();
 
-        const existing = await prisma.apiKey.findUnique({
-            where: { key: trimmedKey }
-        });
-
-        if (existing) {
+        // Each stored value differs (a fresh random number goes into every encryption), so a repeat is found by reading them.
+        const stored = await prisma.apiKey.findMany({ select: { key: true } });
+        if (stored.some((row) => readKey(row.key) === trimmedKey)) {
             return { success: false, error: "This API key already exists" };
         }
 
@@ -93,7 +91,7 @@ export async function addAPIKey(name: string, key: string, provider: LLMProvider
             data: {
                 name: name.trim() || `Key ${Date.now()}`,
                 provider,
-                key: trimmedKey,
+                key: encryptSecret(trimmedKey),
                 isActive: true,
                 isValid: null,
                 lastTested: null,
@@ -119,7 +117,7 @@ export async function updateAPIKey(id: string, data: { name?: string; key?: stri
         const updateData: Prisma.ApiKeyUpdateInput = {};
         if (data.name !== undefined) updateData.name = data.name.trim();
         if (data.key !== undefined) {
-            updateData.key = data.key.trim();
+            updateData.key = encryptSecret(data.key.trim());
             updateData.isValid = null;
             updateData.lastTested = null;
         }
@@ -179,7 +177,7 @@ export async function testAPIKey(keyOrId: string, isId: boolean = false, provide
             if (!doc) {
                 return { success: false, error: "API key not found", isValid: false };
             }
-            apiKey = doc.key;
+            apiKey = readKey(doc.key);
             provider = (doc.provider as LLMProvider) || "google";
         }
 
@@ -347,8 +345,15 @@ export async function syncAPIKeysToManager() {
             where: { isActive: true }
         });
 
+        // A key saved before encryption existed is encrypted now, once, where it is.
+        for (const data of snapshot) {
+            if (data.key && !isEncrypted(data.key)) {
+                await prisma.apiKey.update({ where: { id: data.id }, data: { key: encryptSecret(data.key) } });
+            }
+        }
+
         const keys = snapshot.map((data) => ({
-            key: data.key,
+            key: readKey(data.key),
             provider: (data.provider || "google") as LLMProvider,
             id: data.id
         })).filter(k => k.key && k.key.trim() !== "");
@@ -376,6 +381,15 @@ export async function getAPIKeyManagerHealth() {
 }
 
 // ==================== HELPERS ====================
+
+/** The key as stored (encrypted, or plain if saved before encryption): its plain text, only ever used on the server. */
+function readKey(stored: string): string {
+    try {
+        return decryptSecret(stored);
+    } catch {
+        return "";
+    }
+}
 
 function maskKey(key: string): string {
     if (!key || key.length <= 8) return "****";

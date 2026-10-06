@@ -13,7 +13,10 @@ mode="${2:-}"
 [[ "$version" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || { echo "changelog-entry: the version must be three numbers, like 2.13.0" >&2; exit 2; }
 [ -z "$mode" ] || [ "$mode" = "--summary" ] || { echo "changelog-entry: the only choice is --summary" >&2; exit 2; }
 
-file="$(cd "$(dirname "$0")/.." && pwd)/CHANGELOG.md"
+root="$(cd "$(dirname "$0")" && pwd)"
+while [ "$root" != "/" ] && [ ! -f "$root/CHANGELOG.md" ]; do root="$(dirname "$root")"; done
+[ -f "$root/CHANGELOG.md" ] || root="$(cd "$(dirname "$0")/.." && pwd)"
+file="$root/CHANGELOG.md"
 [ -f "$file" ] || { echo "changelog-entry: CHANGELOG.md is not there" >&2; exit 1; }
 
 if [ "$mode" = "--summary" ]; then

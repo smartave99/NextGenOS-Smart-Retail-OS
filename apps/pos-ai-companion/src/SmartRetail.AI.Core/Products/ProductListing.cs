@@ -344,7 +344,7 @@ namespace SmartRetail.AI.Products
                 Line(text, "Material", seen.Material);
                 Line(text, "Size or quantity", seen.SizeOrQuantity);
                 Line(text, "Search words", string.Join(", ", seen.Keywords ?? new List<string>()));
-                Line(text, "Hindi name", seen.HindiName);
+                Line(text, "Local name", seen.LocalName);
                 Line(text, "Could not be read", seen.Notes);
             }
 

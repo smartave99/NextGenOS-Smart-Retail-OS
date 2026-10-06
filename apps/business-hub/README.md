@@ -69,7 +69,7 @@ The browser tests start `tests/NextGenOS.Hub.E2EHost`, which builds the Hub exac
 ## Layout
 
 - `src/NextGenOS.Hub.Core` — the domain: settings, catalogue, documents with the tax engine, restaurant, library, projects, appointments, purchasing, reports, the demo company builder.
-- `src/NextGenOS.Hub.Web` — the Blazor program: licence gate, sign-in, setup wizard, screens.
+- `src/NextGenOS.Hub.Web` — the Blazor program: licence gate, sign-in, setup wizard, screens. In the shipped build the names in `Hub.Core` are hidden and the names of methods in `Hub.Web` are kept (`scripts/protect-dotnet.mjs`), so **the web program must not implement an interface that `Hub.Core` defines** (the name hiding stops with "inconsistent virtual method"): hand `Hub.Core` a function instead (see `DelegateEntitlements`). Only the full gate's `hub-release` check catches this.
 - `tests/` — domain tests, web tests, and the browser-test host.
 - `e2e/` — browser tests (Playwright); `e2e/protected.mjs` runs them all against the protected build; `e2e/licensed.e2e.mjs` is run by `licensing/e2e/hub-e2e.mjs` with a real licence.
 - `installer/` — the Windows setup (NSIS), its build script and its test.

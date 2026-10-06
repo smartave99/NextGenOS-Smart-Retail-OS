@@ -14,6 +14,15 @@ public sealed class NoEntitlements : IEntitlements
 }
 
 /// <summary>
+/// An answer given as a small function. The web program passes its licence this way instead of implementing <see cref="IEntitlements"/> itself: the web program keeps the names of
+/// its methods when the shipped build hides names, and a method of ours that implements an interface from a library whose names are hidden would no longer match it.
+/// </summary>
+public sealed class DelegateEntitlements(Func<string, bool> has) : IEntitlements
+{
+    public bool Has(string module) => has(module);
+}
+
+/// <summary>
 /// The switches for the major capabilities. Every one starts off, so that nothing new happens on a shop until its owner turns it on, and the owner can turn it off again.
 /// A switch only counts when the licence has the "ai" module as well: <see cref="IsEnabled"/> is the one answer the program uses.
 /// </summary>

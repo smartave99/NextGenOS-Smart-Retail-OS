@@ -37,6 +37,13 @@ jobs:
           try "B: a draft, target = this branch" "{\"tag_name\":\"probe-b\",\"target_commitish\":\"${BRANCH}\",\"draft\":true,\"name\":\"probe b\"}"
           try "C: a draft, target = main" "{\"tag_name\":\"probe-c\",\"target_commitish\":\"main\",\"draft\":true,\"name\":\"probe c\"}"
           try "D: a draft, no target" "{\"tag_name\":\"probe-d\",\"draft\":true,\"name\":\"probe d\"}"
+          try "G: a draft whose tag name starts with v" "{\"tag_name\":\"v0.0.1-probe\",\"target_commitish\":\"${SHA}\",\"draft\":true,\"name\":\"probe g\"}"
+          try "H: the same, a pre-release with notes, as the real run asks" "{\"tag_name\":\"v0.0.1-probe-h\",\"target_commitish\":\"${SHA}\",\"draft\":true,\"prerelease\":true,\"name\":\"probe h\",\"body\":\"The release files are being built.\"}"
+          call POST "/repos/${R}/git/refs" "{\"ref\":\"refs/tags/v0.0.1-probe-i\",\"sha\":\"${SHA}\"}"
+          echo "  (I: a tag whose name starts with v) $(jq -c '{ref, message}' /tmp/out)"
+          call DELETE "/repos/${R}/git/refs/tags/v0.0.1-probe-i"
+          call GET "/repos/${R}/tags/protection"
+          jq -c '.' /tmp/out | head -c 400; echo
           call POST "/repos/${R}/git/refs" "{\"ref\":\"refs/tags/probe-f\",\"sha\":\"${SHA}\"}"
           echo "  (F: a tag at the commit) $(jq -c '{ref, message}' /tmp/out)"
           call DELETE "/repos/${R}/git/refs/tags/probe-f"

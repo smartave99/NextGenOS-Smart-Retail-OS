@@ -2,13 +2,33 @@ name: Release
 
 # Builds the release files and publishes them as a GitHub Release.
 #   - push a tag such as v1.0.0 (or v1.0.0-rc1 for a trial release), or
-#   - run it by hand from the Actions tab and choose the brand kit.
+#   - run it by hand from the Actions tab and choose the brand kit, or
+#   - change .github/trial-release.json on a claude/* branch: trial-release.yml then calls this workflow and, when the gate passes, makes the tag and the GitHub Release itself
+#     (a trial: built without licence keys, marked, never for a customer). A real release always needs a tag made by the owner.
 # Android signing keys (optional, repository secrets): ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
 # Without them the app is signed with a one-off TEST key: fine for trying it on a phone, not for a store.
 
 on:
   push:
     tags: ["v*"]
+  workflow_call:
+    inputs:
+      kit:
+        type: string
+        default: "smart-avenue-99"
+      version_name:
+        type: string
+        default: "1.0.0"
+      version_code:
+        type: string
+        default: "1"
+      trial_without_keys:
+        type: boolean
+        default: false
+      publish_trial:
+        description: "Make the tag and the GitHub Release from this run (only for a trial)."
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       kit:
@@ -291,11 +311,31 @@ jobs:
           name: linux
           path: dist/*
 
+  studio:
+    name: Setup Studio for NextGenOS staff (Windows and Linux bundles)
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Make the bundles (the Studio, its packs, its one library and Node.js, checked against nodejs.org's fingerprint)
+        run: |
+          set -euo pipefail
+          node tools/setup-studio/scripts/make-bundle.mjs --os windows --out dist --download-node 22.12.0
+          node tools/setup-studio/scripts/make-bundle.mjs --os linux --out dist --download-node 22.12.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio
+          path: dist/*
+
   publish:
     name: Publish the GitHub Release
-    needs: [gate, android, windows, linux]
+    needs: [gate, android, windows, linux, studio]
     # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
-    if: ${{ always() && startsWith(github.ref, 'refs/tags/') && needs.gate.result == 'success' }}
+    if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -308,6 +348,7 @@ jobs:
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
           LINUX: ${{ needs.linux.result }}
+          STUDIO: ${{ needs.studio.result }}
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
           set -euo pipefail
@@ -317,7 +358,9 @@ jobs:
             echo "Windows setup for the Business Hub: ${WINDOWS}"
             echo "Linux packages for the Business Hub: ${LINUX}"
             echo "Android app: ${ANDROID}"
+            echo "Setup Studio for staff: ${STUDIO}"
           } > dist/BUILD-STATUS.txt
+          cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
           cat dist/BUILD-STATUS.txt
           # A build made without the licence keys is marked so that nothing downstream (the Setup Studio included) can mistake it for a real one.
           if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then echo "This build has NO licence keys: it can never be activated. It was made only to try the installing. Do not give it to a customer." > dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt; fi
@@ -328,10 +371,14 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
+          # A tag the owner pushed names the release. A trial started from a branch makes its own tag (at the commit that was built), so nothing has to be pushed by hand.
+          if [ "${REF_TYPE}" = "tag" ]; then TAG="${REF_NAME}"; else TAG="v${VERSION_NAME}-trial${RUN_NUMBER}"; fi
           PRE=""
-          case "${TAG}" in *-rc*|*-beta*|*-alpha*) PRE="--prerelease";; esac
+          case "${TAG}" in *-rc*|*-beta*|*-alpha*|*-trial*) PRE="--prerelease";; esac
           {
             if [ -f dist/NO-LICENCE-KEYS-TRIAL-ONLY.txt ]; then echo "> **TRIAL BUILD, NO LICENCE KEYS.** The Windows setup in this release can never be activated. It is only for trying the install, the service and the uninstall. Never give it to a customer."; echo; fi
             cat .github/release-notes.md; echo; echo "Built from ${GITHUB_SHA}."; echo; echo '```'; cat dist/BUILD-STATUS.txt; echo '```'
@@ -341,5 +388,5 @@ jobs:
             gh release upload "${TAG}" dist/* --clobber --repo "${GITHUB_REPOSITORY}"
             gh release edit "${TAG}" --notes-file "${RUNNER_TEMP}/notes.md" --repo "${GITHUB_REPOSITORY}"
           else
-            gh release create "${TAG}" dist/* ${PRE} --repo "${GITHUB_REPOSITORY}" --title "Smart Retail POS ${TAG}" --notes-file "${RUNNER_TEMP}/notes.md"
+            gh release create "${TAG}" dist/* ${PRE} --target "${GITHUB_SHA}" --repo "${GITHUB_REPOSITORY}" --title "Smart Retail POS ${TAG}" --notes-file "${RUNNER_TEMP}/notes.md"
           fi

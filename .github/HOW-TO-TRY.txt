@@ -1,0 +1,56 @@
+How to try this release
+=======================
+
+Where things are (all on this release page):
+
+  NextGenOS-Setup-Studio-<version>-windows.zip / -linux.zip   the Setup Studio for NextGenOS staff, with its own Node.js. Never for a customer.
+  SmartRetailPOS-Hub-Setup-<version>.exe                      the Hub's Windows setup
+  smart-retail-pos-hub_<version>-1_amd64.deb / _arm64.deb     the Hub's Linux packages
+  SmartRetailPOS-<kit>-<version>.apk / .aab                   the Android app (signed with a one-off test key unless ANDROID-SIGNING.txt says otherwise)
+  base-kit.json                                               the list the Studio reads: which file is which, and its fingerprint
+  SHA256SUMS.txt, BUILD-STATUS.txt                            check your download; which parts were built
+
+If the release says TRIAL, the programs were built WITHOUT licence keys, only to try the installing. They can never be activated: the Hub shows its "needs a licence"
+page and nothing more. Never give a trial to a customer.
+
+PART A: the Studio (about 15 minutes)
+-------------------------------------
+1. Download every file of the release into ONE folder (for example C:\release). Unzip the Studio zip somewhere else.
+2. Double-click "Setup Studio.bat" in the folder "NextGenOS Setup Studio" (Linux: ./setup-studio.sh). A window opens (leave it open) and your browser shows the Studio.
+   Windows may warn about an unknown publisher: "More info", then "Run anyway".
+3. Make the administrator account (a name and a password of at least 8 characters). In Settings add a salesperson and a reviewer.
+4. Sign in as the salesperson. Add a customer (three questions), fill in the details, choose a look and a machine. Watch the picture of the program change.
+5. Prepare the setup and send it for approval. Sign in as the reviewer and approve it. (The person who prepared it cannot approve it: try.)
+6. As the administrator: Settings, "The programs folder", type the folder from step 1, "Check and save". It should say "Version <version>: N files checked".
+7. As the reviewer: the customer's "Installer" step. If the release is a trial, tick "only to try". Press "Make ...'s pack" and download the zip.
+8. Open the pack. Read "START HERE.html" and "READ ME FIRST.txt" in the shop-computer folder: do they say the right things, in words an owner understands?
+
+PART B: the Windows setup on a real Windows 10 or 11 PC (about 10 minutes)
+--------------------------------------------------------------------------
+1. In the pack, open "1 - Shop PC (Windows)". Keep the setup file and the "profile" folder together.
+2. Double-click the setup. Say Yes to the permission question. Windows warns about an unknown publisher until the setup is signed: "More info", "Run anyway".
+3. When it finishes, your browser should open http://127.0.0.1:5280 and show a page that says the program needs a licence, with a place to type a key.
+   That is the correct result for a trial. Tell us if it shows anything else, or if it asked you to install something first.
+4. Restart the PC. The page should be there again without you starting anything (it runs as a Windows service).
+5. For a "touch-screen till" customer the program should also open full screen by itself after the restart.
+6. Uninstall it (Settings, Apps). The folder C:\ProgramData\NextGenOS stays on purpose: the shop's information is kept.
+
+PART C: Linux (Ubuntu 22.04/24.04, Mint 21+ or Debian 12+)
+-----------------------------------------------------------
+1. Make the customer's machine "Linux" in the Studio and make a new pack. Copy "1 - Shop PC (Linux)" to the Linux PC.
+2. In a terminal there: sudo ./install.sh   (be online for this step)
+3. Open http://127.0.0.1:5280: the "needs a licence" page. Reboot: it should still be there.
+4. Remove it with the Software app. /var/lib/nextgenos stays on purpose.
+
+WHAT TO TELL US
+---------------
+ - Anything that asked you to install something first (that is a bug).
+ - Any word on any screen you did not understand.
+ - Anything that looked wrong, on either system.
+
+NOT BUILT YET
+-------------
+ - A built website for a customer: the pack carries its public settings and the steps only.
+ - The AI assistant's setup is not part of this release. It reads the Windows POS database, not the new Hub's data.
+ - A signed list of release files: the Studio checks files against fingerprints, which catches damaged downloads, not forged ones.
+ - Code signing of the setup (needs the owner's certificate).

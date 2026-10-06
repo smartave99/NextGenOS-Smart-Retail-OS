@@ -180,8 +180,30 @@ namespace SmartRetail.AI.Tests
             Assert.Matches(@"(?m)^  windows:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
             // So is the Linux package of the Hub; the release waits for all three builds to report.
             Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, android, windows, linux\]\s*\n", workflow);
+            // And so is the staff bundle of the Setup Studio.
+            Assert.Matches(@"(?m)^  studio:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, android, windows, linux, studio\]\s*\n", workflow);
             Assert.Contains("needs.gate.result == 'success'", workflow);
+        }
+
+        [Fact]
+        public void A_trial_release_started_from_a_branch_is_always_built_without_keys_and_never_from_main_or_a_tag()
+        {
+            var trial = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "trial-release.yml"));
+
+            // It starts only from a claude/* branch, only when the request file changes, and it asks the Release workflow for a keyless, marked trial.
+            Assert.Matches(@"(?m)^    branches: \[""claude/\*\*""\]\s*$", trial);
+            Assert.Contains("paths: [\".github/trial-release.json\"]", trial);
+            Assert.DoesNotContain("tags:", trial);
+            Assert.Matches(@"(?m)^      trial_without_keys: true\s*$", trial);
+            Assert.Matches(@"(?m)^      publish_trial: true\s*$", trial);
+            Assert.Contains("uses: ./.github/workflows/release.yml", trial);
+
+            // And the Release workflow makes a trial's tag only from such a request, after the gate, never a plain release.
+            var release = File.ReadAllText(Path.Combine(Repository.Root(), ".github", "workflows", "release.yml"));
+            Assert.Contains("inputs.publish_trial == true", release);
+            Assert.Contains("needs.gate.result == 'success'", release);
+            Assert.Contains("TAG=\"v${VERSION_NAME}-trial${RUN_NUMBER}\"", release);
         }
 
         [Fact]

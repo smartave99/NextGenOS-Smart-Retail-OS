@@ -8,6 +8,8 @@
 | `SmartRetailPOS-Hub-<version>-win-x64.zip` | The same program as a plain folder, for a person who deploys by hand. |
 | `smart-retail-pos-hub_<version>-1_amd64.deb` / `_arm64.deb` | **Business Hub** for Ubuntu 22.04/24.04, Linux Mint 21+ and Debian 12+ (Intel/AMD or ARM). Installs a background service with its own account, keeps the shop's data in `/var/lib/nextgenos` (never removed), and adds a menu entry and a full-screen entry for touch tills. |
 | `SmartRetailPOS-<kit>-<version>.apk` / `.aab` | The Android app: a shell around the customer's licensed website. |
+| `NextGenOS-Setup-Studio-<version>-windows.zip` / `-linux.zip` | The **Setup Studio** for NextGenOS staff, with its own Node.js. Turns a customer's details into a customer pack (the programs plus that customer's own set-up). **Staff only; never give it to a customer.** |
+| `HOW-TO-TRY.txt` | Plain steps to try the Studio, the Windows setup and the Linux package. |
 | `base-kit.json` | The list the NextGenOS **Setup Studio** reads: which file is which, with fingerprints. Download every file of the release into one folder and give that folder to the Studio, which adds a customer's own set-up beside the programs. |
 | `SHA256SUMS.txt`, `BUILD-STATUS.txt` | Check your download; which parts were built. |
 

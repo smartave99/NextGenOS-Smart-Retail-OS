@@ -31,6 +31,8 @@ What is there: eight switches (all off); a description of the computer and what 
 
 **Business events** (*Settings → AI helpers → Business events*, also off by default): a history of what happened in the business with the reason the system believes it, kept apart from what cameras and sensors merely saw. Nothing in the shop writes to it yet; it is the foundation the later parts (the business map, forecasts, the assistant, cameras) are built on. Records are forgotten when their time is up; biometric data is not kept unless the owner writes a number of days; card details are never kept.
 
+**Business map** (*Settings → AI helpers → Business map*, off by default too): what there is (places, shelves, cameras and sensors) and how it connects to your products, people and bills. Your own records are read where they are, never copied. It names things the way events do (`zone:aisle-3`, `product:12`).
+
 ## Devices
 
 `libs/dotnet/NextGenOS.Devices` speaks the languages of shop printers: **ESC/POS** (nearly every receipt printer), **ZPL**, **TSPL**, **EPL** and **CPCL** (label printers), and reaches them over the **network** (port 9100), a **serial or Bluetooth port**, a **USB device file**, the **system print queue (CUPS)** or the **Windows spooler** (raw). Letters a printer's character set lacks (other alphabets, Chinese, Japanese, Korean) are printed as pictures; receipt currency signs it cannot write are spelled (₹ as Rs). Scanners: USB and Bluetooth scanners that type like a keyboard work in every box; any camera (phone, tablet, webcam) reads barcodes through the browser or, where the browser cannot, through the Hub. Price tags and posters (shelf labels, A4 and A3) print from the browser to any printer. Set it all up in **Settings → Printers**.

@@ -4,6 +4,7 @@
 @using System.Globalization
 @using NextGenOS.Hub.Ai
 @using NextGenOS.Hub.Events
+@using NextGenOS.Hub
 
 <PageTitle>Business events</PageTitle>
 <h1>Business events</h1>
@@ -258,7 +259,22 @@ else if (!App.Events.Recording)
         await Reload();
     }
 
-    private string Refs(EventRecord e) => string.Join(" · ", new[] { e.ActorRef ?? e.SubjectRef, e.ObjectRef, e.ZoneRef }.Where(x => !string.IsNullOrEmpty(x)));
+    private readonly Dictionary<string, string> named = new();
+
+    /// <summary>The things an event points at, by name where the business map knows them ("Basmati rice (product:12)") and by reference where it does not.</summary>
+    private string Refs(EventRecord e) => string.Join(" · ", new[] { e.ActorRef ?? e.SubjectRef, e.ObjectRef, e.ZoneRef }.Where(x => !string.IsNullOrEmpty(x)).Select(x => Named(x!)));
+
+    private string Named(string reference)
+    {
+        if (named.TryGetValue(reference, out var known)) return known;
+        string text = reference;
+        try
+        {
+            if (Ontology.ThingRef.TryParse(reference, out var thing) && App.Ontology.Resolve(thing) is { Exists: true } view && !view.Retired) text = view.Label + " (" + reference + ")";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { /* a name that cannot be looked up is shown as the reference */ }
+        return named[reference] = text;
+    }
 
     private static string Percent(double confidence) => Math.Round(confidence * 100).ToString(CultureInfo.InvariantCulture) + "%";
 }

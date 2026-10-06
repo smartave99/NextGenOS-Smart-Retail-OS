@@ -17,7 +17,7 @@ public class CoreTests
         Assert.NotNull(f.App.Db.Scalar("SELECT name FROM sqlite_master WHERE name = 'documents'"));
         var again = HubApp.Open(f.App.Db.Path, f.Clock);
         // Every step of the database once, and only once: opening it again does not run a step twice.
-        Assert.Equal(new long[] { 1, 2, 3 }, again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
+        Assert.Equal(new long[] { 1, 2, 3, 4 }, again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
     }
 
     [Fact]

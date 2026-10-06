@@ -502,7 +502,7 @@ public class EventMigrationTests
             Assert.Contains("site_id", columns);
         }
 
-        Assert.Equal(new long[] { 1, 2, 3 }, f.App.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
+        Assert.Equal(new long[] { 1, 2, 3, 4 }, f.App.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
     }
 
     [Fact]
@@ -529,6 +529,6 @@ public class EventMigrationTests
         Assert.Empty(Tables(f.App).Intersect(EventTables.Concat(AiTables)));
         var again = HubApp.Open(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), EventTables.Concat(AiTables).ToHashSet());
-        Assert.Contains("before-update-1-to-3", again.Db.LastBackup);
+        Assert.Contains("before-update-1-to-4", again.Db.LastBackup);
     }
 }

@@ -115,7 +115,28 @@ public class AiSettingsWebTests
 
         Assert.False(f.Hub.Events.Recording);
         Assert.Equal(new NextGenOS.Hub.Events.EventCounts(0, 0, 0, 0, 0, null, null), f.Hub.Events.Counts());
-        Assert.Empty(f.Hub.Audit.Recent().Where(a => a.Action.StartsWith("events.", StringComparison.Ordinal)));
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("events.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_business_map_screen_is_for_the_owner_and_looking_at_it_adds_nothing_to_the_map()
+    {
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        var http = Client(f);
+
+        var anonymous = await Get(http, "/settings/map");
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.Contains("/login", anonymous.Headers.Location!.OriginalString);
+
+        var owner = await SignIn(http, "owner", "correct horse battery");
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/settings/map", owner)).StatusCode);
+        var manager = await SignIn(http, "boss", "manager good password");
+        await Get(http, "/settings/map", manager);
+
+        Assert.False(f.Hub.Ontology.Writable);
+        Assert.Empty(f.Hub.Ontology.Things(NextGenOS.Hub.Ontology.EntityType.Zone));
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("map.", StringComparison.Ordinal));
     }
 
     [Fact]

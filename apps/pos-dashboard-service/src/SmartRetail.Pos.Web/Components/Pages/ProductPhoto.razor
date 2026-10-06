@@ -545,7 +545,7 @@ else
     /// <summary>Stops waiting for Codex's usage limit: everything is tried again at once.</summary>
     private void TryNow() => Act(() => Photos.TryNow());
 
-    /// <summary>"from photo 3: European model", or "with the listings": where the work goes on when the limit lifts.</summary>
+    /// <summary>"from photo 3: Model 1" (the title the profile gives it), or "with the listings": where the work goes on when the limit lifts.</summary>
     private string CarryOnWith(ProductPhotoInfo info, PhotoSet set)
     {
         if (info.ListingPending && !set.Pending.Contains(PhotoKind.WhiteBackground))
@@ -587,7 +587,7 @@ else
         Show("The AI is changing the photo as you asked. Photos made before stay; you can leave this page meanwhile.", problem: false, whileMaking: true);
     }
 
-    /// <summary>", then Indian model" after the photo being made: what the AI makes next for this product.</summary>
+    /// <summary>" · next: Model 2 and 1 more" after the photo being made: what the AI makes next for this product.</summary>
     private string NextAfter(PhotoQueue queue) =>
         queue.NextKinds.Count > 0 ? " · next: " + queue.NextKinds[0].Title(Ai.Shop) + (queue.NextKinds.Count > 1 ? $" and {queue.NextKinds.Count - 1} more" : "")
         : queue.ListingNext ? " · then the listings"

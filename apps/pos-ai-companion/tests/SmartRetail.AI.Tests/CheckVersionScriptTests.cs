@@ -182,7 +182,12 @@ namespace SmartRetail.AI.Tests
             Assert.Matches(@"(?m)^  linux:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
             // And so is the staff bundle of the Setup Studio.
             Assert.Matches(@"(?m)^  studio:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows, linux, studio\]\s*\n", workflow);
+            // And so is the website of the customer, on Linux and on Windows (each system builds its own, with its own native parts, then starts it from the zip).
+            Assert.Matches(@"(?m)^  website:\s*\n(    .*\n)*?    needs: \[gate, prepare\]\s*\n", workflow);
+            Assert.Contains("node scripts/make-website-package.mjs", workflow);
+            Assert.Contains("node scripts/smoke-website.mjs", workflow);
+            Assert.Contains("--node-app", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows, linux, studio, website\]\s*\n", workflow);
             // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
             Assert.Matches(@"(?m)^  prepare:\s*\n(    .*\n)*?    needs: gate\s*\n", workflow);
             Assert.DoesNotContain("upload-artifact", workflow);
@@ -222,7 +227,7 @@ namespace SmartRetail.AI.Tests
             {
                 // Typed values (inputs, brand-kit fields) may reach scripts only as environment variables, never inside the script text.
                 var isScriptText = !line.TrimStart().StartsWith("env:") && !line.TrimStart().StartsWith("KIT:") && !line.TrimStart().StartsWith("VERSION_")
-                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:") && !line.TrimStart().StartsWith("TRIAL_") && !line.TrimStart().StartsWith("PUBLISH_TRIAL:")
+                                   && !line.TrimStart().StartsWith("TAG:") && !line.TrimStart().StartsWith("APP_") && !line.TrimStart().StartsWith("STOREFRONT_URL:") && !line.TrimStart().StartsWith("BRAND_") && !line.TrimStart().StartsWith("KEYSTORE_PASSWORD:") && !line.TrimStart().StartsWith("KEY_") && !line.TrimStart().StartsWith("GH_TOKEN:") && !line.TrimStart().StartsWith("KEYSTORE_B64:") && !line.TrimStart().StartsWith("TRIAL_") && !line.TrimStart().StartsWith("PUBLISH_TRIAL:") && !line.TrimStart().StartsWith("WEBSITE_")
                                    && !line.TrimStart().StartsWith("#") && !line.TrimStart().StartsWith("description:") && !line.TrimStart().StartsWith("default:");
                 if (isScriptText)
                 {

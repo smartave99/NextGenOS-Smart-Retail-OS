@@ -9,6 +9,7 @@ import { writeZipFile } from './zip.mjs';
 import { pick } from './basekit.mjs';
 import { handoverFor, handoverHtml } from './handover.mjs';
 import { countryPack } from './packs.mjs';
+import { buildAiProfile } from './aiprofile.mjs';
 
 /** Something a person must put right before a pack can be made. */
 export class PackError extends Error {}
@@ -127,6 +128,15 @@ const websiteEnv = (intake) => CRLF([
   '# No password or key is written here. The website\'s own accounts (its database and picture storage) are set up separately.',
 ]);
 
+/** The same public settings on one line, separated by semicolons: what a person pastes into the release workflow's "Website settings" box. Null when a value holds a semicolon (use a brand kit then). */
+export function websiteSettingsLine(intake) {
+  const values = websiteEnv(intake).split(/\r?\n/).filter((l) => /^NEXT_PUBLIC_[A-Z_]+=/.test(l));
+  return values.some((l) => l.includes(';')) ? null : values.join(';');
+}
+
+/** The file name the release workflow gives a customer's website for one system (scripts/make-website-package.mjs): website-<customer>-<windows|linux>.zip. */
+export const websiteFileName = (customerId, os) => `website-${customerId}-${os}.zip`;
+
 /**
  * What a pack would hold, and what is missing, without writing anything (slug: the customer's short name, which is also its brand kit's name). Returns [{ id, title, wanted, status: 'ready'|'missing'|'skipped', files: [programs], note }].
  * `kit` is the result of readBaseKit.
@@ -146,9 +156,10 @@ export function planPack({ intake, kit, slug }) {
       note: !windows ? 'It is a Windows program, so it is left out of a Linux pack.' : ai.length ? 'It reads the Windows POS database, not yet the new program\'s own data.' : 'The AI assistant\'s setup is not in the programs folder (it is built on a Windows PC with apps/pos-ai-companion/build.ps1 -Installer).' });
   }
   if (eco.website.wanted) {
-    const site = pick(kit, 'website');
+    // A website is built for one customer (its name, address and country are built in): only the one named for this customer is used, for each system the release has.
+    const site = pick(kit, 'website', { kit: slug });
     items.push({ id: 'website', title: 'The website', wanted: true, files: site, status: site.length ? 'ready' : 'missing',
-      note: site.length ? 'The built website and its public settings.' : 'The website\'s public settings are in the pack. A built website for this customer is not in the programs folder: the release does not build one yet.' });
+      note: site.length ? `The website built for this customer (${site.map((f) => f.os === 'windows' ? 'Windows' : 'Linux').join(' and ')}), with its public settings.` : 'The website\'s public settings are in the pack. A website for this customer has not been built yet: each customer has their own build. The pack holds the steps (the release workflow, with these settings).' });
   }
   if (eco.android.wanted) {
     const apk = pick(kit, 'android-apk', { kit: slug });
@@ -231,22 +242,41 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
     if (item.id === 'ai' && item.status === 'ready') {
       const folder = '2 - AI assistant (Windows)';
       for (const f of item.files) copy(`${folder}/${f.name}`, f.path);
+      // The business's own settings for its pictures and posters (country, who the model photos show, festivals, second language): plain data beside the setup, which copies it in.
+      const aiProfile = buildAiProfile(intake);
+      if (aiProfile.problems.length) throw new PackError(`The AI assistant's settings for ${business} cannot be written: ${aiProfile.problems.join(' ')}`);
+      put(`${folder}/profile/ai.json`, aiProfile.text);
       put(`${folder}/READ ME FIRST.txt`, readme(`${business}: the AI assistant`, [
         'The AI assistant answers questions about sales and stock, and makes sale posters.',
         'It runs beside the Windows POS on the same computer and only reads its database; it never changes anything.',
         'It does not yet read the information of the new Smart Retail POS program.',
         '',
-        `1. Double-click "${item.files[0].name}" and follow the steps.`,
-        '2. Open the AI assistant from the Start menu. The first time, type the licence key you were given.',
+        '1. Keep this whole folder together: the setup file and the folder called "profile" next to it.',
+        `2. Double-click "${item.files[0].name}" and follow the steps.`,
+        '3. Open the AI assistant from the Start menu. The first time, type the licence key you were given.',
+        '',
+        'The folder "profile" holds this business\'s own settings for the AI: its country, who the people in product photos look like, its festivals and the second language of its posters. Setup copies it in. It holds no password or key. Without it the AI still works, with neutral wording.',
       ], help));
     }
     if (item.id === 'website') {
       const folder = '3 - Website';
       for (const f of item.files) copy(`${folder}/${f.name}`, f.path);
       put(`${folder}/website-settings.env`, websiteEnv(intake));
-      put(`${folder}/READ ME FIRST.txt`, readme(`${business}: the website`, [
-        item.files.length ? 'The built website is in this folder.' : 'The built website is not in this pack yet.',
-        'website-settings.env holds the website\'s public settings: its name, address, country and kind of business. It holds no password.',
+      const line = websiteSettingsLine(intake);
+      put(`${folder}/READ ME FIRST.txt`, readme(`${business}: the website`, item.files.length ? [
+        `The website built for ${business} is in this folder: ${item.files.map((f) => f.name).join(', ')}.`,
+        'Use the one for the computer that will run the website: "windows" for Windows 10 or 11 (64-bit), "linux" for Ubuntu, Linux Mint or Debian (64-bit). Unpack it and read "READ ME FIRST.txt" inside. It carries its own Node.js: nothing has to be installed first.',
+        ...item.files.map((f) => `Fingerprint of ${f.name} (SHA-256): ${f.sha256}`),
+        ...(kit.trial ? ['', 'This website was built without the licence keys (a trial build). It can never be licensed. Never give it to a customer.'] : []),
+        '',
+        'The name, address, country and kind of business are built into this website, from website-settings.env (it holds no password). To change them, make a new website.',
+        'It needs the licence for the website, and its own accounts (its database and its picture storage). Those are set up by the person who puts the website online; the folder inside lists them in private-settings.example.env.',
+      ] : [
+        `The website for ${business} has not been built yet. A website is built for each customer, because its name, address and country are built in.`,
+        'website-settings.env holds those public settings. It holds no password.',
+        `To build it: on GitHub, open Actions, "Release", Run workflow. Type ${customerId} as "Website customer"${line ? ' and paste this line as "Website settings":' : ', and give the settings of website-settings.env (the box takes one line; a setting that holds a semicolon needs a brand kit in brand-kits/ instead):'}`,
+        ...(line ? ['', line, ''] : []),
+        `The release makes ${websiteFileName(customerId, 'windows')} and ${websiteFileName(customerId, 'linux')}. Download them into the programs folder of the Setup Studio and make the pack again.`,
         'The website also needs its own accounts (its database and its picture storage). Those are set up by the person who puts the website online.',
       ], help));
     }
@@ -269,7 +299,7 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
 
   // The hand-over sheet, last, so it can name what is in the pack.
   const logoUri = logo ? `data:image/${logo.ext === 'jpg' ? 'jpeg' : logo.ext === 'svg' ? 'svg+xml' : logo.ext};base64,${logo.bytes.toString('base64')}` : null;
-  const sheet = handoverFor({ intake, info, company, pack: true });
+  const sheet = handoverFor({ intake, info, company, pack: { ai: plan.some((p) => p.id === 'ai' && p.status === 'ready') } });
   put('START HERE.html', handoverHtml(sheet, { colour: intake.look.primaryColor, logo: logoUri }));
 
   // What is in it, with every file's fingerprint.

@@ -142,6 +142,42 @@ try {
   step('the look page shows the real program in the chosen machine layout, as a picture that follows each choice');
   await page.locator('[data-step="details"]').click();
   await page.locator('[data-tab="extras"]').click();
+  // the AI assistant's own settings (who the model photos show, festivals, a second language) appear only when the customer gets the assistant, and stay neutral until typed
+  assert.strictEqual(await page.locator('#ai-profile-holder').isHidden(), true, 'no AI settings before the assistant is ordered');
+  await page.locator('label.switch', { hasText: 'The AI assistant (Windows)' }).click();
+  await page.locator('#ai-profile').waitFor();
+  const said = async (id) => page.locator(`#ai-explain [data-line="${id}"]`).innerText();
+  assert.strictEqual(await said('business'), 'Pictures and posters are made for a retail shop in Philippines.');
+  assert.match(await said('model-1'), /No look is asked for/);
+  assert.match(await said('festivals'), /No festival is named/);
+  assert.strictEqual(await said('language'), 'Posters are in one language.');
+  await page.locator('input[data-path="images.countryName"]').fill('the Philippines');
+  await page.locator('input[data-path="images.models.1.title"]').fill('Visayan model');
+  await page.locator('input[data-path="images.models.1.looks"]').fill('Visayan, in his forties');
+  for (const f of ['Sinulog', 'Christmas', 'sinulog']) { await page.locator('#ai-festival-add').fill(f); await page.locator('#ai-festival-add').press('Enter'); }
+  assert.strictEqual(await page.locator('#ai-festival-chips .chip').count(), 2, 'a repeat in other letters is one festival');
+  await page.locator('#ai-language-offers [data-language="fil"]').click();
+  assert.strictEqual(await page.locator('input[data-path="images.localLanguage.name"]').inputValue(), 'Filipino');
+  assert.strictEqual(await page.locator('input[data-path="images.localLanguage.tag"]').inputValue(), 'fil');
+  await page.locator('input[data-path="images.localLanguage.lines.clearance"]').fill('Malaking bawas');
+  assert.strictEqual(await said('business'), 'Pictures and posters are made for a retail shop in the Philippines.');
+  assert.match(await said('model-0'), /called "Model 1"\. No look is asked for/);
+  assert.match(await said('model-1'), /called "Visayan model"\. The person looks like this: Visayan, in his forties\./);
+  assert.match(await said('festivals'), /Sinulog, Christmas/);
+  assert.match(await said('language'), /second line in Filipino \(fil\)\. Ready-made lines for: clearance\./);
+  await shot(page, '09a-ai-profile');
+  // a mistake is named next to the place it was typed, stays in front of the person, and is gone once it is taken out
+  await page.locator('#ai-festival-add').fill('<b>Eid</b>'); await page.locator('#ai-festival-add').press('Enter');
+  await page.locator('#save').click();
+  await page.locator('.toast', { hasText: 'Saved' }).last().waitFor();
+  await page.locator('[data-error-for="images.festivals"] .err', { hasText: 'cannot have' }).waitFor();
+  assert.strictEqual(await page.locator('#ai-festival-chips .chip').count(), 3, 'the festival that cannot be used stays, with its problem');
+  await page.locator('#ai-festival-chips button[aria-label="Take out <b>Eid</b>"]').click();
+  await page.locator('#save').click();
+  await page.locator('.toast', { hasText: 'Saved' }).last().waitFor();
+  await page.locator('[data-error-for="images.festivals"] .err').waitFor({ state: 'detached' });
+  assert.strictEqual(await page.locator('#ai-festival-chips .chip').count(), 2);
+  step('the AI assistant\'s own settings appear when it is ordered, stay neutral until typed, explain live what they change, offer the country\'s languages, and a mistake is named where it was typed');
   await page.locator('[data-path="licence.whiteLabel"] [data-value="theme"]').click();
   await page.locator('#save').click();
   await page.locator('.toast', { hasText: 'Saved' }).last().waitFor();
@@ -261,6 +297,7 @@ try {
   const programs = join(root, 'programs'); mkdirSync(programs);
   writeFileSync(join(programs, 'SmartRetailPOS-Hub-Setup-1.4.0.exe'), Buffer.alloc(20000, 5));
   writeFileSync(join(programs, 'smart-retail-pos-hub_1.4.0-1_amd64.deb'), Buffer.alloc(12000, 6));
+  writeFileSync(join(programs, 'SmartRetailAI-Setup.exe'), Buffer.alloc(9000, 7));
   writeFileSync(join(programs, 'base-kit.json'), JSON.stringify((await makeBaseKit(programs)).manifest));
   await page.goto(studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/installer');
   await page.locator('#programs-card').waitFor();
@@ -276,13 +313,14 @@ try {
   await page.locator('#programs-say .notice.warn', { hasText: 'not found' }).waitFor();
   await page.locator('#programs-folder').fill(programs);
   await page.locator('#programs-save').click();
-  await page.locator('#programs-say .notice.ok', { hasText: 'Version 1.4.0: 2 files checked' }).waitFor();
+  await page.locator('#programs-say .notice.ok', { hasText: 'Version 1.4.0: 3 files checked' }).waitFor();
   await shot(page, '14c-settings-programs');
   await page.locator('#signout').click();
   await signIn(page, 'Rita Reviewer', 'rita-long-password');
   await page.goto(studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/installer');
   await page.locator('#programs-ok').waitFor();
   await page.locator('#pack-items [data-part="shop-pc"][data-status="ready"]').waitFor();
+  await page.locator('#pack-items [data-part="ai"][data-status="ready"]').waitFor();
   await shot(page, '14d-installer-ready');
   await page.locator('#make-pack').click();
   await page.locator('.toast', { hasText: 'The pack is made' }).last().waitFor({ timeout: 60000 });
@@ -293,7 +331,7 @@ try {
   const packPath = join(root, 'downloaded-pack.zip');
   await packDownload.saveAs(packPath);
   const inPack = listZip(readFileSync(packPath));
-  for (const want of ['Luzon Fresh Mart/START HERE.html', 'Luzon Fresh Mart/1 - Shop PC (Windows)/SmartRetailPOS-Hub-Setup-1.4.0.exe', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/setup.json', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/install.ini']) assert.ok(inPack.includes(want), want + ' is in the pack');
+  for (const want of ['Luzon Fresh Mart/START HERE.html', 'Luzon Fresh Mart/1 - Shop PC (Windows)/SmartRetailPOS-Hub-Setup-1.4.0.exe', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/setup.json', 'Luzon Fresh Mart/1 - Shop PC (Windows)/profile/install.ini', 'Luzon Fresh Mart/2 - AI assistant (Windows)/SmartRetailAI-Setup.exe', 'Luzon Fresh Mart/2 - AI assistant (Windows)/profile/ai.json']) assert.ok(inPack.includes(want), want + ' is in the pack');
   await shot(page, '14e-pack-made');
   step('an administrator chooses the programs folder (a wrong folder is explained); a reviewer sees what goes in the pack, makes it, and downloads the zip with the setup and the customer\'s profile beside it');
 
@@ -303,6 +341,7 @@ try {
   assert.match(await page.locator('#handover-sheet').innerText(), /Luzon Fresh Mart: your Smart Retail POS/);
   assert.match(await page.locator('#handover-sheet').innerText(), /Their own colours and logo/);
   assert.match(await page.locator('#handover-sheet').innerText(), /1 - Shop PC \(Windows\)/, 'the sheet names the pack\'s folder');
+  assert.match(await page.locator('#handover-sheet').innerText(), /2 - AI assistant \(Windows\)/, 'and the AI assistant\'s folder');
   await shot(page, '15-handover');
   await page.locator('#deliver-note').fill('Given to the owner, Ana.');
   await page.locator('#deliver').click();

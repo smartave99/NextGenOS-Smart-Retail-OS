@@ -111,6 +111,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
+  // A packaged website (scripts/make-website-package.mjs) is built as a folder that holds its own server and the libraries it needs.
+  // Only that script sets this; the normal build, the Android app's build and the development server are not changed by it.
+  ...(process.env.NGOS_PACKAGE_BUILD === "1" ? { output: "standalone" as const, outputFileTracingRoot: process.cwd() } : {}),
   eslint: {
     ignoreDuringBuilds: true,
   },

@@ -67,6 +67,21 @@ The packages marked MIT are used under the MIT License, whose text is at the end
 | NSIS | Builds the setup program (`SmartRetailAI-Setup.exe`); its runtime is inside the setup | The NSIS licence (zlib/libpng style, with the licences of the compression code it includes), https://nsis.sourceforge.io/NSIS_License |
 | Microsoft Edge WebView2 Runtime bootstrapper | Inside the setup; run only on a PC that does not have WebView2 | Microsoft's redistribution terms for the WebView2 Runtime |
 
+## The website package
+
+`website-<customer>-<windows|linux>.zip` is the customer's website with the software it runs on. It is not part of the Hub's setup. Its folder `app/node_modules` carries each library with its own licence file; the release checks that every library's licence allows proprietary redistribution (MIT, ISC, BSD, Apache-2.0 and the like), and that nothing under GPL, AGPL, SSPL or a non-commercial licence is inside.
+
+| Component | Where | Licence |
+|---|---|---|
+| Node.js (official build from nodejs.org) | `node/`, with its own `LICENSE` file, which lists the components inside Node.js (V8, OpenSSL, ICU, zlib, and others) | MIT, © Node.js contributors, and the licences listed in that file |
+| Next.js, React | The website's server and pages | MIT, © Vercel, Inc. and Meta Platforms, Inc. |
+| Prisma (client and query engine) | `app/node_modules/@prisma`, `.prisma` | Apache-2.0, © Prisma Data, Inc. |
+| sharp | `app/node_modules/sharp` and `@img/sharp-<system>` | Apache-2.0, © Lovell Fuller and contributors |
+| libvips, inside `@img/sharp-libvips-linux-x64` (Linux) and `@img/sharp-win32-x64` (Windows) | The picture library, a separate file that is loaded when the website runs and can be replaced by the user | LGPL-3.0-or-later; its licence text is in the same folder. NextGenOS has not changed it, and offers its source on request (smartave99@gmail.com) |
+| lightningcss | `app/node_modules/lightningcss`, a style compiler the build tools left in the traced files | MPL-2.0, unchanged |
+| caniuse-lite | A table of browser features | CC-BY-4.0, © Alexis Deveria and Ben Briggs |
+| The other libraries (about 190 packages, listed in each folder's `package.json`) | `app/node_modules` | MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC and BlueOak-1.0.0: each with its own licence file |
+
 ## Tools used by NextGenOS staff (never in anything a customer receives)
 
 The Setup Studio (`tools/setup-studio`) is a staff tool. It runs on Node.js and has one dependency, the Anthropic SDK for TypeScript (used only when staff choose the Claude API as their AI tool), with the packages it needs. They are not part of any installer, zip, package or app; they are listed here because the Studio is distributed to NextGenOS staff.

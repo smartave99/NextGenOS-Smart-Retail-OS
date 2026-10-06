@@ -25,7 +25,10 @@ export function handoverFor({ intake: i, info, company = {}, pack = null }) {
   if (first) what.push(`Your first ${first} are already in.`);
   if (i.ecosystem.website.wanted) what.push(`Your website${i.ecosystem.website.domain ? ': ' + i.ecosystem.website.domain : ''}.`);
   if (i.ecosystem.android.wanted) what.push('Your Android app.');
-  if (i.ecosystem.aiAddon?.wanted && i.device.os === 'windows') what.push('The AI assistant, for the Windows POS.');
+  if (i.ecosystem.aiAddon?.wanted && i.device.os === 'windows') {
+    const own = [i.images?.models?.some((m) => m.title || m.looks) && 'the people in its product photos', i.images?.festivals?.length && 'its festivals', i.images?.localLanguage?.name && i.images?.localLanguage?.tag && 'the second language of its posters'].filter(Boolean);
+    what.push(`The AI assistant, for the Windows POS${own.length ? `, set up with ${own.length > 1 ? own.slice(0, -1).join(', ') + ' and ' + own.at(-1) : own[0]}` : ''}.`);
+  }
 
   const steps = [];
   if (pack) {
@@ -37,6 +40,7 @@ export function handoverFor({ intake: i, info, company = {}, pack = null }) {
     'Your business details are already filled in. Check them, choose your own sign-in name and password, and finish.');
   if (i.device.printer !== 'none') steps.push(`Connect the ${(printer?.label ?? 'printer').toLowerCase()}, then open Settings, then Devices, to choose it.`);
   steps.push('Make your first sale to try it.');
+  if (pack?.ai) steps.push('Then, for the AI assistant, open the folder "2 - AI assistant (Windows)" and double-click its setup file. Keep the folder called "profile" next to it: it holds your own settings for the photos and posters.');
 
   const contact = [company.supportPhone, company.supportEmail, company.website].filter(Boolean);
   const sections = [

@@ -107,3 +107,15 @@ test('a program that needs .NET installed is refused; a folder with no program i
   assert.match(dep, /needs \.NET installed/);
   assert.match(audit({ 'prerequisites.json': manifest(), 'readme.txt': 'hi' }, { os: 'linux' }).problems.join('\n'), /no program file was found/);
 });
+
+test('Linux: OpenSSL 3 may be relied on only when the package says so (the website\'s database library links to it)', () => {
+  const files = { app: makeElf({ needed: ['libc.so.6'] }), 'engine.so.node': makeElf({ needed: ['libssl.so.3', 'libcrypto.so.3', 'libc.so.6'] }) };
+  const without = audit({ 'prerequisites.json': manifest(), ...files }, { os: 'linux' }).problems.join('\n');
+  assert.match(without, /engine\.so\.node: needs libssl\.so\.3/);
+  assert.match(without, /engine\.so\.node: needs libcrypto\.so\.3/);
+  assert.deepEqual(audit({ 'prerequisites.json': manifest({ system: ['glibc-2.35-or-newer', 'openssl-3'] }), ...files }, { os: 'linux' }).problems, []);
+  // Only OpenSSL 3: the older one, and any other library, is still not supplied.
+  const old = audit({ 'prerequisites.json': manifest({ system: ['glibc-2.35-or-newer', 'openssl-3'] }), 'engine.so.node': makeElf({ needed: ['libssl.so.1.1', 'libz.so.1'] }) }, { os: 'linux' }).problems.join('\n');
+  assert.match(old, /needs libssl\.so\.1\.1/);
+  assert.match(old, /needs libz\.so\.1/);
+});

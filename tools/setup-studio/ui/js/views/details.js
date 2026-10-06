@@ -1,8 +1,11 @@
 import { h, icon, getPath, setPath, sheet, toast, ago } from '../dom.js';
 import { post } from '../api.js';
 import { text, area, select, toggle, seg, cards, section, errorBox } from './form.js';
+import { aiSection } from './aiprofile.js';
 
 const TABS = [['business', 'Business'], ['money', 'Bills and money'], ['data', 'Starting data'], ['extras', 'Extras and licence']];
+// Puts one piece in a box, or empties it. (replaceChildren(null) would write the word "null" on the page.)
+const show = (box, node) => (node ? box.replaceChildren(node) : box.replaceChildren());
 const FEATURE_WORDS = { counterSale: ['Sell at the counter', 'Take sales at a till'], tables: ['Tables', 'Seat guests and run tabs'], kitchen: ['Kitchen screen', 'Send orders to a kitchen'], lending: ['Lending', 'Loans, returns and fines'], projects: ['Projects', 'Quotes, progress bills, retention'], appointments: ['Bookings', 'Appointments and visits'], credit: ['Credit accounts', 'Sell on account'], purchases: ['Buying', 'Orders to suppliers and stock in'], weighedItems: ['Weighed items', 'Sell by weight'] };
 
 export async function render(ctx) {
@@ -27,12 +30,12 @@ function business(ctx) {
     const c = country();
     regionBox.replaceChildren();
     if (c && c.regions.length > 1) regionBox.append(select(ctx, 'business.region', c.regions, { label: c.regionLabel ?? 'Region', blank: 'The owner chooses while setting up', hint: 'Only needed when tax depends on the place.' }));
-    taxNote.replaceChildren(c && !c.reviewed ? h('div', { class: 'notice warn' }, icon('warn'), h('div', {}, h('b', {}, `The ${c.name} tax rules are not yet checked by a local tax adviser.`), h('div', { class: 'small' }, 'Tell the customer, and have their accountant confirm the rates and bill wording before real bills.'))) : null);
+    show(taxNote, c && !c.reviewed ? h('div', { class: 'notice warn' }, icon('warn'), h('div', {}, h('b', {}, `The ${c.name} tax rules are not yet checked by a local tax adviser.`), h('div', { class: 'small' }, 'Tell the customer, and have their accountant confirm the rates and bill wording before real bills.'))) : null);
     ctx.redraw();
   };
   const industry = () => ctx.opts.industries.find((i) => i.id === d.business.industry);
   const coverage = h('div');
-  const drawIndustry = () => { const i = industry(); coverage.replaceChildren(i ? h('details', { class: 'more mt-s' }, h('summary', {}, icon('info', 's'), `What works today for ${i.name}`), h('div', { class: 'grid2 mt-s' }, h('div', {}, h('b', {}, 'Works today'), h('ul', {}, i.coverage.works.map((w) => h('li', {}, w)))), h('div', {}, h('b', {}, 'Not built yet'), h('ul', {}, i.coverage.notYet.length ? i.coverage.notYet.map((w) => h('li', {}, w)) : h('li', {}, 'Nothing listed'))))) : null); };
+  const drawIndustry = () => { const i = industry(); show(coverage, i ? h('details', { class: 'more mt-s' }, h('summary', {}, icon('info', 's'), `What works today for ${i.name}`), h('div', { class: 'grid2 mt-s' }, h('div', {}, h('b', {}, 'Works today'), h('ul', {}, i.coverage.works.map((w) => h('li', {}, w)))), h('div', {}, h('b', {}, 'Not built yet'), h('ul', {}, i.coverage.notYet.length ? i.coverage.notYet.map((w) => h('li', {}, w)) : h('li', {}, 'Nothing listed'))))) : null); };
   const reg = h('div');
   const out = [
     section('The business', 'The name customers know it by, and where it is.',
@@ -138,15 +141,21 @@ function importSheet(ctx, kind, ind, done) {
 function extras(ctx) {
   const d = ctx.draft;
   const site = h('div'); const app = h('div');
-  const drawSite = () => site.replaceChildren(d.ecosystem.website.wanted ? text(ctx, 'ecosystem.website.domain', { label: 'Website name', placeholder: 'shop.example.com', hint: 'Without https:// and without a slash.' }) : null);
-  const drawApp = () => app.replaceChildren(d.ecosystem.android.wanted ? text(ctx, 'ecosystem.android.appId', { label: 'App id', placeholder: 'com.yourshop.app', hint: 'Small letters, at least three parts separated by dots.' }) : null);
+  const drawSite = () => show(site, d.ecosystem.website.wanted ? text(ctx, 'ecosystem.website.domain', { label: 'Website name', placeholder: 'shop.example.com', hint: 'Without https:// and without a slash.' }) : null);
+  const drawApp = () => show(app, d.ecosystem.android.wanted ? text(ctx, 'ecosystem.android.appId', { label: 'App id', placeholder: 'com.yourshop.app', hint: 'Small letters, at least three parts separated by dots.' }) : null);
   drawSite(); drawApp();
+  // The AI assistant's own settings (who the model photos show, festivals, a second language) are shown only when the customer gets the assistant.
+  const ai = h('div', { id: 'ai-profile-holder' });
+  let aiBuilt = false;
+  const drawAi = () => { const wanted = ctx.draft.ecosystem.aiAddon.wanted; if (wanted && !aiBuilt) { ai.append(aiSection(ctx)); aiBuilt = true; } ai.hidden = !wanted; };
+  drawAi();
   const level = () => ctx.opts.options.whiteLabel.find((l) => l.id === d.licence.whiteLabel);
   return [
     section('The rest of the ecosystem', 'Does this customer also get a website and a phone app?',
       h('div', { class: 'grid2' }, h('div', { class: 'col' }, toggle(ctx, 'ecosystem.website.wanted', { label: 'A website', text: 'An online shop for their products', onChange: drawSite }), site),
         h('div', { class: 'col' }, toggle(ctx, 'ecosystem.android.wanted', { label: 'An Android app', text: 'Opens their website as an app', onChange: drawApp }), app)),
-      h('div', { class: 'mt-s' }, toggle(ctx, 'ecosystem.aiAddon.wanted', { label: 'The AI assistant (Windows)', text: 'Answers questions about sales and stock. It reads the Windows POS database, not yet the new program\'s own data.' }))),
+      h('div', { class: 'mt-s' }, toggle(ctx, 'ecosystem.aiAddon.wanted', { label: 'The AI assistant (Windows)', text: 'Answers questions about sales and stock, and makes product photos and sale posters. It reads the Windows POS database, not yet the new program\'s own data.', onChange: drawAi }))),
+    ai,
     section('What their licence will allow', 'How much of the look the owner can change on their own. This is what you choose when you make their licence.',
       cards(ctx, 'licence.whiteLabel', ctx.opts.options.whiteLabel, { minWidth: 230 }),
       h('div', { class: 'mt-s', style: { 'max-width': '240px' } }, text(ctx, 'licence.seats', { label: 'Number of PCs', type: 'number', inputmode: 'numeric' }))),

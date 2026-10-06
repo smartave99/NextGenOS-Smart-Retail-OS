@@ -8,11 +8,12 @@ import { createHash, randomBytes } from 'node:crypto';
 import { makeBaseKit } from '../../../scripts/make-base-kit.mjs';
 import { readBaseKit } from '../lib/basekit.mjs';
 import { checkIntake } from '../lib/intake.mjs';
-import { buildPack, planPack, PackError, brandKitFor, fileSafe, PROFILE_FILES } from '../lib/pack.mjs';
+import { buildPack, planPack, PackError, brandKitFor, fileSafe, PROFILE_FILES, websiteSettingsLine, websiteFileName } from '../lib/pack.mjs';
 import { readDeb } from '../lib/deb.mjs';
 import { listZip } from '../lib/zip.mjs';
 import { check as checkKit } from '../../brand-studio/lib/kit.mjs';
 import { auditFolder } from '../../../scripts/audit-package.mjs';
+import { parseSettings, knownPacks, packageName } from '../../../scripts/make-website-package.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -205,5 +206,81 @@ test('the brand kit made for the Android build is one the Brand Studio accepts',
     assert.deepEqual(errors, []);
     assert.equal(kit.android.storefrontUrl, 'https://luzonfresh.example');
     assert.equal(kit.currency, 'PHP');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the website: the one built for THIS customer is copied with its fingerprint, one for another customer is not, and without one the steps say how to make it', async () => {
+  const root = tmp();
+  try {
+    const linux = randomBytes(3000), windows = randomBytes(3500);
+    const { dir } = await programs(root, { extra: { 'website-luzon-fresh-mart-linux.zip': linux, 'website-luzon-fresh-mart-windows.zip': windows, 'website-someone-else-linux.zip': randomBytes(2000) } });
+    const kit = await readBaseKit(dir);
+    const intake = intakeOf({ ecosystem: { website: { wanted: true, domain: 'luzonfresh.example' } } });
+    const plan = planPack({ intake, kit, slug: 'luzon-fresh-mart' }).find((i) => i.id === 'website');
+    assert.equal(plan.status, 'ready');
+    assert.deepEqual(plan.files.map((f) => f.name).sort(), ['website-luzon-fresh-mart-linux.zip', 'website-luzon-fresh-mart-windows.zip']);
+    assert.match(plan.note, /built for this customer/);
+    const r = await buildPack({ customerId: 'luzon-fresh-mart', parts: partsOf(intake), kit, out: join(root, 'out'), now: new Date('2026-10-05T12:00:00Z') });
+    const site = join(r.dir, '3 - Website');
+    assert.equal(readFileSync(join(site, 'website-luzon-fresh-mart-linux.zip')).equals(linux), true, 'copied exactly');
+    assert.equal(readFileSync(join(site, 'website-luzon-fresh-mart-windows.zip')).equals(windows), true);
+    assert.ok(!existsSync(join(site, 'website-someone-else-linux.zip')), 'another customer\'s website is never in this pack');
+    const readme = readFileSync(join(site, 'READ ME FIRST.txt'), 'utf8');
+    assert.ok(readme.includes(`Fingerprint of website-luzon-fresh-mart-linux.zip (SHA-256): ${sha(linux)}`), 'the fingerprint is written down');
+    assert.ok(readme.includes(sha(windows)));
+    assert.match(readme, /nothing has to be installed first/);
+    assert.doesNotMatch(readme, /someone-else/);
+    const contents = JSON.parse(readFileSync(join(r.dir, 'PACK-CONTENTS.json'), 'utf8'));
+    const part = contents.parts.find((p) => p.id === 'website');
+    assert.deepEqual(part.programs.map((p) => p.sha256).sort(), [sha(linux), sha(windows)].sort());
+    assert.ok(contents.files.some((f) => f.path === '3 - Website/website-luzon-fresh-mart-linux.zip' && f.sha256 === sha(linux)));
+    assert.ok(listZip(readFileSync(r.zip)).some((n) => n.endsWith('3 - Website/website-luzon-fresh-mart-windows.zip')));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the website: with no website built for this customer, the pack keeps the public settings and says exactly how to make one', async () => {
+  const root = tmp();
+  try {
+    const { dir } = await programs(root, { extra: { 'website-someone-else-linux.zip': randomBytes(2000) } });
+    const kit = await readBaseKit(dir);
+    const intake = intakeOf({ ecosystem: { website: { wanted: true, domain: 'luzonfresh.example' } } });
+    assert.equal(planPack({ intake, kit, slug: 'luzon-fresh-mart' }).find((i) => i.id === 'website').status, 'missing');
+    const r = await buildPack({ customerId: 'luzon-fresh-mart', parts: partsOf(intake), kit, out: join(root, 'out') });
+    const site = join(r.dir, '3 - Website');
+    assert.deepEqual(readdirSync(site).sort(), ['READ ME FIRST.txt', 'website-settings.env']);
+    const readme = readFileSync(join(site, 'READ ME FIRST.txt'), 'utf8');
+    assert.match(readme, /has not been built yet/);
+    assert.match(readme, /Actions, "Release", Run workflow/);
+    assert.match(readme, /Website customer/);
+    assert.match(readme, /Website settings/);
+    assert.ok(readme.includes(websiteSettingsLine(intake)), 'the one line to paste is there');
+    assert.ok(readme.includes(websiteFileName('luzon-fresh-mart', 'windows')) && readme.includes(websiteFileName('luzon-fresh-mart', 'linux')));
+    assert.doesNotMatch(readme, /someone-else/);
+    assert.doesNotMatch(readme, /does not build one yet|the release does not build/i, 'no longer says the release builds none');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the website settings the pack writes are exactly what the website builder reads, on one line too, and a name changes the result', async () => {
+  const packs = knownPacks();
+  const intake = intakeOf({ ecosystem: { website: { wanted: true, domain: 'luzonfresh.example' } } });
+  const root = tmp();
+  try {
+    const { dir } = await programs(root);
+    const kit = await readBaseKit(dir);
+    const r = await buildPack({ customerId: 'luzon-fresh-mart', parts: partsOf(intake), kit, out: join(root, 'out') });
+    const file = readFileSync(join(r.dir, '3 - Website', 'website-settings.env'), 'utf8');
+    const parsed = parseSettings(file, packs);
+    assert.deepEqual(parsed.problems, []);
+    assert.equal(parsed.values.NEXT_PUBLIC_SITE_NAME, 'Luzon Fresh Mart');
+    assert.equal(parsed.values.NEXT_PUBLIC_SITE_URL, 'https://luzonfresh.example');
+    const line = websiteSettingsLine(intake);
+    assert.deepEqual(parseSettings(line.split(';').join('\n'), packs).values, parsed.values);
+    // Another customer, another country: another result (nothing is fixed in the program).
+    const other = intakeOf({ business: { name: 'Gilded Page Books', country: 'GB', industry: 'library', contact: { phone: '+44 20 7946 0000', email: 'hello@gilded.example', address: 'Leeds, England' } }, ecosystem: { website: { wanted: true, domain: 'gilded.example' } } });
+    const v = parseSettings(websiteSettingsLine(other).split(';').join('\n'), packs).values;
+    assert.deepEqual([v.NEXT_PUBLIC_SITE_NAME, v.NEXT_PUBLIC_COUNTRY, v.NEXT_PUBLIC_INDUSTRY], ['Gilded Page Books', 'GB', 'library']);
+    // A value that holds a semicolon cannot be put on one line.
+    assert.equal(websiteSettingsLine(intakeOf({ business: { name: 'Salt; Pepper', country: 'PH', industry: 'retail', contact: { phone: '+63 2 5555 0100', email: 'a@b.example', address: 'Manila' } } })), null);
+    assert.equal(`${packageName('luzon-fresh-mart', 'linux')}.zip`, websiteFileName('luzon-fresh-mart', 'linux'), 'the Studio and the builder name the file the same way');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

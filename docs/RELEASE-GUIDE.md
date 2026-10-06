@@ -31,6 +31,7 @@ The workflow does, in order:
 1. **Gate**: `node scripts/verify-all.mjs --full`: every test, the browser tests, the licence checks, the package audit, the protected-build tests, the installer test. **If it fails, nothing is released.**
 2. **Windows** (a real Windows machine at GitHub): builds the Hub, hides its names, audits it, writes the setup and a zip, starts the program from the zip, then **installs the setup on that Windows machine, checks the service starts and answers, uninstalls it, and checks the shop's data stays**.
 3. **Android**: builds and signs the `.apk` and `.aab`.
+3b. **Website**: builds the customer's website for Linux and for Windows (each on its own system), audits it, starts it from the zip and checks that it refuses to work without a licence, and puts `website-<customer>-linux.zip` and `website-<customer>-windows.zip` on the release (see `docs/SETUP-STUDIO.md`, "The website, one build per customer").
 4. **Publish**: the files, `SHA256SUMS.txt` and `BUILD-STATUS.txt` go on the release. If the Windows or the Android part failed, the release still goes out with what was built, and `BUILD-STATUS.txt` and the notes say which part failed.
 
 If the Windows job stops with *"The licence keys are not built in yet"*, step 2 above is not done. After you add the two variables, open the failed run and choose **Re-run failed jobs**: the Windows part is built and added to the same release.

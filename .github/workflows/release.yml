@@ -44,6 +44,12 @@ on:
         description: "Only to try the Windows setup: build it without your licence keys. It can never be activated. Never give it to a customer."
         type: boolean
         default: false
+      website_customer:
+        description: "Website for a customer who is NOT in brand-kits/: their short name (small letters, digits, hyphens), for example luzon-fresh-mart. Leave empty to make the website of the brand kit above."
+        default: ""
+      website_settings:
+        description: "Website for that customer: their public settings on ONE line, separated by semicolons, for example NEXT_PUBLIC_SITE_NAME=Luzon Fresh Mart;NEXT_PUBLIC_COUNTRY=PH (the Setup Studio's pack shows the line). No password or key."
+        default: ""
 
 permissions:
   contents: write
@@ -357,6 +363,111 @@ jobs:
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
         run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
 
+  website:
+    # One website for ONE customer, built on the system it is for (the database engine and the picture library are different files for each system).
+    # The customer is the brand kit above, or (website_customer + website_settings) a customer who is not in the repository. The package carries its own Node.js and is checked
+    # (no source, no secret, nothing a factory-new computer lacks), started from its zip, and must refuse to work without a licence. The licence keys are built in like the Hub's.
+    name: Website for the customer (${{ matrix.os }})
+    needs: [gate, prepare]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the licence keys in (public keys only)
+        shell: bash
+        env:
+          NGOS_PUBLIC_KEYS: ${{ vars.NGOS_PUBLIC_KEYS }}
+          NGOS_LICENCE_URL: ${{ vars.NGOS_LICENCE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NGOS_PUBLIC_KEYS}" ]; then
+            printf '%s' "${NGOS_PUBLIC_KEYS}" > "${RUNNER_TEMP}/keys.json"
+            node licensing/studio/src/cli.js apply-public-keys --keys "@${RUNNER_TEMP}/keys.json" --url "${NGOS_LICENCE_URL}"
+          fi
+      - name: Build the website package (build, check prerequisites, audit, write the zip)
+        id: build
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+          WEBSITE_CUSTOMER: ${{ inputs.website_customer }}
+          WEBSITE_SETTINGS: ${{ inputs.website_settings }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
+          OUT="${RUNNER_TEMP}/website-out"
+          if [ -n "${WEBSITE_SETTINGS}" ]; then
+            test -n "${WEBSITE_CUSTOMER}" || { echo "Type the customer's short name too (Website customer)."; exit 1; }
+            CUSTOMER="${WEBSITE_CUSTOMER}"
+            # One line becomes one setting per line. The script refuses anything that is not a public setting.
+            printf '%s' "${WEBSITE_SETTINGS}" | tr ';' '\n' > "${RUNNER_TEMP}/website-settings.env"
+            node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --customer "${CUSTOMER}" --settings "${RUNNER_TEMP}/website-settings.env" --download-node 22.22.0 --out "${OUT}" ${EXTRA}
+          else
+            CUSTOMER="${KIT}"
+            node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --kit "${KIT}" --download-node 22.22.0 --out "${OUT}" ${EXTRA}
+          fi
+          echo "customer=${CUSTOMER}" >> "$GITHUB_OUTPUT"
+      - name: Run the two audits again on the folder and the zip
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/website-out"
+          node scripts/audit-package.mjs "${OUT}/website-${CUSTOMER}-${OS}" "${OUT}/website-${CUSTOMER}-${OS}.zip" --node-app
+          node scripts/audit-prerequisites.mjs "${OUT}/website-${CUSTOMER}-${OS}" --os "${OS}"
+      - name: Start the website from the zip and check it refuses to work without a licence (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        env:
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          set -euo pipefail
+          mkdir "${RUNNER_TEMP}/website-zip"
+          unzip -q "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-linux.zip" -d "${RUNNER_TEMP}/website-zip"
+          node scripts/smoke-website.mjs "${RUNNER_TEMP}/website-zip/website-${CUSTOMER}-linux" --os linux
+      - name: Start the website from the zip and check it refuses to work without a licence (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        env:
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'website-zip'
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          & "$env:SystemRoot\System32\tar.exe" -xf (Join-Path $env:RUNNER_TEMP "website-out\website-$($env:CUSTOMER)-windows.zip") -C $dir
+          if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
+          node scripts/smoke-website.mjs (Join-Path $dir "website-$($env:CUSTOMER)-windows") --os windows
+          if ($LASTEXITCODE -ne 0) { throw 'The website package did not behave.' }
+      - name: Put the website zip in dist
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          CUSTOMER: ${{ steps.build.outputs.customer }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-${OS}.zip" dist/
+      - name: Put the files on the draft release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
+
   studio:
     name: Setup Studio for NextGenOS staff (Windows and Linux bundles)
     needs: [gate, prepare]
@@ -382,7 +493,7 @@ jobs:
 
   publish:
     name: Publish the GitHub Release
-    needs: [gate, prepare, android, windows, linux, studio]
+    needs: [gate, prepare, android, windows, linux, studio, website]
     # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
     if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
@@ -402,6 +513,7 @@ jobs:
           WINDOWS: ${{ needs.windows.result }}
           LINUX: ${{ needs.linux.result }}
           STUDIO: ${{ needs.studio.result }}
+          WEBSITE: ${{ needs.website.result }}
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
           set -euo pipefail
@@ -412,6 +524,7 @@ jobs:
             echo "Linux packages for the Business Hub: ${LINUX}"
             echo "Android app: ${ANDROID}"
             echo "Setup Studio for staff: ${STUDIO}"
+            echo "Website for the customer (Linux and Windows): ${WEBSITE}"
           } > dist/BUILD-STATUS.txt
           cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
           cat dist/BUILD-STATUS.txt

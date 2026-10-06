@@ -43,8 +43,8 @@ public sealed record PhotoQueue(PhotoWork? Now, string NowName, IReadOnlyList<Ph
 
 /// <summary>
 /// Product photos: the owner adds phone photos of a product, and Codex's image tool (ChatGPT Images) makes five photos
-/// from them, one by one, in the background: white background, in use, and with a European, an Indian and an East
-/// Asian model. Right after the first photo Codex also writes the product's listings for Amazon and the website, once:
+/// from them, one by one, in the background: white background, in use, and three with a person (who they show comes from the
+/// customer's profile). Right after the first photo Codex also writes the product's listings for Amazon and the website, once:
 /// they are kept, and written again only when the owner asks. Everything is kept in the data folder the owner chose,
 /// never in the POS database; prices and barcodes in the listings' files come from the POS.
 /// </summary>
@@ -344,7 +344,8 @@ public sealed class ProductPhotoService
         return new PhotoProgress(making, Maker.PlaceInQueue(productId), set?.Problem, set?.MadeCount ?? 0, set?.Pending.Count ?? 0);
     }
 
-    /// <summary>A name for a downloaded photo, e.g. "Sunflower Oil 1 L - 1 White background.png".</summary>
+    /// <summary>A name for a downloaded photo, e.g. "Sunflower Oil 1 L - 1 White background.png". The photos with a person are named as the screens
+    /// name them: with the title from the customer's profile ("Model 1" when it has none).</summary>
     public string DownloadName(int productId, string fileName)
     {
         var info = Store.Load(productId);
@@ -352,7 +353,7 @@ public sealed class ProductPhotoService
         var product = SafeName(info?.Name is { Length: > 0 } name ? name : productId.ToString());
         return image is null
             ? $"{product} - phone photo{Path.GetExtension(fileName)}"
-            : $"{product} - {image.Kind.Number()} {image.Kind.Title()}{Path.GetExtension(fileName)}";
+            : $"{product} - {image.Kind.Number()} {image.Kind.Title(_ai.Shop)}{Path.GetExtension(fileName)}";
     }
 
     /// <summary>The set's newest photo of each kind in one ZIP file, named for uploading to a website or Amazon, with

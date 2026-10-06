@@ -206,7 +206,8 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     const n = latest(params.id);
     if (!n) throw new StudioError('Approve a setup first.', 409);
     const parts = state.ws.releaseParts(params.id, n);
-    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: !!(state.ws.get(params.id).builds ?? []).some((b) => b.kind === 'pack' && b.release === n) }) };
+    const made = [...(state.ws.get(params.id).builds ?? [])].reverse().find((b) => b.kind === 'pack' && b.release === n);
+    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: made ? { ai: !!made.parts?.some((p) => p.id === 'ai' && p.status === 'ready') } : null }) };
   });
 
   // ---- team, record, safe keeping -------------------------------------------------------------------------------------------------

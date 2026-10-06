@@ -50,3 +50,16 @@ test('it refuses an empty folder, mixed Hub versions, and a version that is not 
     assert.equal((await makeBaseKit(ok, { version: '3.2.1' })).manifest.version, '3.2.1');
   } finally { for (const d of [empty, mixed, ok]) rmSync(d, { recursive: true, force: true }); }
 });
+
+test('a website is listed by its customer and system, and its name has no version in it', async () => {
+  const d = folder({ 'website-luzon-fresh-mart-linux.zip': 'a', 'website-luzon-fresh-mart-windows.zip': 'b', 'website-x-linux.zip': 'c', 'website-Bad-linux.zip': 'd', 'website-luzon-macos.zip': 'f', 'SmartRetailPOS-Hub-Setup-2.0.1.exe': 'g' });
+  try {
+    const { manifest, ignored } = await makeBaseKit(d);
+    const sites = manifest.files.filter((f) => f.role === 'website').map((f) => [f.name, f.os, f.arch, f.kit]).sort();
+    assert.deepEqual(sites, [['website-luzon-fresh-mart-linux.zip', 'linux', 'x64', 'luzon-fresh-mart'], ['website-luzon-fresh-mart-windows.zip', 'windows', 'x64', 'luzon-fresh-mart']]);
+    assert.equal(manifest.version, '2.0.1', 'the version is the Hub\'s');
+    assert.deepEqual(ignored.sort(), ['website-Bad-linux.zip', 'website-luzon-macos.zip', 'website-x-linux.zip']);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const only = folder({ 'website-luzon-fresh-mart-linux.zip': 'a' });
+  try { await assert.rejects(makeBaseKit(only), /Say the version/); } finally { rmSync(only, { recursive: true, force: true }); }
+});

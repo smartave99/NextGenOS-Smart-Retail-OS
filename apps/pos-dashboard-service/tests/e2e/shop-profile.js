@@ -21,6 +21,25 @@ const indiaShop = {
   },
 };
 
+// A shop in the Philippines with a Filipino second line, to show that the screens follow the profile and not one market.
+const filipinoShop = {
+  schema: 1,
+  country: { code: 'PH', name: 'the Philippines' },
+  shopKind: 'a small neighbourhood store',
+  images: {
+    models: [
+      { title: 'Filipino model', looks: 'Filipino' },
+      { title: 'Cebuano model', looks: 'Filipino, from the Visayas' },
+      { title: 'Chinese-Filipino model', looks: 'Chinese-Filipino' },
+    ],
+    festivals: ['Christmas', 'Sinulog'],
+    localLanguage: {
+      name: 'Filipino', tag: 'fil',
+      lines: { clearance: 'Malaking tipid, bilisan na', 'new-arrivals': 'Bagong dating na', 'best-sellers': 'Paborito ng lahat', 'festival-offer': 'Espesyal na presyo' },
+    },
+  },
+};
+
 /** Writes <folder>/profile/ai.json and returns the settings that make the app read it. */
 function writeShopProfile(folder, profile = indiaShop) {
   fs.mkdirSync(path.join(folder, 'profile'), { recursive: true });
@@ -28,4 +47,4 @@ function writeShopProfile(folder, profile = indiaShop) {
   return { Ai__ProfileFolder: folder };
 }
 
-module.exports = { indiaShop, writeShopProfile };
+module.exports = { indiaShop, filipinoShop, writeShopProfile };

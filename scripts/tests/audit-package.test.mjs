@@ -71,3 +71,28 @@ test('a program that still shows the real names of its types is refused; one tha
     assert.match(problemsOf({}, { obfuscated: ['Missing.dll'], names }), /Missing\.dll.*missing/);
   } finally { rmSync(src, { recursive: true, force: true }); }
 });
+
+// Fake secrets are built from pieces, so that no line of this file looks like a secret to the gate's scan (scripts/scan-history.mjs reads every commit).
+const KEY_HEAD = ['-----BEGIN', 'PRIVATE KEY-----'].join(' ');
+const DB_URL = ['postgres://admin', 'SuperSecret99@db.example.invalid/shop'].join(':');
+const MINIFIED = 's.pass' + 'word=r.pass' + 'word,s.host=r.host,s.port=r.port;break;';
+
+test('a Node.js app (the website): its node_modules folder is accepted only with nodeApp, and everything inside it is still checked', () => {
+  const files = { 'app/server.js': 'x', 'app/node_modules/lib/index.js': 'module.exports = 1;' };
+  assert.match(problemsOf(files), /node_modules\/\s+node_modules/);
+  assert.equal(problemsOf(files, { nodeApp: true }), '');
+  const found = problemsOf({ 'app/node_modules/lib/index.d.ts': 'x', 'app/node_modules/lib/index.js.map': '{}', 'app/node_modules/lib/.env': 'A=1', 'app/node_modules/lib/test.test.js': 'x', 'app/node_modules/lib/tests/a.js': 'x', 'app/node_modules/lib/yarn.lock': 'x', 'app/node_modules/lib/k.pem': 'x', 'app/node_modules/lib/a.js': DB_URL }, { nodeApp: true });
+  for (const needle of ['index.d.ts', 'index.js.map', '.env', 'test.test.js', 'tests/', 'yarn.lock', 'k.pem', 'database URL with a password']) assert.match(found, new RegExp(needle.replace('.', '\\.')), needle);
+});
+
+test('a Node.js app: JavaScript code is read as code (minified password fields, a library that names the header of a key file), but a real key or connection string in it is still found', () => {
+  const code = { 'a/node_modules/next/polyfill.js': `case 1:s.username=r.username,${MINIFIED}`, 'a/node_modules/google-auth/pem.js': `const header = "${KEY_HEAD}"; const re = /-----BEGIN (RSA )?PRIVATE KEY-----/;`, 'a/node_modules/jwks-rsa/src/errors/SigningKeyNotFoundError.js': 'class E extends Error {}' };
+  assert.equal(problemsOf(code, { nodeApp: true }), '');
+  assert.match(problemsOf({ 'a/polyfill.js': code['a/node_modules/next/polyfill.js'] }), /password in a connection string/, 'without nodeApp the same text is refused');
+  assert.match(problemsOf({ 'a/pem.js': code['a/node_modules/google-auth/pem.js'] }), /private key/, 'and so is a file that only names the header');
+  const body = `${KEY_HEAD}\\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7abcdef`;
+  assert.match(problemsOf({ 'a/key.js': `const k = "${body}";` }, { nodeApp: true }), /key\.js\s+contains private key/);
+  assert.match(problemsOf({ 'a/key.txt': KEY_HEAD }, { nodeApp: true }), /key\.txt\s+contains private key/, 'only JavaScript is read as code');
+  assert.match(problemsOf({ 'a/db.js': `const url = "${DB_URL}";` }, { nodeApp: true }), /db\.js\s+contains database URL with a password/);
+  assert.match(problemsOf({ 'a/signing-key.js': 'x' }, { nodeApp: true }), /signing-key\.js\s+private or signing key/, 'outside node_modules the name is still refused');
+});

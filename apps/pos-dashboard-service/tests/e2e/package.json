@@ -1,7 +1,7 @@
 {
   "name": "smart-retail-pos-e2e",
   "private": true,
-  "description": "Browser tests of Smart Retail POS: billing on demo data, the sales dashboard with the AI growth plan, Ask AI, product photos, finding a product with the camera, Google Lens searches with a product's photo, paging through long lists, the change log (what's new), posters, creatives, barcode stickers, the Fix now list, the assistant's memory, actions and their results, the Monday review, online prices, past chats, getting the AI set up, automatic updates, keeping Codex up to date, starting with Windows, the owner's live view, and offering finished products to the owner's website.",
+  "description": "Browser tests of Smart Retail POS: billing on demo data, the sales dashboard with the AI growth plan, Ask AI, product photos, finding a product with the camera, Google Lens searches with a product's photo, paging through long lists, the change log (what's new), posters, creatives, what the poster and photo screens take from the customer's profile, barcode stickers, the Fix now list, the assistant's memory, actions and their results, the Monday review, online prices, past chats, getting the AI set up, automatic updates, keeping Codex up to date, starting with Windows, the owner's live view, and offering finished products to the owner's website.",
   "scripts": {
     "test": "node billing.e2e.js",
     "test:plan": "node plan.e2e.js",
@@ -30,7 +30,9 @@
     "test:live-shop": "node live-shop.e2e.js",
     "test:codexupdate": "node codexupdate.e2e.js",
     "test:startup": "node startup.e2e.js",
-    "test:owner-products": "node owner-products.e2e.js"
+    "test:owner-products": "node owner-products.e2e.js",
+    "test:licensed": "node ../../../../licensing/e2e/with-studio.mjs -- node with-licence.mjs",
+    "test:profiles": "node profiles.e2e.js"
   },
   "devDependencies": {
     "playwright": "1.56.1"

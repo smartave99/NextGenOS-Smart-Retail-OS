@@ -5,6 +5,10 @@
  *
  *   node scripts/audit-package.mjs <folder-or-zip> [more...] [--obfuscated NextGenOS.Hub.Core.dll,...] [--names-from apps/business-hub/src]
  *
+ * With --node-app (the website is a Node.js server and needs the folder of its libraries) the node_modules folder itself is accepted, and everything inside it is checked like any other file,
+ * with two differences that only apply to JavaScript: a library may name the header of a key file it reads (a key is a secret only when its text follows), and minified code such as
+ * "s.password=r.password," is not a connection string.
+ *
  * Fails on:
  *   - source and project files (.cs .vb .ts .tsx .map .pdb .sln .slnx .csproj .vbproj .razor ...), test programs and test libraries,
  *     anything of the Licence Studio, node_modules, git data;
@@ -63,7 +67,8 @@ export function auditFolder(folder, options = {}) {
       const full = join(dir, e.name);
       const rel = relative(root, full).split(sep).join('/');
       if (e.isDirectory()) {
-        const bad = FORBIDDEN_DIR.find(([re]) => re.test(e.name));
+        // A Node.js server (the website) needs its libraries' folder: with nodeApp the folder itself is accepted, and everything inside it is still checked like any other file.
+        const bad = FORBIDDEN_DIR.find(([re, what]) => re.test(e.name) && !(options.nodeApp && what === 'node_modules'));
         if (bad) { problems.push(`${rel}/  ${bad[1]}`); continue; }
         walk(full);
         continue;
@@ -72,12 +77,14 @@ export function auditFolder(folder, options = {}) {
       files += 1;
       const ext = extname(e.name).toLowerCase();
       if (FORBIDDEN_EXT.has(ext)) problems.push(`${rel}  ${describeExt(ext)}`);
-      const badName = FORBIDDEN_NAME.find(([re]) => re.test(e.name));
+      const code = Boolean(options.nodeApp) && /\.(m?js|cjs)$/i.test(e.name);
+      // A library's error class may be called SigningKeyNotFoundError.js: in JavaScript code inside node_modules the name alone says nothing (a key file would have a key extension, which is refused above).
+      const badName = FORBIDDEN_NAME.find(([re, what]) => re.test(e.name) && !(code && rel.includes('node_modules/') && what === 'private or signing key'));
       if (badName) problems.push(`${rel}  ${badName[1]}`);
       if (statSync(full).size > 200 * 1024 * 1024) continue;
       if (!BINARY_EXT.has(ext)) {
         const text = readFileSync(full, 'utf8');
-        for (const hit of findSecrets(text)) problems.push(`${rel}  contains ${hit}`);
+        for (const hit of findSecrets(text, { code })) problems.push(`${rel}  contains ${hit}`);
       } else if (['.dll', '.exe', '.node', '.so'].includes(ext)) {
         programs += 1;
         const bytes = readFileSync(full);
@@ -115,10 +122,16 @@ function describeExt(ext) {
   return 'file that does not belong in a package';
 }
 
-export function findSecrets(text) {
+/** A key file's text: the header and then its base64 body (a library that only names the header, to know what to look for, holds no key). */
+const PRIVATE_KEY_WITH_BODY = /-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----(?:\s|\\n|\\r)*[A-Za-z0-9+/]{40,}/;
+
+/** { code: true } reads JavaScript as code (a node app's own and its libraries'): see the note at the top. */
+export function findSecrets(text, { code = false } = {}) {
   const hits = [];
   if (!text) return hits;
-  for (const [re, what] of SECRET_PATTERNS) {
+  for (const [pattern, what] of SECRET_PATTERNS) {
+    if (code && what === 'password in a connection string') continue;
+    const re = code && what === 'private key' ? PRIVATE_KEY_WITH_BODY : pattern;
     const global = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
     for (const m of text.matchAll(global)) {
       const around = text.slice(Math.max(0, m.index - 20), m.index + m[0].length + 20);
@@ -179,8 +192,9 @@ function extract(zip) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const value = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-  const targets = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--')));
-  if (!targets.length) { console.error('Usage: node scripts/audit-package.mjs <folder-or-zip>... [--obfuscated a.dll,b.dll] [--names-from dir,dir]'); process.exit(2); }
+  const nodeApp = args.includes('--node-app');
+  const targets = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--') && args[i - 1] !== '--node-app'));
+  if (!targets.length) { console.error('Usage: node scripts/audit-package.mjs <folder-or-zip>... [--obfuscated a.dll,b.dll] [--names-from dir,dir] [--node-app]'); process.exit(2); }
   const obfuscated = (value('--obfuscated') || '').split(',').filter(Boolean);
   const names = typeNamesFrom((value('--names-from') || '').split(',').filter(Boolean).map((p) => resolve(p)));
   let failed = false;
@@ -189,7 +203,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     let temp = null;
     if (!existsSync(folder)) { console.error(`${t}: not found`); failed = true; continue; }
     if (statSync(folder).isFile()) { temp = extract(folder); folder = temp; }
-    const { problems, files, programs } = auditFolder(folder, { obfuscated, names });
+    const { problems, files, programs } = auditFolder(folder, { obfuscated, names, nodeApp });
     if (temp) rmSync(temp, { recursive: true, force: true });
     if (problems.length) {
       failed = true;

@@ -29,3 +29,7 @@ look on their own is decided by their licence (`white.level`: `none`, `theme` or
 | `android.appId`, `android.storefrontUrl` | The Android application id (`com.shopname.app`) and the website the app opens |
 | `receipt.header`, `receipt.footer` | Extra lines on printed bills |
 | `poweredBy` | Show "Powered by NextGenOS" (a `full` white-label licence may turn it off) |
+
+## ai.json (optional, schema 1)
+
+What the AI assistant's pictures and posters need to know about this customer: the country's name, the kind of business, who the three model photos show, the festivals of its shoppers and the second language of its posters (with ready-made lines). It is plain data of the same format the Setup Studio writes (see `docs/SETUP-STUDIO.md`, "The AI assistant's own settings"), and the program reads it from `profile\ai.json` beside the AI assistant's setup. With none, the assistant is neutral. It holds no secrets.

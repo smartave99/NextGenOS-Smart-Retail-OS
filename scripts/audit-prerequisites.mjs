@@ -30,6 +30,8 @@ export const LINUX_SYSTEM = new Set([
   'libc.so.6', 'libm.so.6', 'libdl.so.2', 'libpthread.so.0', 'librt.so.1', 'libutil.so.1', 'libresolv.so.2', 'libgcc_s.so.1', 'libstdc++.so.6',
   'ld-linux-x86-64.so.2', 'ld-linux-aarch64.so.1', 'linux-vdso.so.1',
 ]);
+/** OpenSSL 3 is on every supported Linux desktop, but a program may rely on it only by saying so ("openssl-3" in prerequisites.json): the website's database library links to it. */
+export const LINUX_OPENSSL = new Set(['libssl.so.3', 'libcrypto.so.3']);
 /** The newest glibc the supported systems have is 2.35 (Ubuntu 22.04): nothing in the package may ask for more. */
 export const MAX_GLIBC = [2, 35];
 
@@ -60,6 +62,7 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
   walk(root);
 
   // 1. The package says what it carries and what it relies on.
+  let declared = [];
   const manifest = join(root, 'prerequisites.json');
   if (!existsSync(manifest)) problems.push('prerequisites.json is missing (it says what the package carries and what it relies on the system for)');
   else {
@@ -70,7 +73,8 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
       if (m.arch !== arch) problems.push(`prerequisites.json is for "${m.arch}", not "${arch}"`);
       if (!Array.isArray(m.bundled) || m.bundled.length === 0) problems.push('prerequisites.json must list what is bundled');
       if (!Array.isArray(m.system) || m.system.length === 0) problems.push('prerequisites.json must list what the system supplies');
-      else for (const item of m.system) if (!SYSTEM_ITEMS[os].has(item)) problems.push(`prerequisites.json relies on "${item}", which is not on the allowed list for ${os} (docs/PREREQUISITES.md)`);
+      else declared = m.system;
+      if (Array.isArray(m.system)) for (const item of m.system) if (!SYSTEM_ITEMS[os].has(item)) problems.push(`prerequisites.json relies on "${item}", which is not on the allowed list for ${os} (docs/PREREQUISITES.md)`);
       if (typeof m.minimumSystem !== 'string' || !m.minimumSystem) problems.push('prerequisites.json must say the minimum system in words (minimumSystem)');
     } catch { problems.push('prerequisites.json is not valid JSON'); }
   }
@@ -105,7 +109,7 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
       native += 1;
       if (r.arch !== arch) problems.push(`${rel}: made for another processor (${r.arch}), not ${arch}`);
       for (const lib of r.needed) {
-        if (present.has(lib.toLowerCase()) || LINUX_SYSTEM.has(lib)) continue;
+        if (present.has(lib.toLowerCase()) || LINUX_SYSTEM.has(lib) || (LINUX_OPENSSL.has(lib) && declared.includes('openssl-3'))) continue;
         problems.push(`${rel}: needs ${lib}, which is neither in the package nor part of the base system`);
         needs.set(lib, rel);
       }
@@ -142,5 +146,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     for (const p of problems.slice(0, 60)) console.log('  ' + p);
     process.exit(1);
   }
-  console.log(`PASS  ${basename(resolve(target))}: ${files} files, ${native} program files for ${os} ${arch}; each needs only what is in the package or in the base system${glibc ? ` (newest glibc asked for: ${glibc})` : ''}; carries its own .NET runtime`);
+  console.log(`PASS  ${basename(resolve(target))}: ${files} files, ${native} program files for ${os} ${arch}; each needs only what is in the package or in the base system${glibc ? ` (newest glibc asked for: ${glibc})` : ''}; carries its own runtime (nothing like .NET or Node.js is asked of the machine)`);
 }

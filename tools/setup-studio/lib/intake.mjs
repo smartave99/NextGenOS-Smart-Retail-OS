@@ -3,6 +3,7 @@
 import { countryPack, industryPack, countries as allCountries } from './packs.mjs';
 import { clean, usableColour } from './rules.mjs';
 import { colourProblem } from '../../brand-studio/lib/kit.mjs';
+import { checkImages, LIMITS as IMAGE_LIMITS, POSTER_KINDS, POSTER_KIND_LABELS } from './aiprofile.mjs';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{1,40}$/;
 
@@ -46,6 +47,9 @@ export const OPTIONS = {
     { id: 'theme', label: 'Their own colours and logo', hint: 'The owner can change colours, logo and layout.' },
     { id: 'full', label: 'Fully their own name', hint: 'The owner can also rename the program and remove "by NextGenOS".' },
   ],
+  // The kinds of poster that can have a ready-made second-language line, and the limits the AI assistant's profile is read by (lib/aiprofile.mjs).
+  posterKinds: POSTER_KINDS.map((id) => ({ id, label: POSTER_KIND_LABELS[id] })),
+  imageLimits: IMAGE_LIMITS,
   states: [
     { id: 'draft', label: 'Details' }, { id: 'proposed', label: 'Prepared' }, { id: 'review', label: 'In review' },
     { id: 'approved', label: 'Approved' }, { id: 'built', label: 'Installer ready' }, { id: 'delivered', label: 'Handed over' },
@@ -171,6 +175,9 @@ export function checkIntake(input) {
   if (value.ecosystem.website.wanted && value.ecosystem.website.domain && !/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(value.ecosystem.website.domain)) bad('ecosystem.website.domain', 'Type the website name without https:// and without a slash, like shop.example.com.');
   value.ecosystem.aiAddon = { wanted: isObj(e.aiAddon) && e.aiAddon.wanted === true };
   if (value.ecosystem.aiAddon.wanted && value.device.os !== 'windows') warn('ecosystem.aiAddon', 'The AI assistant is a Windows program, so it cannot go on a Linux machine.');
+  // The pictures and posters the AI assistant makes: who the model photos show, the festivals, the second language. Optional; with nothing typed the AI assistant stays neutral.
+  const images = checkImages(src.images, { wanted: value.ecosystem.aiAddon.wanted, bad, warn });
+  if (images) value.images = images;
   value.ecosystem.android = { wanted: a.wanted === true, appId: str(a.appId, 80).trim().toLowerCase() };
   if (value.ecosystem.android.wanted) {
     if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(value.ecosystem.android.appId)) bad('ecosystem.android.appId', 'The app id must look like com.yourshop.app (small letters, at least three parts).');

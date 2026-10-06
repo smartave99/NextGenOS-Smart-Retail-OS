@@ -36,7 +36,7 @@ export function handoverFor({ intake: i, info, company = {}, pack = null }) {
       ? 'Open the folder "1 - Shop PC (Linux)" and read the page in it, or open a terminal there and type: sudo ./install.sh'
       : `Open the folder "1 - Shop PC (Windows)" and double-click the setup file. It installs everything it needs; nothing has to be installed first.`);
   } else steps.push('Run the setup file on the shop computer. It installs everything it needs; nothing has to be installed first.');
-  steps.push('Open the program in the browser window it shows. The first time, type the licence key you were given.',
+  steps.push('Open the program from its icon (Smart Retail POS): it opens in a window of its own. The first time, type the licence key you were given. The program keeps running in the background; closing its window does not stop it.',
     'Your business details are already filled in. Check them, choose your own sign-in name and password, and finish.');
   if (i.device.printer !== 'none') steps.push(`Connect the ${(printer?.label ?? 'printer').toLowerCase()}, then open Settings, then Devices, to choose it.`);
   steps.push('Make your first sale to try it.');

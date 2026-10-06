@@ -206,16 +206,23 @@ Section "Smart Retail POS Hub" SecMain
     nsExec::ExecToLog 'sc.exe config ${SERVICE} binPath= "\"$INSTDIR\${EXE}\"" start= delayed-auto obj= "NT AUTHORITY\LocalService" DisplayName= "${APP}"'
     Pop $0
   ${EndIf}
-  nsExec::ExecToLog 'sc.exe description ${SERVICE} "Smart Retail POS Hub by ${COMPANY}: the counter, stock, bills and reports of the business. Open ${ADDRESS} in a web browser."'
+  nsExec::ExecToLog 'sc.exe description ${SERVICE} "Smart Retail POS Hub by ${COMPANY}: the counter, stock, bills and reports of the business. Open ${ADDRESS} in a web browser, or use the Smart Retail POS shortcut."'
   nsExec::ExecToLog 'sc.exe failure ${SERVICE} reset= 86400 actions= restart/5000/restart/10000/restart/30000'
   nsExec::ExecToLog 'sc.exe start ${SERVICE}'
   Pop $0
 
-  ; The shortcut people use: it opens the Hub in their browser.
+  ; The shortcut people use: it opens the Hub in a window of its own (Microsoft Edge, which is part of Windows 10 and 11, in "app" mode: no address bar, no tabs).
+  ; The Hub is a service and keeps running in the background when that window is closed. Where Edge cannot be found, the shortcut opens the address in the usual browser instead.
   WriteINIStr "$INSTDIR\Open Smart Retail POS.url" "InternetShortcut" "URL" "${ADDRESS}"
   CreateDirectory "$SMPROGRAMS\${MENU_FOLDER}"
-  CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
-  CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
+  Call FindEdge
+  ${If} $R0 != ""
+    CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$R0" "--app=${ADDRESS} --no-first-run --no-default-browser-check" "$INSTDIR\${EXE}" 0
+    CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$R0" "--app=${ADDRESS} --no-first-run --no-default-browser-check" "$INSTDIR\${EXE}" 0
+  ${Else}
+    CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
+    CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
+  ${EndIf}
 
   ; A touch-screen till or a kiosk opens the Hub full screen by itself when the PC starts (Microsoft Edge is part of Windows 10 and 11).
   ReadINIStr $0 "$EXEDIR\profile\install.ini" "install" "kiosk"

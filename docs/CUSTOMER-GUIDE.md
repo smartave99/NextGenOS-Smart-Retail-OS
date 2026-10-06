@@ -8,7 +8,7 @@ Run **SmartRetailPOS-Hub-Setup-…exe** on the PC that stays at your counter (Wi
 
 ## 2. Activate
 
-Click the icon. Your web browser opens a page that says *This program needs a licence*. Type your **licence key** (it looks like `NGOS-XXXXX-XXXXX-XXXXX-XXXXX`) and press **Activate**. You need the internet for this one time. No internet at the counter? Tell your supplier: they give you a code to type instead.
+Click the icon. A window of its own opens (no address bar, nothing to type but your key) and says *This program needs a licence*. Type your **licence key** (it looks like `NGOS-XXXXX-XXXXX-XXXXX-XXXXX`) and press **Activate**. You need the internet for this one time. No internet at the counter? Tell your supplier: they give you a code to type instead.
 
 ## 3. Set up your business
 

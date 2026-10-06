@@ -113,6 +113,16 @@ for _ in $(seq 1 60); do [ -e "$app/NextGenOS.Hub.exe" ] || break; sleep 1; done
 sleep 3
 check "uninstalling takes the profile files and the full screen shortcuts away" bash -c "! test -e '$app/profile' && ! test -e '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/Smart Retail POS (full screen).lnk'"
 check "the shop's data is still there after that too" test -f "$data/shop.db"
+echo "== the shortcut opens the Hub as a window of its own when Edge is there, and in the usual browser when it is not"
+# (the first install above had no Edge: its shortcuts point at the address file; this one had a stand-in Edge)
+timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true
+text_of() { tr -d '\0' < "$1"; }
+check "the desktop shortcut starts Edge in app mode at this PC's port 5280" bash -c "$(declare -f text_of); text_of '$c/users/Public/Desktop/Smart Retail POS.lnk' | grep -aq -- '--app=http://127.0.0.1:5280'"
+check "the Start menu shortcut does too" bash -c "$(declare -f text_of); text_of '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/Smart Retail POS/Open Smart Retail POS.lnk' | grep -aq -- '--app=http://127.0.0.1:5280'"
+check "the shortcut has no terminal and no address bar to type in: it is Edge's app mode, not a tab" bash -c "$(declare -f text_of); ! text_of '$c/users/Public/Desktop/Smart Retail POS.lnk' | grep -aq -- '--kiosk'"
+timeout 240 "$WINE" "$app/Uninstall.exe" /S > /dev/null 2>&1 || true
+for _ in $(seq 1 60); do [ -e "$app/NextGenOS.Hub.exe" ] || break; sleep 1; done
+sleep 3
 echo "== a plain setup (no profile folder) over a prepared one keeps the prepared files"
 mv "$work/profile" "$work/profile-away"
 timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true

@@ -32,7 +32,7 @@ const NOTES = new Map([
 
 const ROLE_TEXT = {
   'hub-windows-setup': 'The shop program (Business Hub) for Windows 10/11: the setup.',
-  'hub-windows-zip': 'The same shop program as a plain folder, for a person who deploys by hand.',
+  'hub-windows-zip': 'The same shop program as a plain folder, for a person who sets it up by hand: unpack it and double-click "Start Business Hub" (no black window; its READ ME FIRST says more). The setup is the normal way.',
   'hub-linux-deb': 'The shop program (Business Hub) for Ubuntu, Linux Mint and Debian.',
   website: 'The online shop (website), with its own Node.js inside.',
   'android-apk': 'The Android app, to install on a phone.',

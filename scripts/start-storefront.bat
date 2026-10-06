@@ -1,9 +1,0 @@
-@echo off
-setlocal
-cd /d "%~dp0..\apps\storefront-web-mobile"
-echo Starting Smart Retail POS Omnichannel Storefront (Next.js)...
-if not exist "node_modules\" (
-    echo Installing dependencies...
-    call npm install
-)
-call npm run dev

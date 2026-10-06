@@ -2,7 +2,7 @@
 
 Read this before you answer "what is left?", and keep it true: update it in the same commit whenever you finish, find or put off a piece of work (`CLAUDE.md`, section 13).
 
-Last updated: 6 October 2026.
+Last updated: 7 October 2026.
 
 ## Needs the owner (an assistant cannot do these)
 
@@ -19,28 +19,34 @@ Each one needs the owner's own accounts, machines or decisions. They are listed 
 6. **Legal and professional:** the legal name and governing law in `EULA.txt` and a lawyer's review; each country's tax rules checked by a local adviser; an independent security test; proof that NextGenOS may resell the decompiled Windows POS source (`apps/pos-desktop`).
 7. **Try it on real machines:** a real Windows 10/11 PC (the Hub setup and its window shortcut, the Setup Studio, the website; look for a black window flashing), a real phone for the Android app, and each make of printer, scanner and cash drawer you sell.
 8. **The build service for a customer's website and app** (for the Studio's one-button build): a private repository for the results, two access codes with exactly the permissions written in `docs/CUSTOMER-BUILDS.md`, one repository secret, and the codes typed into the Studio's Settings. Click-by-click steps are in that guide. Nothing here has been run against a real GitHub yet.
-9. **Old trial pages:** say which of `v1.0.0-trial7` and `v1.0.0-trial8` to remove; they are replaced by trial 9. (Deleting a release needs the owner's word.)
+9. **GitHub stopped running the checks (needs your look at GitHub's billing).** Since 6 October 2026 at about 21:40 UTC every run of the "CI" workflow, including the one on `main` after pull request 3, fails within three seconds with no runner and no log, while every earlier run passed. This is not the code. The usual cause is the account's GitHub Actions minutes or spending limit (this work used many long runs, some on Windows). On GitHub: your profile picture, Settings, Billing and plans, look at "Actions" usage and the spending limit; raise the limit or wait for the month to reset; then on pull request 4 press "Re-run all jobs". Until then the full gate is run on the assistant's own machine (`node scripts/verify-all.mjs --full`), which is the same program the CI runs; the pull requests say so.
+10. **Old trial pages:** say which of `v1.0.0-trial7` and `v1.0.0-trial8` to remove; they are replaced by trial 9. (Deleting a release needs the owner's word.)
 
 ## Needs an engineer or an assistant (can be done in the repository)
 
-1. **The Setup Studio's one-button website and app.** The workflow side is written and merged (`.github/workflows/build-customer.yml`, `scripts/customer-build/`, `docs/CUSTOMER-BUILDS.md`; 66 tests; never run on a real GitHub). The Studio side (the "Website and app" step, "Connect the build service" in Settings, the stand-in service tests) is being finished by an assistant; until it is merged, the website and app are still built on GitHub by a person who runs the release workflow (`docs/SETUP-STUDIO.md`).
-2. **The older Windows programs** (the POS, the AI add-on, the dashboard host) and the plain Hub zip can still show a console window when started (`CLAUDE.md`, section 10).
+1. **The Setup Studio's one-button website and app.** Both sides are written and merged: the GitHub side (`.github/workflows/build-customer.yml`, `scripts/customer-build/`, `docs/CUSTOMER-BUILDS.md`; 66 tests) and the Studio side (the "Website and app" step, "Connect the build service" in Settings; Sales cannot start a build, Reviewers and Admins can, only an Admin connects the service; tested against a stand-in GitHub). **Neither has ever run against a real GitHub**: the first real run should be a trial build for a made-up customer, after the owner's step 8 above.
+2. **The older Windows programs** (the POS, the AI add-on, the dashboard host) can still show a console window when started (`CLAUDE.md`, section 10). The Setup Studio, the Brand Studio, the website and the Hub zip now start without one (a hidden launcher, `scripts/lib/build-launcher.mjs`; tested with the window code and under Wine here; **never seen on a real Windows PC**: look for a black window flashing).
 3. **Not yet in the Studio's customer pack:** the AI assistant's setup (built on a Windows PC, not by the release workflow yet).
 4. **Things still fixed in code that a customer could want different:** `docs/WHITE-LABEL-AUDIT.md` (the list only shrinks).
 5. **Several shops in one database, and sync between PCs** are not built. Fonts and a light/dark default from a brand kit are allowed by the licence but not applied by the Hub.
 
-6. **Version 2 (the Business Operating System):** `docs/VERSION-2.md` is the direction, `docs/V2-ARCHITECTURE-ASSESSMENT.md` the inspection and the plan. Phase 1 (AI foundation in the Business Hub) is in progress; Phases 2 to 8 (events, ontology, business intelligence, embeddings and knowledge, the assistant, cameras, advanced) are not started.
+6. **Version 2 (the Business Operating System):** `docs/VERSION-2.md` is the direction, `docs/V2-ARCHITECTURE-ASSESSMENT.md` the inspection, the plan and (section 6) exactly what Phase 1 built. **Phase 1 (AI foundation in the Business Hub) is built and tested** (switches, computer profile, privacy routing, secret store, first adapter, services and permissions, models, usage and limits, the owner's AI screen, safer updates). Left inside Phase 1's area: an AI job queue with priorities; hiding names and numbers before text goes to an online service the owner allowed; downloading and checking model files; the command-line assistants and the AI add-on's adapters as Hub adapters; clearing old rows of the use record; the owner's choice of a service per feature. **Phases 2 to 8** (events, ontology, business intelligence, embeddings and knowledge, the assistant, cameras, advanced) are not started.
 7. **Privacy and security findings in the existing AI code** (from the Version 2 inspection; each needs fixing and a test):
    - The AI add-on's "Ask AI" sends hosted providers customer **names, cities, states and remarks** (not covered by the masking), the table and column layout, photos and the typed question unmasked; masking can be switched off. The README's "personal data hidden" is not true for names.
    - The Setup Studio keeps API keys in a **plaintext file** (mode 0600).
-   - DPAPI-protected secrets cannot be saved on Linux; the Hub has no secret store at all (Phase 1 adds one).
+   - DPAPI-protected secrets cannot be saved on Linux. The Hub now has a secret store (Phase 1); the AI add-on, the Setup Studio and the storefront still use their own mechanisms.
    - The add-on's prompts and `PiiMasker` assume India, rupees and Hindi (`CLAUDE.md` section 8).
    - No AI audit trail and no cost tracking anywhere; three separate provider stacks (C#, Node, TypeScript) with different default models and four secret mechanisms.
-8. **Business Hub debt:** migrations are forward-only with no backup and have never been run on a real old database; `audit_log` is append-only by convention only; roles are fixed in code and services do not check permissions themselves; the licence limits (devices, stores, users) are not enforced.
+8. **Business Hub debt:** migrations now copy the database first and have a tested way back for the newest step, but have never been run on a real old shop database (the first step, the shop's own tables, has no way back); `audit_log` is append-only by convention only; roles are fixed in code and services do not check permissions themselves; the licence limits (devices, stores, users) are not enforced.
 
 ## What cannot be verified from a cloud session
 
-The gate prints the list every time (`node scripts/verify-all.mjs`, "NOT VERIFIED"). Say it whenever you report on the work.
+The gate prints the list every time (`node scripts/verify-all.mjs`, "NOT VERIFIED"). Say it whenever you report on the work. For the AI helpers (Phase 1) in particular:
+
+- **The Windows Credential Manager store** (`Ai/Secrets.cs`) has not run: there is no Windows here. On a real PC: connect a service with a key in *Settings, AI helpers*, restart the Hub's service, press Test, and look in Windows' Credential Manager for an entry starting `NextGenOS.Hub/`.
+- **The computer description on real hardware**: graphics cards (NVIDIA tool, Apple, Jetson) and Windows were not seen; the profile on the owner's own PC should be looked at once.
+- **A real AI service**: only a stand-in web server was used. Try Ollama or LM Studio on the shop PC, and one online account, once each.
+- **An update of a real old shop database**: the copy made before an update and the way back were tried on test databases only.
 
 ## Where things are
 

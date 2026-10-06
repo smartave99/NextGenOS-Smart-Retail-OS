@@ -16,7 +16,7 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
     },
     {
       name: 'setup-studio',
-      title: 'The Setup Studio: rules shared with the Hub by test vectors, intake, proposals, team and approval, the activity record, and the AI tools (with stand-in programs and services)',
+      title: 'The Setup Studio: rules shared with the Hub by test vectors, intake, proposals, team and approval, the activity record, the AI tools (with stand-in programs and services), and the build service for a customer\'s website and app (with a stand-in service: every ending, no access code anywhere it must not be, what is sent and what is refused)',
       run: () => {
         if (!has('node') || !has('npm')) return { status: 'SKIP', detail: 'node or npm is not installed here' };
         if (!existsSync(join(studio, 'node_modules', '@anthropic-ai', 'sdk'))) {
@@ -31,7 +31,7 @@ export function checks({ root, sh, has, runCmd, join, existsSync }) {
     },
     {
       name: 'setup-studio-e2e',
-      title: 'The Setup Studio in a real browser: first sign-in, a customer, the live preview in the customer\'s colours, an AI answer read again by the rules, a second person approving, the hand-over',
+      title: 'The Setup Studio in a real browser: first sign-in, a customer, the live preview in the customer\'s colours, an AI answer read again by the rules, a second person approving, connecting the build service and making the website and app (a stand-in service), the pack, the hand-over',
       full: true,
       run: () => {
         if (!has('node')) return { status: 'SKIP', detail: 'node is not installed here' };

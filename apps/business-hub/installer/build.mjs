@@ -6,7 +6,8 @@
  *   1. publishes the Hub as one self-contained folder (no .NET needed on the customer's PC),
  *   2. hides the names in our programs (scripts/protect-dotnet.mjs) and deletes symbols and maps,
  *   3. checks it runs on a factory-new PC (scripts/audit-prerequisites.mjs), then audits the folder: no source, no test program, no key, no database, no licence file, no secret, names really hidden,
- *   4. writes the setup (NSIS, SmartRetailHub.nsi) and a plain zip of the same folder, and audits the zip too.
+ *   4. writes the setup (NSIS, SmartRetailHub.nsi), then a plain zip of the same folder with a hidden launcher beside the program ("Start Business Hub", no black window: zip-launcher.mjs),
+ *      and audits the zip too.
  * It stops at the first problem. The licence keys must already be built into the licence library ("sync-clients" in the Licence Studio,
  * or the release workflow's step): a setup without them would refuse every licence. --allow-no-key is for trying the build only.
  * Needs: dotnet 10 SDK, node 22, Obfuscar (found or installed by scripts/lib/obfuscar.mjs), NSIS (makensis).
@@ -15,6 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { here, repo, flags, run, say, checkKeys, prerequisitesFor, OUR_PROGRAMS, NAMES_FROM } from './common.mjs';
+import { addZipLauncher } from './zip-launcher.mjs';
 
 const { flag, has } = flags(process.argv.slice(2));
 const version = flag('--version', '');
@@ -52,21 +54,27 @@ try {
   mkdirSync(dist, { recursive: true });
   const base = `SmartRetailPOS-Hub-${version}-${rid}`;
 
-  // 4a. The zip: the same folder, for a person who deploys by hand.
-  say('Writing the zip');
-  const zip = join(dist, `${base}.zip`);
-  rmSync(zip, { force: true });
-  if (process.platform === 'win32') run(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), ['-a', '-c', '-f', zip, '-C', out, '.']);   // Windows' own tar writes zip files (another tar earlier on the path may not)
-  else run('zip', ['-q', '-r', zip, '.'], { cwd: out });
-  audit(zip);
-
-  // 4b. The setup.
+  // 4a. The setup, from the folder as it was published (it installs a Windows service and the window shortcuts itself, so it needs no launcher).
   say('Writing the setup');
   const list = join(work, 'uninstall-files.nsh');
   process.stdout.write(run('node', [join(here, 'make-uninstall-list.mjs'), out, list]));
   const makensis = process.platform === 'win32' && existsSync('C:\\Program Files (x86)\\NSIS\\makensis.exe') ? 'C:\\Program Files (x86)\\NSIS\\makensis.exe' : 'makensis';
   const setup = join(dist, `SmartRetailPOS-Hub-Setup-${version}.exe`);
   process.stdout.write(run(makensis, ['-V2', `-DVERSION=${version}`, `-DSOURCE=${out}`, `-DUNINSTALL_LIST=${list}`, `-DOUTFILE=${setup}`, `-DEULA=${join(repo, 'EULA.txt')}`, `-DNOTICES=${join(repo, 'THIRD-PARTY-NOTICES.md')}`, join(here, 'SmartRetailHub.nsi')]));
+
+  // 4b. The zip: the same folder, for a person who deploys by hand. Double-clicking NextGenOS.Hub.exe would show a black window, so the zip carries "Start Business Hub" beside it
+  // (a small hidden launcher: it starts the Hub in the background and opens it in a window of its own), a helper with a window for finding a problem, and a read-me that says the
+  // setup is the normal way (CLAUDE.md, section 10). The folder is checked again with the launcher in it.
+  say('Adding the launcher, the helper and the read-me to the folder for the zip');
+  try { console.log(`  ${addZipLauncher(out, { version }).join('\n  ')}`); } catch (e) { console.error(`\n${e.message}`); process.exit(1); }
+  process.stdout.write(run('node', [join(repo, 'scripts', 'audit-prerequisites.mjs'), out, '--os', 'windows', '--arch', 'x64']));
+  audit(out);
+  say('Writing the zip');
+  const zip = join(dist, `${base}.zip`);
+  rmSync(zip, { force: true });
+  if (process.platform === 'win32') run(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), ['-a', '-c', '-f', zip, '-C', out, '.']);   // Windows' own tar writes zip files (another tar earlier on the path may not)
+  else run('zip', ['-q', '-r', zip, '.'], { cwd: out });
+  audit(zip);
   console.log(`\nWrote:\n  ${setup}\n  ${zip}`);
 } finally {
   rmSync(work, { recursive: true, force: true });

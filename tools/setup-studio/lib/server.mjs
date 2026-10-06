@@ -21,7 +21,8 @@ import { inside } from './fsx.mjs';
 import { askForProposal, preview as aiPreview, describeTools, ADAPTERS, AiError } from './ai/index.mjs';
 import { toolStatus, listModels, checkUpdate, updateTool, updateHow } from './ai/control.mjs';
 import { cleanToolConfig, EFFORTS } from './ai/options.mjs';
-import { keyStatus, saveKey, removeKey, PROVIDERS } from './secrets.mjs';
+import { keyStatus, saveKey, removeKey, PROVIDERS, BUILD_CODES, saveBuildCode, removeBuildCode } from './secrets.mjs';
+import { createBuildService, withSiteBuilds } from './builds.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const UI = resolve(here, '..', 'ui');
@@ -38,12 +39,18 @@ export function defaultWorkspaceFolder(env = process.env) {
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const PREVIEW_CSP = "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
-/** Starts the Studio. Returns { server, url, token, close, state }. `folder` is the workspace folder (made at first use). */
-export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null } = {}) {
+/**
+ * Starts the Studio. Returns { server, url, token, close, state }. `folder` is the workspace folder (made at first use). `build` is for tests only: it points the build service
+ * client at a stand-in on this PC (addresses, how often to look); the real Studio always talks to the one real address.
+ */
+export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, build = {} } = {}) {
   const hooks = { beat: onBeat, quit: onQuit };
   const token = randomBytes(18).toString('base64url');
   const tokenBuf = Buffer.from(token);
-  const state = { ws: Workspace.exists(folder) ? Workspace.open(folder) : null, folder, sessions: new Map(), aiRunning: new Set() };
+  const state = { ws: Workspace.exists(folder) ? Workspace.open(folder) : null, folder, sessions: new Map(), aiRunning: new Set(), builds: null };
+  const studioVersion = () => JSON.parse(readFileSync(resolve(here, '..', 'package.json'), 'utf8')).version;
+  /** The build service (made when first needed, because the workspace may only be made after the Studio has started). */
+  const builds = () => (state.builds ??= createBuildService({ ws: state.ws, env, studioVersion: studioVersion(), ...build }));
   const checkKey = (given) => { const g = Buffer.from(String(given ?? '')); return g.length === tokenBuf.length && timingSafeEqual(g, tokenBuf); };
 
   const send = (res, status, body, type = 'application/json; charset=utf-8', extra = {}) => {
@@ -178,16 +185,21 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     if (!n) return { release: null, programs: noKit, items: [], builds: customer.builds };
     const parts = state.ws.releaseParts(params.id, n);
     const programs = programsFolder() ? await readBaseKit(programsFolder()) : null;
-    const items = programs?.ok ? planPack({ intake: parts.intake, kit: programs, slug: params.id }).map((i) => ({ id: i.id, title: i.title, status: i.status, note: i.note, files: i.files.map((f) => f.name) })) : [];
-    return { release: parts.info, programs: programs ? kitSummary(programs) : noKit, items, builds: customer.builds };
+    // The website and the app made for this customer from this release (by the build service) count as if they were in the programs folder.
+    const kit = programs?.ok ? await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(params.id), release: n, customerId: params.id }) : null;
+    const items = kit ? planPack({ intake: parts.intake, kit, slug: params.id }).map((i) => ({ id: i.id, title: i.title, status: i.status, note: i.note, files: i.files.map((f) => f.name) })) : [];
+    return { release: parts.info, programs: programs ? kitSummary(programs) : noKit, items, trial: !!kit?.trial, builds: customer.builds };
   });
   route('POST', '/api/customers/:id/outputs/pack', { limit: 2_000 }, async ({ me, params, body }) => {
     if (!can(me, 'build')) throw new StudioError('Your role cannot make installers.', 403, 'role');
     const n = latest(params.id);
     if (!n) throw new StudioError('Approve a setup first. Installers are made from an approved release.', 409);
     if (!programsFolder()) throw new StudioError('Choose the programs folder first (the files of a NextGenOS release).', 409, 'no-programs');
-    const kit = await readBaseKit(programsFolder());
-    if (!kit.ok) throw new StudioError('The programs folder has problems:\n' + kit.problems.join('\n'), 409, 'programs', kit.problems);
+    const programs = await readBaseKit(programsFolder());
+    if (!programs.ok) throw new StudioError('The programs folder has problems:\n' + programs.problems.join('\n'), 409, 'programs', programs.problems);
+    // Every fingerprint of the website and app made for this customer is read again before they are copied into the pack.
+    const kit = await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(params.id), release: n, customerId: params.id, verify: true });
+    if (kit.siteProblems.length) throw new StudioError('The website or app made for this customer cannot be used:\n' + kit.siteProblems.join('\n'), 409, 'site', kit.siteProblems);
     const parts = state.ws.releaseParts(params.id, n);
     if (state.aiRunning.has('pack:' + params.id)) throw new StudioError('A pack is already being made for this customer.', 409);
     state.aiRunning.add('pack:' + params.id);
@@ -218,6 +230,34 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     const made = [...(state.ws.get(params.id).builds ?? [])].reverse().find((b) => b.kind === 'pack' && b.release === n);
     return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: made ? { ai: !!made.parts?.some((p) => p.id === 'ai' && p.status === 'ready') } : null }) };
   });
+
+  // ---- the build service: a customer's website and Android app are made off this PC, for each customer, and come back into the pack ---------
+  route('GET', '/api/build-service', {}, () => ({ connection: builds().connection() }));
+  route('PUT', '/api/build-service', { limit: 5_000 }, ({ me, body }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can connect the build service.', 403, 'role');
+    return { connection: builds().saveNames(me, body) };
+  });
+  route('PUT', '/api/build-service/codes/:which', { limit: 5_000 }, ({ me, params, body }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can save an access code.', 403, 'role');
+    try { saveBuildCode(params.which, body.code, env); } catch (e) { throw new StudioError(e.message); }
+    state.ws.log(me, 'key.saved', null, `build service: ${BUILD_CODES[params.which].label.toLowerCase()}`);   // the code itself is never written anywhere but its own file
+    return { connection: builds().connection() };
+  });
+  route('DELETE', '/api/build-service/codes/:which', {}, ({ me, params }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can remove an access code.', 403, 'role');
+    try { removeBuildCode(params.which, env); } catch (e) { throw new StudioError(e.message); }
+    state.ws.log(me, 'key.removed', null, `build service: ${BUILD_CODES[params.which].label.toLowerCase()}`);
+    return { connection: builds().connection() };
+  });
+  route('POST', '/api/build-service/test', { limit: 2_000 }, async ({ me }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can test the connection.', 403, 'role');
+    const result = await builds().testConnection();
+    state.ws.log(me, 'build.service.tested', null, result.ok ? 'every check passed' : `${result.checks.filter((c) => c.ok === false).length} check(s) need attention`);
+    return result;
+  });
+  route('GET', '/api/customers/:id/website-app', {}, ({ me, params }) => builds().status(params.id, me));
+  route('POST', '/api/customers/:id/website-app/build', { limit: 2_000 }, ({ me, params, body }) => builds().start(me, params.id, { which: Array.isArray(body.parts) ? body.parts.map(String) : null }));
+  route('POST', '/api/customers/:id/website-app/look', { limit: 2_000 }, ({ me, params }) => builds().look(me, params.id));
 
   // ---- team, record, safe keeping -------------------------------------------------------------------------------------------------
   route('GET', '/api/team', {}, () => ({ team: state.ws.team() }));
@@ -360,5 +400,5 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   });
   await new Promise((r, j) => { server.once('error', j); server.listen(port, '127.0.0.1', r); });
   const url = `http://127.0.0.1:${server.address().port}/?k=${token}`;
-  return { server, url, token, state, close: () => new Promise((r) => { server.close(() => r()); server.closeAllConnections?.(); }) };
+  return { server, url, token, state, close: () => new Promise((r) => { state.builds?.close(); server.close(() => r()); server.closeAllConnections?.(); }) };
 }

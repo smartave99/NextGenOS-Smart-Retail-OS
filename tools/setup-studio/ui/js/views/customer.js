@@ -1,4 +1,4 @@
-// One customer, as a journey: details, look and screens, prepare, review, installer, hand over. The page shows where the customer is and the one next thing to do.
+// One customer, as a journey: details, look and screens, prepare, review, website and app, installer, hand over. The page shows where the customer is and the one next thing to do.
 import { h, icon, toast, ago, confirmSheet } from '../dom.js';
 import { get, put, ApiError } from '../api.js';
 import { app, go, refreshCounts } from '../main.js';
@@ -11,18 +11,33 @@ export const STEPS = [
   { id: 'look', label: 'Look and screens', sub: 'Colours, logo, machine' },
   { id: 'prepare', label: 'Prepare', sub: 'Make and improve the setup' },
   { id: 'review', label: 'Review', sub: 'A second person approves' },
+  { id: 'site', label: 'Website and app', sub: 'Made for this customer' },
   { id: 'installer', label: 'Installer', sub: 'What goes to the customer' },
   { id: 'handover', label: 'Hand over', sub: 'Papers and sign-off' },
 ];
-const MODULES = { details: () => import('./details.js'), look: () => import('./look.js'), prepare: () => import('./prepare.js'), review: () => import('./review.js'), installer: () => import('./output.js'), handover: () => import('./handover.js') };
+const MODULES = { details: () => import('./details.js'), look: () => import('./look.js'), prepare: () => import('./prepare.js'), review: () => import('./review.js'), site: () => import('./site.js'), installer: () => import('./output.js'), handover: () => import('./handover.js') };
+
+/**
+ * What of the customer's website and Android app is still to be made for the latest approved release (from the customer's record of builds). The website is made for Windows
+ * and for Linux; the app needs the website's name.
+ */
+export function siteMissing(c) {
+  const release = c.releases.at(-1)?.n;
+  const eco = c.intake.ecosystem;
+  const made = new Set();
+  for (const b of c.builds ?? []) if (b.kind === 'website-app' && b.release === release) for (const p of b.parts ?? []) if (p.status === 'success') made.add(p.id);
+  return { website: eco.website.wanted && !(made.has('website-linux') && made.has('website-windows')), android: eco.android.wanted && !!eco.website.domain && !made.has('android') };
+}
 
 function stepInfo(c) {
   const hasRelease = c.releases.length > 0;
+  const site = hasRelease ? siteMissing(c) : { website: true, android: true };
   return {
     details: { done: c.check.complete, locked: false },
     look: { done: c.check.complete, locked: false },
     prepare: { done: !!c.proposal && !c.stale, locked: !c.check.complete, why: 'Finish the details first' },
     review: { done: ['approved', 'built', 'delivered'].includes(c.state), locked: !c.proposal, why: 'Prepare the setup first' },
+    site: { done: hasRelease && !site.website && !site.android, locked: !hasRelease, why: 'Approve a setup first' },
     installer: { done: ['built', 'delivered'].includes(c.state), locked: !hasRelease, why: 'Approve a setup first' },
     handover: { done: c.state === 'delivered', locked: !hasRelease, why: 'Approve a setup first' },
   };
@@ -34,7 +49,10 @@ export function nextAction(c, can) {
   if (c.state === 'draft' || !c.proposal) return { label: c.stale ? 'Prepare the setup again' : 'Prepare the setup', step: 'prepare' };
   if (c.state === 'proposed') return { label: 'Send for approval', step: 'review' };
   if (c.state === 'review') return can['review.decide'] ? { label: 'Review and approve', step: 'review' } : { label: 'Waiting for approval', step: 'review', quiet: true };
-  if (c.state === 'approved') return { label: 'Make the installer', step: 'installer' };
+  if (c.state === 'approved') {
+    const site = siteMissing(c);
+    return site.website || site.android ? { label: 'Build the website and app', step: 'site' } : { label: 'Make the installer', step: 'installer' };
+  }
   if (c.state === 'built') return { label: 'Hand over', step: 'handover' };
   return { label: 'See the hand-over', step: 'handover', quiet: true };
 }

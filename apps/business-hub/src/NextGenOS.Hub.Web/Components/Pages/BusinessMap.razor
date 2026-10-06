@@ -1,0 +1,254 @@
+@page "/settings/map"
+@attribute [Authorize(Policy = Perm.Ai)]
+@inherits HubPage
+@using System.Globalization
+@using NextGenOS.Hub.Ai
+@using NextGenOS.Hub.Ontology
+
+<PageTitle>Business map</PageTitle>
+<h1>Business map</h1>
+<p class="sub">What there is in the business and how it connects: the places (the shop, its areas and shelves), the devices (cameras, sensors) and how they relate to your products, people and bills. Your products, people and bills stay where they are and are only looked at, never copied here. <a href="settings/ai">Back to the AI helpers</a></p>
+<Notice Error="@Error" Info="@Info" />
+
+@if (!App.Ai.Flags.Licensed)
+{
+    <div class="notice warn" id="map-unlicensed">The business map is not part of this shop's licence. What is here stays readable; nothing can be added.</div>
+}
+else if (!App.Ontology.Writable)
+{
+    <div class="notice warn" id="map-off">The business map is switched off, so nothing can be added to it. You can switch it on under <a href="settings/ai">AI helpers</a>.</div>
+}
+
+<section class="card" id="map-places">
+    <h2>Places and devices</h2>
+    @if (nativeTypes.Count == 0 || things.Count == 0) { <div class="empty" id="map-empty">Nothing has been added yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl" id="map-table">
+            <thead><tr><th>Kind</th><th>Name</th><th>Short name</th><th>Where</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var t in things)
+            {
+                var thing = t.Ref;
+                <tr id="@("thing-" + thing.Type + "-" + thing.Key)">
+                    <td>@TypeLabel(thing.Type)</td>
+                    <td>@t.Label</td>
+                    <td><code>@thing</code></td>
+                    <td>@Where(thing)</td>
+                    <td class="row"><button type="button" class="btn ghost small" @onclick="() => Retire(thing)" disabled="@(!App.Ontology.Writable)">Remove</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+
+    <h3>Add a place or device</h3>
+    <div class="field-row">
+        <div>
+            <label for="a-type">Kind</label>
+            <select id="a-type" @bind="add.Type">@foreach (var t in nativeTypes) { <option value="@t.Name">@t.Label</option> }</select>
+        </div>
+        <div><label for="a-name">Name</label><input id="a-name" @bind="add.Name" maxlength="80" placeholder="for example Aisle 3" /></div>
+        <div>
+            <label for="a-in">Inside (optional)</label>
+            <select id="a-in" @bind="add.Inside">
+                <option value="">Nowhere in particular</option>
+                @foreach (var p in places) { <option value="@p.Ref">@TypeLabel(p.Ref.Type): @p.Label</option> }
+            </select>
+        </div>
+    </div>
+    <div class="row"><button type="button" class="btn primary" id="a-go" disabled="@(!App.Ontology.Writable)" @onclick="Add">Add</button></div>
+</section>
+
+<section class="card" id="map-links">
+    <h2>Connections</h2>
+    @if (stored.Count == 0) { <div class="empty" id="map-no-links">Nothing is connected yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl" id="links-table">
+            <thead><tr><th>This</th><th></th><th>That</th><th>Since</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var l in stored)
+            {
+                var id = l.Id!.Value;
+                <tr>
+                    <td>@Name(l.From)</td><td>@l.RelationLabel</td><td>@Name(l.To)</td><td class="nowrap">@Day(l.Since!.Value)</td>
+                    <td class="row"><button type="button" class="btn ghost small" @onclick="() => End(id)" disabled="@(!App.Ontology.Writable)">End</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+
+    <h3>Connect two things</h3>
+    <div class="field-row">
+        <div>
+            <label for="c-type">How</label>
+            <select id="c-type" @bind="connect.Relation">@foreach (var r in relations) { <option value="@r.Name">@r.Label (@string.Join(" or ", r.FromTypes) to @string.Join(" or ", r.ToTypes))</option> }</select>
+        </div>
+        <div><label for="c-from">This (for example camera: device:cam-1)</label><input id="c-from" @bind="connect.From" maxlength="100" /></div>
+        <div><label for="c-to">That (for example zone:aisle-3 or product:12)</label><input id="c-to" @bind="connect.To" maxlength="100" /></div>
+    </div>
+    <div class="row"><button type="button" class="btn primary" id="c-go" disabled="@(!App.Ontology.Writable)" @onclick="Connect">Connect</button></div>
+    <p class="muted small">Connections that your own records already show (a payment pays a bill, a bill has a line for a product) are not added here: they appear by themselves when you look a thing up.</p>
+</section>
+
+<section class="card" id="map-find">
+    <h2>Find the reference of a product or a person</h2>
+    <p class="muted small">Your products, customers and suppliers are named by a number in the shop's records. Type part of a name to see theirs, then use it above.</p>
+    <div class="field-row"><div><label for="p-text">Name</label><input id="p-text" @bind="findText" maxlength="60" /></div></div>
+    <div class="row"><button type="button" class="btn ghost" id="p-go" @onclick="FindThings">Find</button></div>
+    @if (found is not null)
+    {
+        @if (found.Count == 0) { <p class="muted" id="find-none">Nothing has that name.</p> }
+        else
+        {
+            <ul id="find-list">@foreach (var f in found) { <li>@f.Label <code>@f.Ref</code></li> }</ul>
+        }
+    }
+</section>
+
+<section class="card" id="map-look">
+    <h2>Look a thing up</h2>
+    <div class="field-row">
+        <div><label for="l-ref">Reference</label><input id="l-ref" @bind="lookRef" maxlength="100" placeholder="product:12, document:5, zone:aisle-3" /></div>
+    </div>
+    <div class="row"><button type="button" class="btn ghost" id="l-go" @onclick="Look">Show</button></div>
+    @if (looked is not null)
+    {
+        <div id="look-result">
+            <p><strong>@looked.Label</strong> (@TypeLabel(looked.Ref.Type), <code>@looked.Ref</code>)@(looked.Retired ? " · removed" : "")</p>
+            @if (App.Ontology.EntityTypes().FirstOrDefault(t => t.Name == looked.Ref.Type) is { } def) { <p class="muted small">Kind of information: @DataClass.Label(def.DataClass).</p> }
+            @if (lookedLinks.Count == 0) { <p class="muted" id="look-none">It is not connected to anything.</p> }
+            else
+            {
+                <ul id="look-links">
+                @foreach (var l in lookedLinks.Take(ShownLinks))
+                {
+                    <li>@Name(l.From) <em>@l.RelationLabel</em> @Name(l.To)@(l.Derived ? " (from your records)" : "")</li>
+                }
+                </ul>
+                @if (lookedLinks.Count > ShownLinks) { <p class="muted small">and @(lookedLinks.Count - ShownLinks) more.</p> }
+            }
+        </div>
+    }
+</section>
+
+<section class="card" id="map-check">
+    <h2>Is it all in order?</h2>
+    @if (problems.Count == 0) { <p id="check-ok">Every connection points at something that is still there.</p> }
+    else
+    {
+        <ul id="check-problems">@foreach (var p in problems) { <li>@p.What @if (p.RelationshipId is { } rid) { <button type="button" class="btn ghost small" @onclick="() => End(rid)" disabled="@(!App.Ontology.Writable)">End this connection</button> }</li> }</ul>
+    }
+</section>
+
+@code {
+    private sealed class AddForm { public string Type = EntityType.Zone, Name = "", Inside = ""; }
+    private sealed class ConnectForm { public string Relation = RelationType.PartOf, From = "", To = ""; }
+
+    private const int ShownLinks = 30;
+    private readonly AddForm add = new();
+    private readonly ConnectForm connect = new();
+    private IReadOnlyList<EntityTypeDefinition> types = Array.Empty<EntityTypeDefinition>();
+    private IReadOnlyList<EntityTypeDefinition> nativeTypes = Array.Empty<EntityTypeDefinition>();
+    private IReadOnlyList<RelationTypeDefinition> relations = Array.Empty<RelationTypeDefinition>();
+    private IReadOnlyList<ThingView> things = Array.Empty<ThingView>();
+    private IReadOnlyList<ThingView> places = Array.Empty<ThingView>();
+    private IReadOnlyList<Link> stored = Array.Empty<Link>();
+    private IReadOnlyList<MapProblem> problems = Array.Empty<MapProblem>();
+    private ThingView? looked;
+    private IReadOnlyList<Link> lookedLinks = Array.Empty<Link>();
+    private string lookRef = "";
+    private string findText = "";
+    private IReadOnlyList<ThingView>? found;
+    private readonly Dictionary<ThingRef, string> names = new();
+
+    protected override Task LoadAsync()
+    {
+        var map = App.Ontology;
+        types = map.EntityTypes();
+        nativeTypes = types.Where(t => t.Kind == EntityKind.Native).ToList();
+        relations = map.RelationTypes().Where(r => !r.Derived).ToList();
+        things = nativeTypes.SelectMany(t => map.Things(t.Name)).ToList();
+        places = things.Where(t => t.Ref.Type is EntityType.Site or EntityType.Zone).ToList();
+        stored = things.SelectMany(t => map.Related(t.Ref, OntologyService.Outgoing)).Where(l => !l.Derived).DistinctBy(l => l.Id).OrderBy(l => l.Id).ToList();
+        // Connections that start at one of the shop's own records (a product on a shelf) are found from the thing they end at.
+        stored = stored.Concat(things.SelectMany(t => map.Related(t.Ref, OntologyService.Incoming)).Where(l => !l.Derived)).DistinctBy(l => l.Id).OrderBy(l => l.Id).ToList();
+        problems = map.Check();
+        names.Clear();
+        return Task.CompletedTask;
+    }
+
+    private string TypeLabel(string type) => types.FirstOrDefault(t => t.Name == type)?.Label ?? type;
+
+    private string Name(ThingRef thing)
+    {
+        if (names.TryGetValue(thing, out var known)) return known;
+        var view = App.Ontology.Resolve(thing);
+        return names[thing] = view is null ? thing + " (no longer there)" : view.Label + (view.Retired ? " (removed)" : "");
+    }
+
+    private string Where(ThingRef thing) => string.Join(" › ", App.Ontology.Ancestors(thing).Select(a => a.Label));
+
+    private async Task Add()
+    {
+        await Run(() =>
+        {
+            var created = App.Ontology.CreateThing(add.Type, null, add.Name, null, Me.Id);
+            if (!string.IsNullOrEmpty(add.Inside))
+            {
+                var parent = ThingRef.Parse(add.Inside);
+                var relation = created.Ref.Type == EntityType.Zone || created.Ref.Type == EntityType.Site ? RelationType.PartOf : RelationType.LocatedIn;
+                try { App.Ontology.Relate(relation, created.Ref, parent, Me.Id); }
+                catch (HubException e) { Info = "Added, but it could not be put inside that: " + e.Message; add.Name = ""; return; }
+            }
+
+            add.Name = "";
+        }, "Added.");
+        await Reload();
+    }
+
+    private async Task Retire(ThingRef thing) { await Run(() => App.Ontology.Retire(thing, Me.Id), "Removed. Its connections ended, and are kept in the history."); await Reload(); }
+
+    private async Task End(long id) { await Run(() => App.Ontology.Unrelate(id, Me.Id), "The connection ended. It stays in the history."); await Reload(); }
+
+    private async Task Connect()
+    {
+        await Run(() =>
+        {
+            App.Ontology.Relate(connect.Relation, ThingRef.Parse(connect.From), ThingRef.Parse(connect.To), Me.Id);
+            connect.From = connect.To = "";
+        }, "Connected.");
+        await Reload();
+    }
+
+    private async Task FindThings()
+    {
+        found = null;
+        await Run(() =>
+        {
+            var text = findText.Trim();
+            if (text.Length < 2) throw new HubException("too-short", "Type at least two letters.");
+            var list = new List<ThingView>();
+            foreach (var item in App.Catalog.Search(text, limit: 10)) if (App.Ontology.Resolve(new ThingRef(EntityType.Product, item.Id.ToString(CultureInfo.InvariantCulture))) is { } p) list.Add(p);
+            foreach (var party in App.Parties.Search(null, text, 10)) if (App.Ontology.Resolve(new ThingRef(EntityType.Party, party.Id.ToString(CultureInfo.InvariantCulture))) is { } p) list.Add(p);
+            found = list;
+        });
+    }
+
+    private async Task Look()
+    {
+        looked = null;
+        await Run(() =>
+        {
+            var thing = ThingRef.Parse(lookRef);
+            looked = App.Ontology.Resolve(thing) ?? throw new HubException("no-thing", thing + " is not in the map or in your records.");
+            lookedLinks = App.Ontology.Related(thing, OntologyService.Both, null, includeEnded: false);
+        });
+    }
+}

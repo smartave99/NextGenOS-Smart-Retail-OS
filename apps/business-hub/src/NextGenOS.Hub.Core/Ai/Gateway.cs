@@ -49,8 +49,9 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
     private async Task<AiAnswer<T>> RunAsync<T, TProvider>(string task, AiContext context, IEnumerable<string> texts, long estimatedTokens, CancellationToken cancel,
         Func<TProvider, Task<Called<T>>> call) where T : class where TProvider : class, IAiProvider
     {
-        // A card number inside the text makes it payment data, whatever the caller called it.
-        var dataClass = texts.Any(TextGuard.ContainsCardNumber) ? DataClass.PaymentSensitive : context.DataClass;
+        // What the text itself shows counts, whatever the caller called it: a card number makes it payment data (that never leaves this computer), an e-mail address or a phone
+        // number makes anything that was called public, internal or confidential personal data (which an online service gets only with the owner's permission).
+        var dataClass = Strictest(context.DataClass, texts);
 
         if (!flags.Licensed) return Refuse<T>(context, task, dataClass, "The AI features are not part of this shop's licence.", []);
         if (context.Flag is not null && !flags.IsEnabled(context.Flag)) return Refuse<T>(context, task, dataClass, "This feature is switched off. The owner can switch it on in the AI settings.", []);
@@ -111,6 +112,14 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
         return new AiAnswer<T>(null, null, reason, trace);
     }
 
+    private static string Strictest(string given, IEnumerable<string> texts)
+    {
+        var all = texts.ToList();
+        if (all.Any(TextGuard.ContainsCardNumber)) return DataClass.PaymentSensitive;
+        if (given is DataClass.Public or DataClass.Internal or DataClass.Confidential && all.Any(TextGuard.ContainsContactDetails)) return DataClass.Personal;
+        return given;
+    }
+
     /// <summary>About four letters to a token. It is only used to keep to a limit before a call; the real count is written down after.</summary>
     public static long EstimateTokens(IEnumerable<string> texts) => Math.Max(1, texts.Sum(t => (long)t.Length) / 4);
 }
@@ -133,6 +142,7 @@ public sealed class AiFoundation
         Usage = new UsageService(db, clock);
         Hardware = new HardwareService(options.Probe ?? new SystemHardwareProbe(), dataFolder, clock);
         Gateway = new AiGateway(Providers, Flags, Usage, factory);
+        Jobs = new AiJobQueue(Gateway);
     }
 
     public IEntitlements Entitlements { get; }
@@ -143,6 +153,8 @@ public sealed class AiFoundation
     public UsageService Usage { get; }
     public HardwareService Hardware { get; }
     public AiGateway Gateway { get; }
+    /// <summary>The waiting line in front of the gateway, for work that should not crowd out a person who is waiting (reports, cameras).</summary>
+    public AiJobQueue Jobs { get; }
 }
 
 /// <summary>What the program that hosts the Hub gives the AI foundation. Anything not given is the safe choice: no licence for AI, the computer's own secret store, the real machine.</summary>

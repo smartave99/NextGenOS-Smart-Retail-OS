@@ -443,7 +443,7 @@ public class AiMigrationTests
         }
 
         // The tables a shop sells with are exactly the ones the first step made.
-        var shop = Tables(f.App).Except(AiTables).ToArray();
+        var shop = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships" }).ToArray();
         Assert.Contains("documents", shop);
         Assert.Contains("audit_log", shop);
         Assert.DoesNotContain(shop, t => t.StartsWith("ai_", StringComparison.Ordinal));
@@ -454,7 +454,7 @@ public class AiMigrationTests
     {
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
-        var shopTablesBefore = Tables(f.App).Except(AiTables).ToArray();
+        var shopTablesBefore = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships" }).ToArray();
 
         f.App.Db.Rollback(1);
 
@@ -467,7 +467,7 @@ public class AiMigrationTests
         // Forward again: the step runs once more and the tables are back, empty.
         var again = HubApp.Open(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), AiTables.ToHashSet());
-        Assert.Equal(new long[] { 1, 2 }, again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
+        Assert.Equal(new long[] { 1, 2, 3, 4 }, again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
         Assert.Equal("Rice", again.Db.Scalar("SELECT name FROM items"));
     }
 
@@ -476,7 +476,7 @@ public class AiMigrationTests
     {
         using var f = new HubFixture();
         Assert.Throws<InvalidOperationException>(() => f.App.Db.Rollback(0));
-        f.App.Db.Rollback(2);   // already there: nothing to do
+        f.App.Db.Rollback(3);   // already there: nothing to do
         Assert.Subset(Tables(f.App).ToHashSet(), AiTables.ToHashSet());
     }
 
@@ -493,7 +493,7 @@ public class AiMigrationTests
         var updated = HubApp.Open(f.App.Db.Path, f.Clock);   // version 1 -> 2 on an existing shop
         Assert.Null(updated.Db.BackupProblem);
         Assert.NotNull(updated.Db.LastBackup);
-        Assert.Contains("before-update-1-to-2", updated.Db.LastBackup);
+        Assert.Contains("before-update-1-to-4", updated.Db.LastBackup);
         Assert.True(File.Exists(updated.Db.LastBackup));
 
         // The copy is a whole shop database as it was before the update: it has the sale data and not the new tables.

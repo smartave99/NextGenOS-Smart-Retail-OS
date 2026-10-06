@@ -69,6 +69,18 @@ Anything a customer, an owner, a cashier or a shopper can see, hear or print is 
 - **AI-made content takes its settings from the profile**: which images are made, who is shown, in which place and language, in which style, with which brand notes. The prompts are built from those settings; none of it is written into the prompt text.
 - **New work is checked for this.** Before finishing any change that shows something to a person, ask: could another customer, in another country, in another trade, want this different? If so, it is a setting with a neutral default, with a test that changing the setting changes the result. `docs/WHITE-LABEL-AUDIT.md` lists what is still fixed; the list only shrinks.
 
+## 10. Programs open like programs (no terminal, ever)
+
+Everything a person starts on a laptop, a counter PC or a device (the Setup Studio, the Brand Studio, the website, the Business Hub's shortcuts, any new tool) opens **as a program of its own**:
+
+- One icon or menu entry starts it. A window with no address bar opens. **No terminal or console window appears, at any time.** Nobody is told to open a terminal, type a command or "leave this window open".
+- **One copy at a time:** starting it again brings up the window that is already open.
+- **Closing the window stops it.** The one exception is a background service that the shop depends on (the Business Hub): it keeps running on purpose, and closing its window only closes the window. Say which kind a program is, in its guide.
+- A start-up problem is written in a plain note that opens by itself, never left in a terminal nobody can see.
+- A launcher that shows a terminal may exist only as a clearly named "(with a window, for problems)" helper, or for a server that staff run remotely.
+- The window code is one file, `scripts/lib/app-window.mjs`; the Windows launcher is made by `scripts/lib/build-launcher.mjs`. A copy that travels with a program is the same file, unchanged (a test checks it).
+- What cannot be checked here (a real Windows PC) is listed under NOT VERIFIED, and the release workflow checks it on a Windows runner.
+
 ## 9. Style
 
 Plain words for the people who use the product: shop owners, cashiers, salespeople. No jargon in screens or messages. Match the code around you. Say what changed in `CHANGELOG.md` when a release is cut.

@@ -4,7 +4,7 @@
  * it carries its own Node.js, the built server, the static files, the libraries it needs and the native parts for that system.
  *
  *   node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 --customer <short-name> --settings <website-settings.env>
- *        (--node-runtime <folder> | --download-node 22.22.0)  [--out dist] [--allow-no-key] [--deps-from <installed libraries>] [--logo <logo.png>]
+ *        (--node-runtime <folder> | --download-node 22.22.0)  [--out dist] [--allow-no-key] [--deps-from <installed libraries>] [--logo <logo.png>] [--design-pack <design-pack.json>]
  *   node scripts/make-website-package.mjs --os linux --version 1.0.0 --kit <brand-kits folder name> ...     (settings and logo come from the customer's brand kit)
  *
  *   --settings        the customer's public settings: the file the Setup Studio writes as website-settings.env (name, address, country, kind of business, place).
@@ -14,6 +14,9 @@
  *   --node-runtime    a folder with an official Node.js of that system already unpacked (node.exe, or bin/node)
  *   --download-node   fetches nodejs.org's own build of that version and checks it against nodejs.org's published SHA-256 list
  *   --deps-from       a node_modules folder that matches package-lock.json (saves the install on a developer's computer); without it the libraries are installed with "npm ci"
+ *   --design-pack     the customer's design pack (how the shopper's website LOOKS: tokens, own fonts and pictures, a checked style sheet; docs/DESIGN-PACK.md). It is checked again here,
+ *                     and the build stops with a plain message when it is not acceptable. With --kit it is taken from brand-kits/<kit>/design-pack.json when that file exists.
+ *                     Without one the website looks as it always did. It goes only into this customer's build: the repository's own website folder is never changed.
  *   --allow-no-key    only for trying the build: the licence keys are not built in, the website refuses every licence, and the package says so on its face
  *
  * What goes in: the website's built server and static files, the production libraries it needs (checked for their licences), Node.js, the start scripts, a plain README,
@@ -37,6 +40,7 @@ import { auditFolder, findSecrets } from './audit-package.mjs';
 import { auditPrerequisites } from './audit-prerequisites.mjs';
 import { writeZipFile } from '../tools/setup-studio/lib/zip.mjs';
 import { buildLauncher } from './lib/build-launcher.mjs';
+import { DESIGN_DIR, DESIGN_ENV, DESIGN_PACK_FILE, DesignPackFileError, loadDesignPack, writeDesignPack } from './design-pack.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repo = resolve(here, '..');
@@ -316,6 +320,8 @@ export function copyAppSource(from, to) {
       const top = rel.split(sep)[0];
       if (SKIP_TOP.has(top) || top.startsWith('.env') || top === 'tsconfig.tsbuildinfo' || top === 'next-env.d.ts') return false;
       if (GENERATED_PUBLIC.test(rel)) return false;
+      // A design pack belongs to one customer's build and is written there (applyDesignPack); one left in a developer's folder never travels into another customer's website.
+      if (rel === join('public', DESIGN_DIR) || rel.startsWith(join('public', DESIGN_DIR) + sep)) return false;
       if (/(^|[\\/])(licence\.ngos|crl\.ngos|install-id)$/.test(rel) || /\.(ngoslic|ngos)$/.test(rel)) return false;
       return true;
     },
@@ -365,11 +371,12 @@ function run(cmd, args, opts = {}) {
  * Builds the website in a copy of its folder (the repository is not touched) and returns where the pieces are: { standalone, staticDir, publicDir, keys }.
  * The libraries come from --deps-from (hard-linked) or from "npm ci"; the database library is made for THIS system; the pages are built with the customer's public settings only.
  */
-export function buildWebsite({ work, settings, source = appDir, depsFrom = null, logo = null, allowNoKey = false, log = () => {} }) {
+export function buildWebsite({ work, settings, source = appDir, depsFrom = null, logo = null, designPack = null, allowNoKey = false, log = () => {} }) {
   const app = join(work, 'app');
   log('Copying the website\'s source into a build folder');
   copyAppSource(source, app);
   if (logo) { checkLogo(logo); copyFileSync(logo, join(app, 'public', 'logo.png')); }
+  if (designPack) { log(`Putting the design pack "${designPack.name}" into this customer's website`); writeDesignPack(designPack, join(app, 'public')); }
 
   const keys = keysBuiltIn(app);
   if ((keys.count === 0 || !keys.url) && !allowNoKey) {
@@ -387,7 +394,7 @@ export function buildWebsite({ work, settings, source = appDir, depsFrom = null,
     run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'], { cwd: app, env: buildEnvironment({}, { NODE_ENV: 'development' }), shell: process.platform === 'win32' });
   }
 
-  const env = buildEnvironment(settings, { NGOS_PACKAGE_BUILD: '1' });
+  const env = buildEnvironment(settings, { NGOS_PACKAGE_BUILD: '1', ...(designPack ? { [DESIGN_ENV]: designPack.id } : {}) });
   log('Making the database library for this system (Prisma)');
   run(process.execPath, [join(modules, 'prisma', 'build', 'index.js'), 'generate', '--schema', join(app, 'prisma', 'schema.prisma')], { cwd: app, env });
   run(process.execPath, [join(app, 'scripts', 'generate-version.js')], { cwd: app, env });
@@ -629,7 +636,7 @@ export const TRIAL_TEXT = 'This website was built WITHOUT licence keys: it can n
  *   node                               { root, version }: an unpacked Node.js of that system
  *   returns the folder
  */
-export function assemblePackage({ out, os, customer, version, settings, standalone, staticDir, publicDir, node, trial = false, keyCount = 0, notices = {}, now = new Date() }) {
+export function assemblePackage({ out, os, customer, version, settings, standalone, staticDir, publicDir, node, trial = false, keyCount = 0, notices = {}, designPack = null, now = new Date() }) {
   checkSystem(os);
   const name = packageName(customer, os);
   checkVersion(version);
@@ -680,6 +687,7 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
   writeFileSync(join(pkg, 'PACKAGE-INFO.json'), JSON.stringify({
     schema: 1, product: 'Smart Retail POS website', customer, name: name2, version, os, arch: 'x64', builtAt: now.toISOString(), node: node.version,
     licenceKeysBuiltIn: keyCount, trialWithoutLicenceKeys: Boolean(trial), publicSettings: settings,
+    ...(designPack ? { designPack: { name: designPack.name, id: designPack.id } } : {}),
   }, null, 2) + '\n');
   writeFileSync(join(pkg, 'READ ME FIRST.txt'), readmeFor({ name: name2, os, customer, trial, version, nodeVersion: node.version }));
   if (trial) writeFileSync(join(pkg, TRIAL_FILE), TRIAL_TEXT);
@@ -768,7 +776,7 @@ export async function zipPackage(folder, zipFile) {
  * public key built in, so that a licensed website can be tried; the command line has no such switch, and the repository's own files are never changed.
  */
 export async function makeWebsitePackage(opts) {
-  const { os, version, out, allowNoKey = false, depsFrom = null, kit = null, settingsFile = null, logo = null, nodeGiven = null, nodeDownload = null, source = appDir, log = (m) => console.log(`\n== ${m}`) } = opts;
+  const { os, version, out, allowNoKey = false, depsFrom = null, kit = null, settingsFile = null, logo = null, designPackFile = null, nodeGiven = null, nodeDownload = null, source = appDir, log = (m) => console.log(`\n== ${m}`) } = opts;
   checkSystem(os);
   checkVersion(version);
   if (hostOs() !== os) {
@@ -801,17 +809,25 @@ export async function makeWebsitePackage(opts) {
   const chosenLogo = logo ? resolve(logo) : kitLogo;
   if (chosenLogo) checkLogo(chosenLogo);
 
+  // The design pack (how the shopper's website looks): the one that was named, or the brand kit's own. It is checked here, before the long build, and the build stops when it is not acceptable.
+  let designPack = null;
+  const packFile = designPackFile ? resolve(designPackFile) : kit && existsSync(join(repo, 'brand-kits', kit, DESIGN_PACK_FILE)) ? join(repo, 'brand-kits', kit, DESIGN_PACK_FILE) : null;
+  if (packFile) {
+    try { designPack = loadDesignPack(packFile); } catch (e) { if (e instanceof DesignPackFileError) throw new WebsiteError(e.message); throw e; }
+    console.log(`Design pack "${designPack.name}" checked (id ${designPack.id}).`);
+  }
+
   const work = mkdtempSync(join(tmpdir(), 'ngos-site-'));
   try {
     log('Node.js to carry');
     const node = await nodeRuntime({ os, given: nodeGiven, download: nodeDownload, work });
-    const built = buildWebsite({ work, settings: parsed.values, source, depsFrom, logo: chosenLogo, allowNoKey, log });
+    const built = buildWebsite({ work, settings: parsed.values, source, depsFrom, logo: chosenLogo, designPack, allowNoKey, log });
     const trial = built.keys.count === 0 || !built.keys.url;
     log('Putting the package together');
     mkdirSync(out, { recursive: true });
     const { folder, name, pruned } = assemblePackage({
       out, os, customer, version, settings: parsed.values, standalone: built.standalone, staticDir: built.staticDir, publicDir: built.publicDir, node, trial,
-      keyCount: built.keys.count, notices: { eula: join(repo, 'EULA.txt'), thirdParty: join(repo, 'THIRD-PARTY-NOTICES.md') },
+      keyCount: built.keys.count, notices: { eula: join(repo, 'EULA.txt'), thirdParty: join(repo, 'THIRD-PARTY-NOTICES.md') }, designPack,
     });
     console.log(`Removed from the build: ${pruned.files} source/type/map files${pruned.other.length ? `; other systems' parts: ${pruned.other.join(', ')}` : ''}.`);
     rmSync(work, { recursive: true, force: true });   // the build folder is large: free it before the checks and the zip
@@ -824,7 +840,7 @@ export async function makeWebsitePackage(opts) {
     log('Writing the zip');
     const zip = join(out, `${name}.zip`);
     const count = await zipPackage(folder, zip);
-    return { folder, zip, files: count, trial, sha256: sha256(readFileSync(zip)) };
+    return { folder, zip, files: count, trial, designPack: designPack ? { name: designPack.name, id: designPack.id } : null, sha256: sha256(readFileSync(zip)) };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -836,13 +852,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const has = (n) => args.includes(n);
   try {
     if (has('--help') || args.length === 0) {
-      console.log('Usage: node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 --customer <short-name> --settings <website-settings.env> (--node-runtime <folder> | --download-node 22.22.0) [--out dist] [--allow-no-key] [--deps-from <node_modules>] [--logo <logo.png>]\n       node scripts/make-website-package.mjs --os linux --version 1.0.0 --kit <brand kit name> --download-node 22.22.0');
+      console.log('Usage: node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 --customer <short-name> --settings <website-settings.env> (--node-runtime <folder> | --download-node 22.22.0) [--out dist] [--allow-no-key] [--deps-from <node_modules>] [--logo <logo.png>] [--design-pack <design-pack.json>]\n       node scripts/make-website-package.mjs --os linux --version 1.0.0 --kit <brand kit name> --download-node 22.22.0');
       process.exit(args.length ? 0 : 2);
     }
     const r = await makeWebsitePackage({
       os: flag('--os'), version: flag('--version'), customer: flag('--customer') || null, kit: flag('--kit') || null, settingsFile: flag('--settings') ? resolve(flag('--settings')) : null,
       nodeGiven: flag('--node-runtime') || null, nodeDownload: flag('--download-node') || null, out: resolve(flag('--out') ?? join(repo, 'dist')),
-      allowNoKey: has('--allow-no-key'), depsFrom: flag('--deps-from') || null, logo: flag('--logo') || null,
+      allowNoKey: has('--allow-no-key'), depsFrom: flag('--deps-from') || null, logo: flag('--logo') || null, designPackFile: flag('--design-pack') || null,
     });
     console.log(`\nWrote:\n  ${r.zip}\n  ${r.folder}${sep}   (${r.files} files)\n  SHA-256 ${r.sha256}${r.trial ? '\n\nTRIAL BUILD: no licence keys are built in. It can never be licensed. Never give it to a customer.' : ''}`);
   } catch (e) {

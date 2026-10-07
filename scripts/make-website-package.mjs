@@ -734,6 +734,39 @@ export async function zipPackage(folder, zipFile) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
+ * What the older way (--settings, --kit, --logo) says about one customer, checked: { customer, values, kitFolder, logo, packs }. Throws a WebsiteError in plain words, before anything is made.
+ * The settings file adds to the brand kit's settings or overrides them; a value that is not a public setting, or looks like a key, is refused.
+ */
+export function resolveCustomerSettings({ customer = null, kit = null, settingsFile = null, logo = null }) {
+  const packs = knownPacks();
+  let values = {};
+  let kitLogo = null;
+  let kitFolder = null;
+  let name = customer;
+  if (!kit && !settingsFile) throw new WebsiteError('Give the customer\'s public settings: --settings <website-settings.env> or --kit <brand kit name>.');
+  if (kit) {
+    if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(kit)) throw new WebsiteError(`"${String(kit).slice(0, 60)}" is not a brand kit name.`);
+    kitFolder = join(repo, 'brand-kits', kit);
+    const k = settingsFromKit(kitFolder);
+    values = { ...k.values };
+    kitLogo = k.logo;
+    name = name || kit;
+  }
+  if (settingsFile) {
+    if (!existsSync(settingsFile)) throw new WebsiteError(`The settings file ${settingsFile} was not found.`);
+    const own = parseSettings(readFileSync(settingsFile, 'utf8'), { ...packs, requireName: !kit });
+    if (own.problems.length) throw new WebsiteError(`The settings in ${basename(settingsFile)} cannot be used:\n  ${own.problems.join('\n  ')}`);
+    values = { ...values, ...own.values };
+  }
+  checkCustomer(name);
+  const parsed = parseSettings(Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n'), packs);
+  if (parsed.problems.length) throw new WebsiteError(`The settings cannot be used:\n  ${parsed.problems.join('\n  ')}`);
+  const chosenLogo = logo ? resolve(logo) : kitLogo;
+  if (chosenLogo) checkLogo(chosenLogo);
+  return { customer: name, values: parsed.values, kitFolder, logo: chosenLogo, packs };
+}
+
+/**
  * Writes the customer folder that the older way (--settings, --kit, --logo) stands for: the brand kit's brand.json when there is one, the public settings as website-settings.env
  * (checked already), and the logo in assets/. The website reads the folder when it starts (apps/storefront-web-mobile/src/lib/customer).
  */
@@ -765,37 +798,8 @@ export async function makeWebsitePackage(opts) {
 
   // Without a customer there is nothing more to say: THE website is made. With one, the customer's settings are checked now, before anything is built (a mistake is found in a second, not after the build).
   const forCustomer = Boolean(opts.customer || kit || settingsFile);
-  let customer = opts.customer || null;
-  let customerFiles = null;
-  if (forCustomer) {
-    const packs = knownPacks();
-    let values = {};
-    let kitLogo = null;
-    let kitFolder = null;
-    let settingsText = null;
-    if (!kit && !settingsFile) throw new WebsiteError('Give the customer\'s public settings: --settings <website-settings.env> or --kit <brand kit name>.');
-    if (kit) {
-      if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(kit)) throw new WebsiteError(`"${String(kit).slice(0, 60)}" is not a brand kit name.`);
-      kitFolder = join(repo, 'brand-kits', kit);
-      const k = settingsFromKit(kitFolder);
-      values = { ...k.values };
-      kitLogo = k.logo;
-      customer = customer || kit;
-    }
-    if (settingsFile) {
-      if (!existsSync(settingsFile)) throw new WebsiteError(`The settings file ${settingsFile} was not found.`);
-      settingsText = readFileSync(settingsFile, 'utf8');
-      const own = parseSettings(settingsText, { ...packs, requireName: !kit });
-      if (own.problems.length) throw new WebsiteError(`The settings in ${basename(settingsFile)} cannot be used:\n  ${own.problems.join('\n  ')}`);
-      values = { ...values, ...own.values };
-    }
-    checkCustomer(customer);
-    const parsed = parseSettings(Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n'), packs);
-    if (parsed.problems.length) throw new WebsiteError(`The settings cannot be used:\n  ${parsed.problems.join('\n  ')}`);
-    const chosenLogo = logo ? resolve(logo) : kitLogo;
-    if (chosenLogo) checkLogo(chosenLogo);
-    customerFiles = { values: parsed.values, settingsText, kitFolder, logo: chosenLogo, packs };
-  }
+  const customerFiles = forCustomer ? resolveCustomerSettings({ customer: opts.customer || null, kit, settingsFile, logo }) : null;
+  const customer = customerFiles?.customer ?? null;
 
   const work = mkdtempSync(join(tmpdir(), 'ngos-site-'));
   try {

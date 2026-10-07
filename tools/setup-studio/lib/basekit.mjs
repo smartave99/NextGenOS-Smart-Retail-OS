@@ -10,7 +10,8 @@ export const ROLES = {
   'hub-windows-zip': 'The Hub as a zip for Windows',
   'hub-linux-deb': 'The Linux package for the Hub',
   'ai-addon-windows': 'The AI assistant for Windows',
-  website: 'The website',
+  'website-generic': 'The website program, the same for every customer (the Studio puts a customer\'s folder and licence beside it)',
+  website: 'A website made for one customer',
   'android-apk': 'An Android app',
   'android-aab': 'An Android app for the Play Store',
 };

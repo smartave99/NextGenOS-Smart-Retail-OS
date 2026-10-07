@@ -7,6 +7,8 @@
  *
  *   --program          the generic package (website-linux.zip or website-windows.zip), or the folder it unpacks to
  *   --customer-folder  the customer's folder: brand.json, setup.json, website-settings.env, assets/ (see apps/storefront-web-mobile/src/lib/customer/rules.mjs)
+ *   --settings, --kit, --logo   instead of a folder: the older way the build service and the release workflow give a customer (a website-settings.env, a brand kit's name, a PNG logo); the
+ *                      folder is made from them and checked with the same rules as before
  *   --licence          the customer's licence file from the Licence Studio (licence.ngos); --no-licence makes the website without one (it is put in later)
  *   --customer         the customer's short name (2 to 41 small letters, digits and hyphens): the result is website-<customer>-<system>
  *   --person           who is making it (default: the name of the person logged in to this computer): it goes, with the time, in a hidden mark
@@ -18,12 +20,12 @@
  * The library is tools/setup-studio/lib/website-assemble.mjs, because that is where the Studio's own assembling code lives (it travels with the Studio, which holds no source code and
  * does not carry scripts/). This command is for the people who work on the repository and for the release workflow; the audit lives here, which is why it can be asked for here.
  */
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditFolder } from './audit-package.mjs';
-import { knownPacks, repo } from './make-website-package.mjs';
+import { WebsiteError, knownPacks, repo, resolveCustomerSettings, writeCustomerFolder } from './make-website-package.mjs';
 import { AssembleError, assembleWebsite } from '../tools/setup-studio/lib/website-assemble.mjs';
 
 export async function main(argv) {
@@ -31,16 +33,30 @@ export async function main(argv) {
   const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
   const has = (n) => args.includes(n);
   if (!args.length || has('--help')) {
-    console.log('Usage: node scripts/assemble-website.mjs --program <website-linux.zip|website-windows.zip|folder> --customer-folder <folder> (--licence <licence.ngos> | --no-licence) --customer <short-name> [--person "Name"] [--out dist] [--expect-sha256 <hash>] [--audit] [--no-zip]');
+    console.log('Usage: node scripts/assemble-website.mjs --program <website-linux.zip|website-windows.zip|folder> (--customer-folder <folder> | --settings <website-settings.env> | --kit <brand kit name>) (--licence <licence.ngos> | --no-licence) --customer <short-name> [--person "Name"] [--logo <logo.png>] [--out dist] [--expect-sha256 <hash>] [--audit] [--no-zip]');
     return args.length ? 0 : 2;
   }
   try {
     const person = flag('--person') || (() => { try { return os.userInfo().username; } catch { return process.env.USERNAME || process.env.USER || ''; } })();
-    const made = await assembleWebsite({
-      genericPackage: flag('--program') ? resolve(flag('--program')) : null, customerFolder: flag('--customer-folder') ? resolve(flag('--customer-folder')) : null,
-      licenceFile: flag('--licence') ? resolve(flag('--licence')) : null, allowNoLicence: has('--no-licence'), customer: flag('--customer'), person,
+    let customer = flag('--customer');
+    let customerFolder = flag('--customer-folder') ? resolve(flag('--customer-folder')) : null;
+    let temp = null;
+    if (!customerFolder && (flag('--settings') || flag('--kit'))) {
+      const checked = resolveCustomerSettings({ customer: customer || null, kit: flag('--kit') || null, settingsFile: flag('--settings') ? resolve(flag('--settings')) : null, logo: flag('--logo') || null });
+      customer = checked.customer;
+      temp = mkdtempSync(join(os.tmpdir(), 'ngos-customer-'));
+      customerFolder = writeCustomerFolder(join(temp, 'customer'), checked);
+    }
+    let made;
+    try {
+      made = await assembleWebsite({
+      genericPackage: flag('--program') ? resolve(flag('--program')) : null, customerFolder,
+      licenceFile: flag('--licence') ? resolve(flag('--licence')) : null, allowNoLicence: has('--no-licence'), customer, person,
       out: resolve(flag('--out') ?? `${repo}/dist`), packs: knownPacks(), expectedSha256: flag('--expect-sha256') ?? null, zip: !has('--no-zip'),
-    });
+      });
+    } finally {
+      if (temp) rmSync(dirname(customerFolder), { recursive: true, force: true });
+    }
     if (has('--audit')) {
       const audit = auditFolder(made.folder, { nodeApp: true, customerPackage: true });
       if (audit.problems.length) {
@@ -55,7 +71,7 @@ export async function main(argv) {
     for (const note of made.notes) console.log(`NOTE: ${note}`);
     return 0;
   } catch (e) {
-    if (e instanceof AssembleError) { console.error(`\n${e.message}`); return 1; }
+    if (e instanceof AssembleError || e instanceof WebsiteError) { console.error(`\n${e.message}`); return 1; }
     throw e;
   }
 }

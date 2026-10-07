@@ -231,3 +231,26 @@ test('a Studio release with a Windows installer has installer steps and changelo
     assert.match(out, /\| The Setup Studio for Windows \(1-click installer\) \| `NextGenOS-Setup-Studio-Setup-1\.0\.0\.exe` \|/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('THE website (the same for every customer) is described as such: what it shows alone, and that the Studio puts the customer beside it', () => {
+  const files = FULL.filter((f) => !/^website-/.test(f)).concat(['website-windows.zip', 'website-linux.zip']);
+  const dir = folder(files, { 'BUILD-STATUS.txt': STATUS });
+  try {
+    const { status, out } = notes(dir);
+    assert.equal(status, 0);
+    assert.match(out, /Download `website-linux\.zip` \(Linux\) or `website-windows\.zip` \(Windows\)/);
+    assert.match(out, /double-click \*\*Start Website\*\*/);
+    assert.match(out, /THE website: the same program for every customer, with nothing of a customer inside/);
+    assert.match(out, /no name, no country and no money symbol/);
+    assert.match(out, /nothing is built/);
+    assert.doesNotMatch(out, /made for `/, 'no customer is named: none is inside');
+    assert.match(out, /\| The online shop \(website\) \| `website-linux\.zip`<br>`website-windows\.zip` \|/);
+    assert.doesNotMatch(out, /### Not in this release/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const none = folder(FULL.filter((f) => !/^website-/.test(f)), { 'BUILD-STATUS.txt': STATUS.replace('Website for the customer (Linux and Windows): success', 'Website for the customer (Linux and Windows): failure') });
+  try {
+    const { out } = notes(none);
+    assert.match(out, /The website for Windows\.\*\* Status: Website for the customer/);
+    assert.doesNotMatch(out, /#### The online shop \(website\)/);
+  } finally { rmSync(none, { recursive: true, force: true }); }
+});

@@ -312,6 +312,19 @@ test('the command line makes the same website and says in plain words what is wr
     const bad = run(['--program', b.genericPackage, '--customer-folder', b.customerFolder, '--customer', 'luzon-fresh-mart', '--person', 'A B', '--out', join(root, 'out2')]);
     assert.equal(bad.status, 1);
     assert.match(bad.stderr, /licence file is missing/);
+    // the older way, as the release workflow and the build service give a customer: a settings file, or a brand kit
+    writeFileSync(join(root, 'second.env'), 'NEXT_PUBLIC_SITE_NAME=Second Shop\r\nNEXT_PUBLIC_COUNTRY=GB\r\n');
+    const env = run(['--program', b.genericPackage, '--settings', join(root, 'second.env'), '--customer', 'second-shop', '--no-licence', '--person', 'the release workflow', '--out', join(root, 'out-env'), '--audit']);
+    assert.equal(env.status, 0, env.stdout + env.stderr);
+    assert.deepEqual(readdirSync(join(root, 'out-env', 'website-second-shop-linux', 'customer')), ['website-settings.env']);
+    const kit = run(['--program', b.genericPackage, '--kit', 'example-shop', '--customer', 'example-shop', '--no-licence', '--person', 'the release workflow', '--out', join(root, 'out-kit'), '--audit']);
+    assert.equal(kit.status, 0, kit.stdout + kit.stderr);
+    assert.deepEqual(readdirSync(join(root, 'out-kit', 'website-example-shop-linux', 'customer')).sort(), ['assets', 'brand.json', 'website-settings.env']);
+    writeFileSync(join(root, 'private.env'), 'NEXT_PUBLIC_SITE_NAME=Shop\nDATABASE_URL=postgres://user:secret@host/shop\n');
+    const priv = run(['--program', b.genericPackage, '--settings', join(root, 'private.env'), '--customer', 'third-shop', '--no-licence', '--person', 'A B', '--out', join(root, 'out-private')]);
+    assert.equal(priv.status, 1);
+    assert.match(priv.stderr, /DATABASE_URL is not a public setting/);
+    assert.ok(!existsSync(join(root, 'out-private')));
     assert.equal(run([]).status, 2);
     assert.equal(run(['--program', b.genericPackage, '--customer-folder', b.customerFolder, '--customer', '../x', '--person', 'A B', '--licence', b.licenceFile, '--out', join(root, 'out3')]).status, 1);
     assert.ok(!existsSync(join(root, 'out3')) || readdirSync(join(root, 'out3')).length === 0);

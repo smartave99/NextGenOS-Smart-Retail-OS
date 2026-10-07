@@ -48,7 +48,8 @@ const ROLE_TEXT = {
   'hub-windows-setup': 'The shop program (Business Hub) for Windows 10/11: the setup.',
   'hub-windows-zip': 'The same shop program as a plain folder, for a person who sets it up by hand: unpack it and double-click "Start Business Hub" (no black window; its READ ME FIRST says more). The setup is the normal way.',
   'hub-linux-deb': 'The shop program (Business Hub) for Ubuntu, Linux Mint and Debian.',
-  website: 'The online shop (website), with its own Node.js inside.',
+  'website-generic': 'The online shop (website) program, the same for every customer, with its own Node.js inside. The Setup Studio puts a customer\'s folder and licence beside it.',
+  website: 'The online shop (website) made for one customer, with its own Node.js inside.',
   'android-apk': 'The Android app, to install on a phone.',
   'android-aab': 'The Android app in the form Google Play takes (for NextGenOS staff).',
 };
@@ -117,7 +118,7 @@ function startHere(files, ctx) {
     ]);
   }
 
-  const sites = studioOnly ? [] : by('website');
+  const sites = studioOnly ? [] : [...by('website-generic'), ...by('website')];
   if (sites.length) {
     const win = sites.find((s) => s.os === 'windows');
     const lin = sites.find((s) => s.os === 'linux');
@@ -129,8 +130,9 @@ function startHere(files, ctx) {
     if (lin) lines.push(`- **Linux:** unzip ${code(lin.name)}, open a terminal in the new folder and type ${code('./start-website.sh --app')}. The website opens in a window of its own and the terminal can be closed at once. ${code('./start-website.sh --install-menu')} puts it in the applications menu.`);
     lines.push('- To stop it, close its window. Opening it again while it is open only brings up the same window.');
     lines.push(`- ${ctx.trial ? 'This is a trial build: the window shows the page where a licence key is typed, and nothing can be activated. Visitors to a website with no licence see a page that says it is not available. That is the correct result for a trial.' : 'With no licence yet the window shows the page where the licence key is typed. The shop shows once the customer\'s licence is in.'}`);
-    const kits = [...new Set(sites.map((s) => s.kit))];
-    lines.push(`- This website is built for ${kits.map((k) => code(k)).join(', ')} (the name in the file). A customer's own website is built by NextGenOS from that customer's own settings, with the Setup Studio.`);
+    const kits = [...new Set(sites.filter((s) => s.kit).map((s) => s.kit))];
+    if (sites.some((s) => !s.kit)) lines.push('- This is THE website: the same program for every customer, with nothing of a customer inside. Opened as it is, it shows a plain shop with no name, no country and no money symbol. A customer\'s own website is made by the Setup Studio, on a staff computer, by putting that customer\'s folder (name, address, country, language, colours, logo) and licence file beside this program: nothing is built.');
+    if (kits.length) lines.push(`- ${kits.length === 1 ? 'This website was' : 'These websites were'} made for ${kits.map((k) => code(k)).join(', ')} (the name in the file): the customer's settings are in the folder "customer" beside the program.`);
     if (win) lines.push('- The Windows one was started by the build machine, not by a person on a real PC yet.');
     sections.push(lines);
   }
@@ -206,7 +208,7 @@ function startHere(files, ctx) {
     ...[
       ['The shop program on Windows', studioOnly ? [] : by('hub-windows-setup').map((f) => f.name)],
       ['The shop program on Linux', studioOnly ? [] : by('hub-linux-deb').map((f) => f.name)],
-      ['The online shop (website)', studioOnly ? [] : by('website').map((f) => f.name)],
+      ['The online shop (website)', studioOnly ? [] : [...by('website-generic'), ...by('website')].map((f) => f.name)],
       ['The Android app', studioOnly ? [] : by('android-apk').map((f) => f.name)],
       ['The Setup Studio for Windows (1-click installer)', files.filter((f) => f.role === 'studio-installer').map((f) => f.name)],
       [files.some((f) => f.role === 'studio-installer') ? 'The Setup Studio (portable zip)' : 'The Setup Studio (NextGenOS staff only)', files.filter((f) => f.role === 'studio').map((f) => f.name)],
@@ -225,8 +227,8 @@ function missing(files, status, only = '') {
     ['The shop program for Windows (the setup)', !has('hub-windows-setup'), /^Windows setup/],
     ['The shop program for Linux, Intel or AMD', !has('hub-linux-deb', 'linux', 'x64'), /^Linux packages/],
     ['The shop program for Linux, ARM', !has('hub-linux-deb', 'linux', 'arm64'), /^Linux packages/],
-    ['The website for Windows', !has('website', 'windows'), /^Website/],
-    ['The website for Linux', !has('website', 'linux'), /^Website/],
+    ['The website for Windows', !has('website-generic', 'windows') && !has('website', 'windows'), /^Website/],
+    ['The website for Linux', !has('website-generic', 'linux') && !has('website', 'linux'), /^Website/],
     ['The Android app', !has('android-apk'), /^Android/],
     ['The Setup Studio for Windows', !has('studio', 'windows') && !has('studio-installer', 'windows'), /^Setup Studio/],
     ['The Setup Studio for Linux', !has('studio', 'linux'), /^Setup Studio/],

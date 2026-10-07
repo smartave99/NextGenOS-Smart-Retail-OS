@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeZipFile } from '../lib/zip.mjs';
-import { buildLauncher } from '../../../scripts/lib/build-launcher.mjs';
+import { buildLauncher, findMakensis } from '../../../scripts/lib/build-launcher.mjs';
 import { SECRET_PATTERNS, SECRET_ALLOW } from '../../../scripts/lib/secret-patterns.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -33,8 +33,9 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) { console.error('The version must be three
 
 const say = (m) => console.log(`\n== ${m}`);
 const run = (cmd, a, opts = {}) => {
-  const r = spawnSync(cmd, a, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, ...opts });
-  if (r.error || r.status !== 0) { console.error(`\n${cmd} ${a.join(' ')}\n${r.error?.message ?? ''}${(r.stdout || '').slice(-3000)}${(r.stderr || '').slice(-3000)}`); process.exit(1); }
+  const binary = process.platform === 'win32' && cmd === 'npm' ? 'npm.cmd' : cmd;
+  const r = spawnSync(binary, a, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, ...opts });
+  if (r.error || r.status !== 0) { console.error(`\n${binary} ${a.join(' ')}\n${r.error?.message ?? ''}${(r.stdout || '').slice(-3000)}${(r.stderr || '').slice(-3000)}`); process.exit(1); }
   return r.stdout || '';
 };
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -145,6 +146,48 @@ try {
   const items = files.sort().map((f) => ({ name: `NextGenOS Setup Studio/${relative(top, f).split(sep).join('/')}`, file: f, ...(statSync(f).mode & 0o111 ? { mode: 0o755 } : {}) }));
   await writeZipFile(zip, items);
   console.log(`\nWrote:\n  ${zip}\n  SHA-256 ${sha256(readFileSync(zip))}`);
+
+  if (os === 'windows') {
+    const makensis = findMakensis();
+    if (makensis) {
+      say('Building the 1-click Windows installer (.exe)');
+      const uninstallList = join(work, 'uninstall-files.nsh');
+      const uFiles = [];
+      const uDirs = [];
+      const walkUninstall = (dir, rel) => {
+        for (const e of readdirSync(dir, { withFileTypes: true })) {
+          const r = rel ? rel + sep + e.name : e.name;
+          if (e.isDirectory()) { uDirs.push(r); walkUninstall(join(dir, e.name), r); } else uFiles.push(r);
+        }
+      };
+      walkUninstall(top, '');
+      const winP = (p) => p.split(sep).join('\\').replace(/\$/g, '$$$$');
+      const uLines = ['; Written by make-bundle.mjs: every file setup installed.'];
+      for (const f of uFiles) uLines.push(`Delete "$INSTDIR\\${winP(f)}"`);
+      for (const d of uDirs.sort((a, b) => b.length - a.length)) uLines.push(`RMDir "$INSTDIR\\${winP(d)}"`);
+      writeFileSync(uninstallList, uLines.join('\r\n') + '\r\n');
+
+      const setupExe = join(out, `NextGenOS-Setup-Studio-Setup-${version}.exe`);
+      const nsiScript = join(studio, 'installer', 'SetupStudio.nsi');
+      const icon = join(studio, 'launcher', 'studio.ico');
+      const nsisRes = spawnSync(makensis, [
+        '-V2',
+        `-DVERSION=${version}`,
+        `-DSOURCE=${top}`,
+        `-DUNINSTALL_LIST=${uninstallList}`,
+        `-DOUTFILE=${setupExe}`,
+        `-DICON=${icon}`,
+        nsiScript,
+      ], { encoding: 'utf8' });
+      if (nsisRes.error || nsisRes.status !== 0) {
+        console.error(`\nNSIS installer compilation failed:\n${nsisRes.error?.message ?? ''}${nsisRes.stdout ?? ''}${nsisRes.stderr ?? ''}`);
+        process.exit(1);
+      }
+      console.log(`\nWrote:\n  ${setupExe}\n  SHA-256 ${sha256(readFileSync(setupExe))}`);
+    } else {
+      console.warn('\nmakensis (NSIS) not found; skipping Windows setup .exe generation.');
+    }
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

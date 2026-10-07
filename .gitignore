@@ -25,6 +25,7 @@
 **/.next/
 **/out/
 **/dist/
+dist-downloaded/
 **/dist-electron/
 **/.turbo/
 **/.cache/

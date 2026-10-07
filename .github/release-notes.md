@@ -1,5 +1,6 @@
 {{TRIAL_BANNER}}**Smart Retail POS by NextGenOS** (part of the Smart Retail AI Ecosystem), version {{VERSION}}. Proprietary software: see `EULA.txt`. Nothing in this release works without a licence key from the NextGenOS Licence Studio.
 
+{{CHANGELOG}}
 {{START_HERE}}
 {{MISSING}}
 ### Read this before you test

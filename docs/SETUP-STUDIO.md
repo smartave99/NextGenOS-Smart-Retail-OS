@@ -68,6 +68,10 @@ One folder and one zip, `<customer>-pack-release-<n>.zip`, saved in the Studio's
 | `4 - Android app` | If wanted: the customer's brand kit (what the build reads), and the app itself (the `.apk` to try on a phone, and the `.aab` that the Google Play Store takes) when the step "Website and app" has made it. Without it, the steps to make it. |
 | `PACK-CONTENTS.json` | Every file with its SHA-256 fingerprint, the release number, the programs' version, and who made the pack and when. |
 
+### What the Studio still needs, shown on its first screen
+
+The first screen (Customers) shows a card, "Before the Studio can give a customer their outputs", as long as something is missing: **the programs of a release** (the installer comes from a full release's files; a trial release only makes a pack "to try"), **the build service** (each customer's website and Android app are built on GitHub), and **the customer's licence** (made in the Licence Studio by the person who sells; making it from the Studio's output button is planned and not in this version). It says the same in plain words for each, and an administrator opens Settings from it.
+
 ### What the Studio does, and what it does not do
 
 Staff open the Studio, start a new project for a new company, fill in its details and make the customer's **pack**: the shop program's setup with the customer's profile beside it, the website's settings and steps, the app's brand kit and steps, and the hand-over sheet. The Studio never builds a program and holds no source code (`CLAUDE.md`, sections 3 and 11).

@@ -304,3 +304,24 @@ test('the customer pack over the interface: only an administrator chooses the pr
     assert.ok((await s.call('GET', `/api/audit?customer=${id}`, { session: ritaS })).json.entries.some((e) => e.action === 'build.made'), 'a pack is in the activity record');
   } finally { await s.done(); }
 });
+
+test('the Studio says plainly what it still needs before it can give a customer their outputs, and says nothing secret', async () => {
+  const s = await boot();
+  try {
+    const setup = await s.call('POST', '/api/setup', { body: { name: 'Asha Admin', password: 'a-long-password' } });
+    const admin = setup.json.session;
+    const r = await s.call('GET', '/api/readiness', { session: admin });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.allReady, false);
+    const by = Object.fromEntries(r.json.items.map((i) => [i.id, i]));
+    assert.equal(by.programs.state, 'missing');
+    assert.match(by.programs.text, /does not build programs/);
+    assert.match(by.programs.text, /every file into one folder/);
+    assert.equal(by['build-service'].state, 'missing');
+    assert.match(by['build-service'].text, /built on GitHub, not on this PC/);
+    assert.match(by['build-service'].text, /Connect the build service/);
+    assert.equal(by.licence.state, 'not-built', 'it does not claim a licence button that is not there');
+    assert.equal((await s.call('GET', '/api/readiness', { session: null })).status, 401, 'nobody signed in sees nothing');
+    assert.doesNotMatch(JSON.stringify(r.json), /ghp_|github_pat_|Bearer /);
+  } finally { await s.done(); }
+});

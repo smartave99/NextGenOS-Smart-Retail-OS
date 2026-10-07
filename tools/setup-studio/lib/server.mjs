@@ -178,6 +178,34 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     state.ws.saveSettings(me, { programs: { folder: kit.folder } });
     return { programs: kitSummary(kit), saved: true };
   });
+  // What the Studio still needs before it can give a customer their outputs, in plain words. The Studio builds nothing itself, so each output comes from somewhere else: say where.
+  route('GET', '/api/readiness', {}, async () => {
+    const folder = programsFolder();
+    const kit = folder ? await readBaseKit(folder) : null;
+    const service = builds().connection();
+    const items = [
+      {
+        id: 'programs', title: 'The shop program (installer)', where: 'settings',
+        state: !folder ? 'missing' : !kit.ok ? 'problem' : kit.trial ? 'trial' : 'ready',
+        text: !folder
+          ? 'The Studio does not build programs. It puts a customer\'s installer together from the files of a release. On GitHub open the release, download every file into one folder, then choose that folder in Settings, "The programs folder". Until then it cannot give anyone an installer.'
+          : !kit.ok ? `The programs folder has a problem: ${kit.problems?.[0] ?? 'it cannot be read'}. Fix it in Settings, "The programs folder".`
+          : kit.trial ? `These files (version ${kit.version}) come from a trial release without licence keys. The Studio can make a pack from them only to try it, never to give to a customer. A release made with your licence keys is needed for a real customer.`
+          : `Release ${kit.version} is in place.`,
+      },
+      {
+        id: 'build-service', title: 'The website and the Android app for each customer', where: 'settings',
+        state: service.ready ? 'ready' : 'missing',
+        text: service.ready ? 'The build service is connected: a reviewer or administrator can ask for a customer\'s website and app in the customer\'s step "Website and app".'
+          : `Each customer's website and app have the customer's settings built into them, so they are built on GitHub, not on this PC. ${service.why} An administrator connects it once (Settings, "Connect the build service"). Until then no website or app can be made.`,
+      },
+      {
+        id: 'licence', title: 'The customer\'s licence', where: null, state: 'not-built',
+        text: 'A customer\'s licence is made in the NextGenOS Licence Studio, by the person who sells. Making it from this Studio\'s output button is planned and is not in this version.',
+      },
+    ];
+    return { items, allReady: items.every((i) => i.state === 'ready') };
+  });
   const latest = (id) => state.ws.releaseNumbers(id).at(-1) ?? null;
   route('GET', '/api/customers/:id/outputs', {}, async ({ params }) => {
     const customer = state.ws.get(params.id);

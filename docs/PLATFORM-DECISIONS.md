@@ -155,9 +155,23 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** Every build gives **two files**: the **APK**, for quick sharing by link or message (the client's own staff, trials; phones warn about installing from outside the store, so it is not for the general public), and the **Play Store package (`.aab`)**, to be published under **the client's own Google Play account**, which the client or NextGenOS staff set up once. Updates then reach shoppers through the store. **The signing keys stay with NextGenOS in a protected place, never on staff PCs and never in the repository** (`CLAUDE.md` section 3). The Studio says in plain words which file goes to whom. The app is a shell around the client's website address, so the website must be online (decision 8).
 - **Today:** Built: the build service makes the signed APK and AAB for a client's brand (`docs/CUSTOMER-BUILDS.md`); it has never run on the real GitHub, and a build with no signing secrets is signed with a one-off test key that a phone will not accept as an update. **Not built:** the Studio's plain explanation of which file goes to whom, and anything for setting up the client's Play account.
 
+### 21. Languages at launch
+
+- **Asked:** English first with client wording and translations as a setting, English plus the local language of each launch country, or many languages from day one by AI translation.
+- **Answer:** "English first; client wording and translations as a setting (Recommended)".
+- **Rule:** At launch the screens are in plain English. **Every piece of wording a client sees** (receipts, labels, button names, posters) **is a setting of that client's project** (`CLAUDE.md` section 8), so a shop can already show its own words. Full translations of the screens come **country by country** as each market opens, made with AI and **checked by a local speaker before release**. No unchecked machine translation on a cashier's screen, especially not on money or tax screens.
+- **Today:** Wording settings and country packs exist; there is no translation system for the screens themselves.
+
+### 22. How features and extra PCs are priced (the shape)
+
+- **Asked:** A few plans plus add-ons, fully a la carte, or one price for everything.
+- **Answer:** "3 for start later 1" (3 = one price for everything, 1 = a few plans plus add-ons).
+- **Rule:** **At the start: one price for everything, per store.** **Later: a few simple plans plus add-ons** (extra counter PCs, the AI helpers, the website, the Android app, hosting). The licence already carries a plan and a list of modules, so the later step needs no new format. The owner sets the actual prices.
+- **Today:** The licence has a plan and modules (`licensing/spec/LICENCE-FORMAT.md`). **Not decided:** how many PCs the one price covers; until the owner says, staff set the number of PCs in each licence at sale time (and decision 4's counter-PC count is checked against it).
+
 ## Still to ask, and open items
 
-- Pricing details: the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).
+- Pricing details: how many PCs the one price covers; the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).
 - Languages and training; who answers the phone and in which hours; whether the match report before go-live (decision 17) is accepted.
 - A sentence for the contract about what may go to an outside AI service (decision 10) and about the final unlock (decision 16): counsel.
 

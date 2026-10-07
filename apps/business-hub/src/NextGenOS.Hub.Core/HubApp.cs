@@ -1,5 +1,6 @@
 using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Catalog;
+using NextGenOS.Hub.Counters;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
 using NextGenOS.Hub.Documents;
@@ -22,7 +23,7 @@ namespace NextGenOS.Hub;
 /// </summary>
 public sealed class HubApp
 {
-    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai)
+    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, NetworkOptions? network)
     {
         Db = db;
         Clock = clock;
@@ -49,6 +50,8 @@ public sealed class HubApp
         Events = new EventStore(db, clock, Audit, Ai.Flags, Retention);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags);
+        // A store with one main PC and many counter PCs on the shop's own network: switched off unless the owner chose it (and the Hub was started again since). Nothing leaves the shop.
+        Network = new StoreNetwork(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", network);
     }
 
     public HubDb Db { get; }
@@ -73,6 +76,7 @@ public sealed class HubApp
     public RetentionService Retention { get; }
     public EventStore Events { get; }
     public OntologyService Ontology { get; }
+    public StoreNetwork Network { get; }
 
     /// <summary>
     /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day
@@ -89,10 +93,10 @@ public sealed class HubApp
     }
 
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
-    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null)
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, NetworkOptions? network = null)
     {
         var db = new HubDb(path);
         db.Migrate();
-        return new HubApp(db, clock ?? new SystemClock(), print, ai);
+        return new HubApp(db, clock ?? new SystemClock(), print, ai, network);
     }
 }

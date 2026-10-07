@@ -19,6 +19,8 @@ public static class Perm
     public const string Users = "users";
     /// <summary>Connecting AI services, choosing what they may receive, and reading what they cost. The owner only.</summary>
     public const string Ai = "ai";
+    /// <summary>Letting counter PCs connect over the shop's network, pairing them and removing them. The owner only.</summary>
+    public const string Network = "network";
 }
 
 public static class Roles
@@ -33,7 +35,7 @@ public static class Roles
 
     private static readonly Dictionary<string, HashSet<string>> Grants = new()
     {
-        [Owner] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Settings, Perm.Users, Perm.Ai }),
+        [Owner] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Settings, Perm.Users, Perm.Ai, Perm.Network }),
         [Manager] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void }),
         [Cashier] = new(new[] { Perm.Sell, Perm.Orders, Perm.Loans, Perm.Appointments, Perm.Parties }),
         [Kitchen] = new(new[] { Perm.Kitchen }),

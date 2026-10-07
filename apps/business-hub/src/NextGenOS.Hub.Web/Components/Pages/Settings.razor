@@ -452,6 +452,11 @@ else if (tab == "users")
         </div>
     }
 }
+else if (tab == "older")
+{
+    @* The owner only: the tab is listed only for Perm.Settings, the page is [Authorize(Policy = Perm.Settings)], and the component checks again in each action. *@
+    <MoveFromOlderPos />
+}
 else if (tab == "licence")
 {
     var state = Licence.State;
@@ -516,6 +521,7 @@ else if (tab == "activity")
         yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
+        if (Me.Can(Perm.Settings)) yield return ("older", "Move from the older POS");
         yield return ("licence", "Licence");
         yield return ("activity", "Activity");
     }

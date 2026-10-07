@@ -4,10 +4,12 @@
  *   node scripts/smoke-website.mjs <package folder> --os windows|linux
  * With no licence the website must answer "not available" to a visitor (503), 402 to every programme call, keep only the activation page open, serve its own static files,
  * set the safety headers, run in production mode, listen on this computer only, and say in plain words when its port is already used.
+ * It also looks at the customer's settings the way a page carries them (window.__NGOS_SETTINGS__): THE website (PACKAGE-INFO.json says "generic") with no customer folder says nothing of a
+ * customer (no name, no country); one customer's website says that customer's name, and serves that customer's logo from the customer folder.
  * Exit code 0 only when all of that holds. The folder is used as it is: the website writes a cache into it, so run this on an unpacked copy, never on a package that will be shipped.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join, resolve } from 'node:path';
 import net from 'node:net';
@@ -63,7 +65,9 @@ try {
   check('the website starts, with its own Node.js, and answers on this computer', up, exited !== null ? `it stopped with code ${exited}\n${log.slice(-1500)}` : `no answer in 90 seconds\n${log.slice(-1500)}`);
   if (up) {
     check('it tells the person, in words, where to open it', new RegExp(`http://127\\.0\\.0\\.1:${port}`).test(log) && /close this window/i.test(log), log.slice(-600));
-    check('it tells the person that a licence is still needed', /no licence yet/i.test(log) && /\/admin\/licence/.test(log), log.slice(-600));
+    // A customer's website that already carries its licence file does not say so; if that file is not a real licence for this website (its signature does not verify), the pages below stay closed.
+    if (existsSync(join(folder, 'licence', 'licence.ngos'))) console.log('NOTE  a licence file is in the folder: the checks below show that the website refuses it unless it is a real one for this website');
+    else check('it tells the person that a licence is still needed', /no licence yet/i.test(log) && /\/admin\/licence/.test(log), log.slice(-600));
 
     let r = await get('/privacy');
     check('with no licence a visitor gets a plain "not available" page (503), not the shop', r.status === 503 && /not available right now/.test(r.body), `${r.status}`);
@@ -74,6 +78,32 @@ try {
     check('with no licence a programme call gets 402 licence_required', r.status === 402 && r.body.includes('licence_required'), `${r.status} ${r.body.slice(0, 200)}`);
     r = await get('/admin/licence');
     check('only the activation page stays open (200)', r.status === 200, `${r.status}`);
+
+    // The customer's own settings, as the server put them in the page (the browser never reads a file).
+    let info = {};
+    try { info = JSON.parse(readFileSync(join(folder, 'PACKAGE-INFO.json'), 'utf8')); } catch { /* the check below says what is missing */ }
+    const marker = 'window.__NGOS_SETTINGS__=';
+    const from = r.body.indexOf(marker);
+    const to = from >= 0 ? r.body.indexOf('</script>', from) : -1;
+    let served = null;
+    try { served = from >= 0 && to > from ? JSON.parse(r.body.slice(from + marker.length, to).replace(/;\s*$/, '')) : null; } catch { served = null; }
+    check('the page carries the customer\'s settings, put there by the server', served !== null && typeof served === 'object' && typeof served.siteName === 'string', r.body.slice(Math.max(0, from), from + 300));
+    if (served) {
+      if (info.generic === true) {
+        check('THE website, with no customer folder, says nothing of a customer: no name, no country, no logo of theirs', served.siteName === '' && served.country === '' && served.logoUrl === '', JSON.stringify(served).slice(0, 400));
+        check('and there is no customer folder in it', !existsSync(join(folder, 'customer')));
+      } else {
+        check('this customer\'s website says this customer\'s name', served.siteName !== '' && served.siteName === info.name, `${served.siteName} / ${info.name}`);
+      }
+      const logo = served.logoUrl && served.logoUrl.startsWith('/customer-assets/') ? await get(served.logoUrl) : null;
+      if (logo) check('the customer\'s logo is served from the customer folder', logo.status === 200 && /^image\//.test(logo.headers['content-type'] || ''), `${logo.status} ${logo.headers['content-type']}`);
+      const none = await get('/customer-assets/no-such-picture.png');
+      check('a picture that is not in the customer folder is not found', none.status === 404, `${none.status}`);
+      const escape = await get('/customer-assets/..%2Fbrand.json');
+      check('a name that tries to leave the customer folder is not served (not found, or closed like every page without a licence)', [404, 503].includes(escape.status) && !/"name"/.test(escape.body), `${escape.status}`);
+    }
+    const api = await get('/api/settings');
+    check('the settings address is behind the licence like every programme call (402)', api.status === 402, `${api.status}`);
     const h = r.headers;
     check('the safety headers are on the answer', ['content-security-policy', 'strict-transport-security', 'x-content-type-options', 'x-frame-options', 'referrer-policy', 'permissions-policy'].every((n) => h[n]), JSON.stringify(Object.keys(h)));
     const csp = h['content-security-policy'] || '';

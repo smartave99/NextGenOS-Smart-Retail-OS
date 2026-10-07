@@ -8,6 +8,7 @@ using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Web.Auth;
 using NextGenOS.Hub.Web.Components;
+using NextGenOS.Hub.Web.Counters;
 using NextGenOS.Licensing.AspNetCore;
 
 namespace NextGenOS.Hub.Web;
@@ -51,8 +52,19 @@ public static class HubHost
         Directory.CreateDirectory(folder);
         var services = builder.Services;
 
+        // Counter PCs on the shop's own network: off unless the owner chose it. Off, nothing is added and the Hub listens on this PC only, as it always did.
+        var network = StoreNetworkHost.Add(builder, folder);
+
         // The AI parts of the Hub are allowed only when the signed licence has the "ai" module (and they are all off until the owner switches them on).
-        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>()))));
+        // The licence's number of PCs limits the counter PCs (the main PC counts as one); like the modules it is handed over as a function.
+        services.AddSingleton(sp =>
+        {
+            var licence = sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>();
+            var hub = HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(licence)),
+                network: new NextGenOS.Hub.Counters.NetworkOptions(network, LicenceEntitlements.DeviceLimit(licence)));
+            StoreNetworkHost.Connect(hub, sp.GetRequiredService<ConnectionTracker>());
+            return hub;
+        });
 
         // The sign-in cookie is protected with keys kept in the data folder (and, on Windows, locked to this PC), so a restart does not sign everyone out.
         var protection = services.AddDataProtection().SetApplicationName("NextGenOS.Hub").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(folder, "keys")));
@@ -118,7 +130,10 @@ public static class HubHost
 
     public static void UseHub(WebApplication app)
     {
-        // First of all: nothing is served, not even a static file, without a usable licence.
+        // Before even the licence page: a computer on the shop's network that was not paired with this shop gets one plain refusal and nothing else (it must not see the licence
+        // page, or be able to type a licence key). Requests from this PC itself pass straight through, untouched.
+        app.UseStoreNetworkGate();
+        // Then: nothing is served, not even a static file, without a usable licence.
         app.UseLicenceGate();
         app.Use(SecurityHeaders);
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
@@ -142,6 +157,7 @@ public static class HubHost
         });
         app.MapGet("/export/{report}.csv", ExportEndpoint.Handle).RequireAuthorization(Perm.Reports);
         DeviceEndpoints.Map(app);
+        StoreNetworkEndpoints.Map(app);
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode(o => o.ContentSecurityFrameAncestorsPolicy = "'none'");
         // Nothing is done in the shop's database until there is a licence: the background upkeep (HubWorker) starts with the licence, and the first request that needs the shop opens it.
     }
@@ -163,6 +179,13 @@ public static class HubHost
     /// <summary>Headers on every answer: nothing from another site runs, the page cannot be framed, and nothing is guessed about file types.</summary>
     private static Task SecurityHeaders(HttpContext context, RequestDelegate next)
     {
+        ApplySecurityHeaders(context);
+        return next(context);
+    }
+
+    /// <summary>The headers above, set on one answer (also used by the pages that are answered before this step, for computers that are not paired).</summary>
+    internal static void ApplySecurityHeaders(HttpContext context)
+    {
         var h = context.Response.Headers;
         h["X-Content-Type-Options"] = "nosniff";
         h["X-Frame-Options"] = "DENY";
@@ -170,7 +193,6 @@ public static class HubHost
         h["Cross-Origin-Opener-Policy"] = "same-origin";
         h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(), payment=()";
         h.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
-        return next(context);
     }
 
     /// <summary>Until the shop is set up, every page goes to the setup; afterwards the setup page is closed for good.</summary>

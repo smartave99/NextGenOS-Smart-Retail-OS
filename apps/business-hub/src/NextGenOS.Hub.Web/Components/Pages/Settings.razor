@@ -496,6 +496,7 @@ else if (tab == "activity")
         yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
+        if (Me.Can(Perm.Network)) yield return ("network", "Store network");
         yield return ("licence", "Licence");
         yield return ("activity", "Activity");
     }
@@ -530,6 +531,8 @@ else if (tab == "activity")
     {
         // The AI helpers have a screen of their own (they are optional, and there is a lot to it).
         if (key == "ai") { Nav.NavigateTo("settings/ai"); return; }
+        // So have the counter PCs: connecting the other PCs of the shop to this one.
+        if (key == "network") { Nav.NavigateTo("settings/network"); return; }
         tab = key;
         Error = Info = null;
         _ = Reload();

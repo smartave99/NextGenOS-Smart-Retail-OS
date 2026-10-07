@@ -12,4 +12,14 @@ public static class LicenceEntitlements
         var state = licence.State;
         return state.IsUsable && state.HasModule(module);
     });
+
+    /// <summary>
+    /// How many PCs the signed licence is for (<c>limits.devices</c>): the main PC and its counter PCs together. 0 means the licence gives no limit (or there is no usable licence, in which
+    /// nothing runs anyway). Handed to the Hub as a function, for the same reason as <see cref="From"/>.
+    /// </summary>
+    public static Func<int> DeviceLimit(ProductLicence licence) => () =>
+    {
+        var state = licence.State;
+        return state.IsUsable && state.Licence?.Limits is { Devices: > 0 } limits ? limits.Devices : 0;
+    };
 }

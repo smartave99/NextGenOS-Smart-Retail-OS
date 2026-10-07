@@ -248,7 +248,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked (7 October 2026):** The older POS takes a bill discount off the total after tax and leaves the tax unchanged (bill 194.19 with 34.20 tax stays 34.20). What should the new program do?
 - **Answer (the owner chose):** "Discount lowers the tax too (Recommended)".
 - **Rule:** A discount on the whole bill is **spread over the items first, and the tax is worked out on what is left.** Line discounts (percent or amount) work the same way. Old bills are not recalculated. A test pins the example from the study (`docs/old-programs/01-selling-buying-stock.md`, B4).
-- **Today:** Not built. The Hub has no bill discount and no line discount screen (`docs/old-programs/06-hub-map.md`).
+- **Today:** **Built (7 October 2026).** Line discount by percent or amount, and a whole-bill discount by amount or percent, spread over the lines before tax with the largest-remainder rule so the parts add up exactly (`DocumentService.Allocate`); the tax engine is unchanged, it is given each line's discount as an amount. Credit notes give back a line's exact share of what was taken off. Cashiers need the owner's limit (*Settings → Business*); owners and managers do not. Tested by `DiscountTests` (the study's examples L2, L3, L13 and the bill example B4 with the new rule: 165.19 where the old POS gave 174.19) and the browser scenario `e2e/discounts.e2e.mjs`. **Not done:** discount by a customer's standing discount, an offer or a coupon (customers work package); a 'discount' wording setting per customer; the same discount on purchases; cess and per-item tax mode (separate gaps in study 01, 7.1).
 
 ### 34. Returns: the cashier chooses cash back or credit on the account
 

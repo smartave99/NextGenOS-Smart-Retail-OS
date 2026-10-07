@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Catalog;
@@ -17,9 +18,10 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 {
     private const string DocColumns =
         "id, type, number, status, direction, party_id, issued_at, created_at, due_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
-        "subtotal_minor, tax_minor, total_minor, payable_minor, paid_minor, tips_minor, retention_minor, advance_minor, table_id, project_id, ref_document_id, user_id, notes, meta";
+        "subtotal_minor, tax_minor, total_minor, payable_minor, paid_minor, tips_minor, retention_minor, advance_minor, table_id, project_id, ref_document_id, user_id, notes, meta, " +
+        "bill_discount_minor, bill_discount_pct_milli";
 
-    private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id";
+    private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id";
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -30,11 +32,13 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         r.TimeOrNull("due_at"), (int)r.Int("currency_decimals"), r.Flag("prices_include_tax"), r.TextOrNull("seller_region"), r.TextOrNull("buyer_region"), r.Flag("round_total"),
         r.Flag("registered"), r.Int("subtotal_minor"), r.Int("tax_minor"), r.Int("total_minor"), r.Int("payable_minor"), r.Int("paid_minor"), r.Int("tips_minor"),
         r.Int("retention_minor"), r.Int("advance_minor"), r.IntOrNull("table_id"), r.IntOrNull("project_id"), r.IntOrNull("ref_document_id"), r.IntOrNull("user_id"),
-        r.TextOrNull("notes"), JsonSerializer.Deserialize<Dictionary<string, string>>(r.Text("meta")) ?? new Dictionary<string, string>());
+        r.TextOrNull("notes"), JsonSerializer.Deserialize<Dictionary<string, string>>(r.Text("meta")) ?? new Dictionary<string, string>(),
+        r.Int("bill_discount_minor"), r.Int("bill_discount_pct_milli"));
 
     private static DocLine MapLine(SqliteDataReader r) => new(
         r.Int("id"), (int)r.Int("line_no"), r.IntOrNull("item_id"), r.Text("description"), r.Int("qty_milli"), r.TextOrNull("unit"), r.Int("unit_price_minor"),
-        r.Int("discount_pct_milli"), r.Text("tax_code"), r.TextOrNull("customer_discount"), r.Flag("fired"), r.TextOrNull("note"), r.TextOrNull("station"), r.IntOrNull("boq_id"));
+        r.Int("discount_pct_milli"), r.Text("tax_code"), r.TextOrNull("customer_discount"), r.Flag("fired"), r.TextOrNull("note"), r.TextOrNull("station"), r.IntOrNull("boq_id"),
+        r.Int("discount_amount_minor"), r.IntOrNull("ref_line_id"));
 
     public Document? GetHeader(long id) => db.QueryOne($"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, ("$id", id));
 
@@ -85,18 +89,20 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     {
         var context = shop.Current;
         var party = options.PartyId is { } pid ? parties.Get(pid) ?? throw new HubException("party-not-found", "That customer was not found.") : null;
+        CheckBillDiscount(options.BillDiscountMinor, options.BillDiscountPctMilli);
         var now = clock.UtcNow;
         var number = options.Type is DocTypes.Order or DocTypes.Quote or DocTypes.Purchase ? numbering.Next(c, t, options.Type, now) : null;
         var meta = new Dictionary<string, string>(options.Meta);
         var id = HubDb.Insert(c,
             "INSERT INTO documents(type, number, status, direction, party_id, created_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
-            "adjustments, table_id, project_id, ref_document_id, user_id, notes, meta) " +
-            "VALUES ($type, $number, 'open', $dir, $party, $at, $dec, $incl, $seller, $buyer, $round, $reg, $adj, $table, $project, $ref, $user, $notes, $meta)", t,
+            "adjustments, table_id, project_id, ref_document_id, user_id, notes, meta, bill_discount_minor, bill_discount_pct_milli) " +
+            "VALUES ($type, $number, 'open', $dir, $party, $at, $dec, $incl, $seller, $buyer, $round, $reg, $adj, $table, $project, $ref, $user, $notes, $meta, $bda, $bdp)", t,
             ("$type", options.Type), ("$number", number), ("$dir", options.Direction), ("$party", options.PartyId), ("$at", Iso.Text(now)), ("$dec", context.Decimals),
             ("$incl", (options.PricesIncludeTax ?? context.Settings.PricesIncludeTax) ? 1 : 0), ("$seller", Blank(context.Settings.Region)), ("$buyer", Blank(party?.Region)),
             ("$round", context.Settings.RoundTotal ? 1 : 0), ("$reg", context.Settings.TaxRegistered ? 1 : 0),
             ("$adj", JsonSerializer.Serialize(options.Adjustments, Json)), ("$table", options.TableId), ("$project", options.ProjectId), ("$ref", options.RefDocumentId),
-            ("$user", options.UserId), ("$notes", options.Notes), ("$meta", JsonSerializer.Serialize(meta)));
+            ("$user", options.UserId), ("$notes", options.Notes), ("$meta", JsonSerializer.Serialize(meta)),
+            ("$bda", options.BillDiscountMinor), ("$bdp", options.BillDiscountPctMilli));
         foreach (var line in options.Lines) AddLine(c, t, id, line, party);
         Recalculate(c, t, id);
         return id;
@@ -126,7 +132,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             throw new HubException("qty-whole", $"{description} is sold in whole numbers.");
         var price = input.UnitPriceMinor ?? item?.PriceFor(party?.PriceLevel ?? "retail") ?? throw new HubException("price-missing", "Please give a price.");
         if (price < 0) throw new HubException("price", "A price cannot be negative.");
-        if (input.DiscountPctMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
+        CheckLineDiscount(input.DiscountPctMilli, input.DiscountAmountMinor, input.QtyMilli, price);
         string taxCode;
         try { taxCode = context.TaxCode(input.TaxCode ?? item?.TaxCode ?? "standard"); }
         catch (ArgumentException ex) { throw new HubException("tax", ex.Message); }
@@ -134,23 +140,30 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             throw new HubException("customer-discount", $"\"{input.CustomerDiscount}\" is not a discount of {context.Country.Name}.");
         var lineNo = Convert.ToInt32(HubDb.Scalar(c, "SELECT COALESCE(MAX(line_no), 0) + 1 FROM document_lines WHERE document_id = $id", t, ("$id", documentId)) ?? 1);
         HubDb.Exec(c,
-            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, note, station, boq_id) " +
-            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $tax, $cd, $note, $station, $boq)", t,
+            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id) " +
+            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq)", t,
             ("$d", documentId), ("$n", lineNo), ("$item", item?.Id), ("$desc", description), ("$q", input.QtyMilli), ("$unit", input.Unit ?? item?.Unit), ("$price", price),
-            ("$disc", input.DiscountPctMilli), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
+            ("$disc", input.DiscountPctMilli), ("$damt", input.DiscountAmountMinor), ("$refline", input.RefLineId), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
     }
 
-    public DocumentView UpdateLine(long documentId, long lineId, long? qtyMilli = null, long? discountPctMilli = null, string? note = null, string? customerDiscount = null, bool clearCustomerDiscount = false)
+    public DocumentView UpdateLine(long documentId, long lineId, long? qtyMilli = null, long? discountPctMilli = null, string? note = null, string? customerDiscount = null, bool clearCustomerDiscount = false, long? discountAmountMinor = null)
     {
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
             if (qtyMilli is <= 0) throw new HubException("qty", "The quantity must be more than zero.");
             if (discountPctMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
+            if (discountAmountMinor is < 0) throw new HubException("discount", "A discount cannot be less than nothing.");
+            if (discountPctMilli is > 0 && discountAmountMinor is > 0) throw new HubException("discount", "Give the discount as a percent or as an amount, not both.");
+            // Giving one kind of discount takes the other kind off the line.
             HubDb.Exec(c,
-                "UPDATE document_lines SET qty_milli = COALESCE($q, qty_milli), discount_pct_milli = COALESCE($d, discount_pct_milli), note = COALESCE($n, note), " +
+                "UPDATE document_lines SET qty_milli = COALESCE($q, qty_milli), " +
+                "discount_pct_milli = CASE WHEN COALESCE($a, 0) > 0 THEN 0 ELSE COALESCE($d, discount_pct_milli) END, " +
+                "discount_amount_minor = CASE WHEN COALESCE($d, 0) > 0 THEN 0 ELSE COALESCE($a, discount_amount_minor) END, note = COALESCE($n, note), " +
                 "customer_discount = CASE WHEN $clear = 1 THEN NULL ELSE COALESCE($cd, customer_discount) END WHERE id = $id AND document_id = $doc", t,
-                ("$q", qtyMilli), ("$d", discountPctMilli), ("$n", note), ("$cd", Blank(customerDiscount)), ("$clear", clearCustomerDiscount ? 1 : 0), ("$id", lineId), ("$doc", documentId));
+                ("$q", qtyMilli), ("$d", discountPctMilli), ("$a", discountAmountMinor), ("$n", note), ("$cd", Blank(customerDiscount)), ("$clear", clearCustomerDiscount ? 1 : 0), ("$id", lineId), ("$doc", documentId));
+            var now = HubDb.Query(c, "SELECT qty_milli, unit_price_minor, discount_amount_minor FROM document_lines WHERE id = $id AND document_id = $doc", r => (Qty: r.Int("qty_milli"), Price: r.Int("unit_price_minor"), Amount: r.Int("discount_amount_minor")), t, ("$id", lineId), ("$doc", documentId)).FirstOrDefault();
+            if (now.Amount > Gross(now.Qty, now.Price)) throw new HubException("discount", "A discount cannot be more than the line comes to.");
             Recalculate(c, t, documentId);
         });
         return Get(documentId)!;
@@ -178,6 +191,39 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             Recalculate(c, t, documentId);
         });
         return Get(documentId)!;
+    }
+
+    /// <summary>
+    /// A discount on the whole bill, as an amount or as a percent of what the lines come to (give one; both zero takes it off). It is spread over the lines before the tax is
+    /// worked out, so the tax falls with it (decision 33).
+    /// </summary>
+    public DocumentView SetBillDiscount(long documentId, long amountMinor, long pctMilli)
+    {
+        CheckBillDiscount(amountMinor, pctMilli);
+        db.InTransaction((c, t) =>
+        {
+            RequireOpen(c, t, documentId);
+            HubDb.Exec(c, "UPDATE documents SET bill_discount_minor = $a, bill_discount_pct_milli = $p WHERE id = $id", t, ("$a", amountMinor), ("$p", pctMilli), ("$id", documentId));
+            var lines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", documentId));
+            if (amountMinor > lines.Sum(NetOf)) throw new HubException("discount", "The discount is more than the bill comes to.");
+            Recalculate(c, t, documentId);
+        });
+        return Get(documentId)!;
+    }
+
+    private static void CheckBillDiscount(long amountMinor, long pctMilli)
+    {
+        if (amountMinor < 0) throw new HubException("discount", "A discount cannot be less than nothing.");
+        if (pctMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
+        if (amountMinor > 0 && pctMilli > 0) throw new HubException("discount", "Give the discount as a percent or as an amount, not both.");
+    }
+
+    private static void CheckLineDiscount(long pctMilli, long amountMinor, long qtyMilli, long priceMinor)
+    {
+        if (pctMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
+        if (amountMinor < 0) throw new HubException("discount", "A discount cannot be less than nothing.");
+        if (pctMilli > 0 && amountMinor > 0) throw new HubException("discount", "Give the discount as a percent or as an amount, not both.");
+        if (amountMinor > Gross(qtyMilli, priceMinor)) throw new HubException("discount", "A discount cannot be more than the line comes to.");
     }
 
     public DocumentView SetParty(long documentId, long? partyId)
@@ -228,15 +274,67 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         {
             PricesIncludeTax = header.PricesIncludeTax, SellerRegion = header.SellerRegion, BuyerRegion = header.BuyerRegion, Registered = header.Registered, RoundTotal = header.RoundTotal,
         };
-        var input = lines.Select(l => new TaxLineInput
+        // A discount on the whole bill is spread over the lines first, as an amount on each line, and the engine then works the tax out on what is left.
+        var shares = BillDiscountShares(header, lines);
+        var input = lines.Select((l, i) => new TaxLineInput
         {
             Name = l.Description, Qty = MoneyText.Minor(l.QtyMilli, 3), UnitPrice = MoneyText.Minor(l.UnitPriceMinor, d), TaxCode = l.TaxCode,
-            DiscountPercent = l.DiscountPctMilli > 0 ? MoneyText.Minor(l.DiscountPctMilli, 3) : null, CustomerDiscount = l.CustomerDiscount,
+            DiscountPercent = shares[i] == 0 && l.DiscountAmountMinor == 0 && l.DiscountPctMilli > 0 ? MoneyText.Minor(l.DiscountPctMilli, 3) : null,
+            DiscountAmount = shares[i] > 0 ? MoneyText.Minor(LineDiscountOf(l) + shares[i], d) : l.DiscountAmountMinor > 0 ? MoneyText.Minor(LineDiscountOf(l), d) : null,
+            CustomerDiscount = l.CustomerDiscount,
         }).ToList();
         // A regional country (Canada, the US) needs a region to tax by: the shop's own when the buyer's is not known.
         if (context.Country.Tax.Model == "regional" && string.IsNullOrEmpty(taxContext.SellerRegion) && string.IsNullOrEmpty(taxContext.BuyerRegion))
             taxContext.SellerRegion = context.Country.Tax.Regions?.List?.FirstOrDefault()?.Code;
         return TaxEngine.Calculate(context.Country, taxContext, input, adjustments.ToList());
+    }
+
+    // ---- discounts (the same steps as the tax engine, so that what is spread is exactly what the engine takes off) --------------------------------
+
+    /// <summary>Quantity times price, rounded half up, as the tax engine does it (quantity in thousandths, price in minor units).</summary>
+    public static long Gross(long qtyMilli, long priceMinor) => (long)((2 * (BigInteger)qtyMilli * priceMinor + 1000) / 2000);
+
+    /// <summary>What a line's own discount comes to: the amount if there is one, else the percent of the line, never more than the line.</summary>
+    public static long LineDiscountOf(DocLine line)
+    {
+        var gross = Gross(line.QtyMilli, line.UnitPriceMinor);
+        var discount = line.DiscountAmountMinor > 0 ? line.DiscountAmountMinor : (long)((2 * (BigInteger)gross * line.DiscountPctMilli + 100_000) / 200_000);
+        return Math.Min(discount, gross);
+    }
+
+    /// <summary>What a line comes to after its own discount.</summary>
+    public static long NetOf(DocLine line) => Gross(line.QtyMilli, line.UnitPriceMinor) - LineDiscountOf(line);
+
+    /// <summary>How much of the bill's discount falls on each line (in the order of the lines). Nothing when the bill has no discount.</summary>
+    public static long[] BillDiscountShares(Document header, IReadOnlyList<DocLine> lines)
+    {
+        var nets = lines.Select(NetOf).ToArray();
+        var total = nets.Sum();
+        var wanted = header.BillDiscountPctMilli > 0 ? (long)((2 * (BigInteger)total * header.BillDiscountPctMilli + 100_000) / 200_000) : header.BillDiscountMinor;
+        return Allocate(nets, Math.Min(wanted, total));
+    }
+
+    /// <summary>
+    /// Divides an amount in proportion to the weights, in whole minor units, so that the parts add up to exactly the amount: each gets the rounded-down share, and the
+    /// units left over go one each to the biggest fractions (the first line wins a tie). A line with no weight gets nothing, and no part is more than its weight.
+    /// </summary>
+    public static long[] Allocate(IReadOnlyList<long> weights, long amount)
+    {
+        var shares = new long[weights.Count];
+        var total = weights.Aggregate(BigInteger.Zero, (a, w) => a + w);
+        if (amount <= 0 || total.IsZero) return shares;
+        if (amount > total) amount = (long)total;
+        var fractions = new (BigInteger Fraction, int Index)[weights.Count];
+        long given = 0;
+        for (var i = 0; i < weights.Count; i++)
+        {
+            var product = (BigInteger)amount * weights[i];
+            shares[i] = (long)(product / total);
+            fractions[i] = (product % total, i);
+            given += shares[i];
+        }
+        foreach (var (_, index) in fractions.OrderByDescending(f => f.Fraction).ThenBy(f => f.Index).Take((int)(amount - given))) shares[index]++;
+        return shares;
     }
 
     // ---- issuing ---------------------------------------------------------------------------------------------------------------
@@ -325,6 +423,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var draftId = CreateDraft(c, t, new DraftOptions
             {
                 Type = request.Type, PartyId = request.PartyId, UserId = request.UserId, Notes = request.Notes, Lines = request.Lines, Adjustments = request.Adjustments,
+                BillDiscountMinor = request.BillDiscountMinor, BillDiscountPctMilli = request.BillDiscountPctMilli,
             });
             return Issue(c, t, draftId, new IssueOptions { Payments = request.Payments, UserId = request.UserId, OnCredit = request.OnCredit });
         });
@@ -414,20 +513,36 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var invoice = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", invoiceId)).SingleOrDefault() ?? throw new HubException("not-found", "That document was not found.");
             if (invoice is not { Type: DocTypes.Invoice, Status: DocStatus.Issued }) throw new HubException("not-invoice", "A credit note can be made for a final invoice only.");
             var original = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", invoiceId));
+            // What was already given back: counted by the invoice line each credit line points to (older credit notes, made before lines remembered that, by what they look like).
             var already = HubDb.Query(c,
-                "SELECT l.item_id, l.description, l.unit_price_minor, l.discount_pct_milli, SUM(l.qty_milli) AS q FROM document_lines l JOIN documents d ON d.id = l.document_id " +
-                "WHERE d.ref_document_id = $id AND d.type = 'credit-note' AND d.status = 'issued' GROUP BY l.description, l.unit_price_minor, l.discount_pct_milli",
-                r => (Description: r.Text("description"), Price: r.Int("unit_price_minor"), Disc: r.Int("discount_pct_milli"), Qty: r.Int("q")), t, ("$id", invoiceId));
+                "SELECT l.ref_line_id, l.description, l.unit_price_minor, l.discount_pct_milli, SUM(l.qty_milli) AS q, SUM(l.discount_amount_minor) AS da FROM document_lines l JOIN documents d ON d.id = l.document_id " +
+                "WHERE d.ref_document_id = $id AND d.type = 'credit-note' AND d.status = 'issued' GROUP BY l.ref_line_id, l.description, l.unit_price_minor, l.discount_pct_milli",
+                r => (RefLine: r.IntOrNull("ref_line_id"), Description: r.Text("description"), Price: r.Int("unit_price_minor"), Disc: r.Int("discount_pct_milli"), Qty: r.Int("q"), Amount: r.Int("da")), t, ("$id", invoiceId));
+            var invoiceResultText = HubDb.Scalar(c, "SELECT result FROM documents WHERE id = $id", t, ("$id", invoiceId)) as string;
+            var invoiceResult = invoiceResultText is null ? null : NewtonJson.DeserializeObject<TaxResult>(invoiceResultText);
             var noteLines = new List<LineInput>();
             foreach (var (lineId, qty) in credits.Where(x => x.QtyMilli > 0))
             {
                 var line = original.FirstOrDefault(l => l.Id == lineId) ?? throw new HubException("line", "That line is not on the invoice.");
-                var done = already.Where(a => a.Description == line.Description && a.Price == line.UnitPriceMinor && a.Disc == line.DiscountPctMilli).Sum(a => a.Qty);
+                var given = already.Where(a => a.RefLine == line.Id || (a.RefLine is null && a.Description == line.Description && a.Price == line.UnitPriceMinor && a.Disc == line.DiscountPctMilli)).ToList();
+                var done = given.Sum(a => a.Qty);
                 if (qty + done > line.QtyMilli) throw new HubException("too-many", $"Only {ShopContext.Qty(line.QtyMilli - done)} of {line.Description} can still be credited.");
+                // A line that had an amount discount, or any line of a bill that had a discount on the whole bill, gives back exactly its share of what was taken off (the last
+                // part gives back what is left, so the pieces add up to the whole). Any other line is given back at its percent, as before.
+                var position = original.ToList().FindIndex(l => l.Id == lineId);
+                var taken = invoiceResult is not null && position >= 0 && position < invoiceResult.Lines.Count ? (long)MoneyText.Parse(invoiceResult.Lines[position].Discount, invoice.CurrencyDecimals) : 0;
+                var byAmount = taken > 0 && (line.DiscountAmountMinor > 0 || invoice.HasBillDiscount);
+                long creditDiscount = 0;
+                if (byAmount)
+                {
+                    var left = taken - given.Sum(a => a.Amount);
+                    creditDiscount = qty + done == line.QtyMilli ? left : Math.Min(left, (long)((2 * (BigInteger)taken * qty + line.QtyMilli) / (2 * (BigInteger)line.QtyMilli)));
+                    creditDiscount = Math.Min(creditDiscount, Gross(qty, line.UnitPriceMinor));
+                }
                 noteLines.Add(new LineInput
                 {
-                    ItemId = line.ItemId, Description = line.Description, QtyMilli = qty, Unit = line.Unit, UnitPriceMinor = line.UnitPriceMinor, DiscountPctMilli = line.DiscountPctMilli,
-                    TaxCode = line.TaxCode, CustomerDiscount = line.CustomerDiscount,
+                    ItemId = line.ItemId, Description = line.Description, QtyMilli = qty, Unit = line.Unit, UnitPriceMinor = line.UnitPriceMinor, DiscountPctMilli = byAmount ? 0 : line.DiscountPctMilli,
+                    DiscountAmountMinor = creditDiscount, RefLineId = line.Id, TaxCode = line.TaxCode, CustomerDiscount = line.CustomerDiscount,
                 });
             }
             if (noteLines.Count == 0) throw new HubException("empty", "Choose what is being returned.");

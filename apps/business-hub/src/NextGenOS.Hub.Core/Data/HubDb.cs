@@ -117,6 +117,11 @@ public sealed class HubDb
         }
     }
 
+    /// <summary>The number of the newest step of the shop database that this program knows.</summary>
+    public static int LatestVersion { get; } = typeof(HubDb).Assembly.GetManifestResourceNames()
+        .Where(n => n.StartsWith(MigrationPrefix, StringComparison.Ordinal) && n.EndsWith(".sql", StringComparison.Ordinal))
+        .Select(n => VersionOf(n, MigrationPrefix)).DefaultIfEmpty(0).Max();
+
     private const string MigrationPrefix = "NextGenOS.Hub.migrations.";
     private const string RollbackPrefix = "NextGenOS.Hub.rollbacks.";
 

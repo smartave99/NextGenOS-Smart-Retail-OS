@@ -688,6 +688,8 @@ Hub code read: `apps/business-hub/src/NextGenOS.Hub.Core/Documents/DocumentServi
 
 ### 7.1 Till lines, tax, discount, totals, round-off (status: DONE)
 
+**Update, 7 October 2026: D3 and D4 are closed in the Hub** (line discount by amount; bill discount spread over the lines before tax, decision 33; credit notes carry the exact share). Tests: `apps/business-hub/tests/NextGenOS.Hub.Tests/DiscountTests.cs` (L2, L3, L13, B4 with the new rule). D5 (tax mode per item), D6 (cess) and D12 (free-quantity promotion) are still open.
+
 **What the Hub does** (`DocumentService.Recalculate`, `DocumentService.cs:207`; `TaxEngine.Calculate`, `TaxEngine.cs:21`):
 - Money is whole minor units (a `long`), quantity is in thousandths (`qty_milli`), percentages are in thousandths of a percent (`discount_pct_milli`). The engine uses `BigInteger` and **rounds half up** (`R(a, b) = (2a + b) / 2b`, `TaxEngine.cs:17`) at every step. There is no floating point.
 - Per line: `gross = R(qty * price, 1000)`; percent discount `= R(gross * pct, 100000)` (capped at gross); `net = gross - discount` (`TaxEngine.cs:41` to `46`).

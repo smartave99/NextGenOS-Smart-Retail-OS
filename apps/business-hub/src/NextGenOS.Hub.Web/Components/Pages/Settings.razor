@@ -48,6 +48,8 @@
             <label class="check"><input type="checkbox" @bind="s.TaxRegistered" /> My business is registered for @Shop.Country.Tax.Name</label>
             <label class="check"><input type="checkbox" @bind="s.RoundTotal" /> Round every total to the nearest whole unit</label>
             <label class="check"><input type="checkbox" @bind="s.AllowNegativeStock" /> Allow selling when the count says there is none left</label>
+            <label for="s-cdisc">Biggest discount a cashier may give (percent of the bill; 0 means none)</label><input id="s-cdisc" inputmode="decimal" @bind="cashierDiscount" maxlength="7" />
+            <p class="muted small">Owners and managers can always give a discount. A cashier can give one only up to this much.</p>
         </div>
         <p class="muted small">Country: <strong>@Shop.Country.Name</strong> (@Shop.CurrencyCode). To use another country, set up a new data folder.</p>
         <div class="row"><button type="button" class="btn primary" id="save-shop" @onclick="SaveShop">Save</button></div>
@@ -497,6 +499,7 @@ else if (tab == "activity")
     [SupplyParameterFromQuery(Name = "saved")] public string? Saved { get; set; }
     private ShopSettings s = new();
     private string payText = "";
+    private string cashierDiscount = "0";
     private readonly Dictionary<string, string> rates = new();
     private readonly Dictionary<string, string> parts = new();
     private readonly Dictionary<string, bool> features = new();
@@ -530,6 +533,7 @@ else if (tab == "activity")
         scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
+        cashierDiscount = ShopContext.Qty(s.CashierDiscountPctMilli).TrimEnd('0').TrimEnd('.');
         rates.Clear();
         foreach (var kv in s.RateOverrides) rates[kv.Key] = kv.Value;
         parts.Clear();
@@ -667,6 +671,9 @@ else if (tab == "activity")
         if (methods.Count == 0) throw new HubException("pay", "Please give at least one way of paying.");
         if (methods.Any(m => m.Length > 20 || m.Any(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '-'))) throw new HubException("pay", "Ways of paying should be short words, like cash, card, upi.");
         s.PaymentMethods = methods;
+        try { s.CashierDiscountPctMilli = string.IsNullOrWhiteSpace(cashierDiscount) ? 0 : ShopContext.QtyMilli(cashierDiscount.Trim()); }
+        catch (FormatException) { throw new HubException("cashier-discount", "Please type the cashier's discount limit as a number, like 5 or 2.5."); }
+        if (s.CashierDiscountPctMilli is < 0 or > 100_000) throw new HubException("cashier-discount", "The cashier's discount limit must be between 0 and 100 percent.");
         App.Shop.Save(s);
         App.Audit.Log(Me.Id, "settings", "shop", null, "business details");
     }, "Saved.");

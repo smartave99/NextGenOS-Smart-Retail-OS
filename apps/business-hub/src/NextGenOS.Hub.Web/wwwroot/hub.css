@@ -107,6 +107,9 @@ label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; f
 .line .nm { font-weight: 600; }
 .line .amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .line .ctl { display: flex; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.disc-in { width: 100%; min-height: 34px; padding: 4px 8px; }
+.discount-row { align-items: center; margin-top: 6px; }
+.discount-row .disc-in { width: 9em; }
 .qty { width: 74px; min-height: 34px; padding: 4px 8px; text-align: center; }
 .qbtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--ngos-line-strong); background: var(--ngos-surface); color: var(--ngos-text); font: inherit; font-size: 1.1rem; cursor: pointer; }
 .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-variant-numeric: tabular-nums; }

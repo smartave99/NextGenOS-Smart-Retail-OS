@@ -53,7 +53,7 @@
         {
             @foreach (var line in cart.Lines)
             {
-                var result = cart.Result?.Lines[line.LineNo - 1];
+                var result = cart.ResultFor(line);
                 <div class="line">
                     <span class="nm">@line.Description</span>
                     <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>
@@ -65,9 +65,26 @@
                         <span class="spacer"></span>
                         <button type="button" class="btn ghost small" @onclick="() => Remove(line)">Remove</button>
                     </div>
+                    @if (CanDiscount)
+                    {
+                        <div class="ctl">
+                            <input class="disc-in" inputmode="decimal" aria-label="Discount on @line.Description" placeholder="Discount (10% or an amount)" value="@LineDiscountText(line)" @onchange="e => SetLineDiscount(line, e.Value?.ToString())" />
+                        </div>
+                    }
                 </div>
             }
 
+            @if (CanDiscount)
+            {
+                <div class="row discount-row">
+                    <label for="bill-discount" class="grow">Discount on the whole bill</label>
+                    <input id="bill-discount" class="disc-in" inputmode="decimal" placeholder="10% or an amount" value="@BillDiscountText()" @onchange="e => SetBillDiscount(e.Value?.ToString())" />
+                </div>
+            }
+            @if (cart.Result is { } given && Shop.Minor(given.Totals.Discount) > 0)
+            {
+                <div class="total-row muted"><span>Discount given</span><span id="discount-given">−@Shop.Money(Shop.Minor(given.Totals.Discount))</span></div>
+            }
             <div class="total-row"><span>Subtotal</span><span>@Money(cart.Document.SubtotalMinor)</span></div>
             @foreach (var part in TaxParts())
             {
@@ -205,7 +222,7 @@
     {
         Run(() =>
         {
-            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && l.DiscountPctMilli == 0 && l.Note is null);
+            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && l.DiscountPctMilli == 0 && l.DiscountAmountMinor == 0 && l.Note is null);
             if (cart is null)
                 cart = App.Documents.CreateDraft(new DraftOptions { UserId = Me.Id, PartyId = customer?.Id, Lines = { new LineInput { ItemId = item.Id } } });
             else if (existing is not null)
@@ -238,6 +255,68 @@
     }
 
     private void Remove(DocLine line) => Run(() => cart = App.Documents.RemoveLine(cart!.Document.Id, line.Id));
+
+    // ---- discounts: "10%" is a percent, a plain number is an amount of money -------------------------------------------------------------------
+
+    /// <summary>Owners and managers may always give a discount; a cashier may when the owner has set a limit above nothing (Settings).</summary>
+    private bool CanDiscount => Me.Can(Perm.Discount) || Shop.Settings.CashierDiscountPctMilli > 0;
+
+    private string LineDiscountText(DocLine line) =>
+        line.DiscountPctMilli > 0 ? Qty(line.DiscountPctMilli) + "%" : line.DiscountAmountMinor > 0 ? Shop.Text(line.DiscountAmountMinor) : "";
+
+    private string BillDiscountText() =>
+        cart is null ? "" : cart.Document.BillDiscountPctMilli > 0 ? Qty(cart.Document.BillDiscountPctMilli) + "%" : cart.Document.BillDiscountMinor > 0 ? Shop.Text(cart.Document.BillDiscountMinor) : "";
+
+    private void ParseDiscount(string? text, out long pctMilli, out long amountMinor)
+    {
+        pctMilli = 0;
+        amountMinor = 0;
+        var typed = (text ?? "").Trim();
+        if (typed.Length == 0) return;
+        try
+        {
+            if (typed.EndsWith('%')) pctMilli = ShopContext.QtyMilli(typed[..^1].Trim());
+            else if (!TryMoney(Shop, typed, out amountMinor)) throw new FormatException();
+        }
+        catch (FormatException) { throw new HubException("discount", "Please type a discount like 10% or 25.50."); }
+        if (pctMilli < 0 || amountMinor < 0) throw new HubException("discount", "A discount cannot be less than nothing.");
+    }
+
+    /// <summary>A cashier without the discount permission may not take off more than the owner's limit, counting every discount on the bill.</summary>
+    private void KeepWithinLimit(Action putBack)
+    {
+        if (Me.Can(Perm.Discount) || cart?.Result is not { } result) return;
+        var gross = Shop.Minor(result.Totals.Gross);
+        var off = Shop.Minor(result.Totals.Discount);
+        var limit = Shop.Settings.CashierDiscountPctMilli;
+        if (gross > 0 && (decimal)off * 100_000m > (decimal)limit * gross)
+        {
+            putBack();
+            throw new HubException("discount-limit", $"A cashier may take off up to {Qty(limit)}% of a bill. Ask a manager for more.");
+        }
+    }
+
+    private void SetLineDiscount(DocLine line, string? text)
+    {
+        Run(() =>
+        {
+            ParseDiscount(text, out var pct, out var amount);
+            var (beforePct, beforeAmount) = (line.DiscountPctMilli, line.DiscountAmountMinor);
+            cart = App.Documents.UpdateLine(cart!.Document.Id, line.Id, discountPctMilli: pct, discountAmountMinor: amount);
+            KeepWithinLimit(() => cart = App.Documents.UpdateLine(cart!.Document.Id, line.Id, discountPctMilli: beforePct, discountAmountMinor: beforeAmount));
+        });
+    }
+
+    private void SetBillDiscount(string? text)
+    {
+        Run(() =>
+        {
+            ParseDiscount(text, out var pct, out var amount);
+            var (beforePct, beforeAmount) = (cart!.Document.BillDiscountPctMilli, cart.Document.BillDiscountMinor);
+            cart = App.Documents.SetBillDiscount(cart.Document.Id, amount, pct);
+            KeepWithinLimit(() => cart = App.Documents.SetBillDiscount(cart!.Document.Id, beforeAmount, beforePct));
+        });
+    }
 
     private IEnumerable<NextGenOS.Tax.Component> TaxParts() => cart?.Result?.Totals.Components?.Where(c => Shop.Minor(c.Amount) != 0) ?? Enumerable.Empty<NextGenOS.Tax.Component>();
 

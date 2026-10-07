@@ -21,6 +21,8 @@ public sealed class ShopSettings
     public bool TaxRegistered { get; set; } = true;
     public bool RoundTotal { get; set; }
     public bool AllowNegativeStock { get; set; } = true;
+    /// <summary>The biggest discount a cashier may give at the till, as a percent of the bill in thousandths (5000 = 5%). 0 means none; owners and managers have no limit.</summary>
+    public long CashierDiscountPctMilli { get; set; }
     public string ReceiptFooter { get; set; } = "Thank you!";
     public bool SetupDone { get; set; }
     /// <summary>Parts of the Hub the owner switched on or off, over the industry's defaults (name → on/off).</summary>

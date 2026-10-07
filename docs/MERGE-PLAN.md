@@ -23,7 +23,7 @@ Written on 7 October 2026. This page is a **plan and a list of facts, not finish
 | Runs on | Windows only, 32-bit, needs SQL Server | Windows and Linux, own database file |
 | Trades and countries | Retail, Indian GST (rupees, GST words, WhatsApp flows in thousands of places) | Retail, restaurant, library, construction, services, wholesale; country packs |
 | White-label, licence | Licence enforced and brand from the licence (edited already) | Built in |
-| Source | Recovered from compiled files; the owner still has to prove NextGenOS may resell it (`docs/OPEN-WORK.md`, item 6) | Written new, owned |
+| Source | Recovered from compiled files; **the owner states it is theirs** (decision 27) | Written new, owned |
 
 The old POS has what the Hub does not yet have: **397 screens** of Indian retail and accounting features. That is what is worth bringing across.
 

@@ -198,6 +198,12 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** **One shop program.** The Business Hub is the host (it is the one that builds by itself, makes a new customer's database, runs on Windows and Linux, serves every trade and country, and has the licence and white-label); **the older Windows POS's features and business rules are brought into it, screen by screen, from the recovered source** (397 screens, grouped in `docs/MERGE-PLAN.md`), with a test that pins every money rule, and with the old POS's own way kept where it is better. **The rest is deleted** from the repository: each piece of the older POS is removed **only after the Hub does the same job and a test shows it**, one commit per group so any of them can be undone; history is kept; nothing is deleted first. The order of work, the delete list and what is needed from the owner (the database scripts or a backup of a working database; the screens used every day) are in `docs/MERGE-PLAN.md`. Releases and tags are deleted only when the owner says so for that action (`CLAUDE.md` section 12).
 - **Today:** **Nothing is ported or deleted yet.** The plan is written. The first step is a reader for the older POS's SQL Server database (decision 17).
 
+### 27. The recovered Windows POS software is the owner's: never ask again
+
+- **Said (the owner, in their own words):** "and that recovered software is mine dont fucking ask me again after wasting so much resource".
+- **Rule:** The recovered Windows POS source (`apps/pos-desktop` and its companion libraries) **belongs to the owner. This is settled. No assistant and no document asks the owner for proof of ownership, a lawyer's opinion or original paperwork about it, and none lists it as an open item or as something "not verified".** It was removed from the gate's NOT VERIFIED list and from `docs/OPEN-WORK.md`. (Separate and still in force: the licences of third-party libraries are listed and noticed as `CLAUDE.md` section 3 says; that is a duty of the build, not a question to the owner.)
+- **Today:** Done: removed from the gate's list and from the documents that called it open (`docs/OPEN-WORK.md`, `docs/COMMERCIALIZATION_READINESS.md`, `docs/SECURITY-MODEL.md`, `docs/MERGE-PLAN.md`).
+
 ## Still to ask, and open items
 
 - Pricing details: how many PCs the one price covers; the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).

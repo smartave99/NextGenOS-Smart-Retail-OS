@@ -158,3 +158,7 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-07 10:55 (about; the owner's answer to the question "Which program should be the shop program that your customers get?", with the choices: both, old POS, or Hub with old POS for existing customers)
 
 > merge it fool make the best out of it and delete rest instead of wasting the token
+
+### 2026-10-07 11:05 (about; sent while an assistant was working)
+
+> and that recovered software is mine dont fucking ask me again after wasting so much resource

@@ -6,6 +6,24 @@ A customer's **website** (for Linux and for Windows) and **Android app** have th
 
 Staff never see GitHub, Node.js or a terminal. In the Studio this is called **the build service**.
 
+## Work in progress: the website becomes one program for every customer (decisions 23 and 24)
+
+This page still describes the build service as it was written. The website is being changed so that it is **built once per release without any customer's settings** and reads each customer's settings **when it starts**, from a customer folder placed beside it. The inventory below is what was fixed at build time before this change (found by reading `apps/storefront-web-mobile`, 7 October 2026). The next sections of this page are updated as each piece is finished; `docs/OPEN-WORK.md` says what exists.
+
+**Fixed at build time before the change (every one is now read at start-up instead):**
+
+| What | Where (storefront `src/`) | What it was |
+|---|---|---|
+| Shop name | `lib/shop-name.ts`, `types/site-config.ts` | `NEXT_PUBLIC_SITE_NAME`, default "our store" / "My Shop"; also the upload folder name |
+| Web address | `lib/site-url.ts`, `types/site-config.ts`, `app/layout.tsx`, `lib/licence/manager.ts` | `NEXT_PUBLIC_SITE_URL`, default `https://example.com` / `http://localhost:3000` |
+| Country: money, tax name, locale, languages | `lib/region/lite.ts`, `lib/region/server.ts` | `NEXT_PUBLIC_COUNTRY`, **default India (`IN`)** |
+| Town or area, tax region | `lib/region/lite.ts`, `lib/region/server.ts` | `NEXT_PUBLIC_SHOP_PLACE`, `NEXT_PUBLIC_REGION_CODE` |
+| Kind of business (the words "Products", "Menu items") | `lib/industry/lite.ts` | `NEXT_PUBLIC_INDUSTRY`, default `retail` |
+| Colours, tagline, contact lines of the starting design | `types/site-config.ts` | fixed neutral blue and amber; empty contact; never taken from the customer's brand |
+| Language of the pages | `app/layout.tsx` | `<html lang="en">` fixed |
+| Logo | `public/logo.png` | the build copied the customer's logo over it |
+| Live shop (Supabase), sign-in (Firebase), pictures (Cloudinary): the public parts | `lib/live-shop/config.ts`, `lib/firebase.ts`, `lib/firebase-admin.ts`, `app/admin/media/page.tsx` | `NEXT_PUBLIC_SUPABASE_*`, `NEXT_PUBLIC_FIREBASE_*`, `NEXT_PUBLIC_CLOUDINARY_*` |
+
 ## The pieces
 
 | Piece | What it is |

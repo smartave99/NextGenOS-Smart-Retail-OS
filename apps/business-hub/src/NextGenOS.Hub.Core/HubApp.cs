@@ -74,6 +74,20 @@ public sealed class HubApp
     public EventStore Events { get; }
     public OntologyService Ontology { get; }
 
+    /// <summary>
+    /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day
+    /// (whatever the switches say: forgetting never waits for one). It does nothing until the set-up has finished: before that the shop is still being made, and the sample company's open
+    /// sales are dated days back, so they would look like sales that were forgotten.
+    /// </summary>
+    public void Upkeep()
+    {
+        var settings = Shop.Settings;
+        if (string.IsNullOrEmpty(settings.Country) || !settings.SetupDone) return;
+        Documents.DiscardStaleDrafts();
+        if (Shop.Current.Features.Lending) Library.ProcessHolds();
+        Retention.Prune(null);
+    }
+
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
     public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null)
     {

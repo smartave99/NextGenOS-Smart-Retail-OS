@@ -4,6 +4,9 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Fixed
+- **Setting up with the sample company could fail with "That document was not found."** The Hub's background tidying (which clears sales left open for more than a day) could start at the very moment the sample company was being made, and take its sales, which are dated days back. The tidying now waits until the shop's set-up has finished, and the sample company marks the shop as set up only when it is fully made. Tests pin both.
+
 ### New
 - **AI helpers (optional, off by default)**: *Settings → AI helpers* for the owner. Eight switches, a description of the computer, AI services with permissions per kind of data, limits and a use record, keys kept in the system's safe, and a list of models with a way back. Needs the `ai` part in the licence. The shop's own screens do not use it and are unchanged.
 - **Business event history (optional, off by default)**: *Settings → AI helpers → Business events* for the owner. What cameras and sensors saw is kept apart from what happened in the business; every event says who or what, where, when, how sure, why the system believes it and what it rests on; a wrong event is marked wrong or replaced and stays in the history. Records are forgotten when their time is up (short for what is private, biometric data not kept at all unless the owner says so, card details never), even with the switch off.

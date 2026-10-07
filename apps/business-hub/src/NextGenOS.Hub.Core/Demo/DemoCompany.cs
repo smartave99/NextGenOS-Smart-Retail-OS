@@ -83,7 +83,7 @@ public static class DemoCompany
             existing.Industry = industry.Id;
             existing.PricesIncludeTax = country.Tax.PricesIncludeTaxDefault;
             existing.RoundTotal = country.Tax.Rounding?.DefaultOn ?? false;
-            existing.SetupDone = true;
+            // The shop is marked as set up only when the sample is fully built (below): the background upkeep waits for that, and the sample's open sales are dated days back, so they would look forgotten.
             _app.Shop.Save(existing);
             _shop = _app.Shop.Current;
             _pack = _shop.Industry;
@@ -99,6 +99,9 @@ public static class DemoCompany
                 default: CounterTrade(); break;
             }
             _clock.Set(_now);
+            var finished = _app.SettingsStore.Load();
+            finished.SetupDone = true;
+            _app.Shop.Save(finished);
             var documents = (int)Convert.ToInt64(_app.Db.Scalar("SELECT COUNT(*) FROM documents") ?? 0L);
             return new DemoSummary(existing.Name, _pack.Id, country.Country, _items.Count, _people.Count, documents, _loans, _projects, _bookings, _tables);
         }

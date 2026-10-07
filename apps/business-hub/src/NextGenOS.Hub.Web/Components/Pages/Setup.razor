@@ -315,7 +315,7 @@ else
             State.Finished();
             Nav.NavigateTo("/login", forceLoad: true);
         }
-        catch (HubException ex) { error = ex.Message; busy = false; }
+        catch (HubException ex) { Log.LogWarning(ex, "Setting up was refused ({Code}).", ex.Code); error = ex.Message; busy = false; }
         catch (Exception ex)
         {
             Log.LogError(ex, "Setting up the shop failed.");

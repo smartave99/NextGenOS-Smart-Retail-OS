@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getProducts, getCategories, getDepartments } from "@/app/actions";
 import { SITE_URL } from "@/lib/site-url";
 
-export const revalidate = 3600; // Cache sitemap for 1 hour
+// Made when it is asked for (the shop's own web address is read when the website starts, not when the program was built); the response tells caches to keep it for an hour.
+export const dynamic = "force-dynamic";
 
 export async function GET() {
     const baseUrl = SITE_URL;

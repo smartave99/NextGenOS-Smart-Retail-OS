@@ -8,6 +8,8 @@ import { ArrowLeft, Clock, Tag, Zap } from "lucide-react";
 import WhatsAppButton from "./WhatsAppButton";
 
 export const revalidate = 3600;
+// Rendered when it is asked for: the shop's own name and address are read when the website starts, never kept from the build or from an earlier set-up.
+export const dynamic = "force-dynamic";
 
 
 export async function generateStaticParams() {

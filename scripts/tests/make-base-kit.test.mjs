@@ -63,3 +63,16 @@ test('a website is listed by its customer and system, and its name has no versio
   const only = folder({ 'website-luzon-fresh-mart-linux.zip': 'a' });
   try { await assert.rejects(makeBaseKit(only), /Say the version/); } finally { rmSync(only, { recursive: true, force: true }); }
 });
+
+test('THE website (the same for every customer) is listed by its system alone, apart from a website made for one customer', async () => {
+  const d = folder({ 'website-linux.zip': 'a', 'website-windows.zip': 'b', 'website-luzon-fresh-mart-linux.zip': 'c', 'website-macos.zip': 'd', 'website-windows-linux.zip': 'e', 'SmartRetailPOS-Hub-Setup-2.0.1.exe': 'g' });
+  try {
+    const { manifest, ignored } = await makeBaseKit(d);
+    const generic = manifest.files.filter((f) => f.role === 'website-generic').map((f) => [f.name, f.os, f.arch, f.kit]).sort();
+    assert.deepEqual(generic, [['website-linux.zip', 'linux', 'x64', undefined], ['website-windows.zip', 'windows', 'x64', undefined]]);
+    const own = manifest.files.filter((f) => f.role === 'website').map((f) => [f.name, f.kit]).sort();
+    assert.deepEqual(own, [['website-luzon-fresh-mart-linux.zip', 'luzon-fresh-mart'], ['website-windows-linux.zip', 'windows']], 'a customer who is called "windows" is still a customer, not the program');
+    assert.deepEqual(ignored, ['website-macos.zip']);
+    assert.equal(manifest.version, '2.0.1', 'the website does not set the version: it is inside the file');
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

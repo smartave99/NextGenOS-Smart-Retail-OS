@@ -110,7 +110,7 @@ function fakeSupabase({ demo = false, reportsTable = true, productsTable = true,
 
 beforeEach(() => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_abc";
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_abcdefghij";
 });
 
 afterEach(() => {

@@ -24,16 +24,17 @@ describe("LiveShop", () => {
         expect(screen.getByRole("alert")).toHaveTextContent("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     });
 
-    it("never uses the project's secret key", () => {
+    it("never uses the project's secret key: the server drops it, so it never reaches the page, and the panel says it is not set up", () => {
         process.env.NEXT_PUBLIC_SUPABASE_URL = "https://abcd.supabase.co";
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_secret_abc";
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_secret_abcdefghij";
         render(<LiveShop />);
-        expect(screen.getByRole("alert")).toHaveTextContent("secret key");
+        expect(screen.getByRole("heading", { name: "Live shop is not set up yet" })).toBeInTheDocument();
+        expect(screen.getByRole("alert")).not.toHaveTextContent("sb_secret_abcdefghij");
     });
 
     it("asks the owner to sign in", async () => {
         process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_abc";
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_abcdefghij";
         render(<LiveShop />);
         expect(await screen.findByRole("heading", { name: "See your shop, live" })).toBeInTheDocument();
         expect(screen.getByLabelText("E-mail")).toBeRequired();

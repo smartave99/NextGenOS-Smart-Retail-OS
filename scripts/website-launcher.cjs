@@ -66,7 +66,7 @@ if (!host) stop('Say which address to listen on after --host, for example --host
 if (!fs.existsSync(path.join(here, 'app', 'server.js'))) stop('This folder is not complete: the website itself (app/server.js) is missing. Unpack the zip again, all of it, into a new folder.');
 
 // The private settings (database address, passwords, keys) are read from private-settings.env if it is there. A value set in the computer's own settings wins.
-// The public settings (name, address, country, kind of business) are already inside the website and are not read from here.
+// The public settings (name, address, country, kind of business, language, colours, logo) are the customer's own and are read when the website starts from the folder "customer" beside this program; they are not read from here.
 const NEVER = new Set(['NODE_ENV', 'NGOS_DEV_UNLICENSED', 'NODE_OPTIONS', 'PORT', 'HOSTNAME']);
 const file = path.join(here, 'private-settings.env');
 if (fs.existsSync(file)) {
@@ -89,6 +89,8 @@ process.env.PORT = String(port);
 process.env.HOSTNAME = host;
 process.env.NEXT_TELEMETRY_DISABLED = '1';
 if (!process.env.LICENCE_DIR) process.env.LICENCE_DIR = path.join(here, 'licence');
+// The customer's own settings are read, when the website starts, from the folder "customer" beside this program (the Setup Studio puts it there). No folder: the website is neutral.
+if (!process.env.NGOS_CUSTOMER_DIR) process.env.NGOS_CUSTOMER_DIR = path.join(here, 'customer');
 try { fs.mkdirSync(process.env.LICENCE_DIR, { recursive: true }); } catch (e) { stop('The folder for the licence cannot be made here (' + process.env.LICENCE_DIR + '). Unpack the website into a folder you may write to, such as your Documents or home folder, not into Program Files.'); }
 
 // Is there room to work? The website keeps a cache of resized pictures.

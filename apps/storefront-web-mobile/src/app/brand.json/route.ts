@@ -4,6 +4,7 @@ import { SITE_URL } from "@/lib/site-url";
 import { SHOP_NAME } from "@/lib/shop-name";
 import { COUNTRY } from "@/lib/region/lite";
 import { languageList } from "@/lib/shop-facts";
+import { TERM } from "@/lib/industry/lite";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export async function GET() {
                 contact.instagramUrl,
                 contact.twitterUrl
             ].filter(Boolean),
-            "knowsAbout": ["Departmental Store", "Groceries", "Fashion", "Electronics", "Home Decor", "AI Shopping Assistant"]
+            "knowsAbout": [TERM.item.plural, "AI Shopping Assistant"]
         };
 
         return NextResponse.json(entity, {

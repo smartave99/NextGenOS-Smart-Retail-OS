@@ -134,10 +134,17 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** The goal is to bring **everything** from the client's old system across **automatically**: items and prices, customers and suppliers, stock, balances owed, and the history of sales, **from any type of old system, and many old POS systems keep their data in an SQL database**, so the importer must be able to read those directly as well as spreadsheet and CSV files. The importer must follow these limits, which come from other decisions and rules: it connects to the old database **read-only** and never writes to it; the owner's database password lives in the operating system's credential store and **never leaves the computer** (`CLAUDE.md` sections 3, 15 and 16); nothing about the old shop goes to an outside AI service except what decision 10 allows (so the AI may help guess which column is which from the column names and a few made-up-looking rows only if the owner allows it, otherwise the mapping is done without it). **A match report before go-live** (sales per day, stock value, balances owed, old against new) is kept as a rule for money data until the owner says otherwise; the shop goes live only when it matches. "All types" is a direction, not a day-one promise: a system whose data is locked, cloud-only or has no export cannot be read until the vendor gives an export, and the answer to the owner says so (`CLAUDE.md` section 11).
 - **Today:** A **starter list of items and people** can be pasted from a spreadsheet in the Studio and is applied when the shop is first set up (`docs/SETUP-STUDIO.md`). **Not built:** the import of sales history, balances owed and stock movements; the reader of SQL databases (SQL Server, MySQL or MariaDB, PostgreSQL, SQLite); the mapping helper; the match report. The Windows POS in this repository (`apps/pos-desktop`) is the owner's own old system and the natural first SQL reader.
 
+### 18. How a client's problem reaches the team
+
+- **Asked:** A Help button that makes a safe support file, phone and messaging only, or remote access to the client's PC.
+- **Answer:** "Help button that makes a safe support file (Recommended)".
+- **Rule:** The shop program has a **Help button**. It describes the problem in plain words and, **only if the owner agrees**, attaches a support file with versions, the licence state, the last errors and the backup status. The support file holds **no sales, customers or passwords**, and the owner can read it before it is sent. It arrives on that client's page in the Studio, so staff see everything about the client in one place. Phone and messaging stay as a fallback. **No remote control of a client's PC** is part of the plan; if it is ever wanted it needs the owner's word, the client's permission each time, and a recorded session.
+- **Today:** **Not built:** the Help button, the support file, and the client's page in the Studio. (The audit log and the Hub's own logs exist but are not gathered into a support file.)
+
 ## Still to ask, and open items
 
 - Pricing details: the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).
-- Languages and training; the support process and who answers the phone; whether the match report before go-live (decision 17) is accepted.
+- Languages and training; who answers the phone and in which hours; whether the match report before go-live (decision 17) is accepted.
 - A sentence for the contract about what may go to an outside AI service (decision 10) and about the final unlock (decision 16): counsel.
 
 ## The order the assistant proposed (the owner has not changed it)

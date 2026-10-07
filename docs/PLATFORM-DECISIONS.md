@@ -148,6 +148,13 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** The main Studio (the "super studio" in the owner's words, today the Setup Studio) gets a **Licences section on each client's page**: the licence, the PCs in use, free a PC, extend a trial, switch off. It does this by calling the **Licence Studio's server** with its own **limited staff login**, so each person sees only what their role allows. **The Licence Studio stays a separate private program on the owner's server and keeps the signing key; the main Studio never holds or sees a key** (`CLAUDE.md` sections 3 and 12). The whole client (project, outputs, licence, PCs, version, backups, support) is on one page. The Licence Studio is never merged into the main Studio.
 - **Today:** **Not built.** The Licence Studio has roles and a web interface of its own (`licensing/README.md`); the Setup Studio does not call it.
 
+### 20. How the Android app reaches shoppers and staff
+
+- **Asked:** An APK to share plus a Play Store package, an APK only, or every app published on NextGenOS's own store account.
+- **Answer:** "APK to share, plus a Play Store package (Recommended)".
+- **Rule:** Every build gives **two files**: the **APK**, for quick sharing by link or message (the client's own staff, trials; phones warn about installing from outside the store, so it is not for the general public), and the **Play Store package (`.aab`)**, to be published under **the client's own Google Play account**, which the client or NextGenOS staff set up once. Updates then reach shoppers through the store. **The signing keys stay with NextGenOS in a protected place, never on staff PCs and never in the repository** (`CLAUDE.md` section 3). The Studio says in plain words which file goes to whom. The app is a shell around the client's website address, so the website must be online (decision 8).
+- **Today:** Built: the build service makes the signed APK and AAB for a client's brand (`docs/CUSTOMER-BUILDS.md`); it has never run on the real GitHub, and a build with no signing secrets is signed with a one-off test key that a phone will not accept as an update. **Not built:** the Studio's plain explanation of which file goes to whom, and anything for setting up the client's Play account.
+
 ## Still to ask, and open items
 
 - Pricing details: the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).

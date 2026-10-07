@@ -90,6 +90,9 @@ export const PUBLIC_SETTINGS = {
  * Returns { values, problems }: every problem is a sentence a person can act on; nothing is made or shown while there is one.
  * `findSecrets(text)` (optional) names the kinds of secret a value seems to hold; the package maker passes the release gate's own scan, so a value that looks like a key is refused.
  * `developer` is for the computer's own environment only: a Supabase project on this computer (http://localhost or http://127.0.0.1, Supabase's local set-up) is allowed too.
+ * @param {string} text
+ * @param {{ countries?: string[] | null, industries?: string[] | null, requireName?: boolean, findSecrets?: (text: string) => string[], developer?: boolean }} [options]
+ * @returns {{ values: Record<string, string>, problems: string[] }}
  */
 export function parseSettings(text, { countries = null, industries = null, requireName = true, findSecrets = () => [], developer = false } = {}) {
   const values = {};
@@ -170,6 +173,9 @@ function parseJson(text, what, problems) {
 /**
  * Reads the text of a brand.json (the brand kit's file). Returns { layer, logoName, problems }: only valid values are kept; each wrong one is named in plain words.
  * `countries` and `industries` (lists of codes, optional) say which packs exist.
+ * @param {string | null | undefined} text
+ * @param {{ countries?: string[] | null, industries?: string[] | null }} [options]
+ * @returns {{ layer: Record<string, any>, logoName: string, problems: string[] }}
  */
 export function parseBrand(text, { countries = null, industries = null } = {}) {
   const problems = [];
@@ -218,7 +224,12 @@ export function parseBrand(text, { countries = null, industries = null } = {}) {
   return { layer, logoName, problems };
 }
 
-/** The part of a setup.json (the shop program's profile) that the website can use: the business's name, country and kind of business. */
+/**
+ * The part of a setup.json (the shop program's profile) that the website can use: the business's name, country and kind of business.
+ * @param {string | null | undefined} text
+ * @param {{ countries?: string[] | null, industries?: string[] | null }} [options]
+ * @returns {{ layer: Record<string, any>, problems: string[] }}
+ */
 export function parseSetup(text, { countries = null, industries = null } = {}) {
   const problems = [];
   const root = parseJson(text, 'setup.json', problems);
@@ -257,7 +268,11 @@ function overlay(base, layer) {
   return base;
 }
 
-/** The first non-empty value wins, highest priority first: website-settings.env, brand.json, setup.json, then the developer's own environment (a fallback only). */
+/**
+ * The first non-empty value wins, highest priority first: website-settings.env, brand.json, setup.json, then the developer's own environment (a fallback only).
+ * @param {{ env?: Record<string, any>, brand?: Record<string, any>, setup?: Record<string, any>, fallback?: Record<string, any> }} [layers]
+ * @returns {any}
+ */
 export function mergeLayers({ env = {}, brand = {}, setup = {}, fallback = {} } = {}) {
   const out = cloneNeutral();
   for (const layer of [fallback, setup, brand, env]) overlay(out, layer);

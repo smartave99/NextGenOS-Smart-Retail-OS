@@ -89,8 +89,9 @@ export const PUBLIC_SETTINGS = {
  * Reads the text of a settings file (KEY=value lines, # comments, CRLF or LF, a value may be in quotes).
  * Returns { values, problems }: every problem is a sentence a person can act on; nothing is made or shown while there is one.
  * `findSecrets(text)` (optional) names the kinds of secret a value seems to hold; the package maker passes the release gate's own scan, so a value that looks like a key is refused.
+ * `developer` is for the computer's own environment only: a Supabase project on this computer (http://localhost or http://127.0.0.1, Supabase's local set-up) is allowed too.
  */
-export function parseSettings(text, { countries = null, industries = null, requireName = true, findSecrets = () => [] } = {}) {
+export function parseSettings(text, { countries = null, industries = null, requireName = true, findSecrets = () => [], developer = false } = {}) {
   const values = {};
   const problems = [];
   String(text ?? '').split(/\r?\n/).forEach((raw, i) => {
@@ -109,7 +110,8 @@ export function parseSettings(text, { countries = null, industries = null, requi
     const rule = PUBLIC_SETTINGS[key];
     if (!rule) { problems.push(`${at}: ${key} is not a setting this website knows.`); return; }
     if (key in values) { problems.push(`${at}: ${key} is written twice.`); return; }
-    const why = value === '' && !rule.required ? null : rule.check(value);
+    const check = developer && key === 'NEXT_PUBLIC_SUPABASE_URL' ? (v) => (/^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?\/?$/.test(v) ? null : rule.check(v)) : rule.check;
+    const why = value === '' && !rule.required ? null : check(value);
     if (why) { problems.push(`${at}: ${key} ${why}.`); return; }
     const secret = findSecrets(value);
     if (secret.length) {
@@ -268,14 +270,14 @@ export function mergeLayers({ env = {}, brand = {}, setup = {}, fallback = {} } 
  */
 export function fallbackFromEnvironment(environment, { countries = null, industries = null } = {}) {
   const text = Object.keys(PUBLIC_SETTINGS).filter((k) => typeof environment[k] === 'string' && environment[k].trim() !== '').map((k) => `${k}=${environment[k].trim()}`).join('\n');
-  const parsed = parseSettings(text, { countries, industries, requireName: false });
+  const parsed = parseSettings(text, { countries, industries, requireName: false, developer: true });
   // A line that failed is dropped on its own: re-read each good line (a bad value must not take the good ones with it).
   const good = {};
   for (const line of text.split('\n')) {
-    const one = parseSettings(line, { countries, industries, requireName: false });
+    const one = parseSettings(line, { countries, industries, requireName: false, developer: true });
     if (!one.problems.length) Object.assign(good, one.values);
   }
-  return { layer: layerFromEnvValues(good), problems: parsed.problems };
+  return { layer: layerFromEnvValues(good), problems: parsed.problems.map((p) => p.replace(/^Line \d+: /, '')) };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -287,7 +289,12 @@ export const FOLDER_FILES = { 'brand.json': 262144, 'setup.json': 262144, 'theme
 export const MAX_PICTURE_BYTES = 3 * 1024 * 1024;
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-/** Whether the bytes are a real picture of the kind the file name says (the first bytes say so). */
+/**
+ * Whether the bytes are a real picture of the kind the file name says (the first bytes say so).
+ * @param {string} name
+ * @param {Uint8Array} bytes
+ * @returns {boolean}
+ */
 export function looksLikePicture(name, bytes) {
   const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase();
   if (!bytes || bytes.length < 8) return false;
@@ -305,6 +312,10 @@ export function looksLikePicture(name, bytes) {
  *   found      whether the folder exists
  *   logoFile   the logo's path inside the folder ('assets/logo.png'), or ''
  * It never throws for a bad file; a folder that cannot be read at all gives the neutral settings and a problem.
+ * @param {string} dir
+ * @param {{ fs: any, path: any }} io
+ * @param {{ countries?: string[] | null, industries?: string[] | null, environment?: Record<string, string | undefined> | null }} [options]
+ * @returns {{ settings: any, problems: string[], found: boolean, logoFile: string }}
  */
 export function readCustomerFolder(dir, { fs, path }, { countries = null, industries = null, environment = null } = {}) {
   const problems = [];

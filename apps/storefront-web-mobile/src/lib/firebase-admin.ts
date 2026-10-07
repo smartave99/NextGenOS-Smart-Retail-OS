@@ -2,6 +2,7 @@ import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/a
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getStorage, type Storage } from "firebase-admin/storage";
+import { getSettings } from "@/lib/customer/settings";
 
 /**
  * Starts Firebase Admin the first time it is needed. With no (or incomplete) settings it returns null, and the getters below
@@ -24,7 +25,7 @@ function getAdminApp(): App | null {
 
         return initializeApp({
             credential: cert(firebaseAdminConfig),
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+            storageBucket: getSettings().firebase.storageBucket || undefined,
         });
     } catch (error) {
         console.error("Firebase Admin Initialization Failed:", error);

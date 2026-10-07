@@ -3,14 +3,17 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getPerformance } from "firebase/performance";
+import { getSettings } from "@/lib/customer/settings";
 
+// The public parts of the customer's own Firebase project: their settings (the customer folder, read when the website starts), not values built into the program.
+const own = getSettings().firebase;
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    apiKey: own.apiKey,
+    authDomain: own.authDomain,
+    projectId: own.projectId,
+    storageBucket: own.storageBucket,
+    messagingSenderId: own.messagingSenderId,
+    appId: own.appId,
 };
 
 let app: any = null;

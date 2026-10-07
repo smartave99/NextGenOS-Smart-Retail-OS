@@ -2,20 +2,22 @@
 // sends the shop's figures. Only the project's URL and its public key belong on the website; the secret key is
 // refused, so it can never reach a browser.
 
+import { getSettings } from "@/lib/customer/settings";
+
 export type LiveShopConfig =
     | { ok: true; url: string; key: string }
     | { ok: false; problem: string };
 
 export const NOT_SET_UP =
-    "Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the website's settings (Supabase: Project Settings, then Data API and API Keys), then deploy again.";
+    "Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to website-settings.env in the website's customer folder (Supabase: Project Settings, then Data API and API Keys), then start the website again.";
 
 export const SECRET_KEY =
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY holds the project's secret key, which must never be on a website. Replace it with the publishable (or anon public) key.";
 
-/** The project's settings, checked. Next.js puts the NEXT_PUBLIC_ values into the page when it is built. */
+/** The project's settings, checked. They are the customer's own settings (the customer folder, read when the website starts; the server puts them in the page). */
 export function readLiveShopConfig(
-    url: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL,
-    key: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    url: string | undefined = getSettings().supabase.url,
+    key: string | undefined = getSettings().supabase.key,
 ): LiveShopConfig {
     const address = projectUrl(url);
     const publicKey = (key ?? "").trim();

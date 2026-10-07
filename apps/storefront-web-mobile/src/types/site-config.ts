@@ -1,4 +1,5 @@
 import { TERM } from "@/lib/industry/lite";
+import { getSettings } from "@/lib/customer/settings";
 export interface BrandingConfig {
     siteName: string;
     tagline: string;
@@ -197,17 +198,18 @@ export interface SiteConfig {
     llm: LlmConfig;
 }
 
-// A new site starts neutral: the shop's own name and address come from the licence's brand, the Brand Studio or the admin pages.
-// NEXT_PUBLIC_SITE_NAME and NEXT_PUBLIC_SITE_URL let a deployment set them without touching code.
-const SHOP = process.env.NEXT_PUBLIC_SITE_NAME || "My Shop";
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://example.com").replace(/\/+$/, "");
+// A new site starts neutral: the shop's own name, address, colours and contact lines come from the customer's settings (the customer folder, read when
+// the website starts: see lib/customer/settings.ts), the licence's brand, the Brand Studio or the admin pages. With none of them the site is plain.
+const CUSTOMER = getSettings();
+const SHOP = CUSTOMER.siteName || "My Shop";
+const SITE_URL = (CUSTOMER.siteUrl || "https://example.com").replace(/\/+$/, "");
 const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "");
 
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
     branding: {
         siteName: SHOP,
-        tagline: "Everything you need, in one place",
-        logoUrl: "/logo.png",
+        tagline: CUSTOMER.tagline || "Everything you need, in one place",
+        logoUrl: CUSTOMER.logoUrl || "/logo.png",
         faviconUrl: "/favicon.ico",
         posterUrl: "",
         pwaScreenshotUrl: "",
@@ -216,9 +218,9 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         searchPlaceholder: "Search collections..."
     },
     theme: {
-        primaryColor: "#0f6cbd", // Neutral blue (the brand kit replaces this)
+        primaryColor: CUSTOMER.primaryColor || "#0f6cbd", // Neutral blue (the customer's own colour replaces this)
         secondaryColor: "#f59e0b", // Amber
-        accentColor: "#0071e3", // Blue
+        accentColor: CUSTOMER.accentColor || "#0071e3", // Blue
         backgroundColor: "#f8fafc", // Slate 50
         textColor: "#0f172a", // Slate 900
         navbarColor: "#ffffff", // White
@@ -290,9 +292,9 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         ]
     },
     contact: {
-        phone: "",
-        email: "",
-        address: "",
+        phone: CUSTOMER.contact.phone,
+        email: CUSTOMER.contact.email,
+        address: CUSTOMER.contact.address,
         mapEmbedUrl: "",
         storeHours: "",
     },
@@ -312,7 +314,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
         name: SHOP,
         shortName: SHOP,
         description: `${SHOP} on your phone.`,
-        themeColor: "#0071e3",
+        themeColor: CUSTOMER.primaryColor || "#0071e3",
         backgroundColor: "#ffffff",
         display: "standalone",
         startUrl: "/",
@@ -353,13 +355,13 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
             "gift shop",
             "online shopping",
         ],
-        ogImageUrl: "/logo.png",
+        ogImageUrl: CUSTOMER.logoUrl || "/logo.png",
         twitterHandle: "",
         googleVerification: "",
         jsonLd: {
             name: SHOP,
             url: SITE_URL,
-            logo: "/logo.png",
+            logo: CUSTOMER.logoUrl || "/logo.png",
             description: `${SHOP}: browse our products online.`,
             addressCountry: "",
             priceRange: "",

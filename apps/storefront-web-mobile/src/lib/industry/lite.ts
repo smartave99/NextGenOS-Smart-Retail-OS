@@ -1,9 +1,11 @@
 import industries from "./generated/industries.json";
+import { getSettings } from "@/lib/customer/settings";
 
 /**
  * The words of the shop's kind of business (restaurant: "Menu items", library: "Titles", construction: "Rate items"), from the
- * industry pack (industry-packs/), chosen by NEXT_PUBLIC_INDUSTRY. Pages say TERM.items.plural instead of the word "Products", so
- * the same website fits a shop, a café or a library.
+ * industry pack (industry-packs/), chosen by the customer's own setting (see ../customer/settings.ts). With none set it is the
+ * general pack ("Items"), not a shop. Pages say TERM.items.plural instead of the word "Products", so the same website fits a
+ * shop, a café or a library.
  */
 type Pair = [string, string];
 interface IndustryLite {
@@ -15,10 +17,11 @@ interface IndustryLite {
 }
 
 const table = industries as unknown as Record<string, IndustryLite>;
-const id = (process.env.NEXT_PUBLIC_INDUSTRY || "retail").trim().toLowerCase();
+const asked = (getSettings().industry || "generic").trim().toLowerCase();
+const id = table[asked] ? asked : "generic";
 const entry = table[id];
 if (!entry) {
-    throw new Error(`There is no industry pack "${id}" (NEXT_PUBLIC_INDUSTRY). Choose one of: ${Object.keys(table).join(", ")}.`);
+    throw new Error(`There is no industry pack "generic". The packs are: ${Object.keys(table).join(", ")}.`);
 }
 
 export const INDUSTRY_ID = id;

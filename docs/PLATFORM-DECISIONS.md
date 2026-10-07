@@ -141,6 +141,13 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** The shop program has a **Help button**. It describes the problem in plain words and, **only if the owner agrees**, attaches a support file with versions, the licence state, the last errors and the backup status. The support file holds **no sales, customers or passwords**, and the owner can read it before it is sent. It arrives on that client's page in the Studio, so staff see everything about the client in one place. Phone and messaging stay as a fallback. **No remote control of a client's PC** is part of the plan; if it is ever wanted it needs the owner's word, the client's permission each time, and a recorded session.
 - **Today:** **Not built:** the Help button, the support file, and the client's page in the Studio. (The audit log and the Hub's own logs exist but are not gathered into a support file.)
 
+### 19. One window for staff: the main Studio and the private Licence Studio
+
+- **Asked:** One window that talks to the private Licence Studio, two separate tools, or the Licence Studio merged into the main Studio.
+- **Answer:** "One window; it talks to the private Licence Studio (Recommended)".
+- **Rule:** The main Studio (the "super studio" in the owner's words, today the Setup Studio) gets a **Licences section on each client's page**: the licence, the PCs in use, free a PC, extend a trial, switch off. It does this by calling the **Licence Studio's server** with its own **limited staff login**, so each person sees only what their role allows. **The Licence Studio stays a separate private program on the owner's server and keeps the signing key; the main Studio never holds or sees a key** (`CLAUDE.md` sections 3 and 12). The whole client (project, outputs, licence, PCs, version, backups, support) is on one page. The Licence Studio is never merged into the main Studio.
+- **Today:** **Not built.** The Licence Studio has roles and a web interface of its own (`licensing/README.md`); the Setup Studio does not call it.
+
 ## Still to ask, and open items
 
 - Pricing details: the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).

@@ -1157,6 +1157,14 @@ This is the consolidated list. The topic sections hold the detail.
 
 **Not looked at at all in this study (the list asked for them but the time went to the rules above):** coupon and gift SMS or WhatsApp sending; customer contact list, bulk update and Excel import or export screens for customers, suppliers and products (`frmCustomerBulkUpdate`, `frmSupplierBulkUpdate`, `frmExportImportExcel_*`); `frmCustomerMobileRpt`; product image maker; `frmProductListWeigh` (weighing scale list); `frmKeyBordProduct`; the GST return forms. Each is a small screen over the tables in this file; read it when its port starts.
 
+**Found while building the data reader (7 October 2026; the reader and its maps are in `docs/old-programs/DATABASE.md`).** Each was handled the safe way and is listed in the match report as "please look":
+- Whether customer number 1 is always the walk-in customer: A1.11 note 5 says "the two codes 'Cash' and rows with ID = 1". The reader trusts only the **name** "Cash".
+- Whether the typed `Opbal`/`Optype` can differ from the ledger's "Opening Balance" row in a real database. The reader moves the ledger's total (the typed opening balance is already inside it, A1.1 rule 7) and notes a person whose typed balance is not in the ledger.
+- Which of a product's prices is right when `Temp_Stock.SPrice`/`WPrice` differ from `Product.SellingPrice`/`ReorderPoint`. The reader uses the stock row's (the till reads `Temp_Stock`, A2.0 item 4) and counts the items where they differ.
+- The column types of `CustomerLedgerBook` and `SupplierLedgerBook` (`PartyID`, `Debit`, `Credit`, `Label`): not in `PosSchemaData.cs`; the reader accepts any number or text type.
+- A product with several barcodes: the Hub keeps one barcode and no lots, so each barcode became its own item (an owner decision to confirm).
+- "Not enforced" credit (A1.3): the Hub has no "no limit"; a very high limit and a note were used (an owner decision to confirm).
+
 ## E. Porting notes (all topics)
 
 **Order of work, smallest safe step first (a proposal; the owner decides):**

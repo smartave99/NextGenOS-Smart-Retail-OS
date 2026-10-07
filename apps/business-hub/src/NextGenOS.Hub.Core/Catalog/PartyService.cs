@@ -16,17 +16,23 @@ public sealed class PartyService(HubDb db, ShopContextProvider shop, IClock cloc
 
     public Party Create(PartyInput input)
     {
+        var id = db.InTransaction((c, t) => Create(c, t, input));
+        return Get(id)!;
+    }
+
+    /// <summary>Adds a person inside the caller's transaction (so that a bigger action, such as moving a shop across from an older system, is all or nothing). Returns the new id.</summary>
+    public long Create(SqliteConnection connection, SqliteTransaction transaction, PartyInput input)
+    {
         Validate(input);
         try
         {
-            var id = db.InTransaction((c, t) => HubDb.Insert(c,
+            return HubDb.Insert(connection,
                 "INSERT INTO parties(kind, code, name, phone, email, address, tax_id, region, member_type, price_level, credit_limit_minor, terms_days, card_barcode, notes, created_at) " +
-                "VALUES ($kind, $code, $name, $phone, $email, $address, $tax, $region, $mt, $pl, $cl, $td, $card, $notes, $at)", t,
+                "VALUES ($kind, $code, $name, $phone, $email, $address, $tax, $region, $mt, $pl, $cl, $td, $card, $notes, $at)", transaction,
                 ("$kind", input.Kind), ("$code", Blank(input.Code)), ("$name", input.Name.Trim()), ("$phone", Blank(input.Phone)), ("$email", Blank(input.Email)),
                 ("$address", Blank(input.Address)), ("$tax", Blank(input.TaxId)), ("$region", Blank(input.Region)), ("$mt", Blank(input.MemberType)),
                 ("$pl", input.PriceLevel), ("$cl", input.CreditLimitMinor), ("$td", input.TermsDays), ("$card", Blank(input.CardBarcode)), ("$notes", Blank(input.Notes)),
-                ("$at", Iso.Text(clock.UtcNow))));
-            return Get(id)!;
+                ("$at", Iso.Text(clock.UtcNow)));
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
         {

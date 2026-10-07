@@ -444,7 +444,7 @@ public class AiMigrationTests
         }
 
         // The tables a shop sells with are exactly the ones the first step made.
-        var shop = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships" }).ToArray();
+        var shop = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships", "import_runs", "import_id_map", "party_opening_balances" }).ToArray();
         Assert.Contains("documents", shop);
         Assert.Contains("audit_log", shop);
         Assert.DoesNotContain(shop, t => t.StartsWith("ai_", StringComparison.Ordinal));
@@ -455,7 +455,7 @@ public class AiMigrationTests
     {
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
-        var shopTablesBefore = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships" }).ToArray();
+        var shopTablesBefore = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships", "import_runs", "import_id_map", "party_opening_balances" }).ToArray();
 
         f.App.Db.Rollback(1);
 

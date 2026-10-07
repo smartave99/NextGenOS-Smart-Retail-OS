@@ -346,3 +346,5 @@ html[data-look="counter"] main#content { max-width: none; }
 .look-card { display: flex; flex-direction: column; gap: 4px; text-align: left; min-height: var(--ngos-tap); padding: 12px 14px; border: 1px solid var(--ngos-line-strong); border-radius: var(--ngos-radius, 10px); background: var(--ngos-surface); color: var(--ngos-text); font: inherit; cursor: pointer; }
 .look-card span { color: var(--ngos-text-2); font-size: .88rem; }
 .look-card[aria-pressed="true"] { border-color: var(--ngos-accent); box-shadow: 0 0 0 2px var(--ngos-accent); }
+.findings { padding-left: 1.1rem; margin: 6px 0 14px; }
+.findings li { margin: 6px 0; }

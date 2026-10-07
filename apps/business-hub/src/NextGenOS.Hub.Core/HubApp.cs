@@ -4,6 +4,7 @@ using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
+using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Ontology;
 using NextGenOS.Hub.Printing;
@@ -49,6 +50,8 @@ public sealed class HubApp
         Events = new EventStore(db, clock, Audit, Ai.Flags, Retention);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags);
+        // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
+        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties);
     }
 
     public HubDb Db { get; }
@@ -73,6 +76,7 @@ public sealed class HubApp
     public RetentionService Retention { get; }
     public EventStore Events { get; }
     public OntologyService Ontology { get; }
+    public ImportService Importer { get; }
 
     /// <summary>
     /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day

@@ -121,6 +121,18 @@ public sealed class HubDb
     public static int LatestVersion { get; } = typeof(HubDb).Assembly.GetManifestResourceNames()
         .Where(n => n.StartsWith(MigrationPrefix, StringComparison.Ordinal) && n.EndsWith(".sql", StringComparison.Ordinal))
         .Select(n => VersionOf(n, MigrationPrefix)).DefaultIfEmpty(0).Max();
+    /// <summary>
+    /// A consistent copy of the whole file made on request, for a change that is bigger than one save (moving a shop across from an older system). It is the same copy the update
+    /// makes (<c>shop.db.before-import-....bak</c>, VACUUM INTO, safe while the file is in use). Unlike the update, it stops the caller: if the copy cannot be written this throws,
+    /// and the caller must not go on to change anything. Returns where the copy is.
+    /// </summary>
+    public string BackupNow(string label)
+    {
+        using var connection = Open();
+        var problem = Backup(connection, label);
+        if (problem is not null || LastBackup is null) throw new HubException("backup", "A copy of the shop's data could not be made first, so nothing was changed. " + problem);
+        return LastBackup;
+    }
 
     private const string MigrationPrefix = "NextGenOS.Hub.migrations.";
     private const string RollbackPrefix = "NextGenOS.Hub.rollbacks.";

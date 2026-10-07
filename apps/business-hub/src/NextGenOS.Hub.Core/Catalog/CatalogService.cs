@@ -20,22 +20,40 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Item Create(ItemInput input)
     {
+        var id = db.InTransaction((c, t) => Create(c, t, input));
+        return Get(id)!;
+    }
+
+    /// <summary>Adds an item inside the caller's transaction (so that a bigger action, such as moving a shop across from an older system, is all or nothing). Returns the new id.</summary>
+    public long Create(SqliteConnection connection, SqliteTransaction transaction, ItemInput input)
+    {
         var (taxCode, track) = Validate(input);
         try
         {
-            var id = db.InTransaction((c, t) => HubDb.Insert(c,
+            return HubDb.Insert(connection,
                 "INSERT INTO items(kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, created_at) " +
-                "VALUES ($kind, $sku, $barcode, $name, $category, $unit, $price, $trade, $cost, $tax, $track, $reorder, $station, $dur, $attrs, $at)", t,
+                "VALUES ($kind, $sku, $barcode, $name, $category, $unit, $price, $trade, $cost, $tax, $track, $reorder, $station, $dur, $attrs, $at)", transaction,
                 ("$kind", input.Kind), ("$sku", Blank(input.Sku)), ("$barcode", Blank(input.Barcode)), ("$name", input.Name.Trim()), ("$category", Blank(input.Category)),
                 ("$unit", string.IsNullOrWhiteSpace(input.Unit) ? "pc" : input.Unit.Trim()), ("$price", input.PriceMinor), ("$trade", input.TradePriceMinor), ("$cost", input.CostMinor),
                 ("$tax", taxCode), ("$track", track ? 1 : 0), ("$reorder", input.ReorderMilli), ("$station", Blank(input.Station)), ("$dur", input.DurationMin),
-                ("$attrs", JsonSerializer.Serialize(input.Attrs)), ("$at", Iso.Text(clock.UtcNow))));
-            return Get(id)!;
+                ("$attrs", JsonSerializer.Serialize(input.Attrs)), ("$at", Iso.Text(clock.UtcNow)));
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
         {
             throw new HubException("duplicate-barcode", "That barcode is already on another item.");
         }
+    }
+
+    /// <summary>
+    /// Whether an item of this kind keeps stock in this shop, by the same rule <see cref="Create(SqliteConnection, SqliteTransaction, ItemInput)"/> applies: the trade's setting decides
+    /// ("never", "always", or "optional": the item's own choice, else the kind's default). Null when the kind is not one this business keeps.
+    /// </summary>
+    public bool? WouldTrackStock(string kindId, bool? requested)
+    {
+        var context = shop.Current;
+        var kind = context.Industry.ItemKinds.FirstOrDefault(k => k.Id == kindId);
+        if (kind is null) return null;
+        return context.Features.StockTracking switch { "never" => false, "always" => kind.TracksStock, _ => requested ?? kind.TracksStock };
     }
 
     public Item Update(long id, ItemInput input)

@@ -4,7 +4,7 @@ Smart Retail POS is proprietary software of NextGenOS, used under the licence ag
 
 ## Libraries in the app and the dashboard
 
-These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and the sales dashboard (`Dashboard\`). The list is the packages the two projects restore for Windows; a package used by both appears once.
+These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and the sales dashboard (`Dashboard\`). The SQL Server client (`Microsoft.Data.SqlClient` 7.1.0 and the three packages that come with it, listed below) is also built into the Business Hub, which uses it only to read the older POS's database when a shop is moved across (*Settings, Move from the older POS*). The list is the packages the two projects restore for Windows; a package used by both appears once.
 
 | Package | Version | Licence | Copyright |
 |---|---|---|---|

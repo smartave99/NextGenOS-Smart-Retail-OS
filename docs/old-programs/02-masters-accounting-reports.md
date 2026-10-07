@@ -947,7 +947,188 @@ It is a statement of what came in and went out by type, **without** an opening c
 
 ## C. Reports
 
-TO FILL.
+Status of this topic: written (first pass, the reports named in the owner's list, with the rule behind every number). The printed layouts are Crystal Reports files (`rpt*.rpt`, binary, **not read**); what is known here comes from the screen code and its SQL, so grouping, running totals and page totals that the report file adds are listed under "Not understood".
+
+### C0. How every old report works
+
+1. A screen asks for a date window (and sometimes a customer, supplier, product, operator, till or tax type). It runs one SQL text and fills a table. A button then sends the table to a Crystal file with parameters `p1`, `p2` (the dates) and so on, and shows it in `frmReport` (a viewer with print and export).
+2. Windows are `date between from and to` with **date-only** values (dates are saved without a time of day), or `date >= from and date < to + 1 day`. Both give the same result when dates have no time. Keep: a window includes both end days.
+3. Amounts shown are the stored columns; there is no re-calculation except where a rule is written below.
+4. Most screens also have "Export" to Excel (`ClosedXML`) of the grid.
+5. The Hub's way: `ReportService` returns typed rows and `Csv.Build` exports (`Reports/ReportService.cs:168`).
+
+### C1. The list of reports and where each is described
+
+| Report | Screen | Described in |
+|---|---|---|
+| Sales (summary 1, 2, 3, details by date, customer, till, operator; net sale; D-sale; multi-payment) | `frmSalesReport` | C2 |
+| Purchase (summary and details, by supplier, category, product) | `frmPurchaseReport` | C3 |
+| Profit by bill | `frmBIllwise_ProfitReport` | B6 (rule), C4 |
+| Profit by product | `frmProductwiseProfit` | C4 |
+| Profit and loss | `frmProfitloss` | B6 |
+| Best and low selling items | `frmBestAndLowSellingItemsReport` | C5 |
+| Stock in and stock out lists | `frmStockInAndOutReport` | C6 |
+| Current stock (stock in hand, expiry) | `frmCurrentStock` | C6 |
+| Stock movement | `frmStockMovementReport` | C7 |
+| Customer outstanding, debtors, supplier outstanding | `frmCustomerOutstanding`, `frmDebtorsReport`, `frmSupplierOutstanding` | A1.5, A3.5 |
+| Customer ledger, supplier ledger, credit terms statement | `frmCustomerLedger`, `frmSupplierLedger`, `frmCreditTermsStatements` | A1.2, A3.2 |
+| Supplier-wise purchase | `frmSupplierwise_report` | C3 |
+| Tax report | `frmTaxReport` | C8 |
+| Salesman commission | `frmSalesmanCommmissionReport` | C9 |
+| Product sales history | `frmSales_ProductHistory` | C2 |
+| Serial-wise report | `frmSerialwiseReport` | A2.9 |
+| General ledger, day book, cash book, bank book, trial balance, balance sheet | | B4, B5, B7 |
+| GSTR-1, GSTR-3B, HSN summary, GST registers, e-way bill, TCS | `frmGSTR1`, `frmGSTR3B`, `frmGSTR1_HSNC`, `frmGSTDetails*`, `GSTSaleRegister`... | India module study (not this file) |
+
+### C2. Sales report (`frmSalesReport`, `B/frmSalesReport.vb`)
+
+**Filters.** Date window (invoice date); sale type All, Retail or Wholesale (column `InvoiceInfo.CType`, `:832-837`); tax type GST or NON GST; operator; terminal (till) id; customer name. A note on the screen: "If you retrieve Details Report, may be delayed."
+
+**Buttons.** "Summary Report-1, -2, -3", three pairs of "Summary Report / Details Report" (by date, by customer, by terminal, by operator, by tax type), "Net Sale", "D-Sale", "Sale Report (Multi_Payment)". Each pair runs a different Crystal file (`rptSales`, `rptSales1`, `rptSalesD`, `rptOverallSales`, `rptSaleDayBook`, `rptProfitAndLoss` for the margin version).
+
+**Rules and columns seen in the code:**
+1. **Summary** rows come from `InvoiceInfo` (one row per bill, joined to `Customer`): bill number, date, tax type, customer, sales-man, sub-total, CGST, SGST, IGST, CESS, freight, other charges, total, round-off, grand total, total paid, balance, bill discount, offer, loyalty, coupon, gift (the `InvoiceInfo` columns).
+2. **Totals line** (`:947-952`): `sum(GrandTotal)`, `sum(TotalPaid)`, `sum(Balance)` of the bills in the window (and sale type).
+3. **Margin total** (`:975-980`): `sum(Invoice_Product.Margin)` over the same bills (the line margin rule, B6).
+4. **Details** add the lines (`Invoice_Product`) of every bill; they join three tables and are slow, hence the note.
+5. **Year totals** for the chart: `sum(GrandTotal)` grouped by `YEAR(InvoiceDate)` (`:1037`).
+6. **Net Sale** (`GelButton15`, `:1839-1910`, `rptSaleDayBook`): the bills of the window plus the sum of payments by mode: `sum(Invoice_Payment.TotalPaid)` grouped by `PaymentMode` for the window (`:1876`). It does **not** subtract sales returns in the code read (the name suggests it should): **not understood**.
+7. **D-Sale** (`GelButton14`): the same list from a **different table**, `InvoiceInfoD` (`:1805`). It looks like an archive or a "deleted bills" table; **not understood**.
+8. **Bills are not cancelled by a flag:** a deleted bill is removed (with its ledger rows), so these reports have no "cancelled" column.
+
+**Test vectors C2:**
+
+| # | Inputs | Result |
+|---|---|---|
+| R1 | Bills in window: GT 1,180 paid 1,180; GT 590 paid 500 | totals GrandTotal 1,770.00; TotalPaid 1,680.00; Balance 90.00 |
+| R2 | Same, sale type Retail where the second bill is Wholesale | GrandTotal 1,180.00 |
+| R3 | Bills with lines margins 70.00 + 30.00 and 20.00 | margin total 120.00 |
+| R4 | Window with no bill | "Sorry...No record found" |
+| R5 | Payments in the window: By Cash 1,000, PhonePe 500, Credit Terms - 7 days 300 | Net Sale payment table: By Cash 1,000.00; Credit Terms - 7 days 300.00; PhonePe 500.00 (ordered by mode name) |
+
+**Multi-payment sale report** (`frmSaleReport_Multi_Payment`, `B/frmSaleReport_Multi_Payment.vb:244-415`). Filter: date window **and cashier (operator)**. One row per bill: invoice number, date, customer name, grand total, then one column per payment mode: `ByCash` (mode 'By Cash'), `ByCheque`, `ByCreditCard`, `ByDebitCard`, `PhonePe`, `GooglePay`, `Paytm`, `EWallet` ('E-Wallet'), `ByReturn` (mode 'ByReturn': a sales return used as payment), `CreditTerms` (every mode `like 'Credit Terms%'`, summed), then `TotalPaid` = the sum of all those columns (so it **includes the credit amount**), and the operator.
+
+| # | Inputs | Result |
+|---|---|---|
+| R6 | One bill GT 1,000: By Cash 300, PhonePe 200, Credit Terms - 7 days 500 | ByCash 300; PhonePe 200; CreditTerms 500; TotalPaid 1,000 |
+| R7 | Bill paid with By Cash 600 + ByReturn 400 | ByCash 600; ByReturn 400; TotalPaid 1,000 |
+| R8 | Operator "anu", bills of another operator in the window | only "anu" bills appear |
+
+**Product sales history** (`frmSales_ProductHistory`, `:270`): last N lines (top N) for a product or all: bill number, date, tax type, customer, state, GSTIN, product, HSN, unit price `(TaxableAmt + Discount) / Qty` (price before discount, ex tax), quantity, unit, discount % and amount, each tax percent and amount, line total; footer = sum of line totals (`:483-500`).
+
+**Hub today:** `DailySales` (documents, net, tax, total, refunds, tips per local day, credit notes subtracted), `Summary` (totals and average per document), `Payments` (totals by method, refunds taken off), `TopCustomers` (credit notes subtracted). **Differences:** the Hub nets credit notes and splits net and tax; it has no sale type (retail or wholesale; the Hub has `price_level` on the customer), no operator filter, no till, no per-bill payment-mode columns, no margin. **Port:** add operator and till filters, a per-bill "payments by method" table (R6, R7) and the margin figures from line cost (B6).
+
+### C3. Purchase report (`frmPurchaseReport`, `B/frmPurchaseReport.vb`)
+
+**Filters.** Date window (`Stock.Date`), supplier, category, product. **Summary** rows are `Stock` columns: system number, purchase type (Cash, Bank or Credit), reference numbers 1 and 2 (`ReferenceNo2` is the reverse-charge flag 'Yes' or 'No'), date, supplier, supplier invoice number and date, tax type, SGST, CGST, IGST, CESS, sub-total, previous due, freight, other charges, total, round-off, grand total, total payment, payment due, remarks (`:666`). **Detail** rows are purchase lines: invoice no, date, product, quantity, MRP, **`Price = (TaxableAmt + DiscountAmt) / Qty`** (unit price before discount, ex tax), CGST, SGST, IGST and CESS amounts, discount amount, total amount, category (`:609`). Year totals: `sum(GrandTotal)` of `Stock` by year (`:670`). `Stock.GrandTotal` **includes the previous due** (A3.0); a report that adds grand totals counts earlier dues again. **Quirk (fix):** the Hub report must subtract `PreviousDue` (as the P&L does, B6).
+
+| # | Inputs | Result |
+|---|---|---|
+| U1 | Purchase line taxable 1,180, discount 20, qty 10 | Price 120.00 per unit |
+| U2 | Two purchases: GT 5,900 (previous due 0) and GT 6,900 (previous due 1,000) | sum of `GrandTotal` 12,800.00 but real new purchases 11,800.00 |
+| U3 | Category filter "Dairy" | lines of products in that category |
+
+**Supplier-wise report** (`frmSupplierwise_report`): the same detail rows plus supplier name, state and GSTIN and supplier invoice number and date, filtered by supplier; `Calculate` totals the line amounts (`:696`).
+
+**Hub today:** `ReportService.Purchases(from, to)` gives two numbers (received total and unpaid total). **Port:** a purchase register (header and lines) with the columns above, with the previous-due fix.
+
+### C4. Profit by bill and by product
+
+**By bill** (`frmBIllwise_ProfitReport`, `:146-175`): one row per bill in the window, joined to its lines: date, bill number, customer, product discount total (`sum(Invoice_Product.Discount)`), grand total, total paid, balance, cost price (`sum(PurchaseRate * Qty)`), total tax (`sum` of the four tax amounts of the lines), bill discount, profit (`sum(Margin)`), actual profit (`sum(Margin) - BillDiscount`), and "actual" (`GrandTotal - tax - cost`). The grid has a status PROFIT or LOSS from the sign of the profit and totals of profit and loss amounts. Rules: B6 (line margin; cost = last purchase price snapshot).
+
+**By product** (`frmProductwiseProfit`, `BindData` `:255-330`): the same style of grid for lines, filled by another form's table; adds the column "Status" = "LOSS" when the profit column is below 0, else "PROFIT", and sums two columns (index 16 and 18). The source table's SQL was not found in this form: **not understood** which screen feeds it (probably the sales report details). The per-line profit is `Invoice_Product.Margin`.
+
+| # | Inputs | Result |
+|---|---|---|
+| F1 | Two lines margin 70.00 and 30.00, bill discount 15 | Profit 100.00; Actual_Profit 85.00; PROFIT |
+| F2 | One line margin -5.00, no bill discount | Profit -5.00; Actual_Profit -5.00; LOSS |
+| F3 | Bill with grand total 342.20, tax 52.20 (34.20 + 18.00), cost 190 | actual = 342.20 - 52.20 - 190.00 = 100.00 |
+
+**Hub today:** none (no cost on the line). **Port:** B6.
+
+### C5. Best and low selling items (`frmBestAndLowSellingItemsReport`, `:383-424`)
+
+One query, two sort orders: `SUM(Invoice_Product.Qty)` per product (code, name, category, sub-category) for bills in the window, **only products with total above 0**, ordered by quantity **descending** (best selling, `rptBestSellingItems`) or **ascending** (low selling, `rptLowSellingItems`). No "top N" limit in the code; the report file may limit. Quantity is in main units including free promotion quantity and is **not** reduced by sales returns.
+
+| # | Inputs | Result |
+|---|---|---|
+| E1 | Window sales: A 10 and 5, B 3, C none | Best: A 15, B 3. Low: B 3, A 15. C absent |
+| E2 | A sold 10, returned 4 | still 10 |
+| E3 | Two products with 7 each | order between them not defined |
+
+**Hub today:** `TopItems` orders by **revenue** (line total from the tax result), nets credit notes, limit 20. Differences: ranking key and returns; the Hub has no "low selling". **Port:** add a quantity option and a low-selling list; keep credit-note netting (better than the old).
+
+### C6. Stock reports
+
+- **Stock in / stock out lists** (`frmStockInAndOutReport`, `:385-478`): "Stock in" lists every barcode row with `Qty > 0` of an **active** product (`Product.Status = 'Yes'`): supplier name (shown under the heading "ProductCode"), HSN, name, barcode, quantity, **value at cost** `Product.CostPrice * Qty`, **value at sale** `Temp_Stock.SPrice * Qty`. "Stock out" lists the barcode rows of active products with `Qty <= 0` (zero and negative). Optional supplier filter by `Temp_Stock.SuplName`. Note: the cost value uses `Product.CostPrice` (the typed cost on the product), not the effective purchase price used for profit (`EPPrice`).
+- **Current stock** (`frmCurrentStock`, `:578-1198`): one row per barcode of active products (`Qty > 0` or all): product id, code, name, HSN, part no, barcode, purchase price (`PPrice`), sale price (`SPrice`), discount, CGST, SGST, CESS, quantity, unit, wholesale price (`WPrice`), MRP, category, sub-category, last price, `Qty - Damage` (usable quantity), `Damage`, description, minimum stock, sale and purchase tax type, godown, rack, batch, manufacturing and expiry dates, size, colour, default quantity, IMEI 1 and 2, effective purchase price (`EPPrice`). Filters by name, category, expiry window ("Expiry Date Detected"), manufacturing window. Totals: sum of quantity (to 3 decimals) and number of rows (`Calculate`, `:875-899`). There is no money total on this screen.
+- **Low stock:** `rptLowStock` (a report file; the rule is in the AI companion notes: `Product.MinStock > 0` and `sum(Temp_Stock.Qty) < MinStock`). The screen code for it was not read.
+
+| # | Inputs | Result |
+|---|---|---|
+| T1 | Barcode rows: B1 qty 5, `CostPrice` 20, `SPrice` 30; B2 qty 0; B3 qty -2; B4 qty 3 of an inactive product | Stock in: B1 (cost value 100.00, sale value 150.00). Stock out: B2, B3. B4 in neither |
+| T2 | Row qty 10, damage 2 | usable 8; quantity total counts 10 |
+| T3 | Two rows qty 4.500 and 2.250 | total 6.750 |
+
+**Hub today:** `StockValues()` = items with stock above 0 with `on hand * cost` rounded half up (`(2 * on * cost + 1000) / 2000`); `StockList(lowOnly)` with reorder level. No damage, no supplier, no expiry. **Port:** keep the Hub's rounding; add damage and expiry only with batches (A2.9).
+
+### C7. Stock movement (`frmStockMovementReport`, `:417-483`)
+
+Per day and product from `StockMovement(ProductID, OpeningStock, StockIn, StockOut, Date, TransID)`: `Date, PID, ProductName, Max(OpeningStock), Sum(StockIn), Sum(StockOut), ClosingStock = Max(OpeningStock) + Sum(StockIn) - Sum(StockOut)` for rows in the window (`Date >= from and Date < to + 1`), for one product (by name) or all.
+
+**How rows get their `OpeningStock`:** every program event that moves stock saves a row by `ProductSMSave` with `OpeningStock` = `sum(StockIn - StockOut)` of that product's rows dated **before** the event's date (`B/frmProduct.vb:7631`, purchase `B/frmPurchaseEntry.vb:11692`). So all movements of one day share the same opening figure. **Quirk:** entering a movement dated earlier than existing rows does not update the later rows' opening figures; `Max(...)` per day then shows a stale opening. A sale or purchase saved later with a past date makes the report disagree with `Temp_Stock.Qty`. Fix in the Hub: compute the opening as a running sum at report time from `stock_moves`.
+
+| # | Inputs | Result |
+|---|---|---|
+| G1 | 10 Oct rows: (Open 10, In 5, Out 0), (Open 10, In 0, Out 3) | one row: Open 10, In 5, Out 3, Closing 12 |
+| G2 | Product with first movement the opening stock 20 on 1 Apr, then sale 4 on 2 Apr | 1 Apr: Open 0, In 20, Out 0, Closing 20; 2 Apr: Open 20, In 0, Out 4, Closing 16 |
+| G3 | A purchase of 10 entered later but dated 1 Apr, existing 2 Apr row (Open 20) | the 2 Apr row still shows Open 20 (stale; should be 30) |
+
+**Hub today:** `stock_moves(item_id, qty_milli, ...)` with `OnHandMilli` = sum; `CatalogService.Adjust`. No movement report. **Port:** a movement report from `stock_moves` with running balance (G1, G2 as tests; G3 fixed).
+
+### C8. Tax report (`frmTaxReport`, `:405-470`)
+
+Bills with tax: `InvoiceInfo` joined to `Customer` where `(CGST + SGST + IGST + CESS) > 0` in the window: invoice number, date, customer code, customer name, CGST, SGST, IGST, CESS, ordered by date. A second list for repair-service bills: `InvoiceInfo1` joined to `Service` and `Customer` where `ServiceTax > 0`: invoice, date, customer code, name, service tax, ordered by name. Totals are added by the report file. Sales tax per rate (GSTR-1, HSN summary, 3B) are in the India module study.
+
+| # | Inputs | Result |
+|---|---|---|
+| H1 | Bill with CGST 9, SGST 9 | listed |
+| H2 | Bill with zero tax (exempt or "No Taxes") | not listed |
+| H3 | Bill with IGST 18 | listed, CGST and SGST 0 |
+
+**Hub today:** `TaxSummary(from, to)` by tax code and percent with taxable value, components and cess. It is by rate, not by bill. **Port:** add the bill-wise tax list as an option.
+
+### C9. Salesman commission (`frmSalesmanCommmissionReport`, `:195-211`)
+
+`Salesman_Commission(InvoiceID, CommissionPer, Commission)` has one row per bill that had a salesman. At the till (`B/frmPOSNew.vb:10765-10782`): `base = sum over lines of (Qty * SalesRate - LineDiscountAmount)` (net of line discount, before tax; **bill discount ignored**) and `Commission = base * CommissionPer / 100`, where `CommissionPer` comes from the salesman's master (`SalesMan.CommissionPer`). The report groups by salesman for bills in the window: salesman id, name, city, contact, `sum(Commission)`. Payments to salesmen and their ledger (`frmSalesManPayment`, `LedgerBooksalesman1`) belong to the staff study.
+
+| # | Inputs | Result |
+|---|---|---|
+| W1 | Lines: qty 2, rate 100, discount 10; qty 1, rate 50, discount 0; commission 5 % | base 240.00; commission 12.00 |
+| W2 | Same, bill discount 20 | commission still 12.00 |
+| W3 | Two bills of the same salesman, 12.00 and 8.00, one in the window | report 12.00 (the bill outside is left out) |
+| W4 | Bill with no salesman | no commission row |
+
+**Hub today:** none. **Port:** staff module.
+
+### C10. Debtors, outstanding and ledgers (summary)
+
+Rules are in A1.5 and A3.5 (grouping by `CustNameid` / `SuplNameid`, sign rules, window). One extra rule from `frmDebtorsReport` (`:434-524`): it prints `Sum(Credit)` under the heading "City" and `Sum(Debit)` under "ContactNo" (column names reused for the print), then `Balance`. **Keep out of the Hub** (a naming accident).
+
+### C11. Porting notes for reports
+
+1. Port the **numbers**, not the Crystal layouts. Each report becomes a typed query with a CSV export and a print view built in the Hub's print layer.
+2. Golden tests: R1 to R8, U1 to U3, F1 to F3, E1 to E3, T1 to T3, G1 to G3, H1 to H3, W1 to W4, plus the book tests in B (P1 to P9, M1 to M5, S1 to S7) and the customer tests in A1.5.
+3. Where the old report has a quirk (stale opening in the stock movement; purchase grand total includes previous due; best sellers ignore returns), the Hub uses the corrected rule, with the old figure kept in the test as a "differs from old on purpose" note.
+4. Cost for profit: store the cost on the document line at issue (Hub change), because the old program's profit depends on it.
+
+### C12. Not understood (reports)
+
+- All `rpt*.rpt` layouts and what totals, groups and running balances they add.
+- What `frmSalesReport` "D-Sale" (`InvoiceInfoD`) lists, and whether "Net Sale" subtracts sales returns.
+- Which screen feeds `frmProductwiseProfit`, and which two columns it totals.
+- The low stock report screen and the exact filters of the expiry report.
+- The remaining three summary-report variants of `frmSalesReport` (which columns differ between "Summary Report-1, -2, -3").
 
 ## D. Not understood (all topics)
 

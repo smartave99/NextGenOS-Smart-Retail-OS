@@ -33,8 +33,8 @@ The old POS's screens (`apps/pos-desktop/Documentation/UI_SCREEN_INVENTORY.csv`)
 
 | Group (old POS screens) | Hub today | To bring across |
 |---|---|---|
-| Selling at the till: bills, touch till, hold, returns, refunds, multi-payment (27) | Have: sell, bill, hold, split payments, credit notes, void | India touch-till variants, cash refund details |
-| Estimates and quotations (6) | Have: quotes | Retrieve and convert flows, if different |
+| Selling at the till: bills, touch till, hold, returns, refunds, multi-payment (27) | Have: sell, bill, hold, split payments, credit notes, void. **Missing (found by reading the Hub's code, `docs/old-programs/06-hub-map.md`):** no screen offers even a line discount; no bill-level discount; no fixed-amount discount; cess and HSN are never passed to the tax engine; a credit note does not reduce what a customer owes | Line and bill discounts, cess and HSN, India touch-till variants, cash refund details, customer ledger effects of returns |
+| Estimates and quotations (6) | **Partly:** quotes exist only for construction projects (`ProjectService.CreateQuote`), not for shop sales | Estimates and quotations for shop sales, retrieve and convert to an invoice |
 | Buying: purchase entry, orders, returns, stock inward (23) | Partly: purchases, receive, pay | Purchase returns, GST purchase registers, inward notices |
 | Stock: entry, adjust, transfer, godown, damage, settlement, movement (20) | Partly: items and stock adjustment | Transfers between godowns and branches, damage, settlement, movement report |
 | Products: categories, units, bulk change, variants, serial numbers, combo packs, labels, import and export (61) | Partly: items, variants, serial numbers, barcodes | Bulk price and product change, combo packs, barcode label printing, Excel import and export, product images |
@@ -52,6 +52,14 @@ The old POS's screens (`apps/pos-desktop/Documentation/UI_SCREEN_INVENTORY.csv`)
 | Settings, users, printing, backup, language, system (34) | Partly: users and roles, printing, theme | Backup (decision 11), shortcut keys, language conversion |
 | Extras: online shop link, gallery, camera, image reader, calculator, UPI QR (15) | The website and the dashboard are separate programs that already exist | UPI QR only as a payment provider later (decision 13); the rest as asked |
 | Left over, not grouped (31) | n/a | Look one by one (many are tests and dialogs) |
+
+## What reading the Hub's code added (7 October 2026)
+
+- **There is no customer ledger, no customer receipt and no loyalty in the Hub**, and a credit note does not reduce what a customer owes. These are the first things to build for an Indian retail shop.
+- **Money lives in one class (`DocumentService`) with no hook in it.** Anything that must happen together with a sale (loyalty points, a ledger line) needs a callback inside the sale's single database transaction (suggested name `OnIssued`).
+- **With several counters on one main PC, a sale could fail with a database "busy" error** (`HubDb.InTransaction` starts a read-then-write transaction). Two simultaneous checkouts must be tested before the store network is built.
+- **Every India word in program code fails the white-label check** (the Hub's baseline is zero), so the India module's words and rules live in data (packs, profile) or on a line marked as allowed with a reason.
+- **The two looks (decision 30):** density, menu place, bill place and font size already exist as settings on the page and are styled by `hub.css`; a touch-counter combination is already tested. The look is stored once per shop, not per screen, and the sell screen shows tiles only, with no list view. Three ways in: (A) named presets made of the existing settings, no licence-format change; (B) a per-browser choice; (C) a new token, which needs the licence-format change. A is the smallest and is the one to build first.
 
 ## Order of work (a proposal; the owner can change it)
 

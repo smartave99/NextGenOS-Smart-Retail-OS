@@ -1,12 +1,23 @@
 # Map of the Business Hub (the host program)
 
-Status: in progress (written section by section; a section marked "TO FILL" is not written yet).
+Status: all nine sections written on 7 October 2026 (0 to 8). It is a reading of the source, not a test run: nothing was built or run. Where a line says "Not understood" the code was read and the answer was not clear. Keep it true: when you change the Hub, change the matching section in the same commit.
 
 Written 7 October 2026 by reading the source of `apps/business-hub` and `libs/dotnet/NextGenOS.Tax` (read-only study; nothing was built or run). Where a thing was not understood it says "Not understood". File and line numbers are of the files as they were on that day.
 
 ## 0. What to know first
 
-TO FILL (written last, after every section).
+Ten things to know before you add anything (each is worked out in the section named):
+
+1. **Shape (1, 2).** The Hub is `Hub.Core` (all rules and SQLite, no screens) plus `Hub.Web` (Blazor Server screens that call services in the same process; no REST API for screens) plus two shared libraries: `NextGenOS.Tax` (the one tax and money engine, must still compile for .NET Framework 4.8 and C# 10) and `NextGenOS.Devices` (printers, barcodes). `HubApp` builds every service by hand in one constructor: a new service is a property and a line there.
+2. **All money is in one class (4).** `DocumentService` does price, tax (through `TaxEngine`), round-off, payment, numbering and stock inside **one SQLite transaction**. Everything is integers: minor units, thousandths of a unit, thousandths of a percent; the only rounding is half-up `R(a,b)=floor((2a+b)/(2b))`, per line. The totals are stored on the document, so reports only add up stored columns. The numbers to compare with the old POS are in 4.7 (62 engine vectors, India examples worked out).
+3. **The Hub cannot yet say several things the old India POS says (4.2, 8.3).** No cess, no fixed-amount discount, no bill discount, no HSN, no MRP, batch or expiry; the engine can already do cess and fixed discounts, but no code passes them. **No screen offers a line discount at all.** A credit note does not reduce what a customer owes, and there is no customer ledger, receipt or loyalty. Quotes exist only for construction projects.
+4. **Database (3).** One SQLite file per shop, migrations run by themselves at start (`Data/Migrations/NNN_name.sql`, embedded), a whole-file copy is made first on an update, and **every new table needs `tenant_id` and `site_id`, a rollback file and a test**. The shop's own tables (step 1) have no tenant columns and are not to be altered: put new facts in side tables or in the `attrs`/`meta` JSON, and ask the owner before the first `ALTER TABLE`.
+5. **Permissions (5.3).** Fifteen permission names, five fixed roles written in code (`Roles.cs`), policies built from a second hand-kept list (`Permissions.All`). **Services do not check permissions; pages do.** Anything new that is not a page must check `Roles.Can` itself.
+6. **Screens and the look (5).** About 20 pages; the menu is built in code in `MainLayout.razor`. The look is ten tokens written onto `<html>` as `data-*` attributes and styled by `hub.css`; **density (`compact/comfortable/touch`), menu place (`left/top/bottom`) and cart place (`right/left/bottom`) already exist and a touch-counter combination is pinned by a browser test**, but the choice is **one per shop** (a row in `shop.db`), not per screen, has no named presets, and the sell page has tiles only (no list view). Where a "look" plugs in: 5.6.
+7. **Name hiding constrains code (1.3).** The shipped program is run through Obfuscar: every method of Core, Tax, Devices and the licence libraries is renamed, fields are renamed, **properties and constructor parameter names are kept**, and the web program keeps all method names. So: **Web must never implement an interface with methods (or override a virtual) defined in another of our assemblies**; hand Core a function instead. Only the full gate (`hub-release`) catches a mistake here; plain `dotnet test` does not.
+8. **Licence and background work (5.2, 6.6).** The licence gate is the first middleware and nothing can skip it. Background work is only `HubApp.Upkeep()` (every 10 minutes, after set-up) or a worker registered with `AddLicensedWorker<T>()`; the gate fails on `AddHostedService<`.
+9. **White label is enforced by a script (6.7).** `scripts/white-label-audit.mjs` counts India, rupee, Hindi, GST words (`GSTIN`, `CGST`, `SGST`, `IGST`, `HSN`), festivals, company names and built-in pictures in code; **the Hub's baseline is zero, so any such word in a `.cs` or `.razor` file fails the gate**. Put them in data (packs, `profile/`) or mark a line `// white-label-ok: reason`. A customer-visible value is a setting with a neutral default and a test that changing it changes the result.
+10. **Testing and limits (7, 8).** Write a ported rule as a `HubFixture` test (clock fixed at 2026-10-05 06:30 UTC, India region `27`) and assert the old POS's numbers; run `dotnet test apps/business-hub/NextGenOS.Hub.slnx`, then the gate. Builds take **several GB** of disk. The Hub listens on `127.0.0.1` only (no counters on the network yet), and several counters at once would meet SQLite's deferred-transaction busy error (8.3, 11): test that before the store network is built.
 
 ## 1. Solution layout and name hiding
 
@@ -77,7 +88,7 @@ Every service is a class with a primary constructor taking `HubDb db`, `ShopCont
 - **Writes that belong together** use `db.InTransaction((c, t) => ...)`; the inner overloads that take `(SqliteConnection c, SqliteTransaction t)` (for example `DocumentService.CreateDraft(c, t, ...)`, `Issue(c, t, ...)`, `Recalculate(c, t, id)`, `AuditService.Log(c, t, ...)`, `Numbering.Next(c, t, ...)`) exist so another service can join the caller's transaction. Use them to make one all-or-nothing action across services (this is how `Checkout`, `CreateProgressBill` and `SplitByLines` work).
 - **SQL** is parameterised text with `$name` parameters passed as `("$name", value)` tuples (`HubDb.Exec/Scalar/Insert/Query`). Columns are read by name with `Reading` extensions (`r.Int("col")`, `r.Text`, `r.TextOrNull`, `r.Flag`, `r.Time`, `Data/Reading.cs`). No ORM.
 - **Who did it**: methods that change something take `long? userId`. Pages pass `Me.Id`.
-- **The audit log** (`AuditService.Log(userId, action, entity, entityId, detail)`; `Recent(limit)`) is written for: issue, void, credit-note, order-cancelled, user-created/on/off/role-changed/password-changed/login-locked, printer-saved/removed, bill-printed, drawer-opened, labels-printed, advance, fine, charge, fine-waived, copy-lost, and every AI switch and service change (`ai.*`). It is **not** written for: an item price change, stock adjustment (`CatalogService.Adjust` writes the `stock_moves` row with reason and user instead, not an audit row), a payment taken later (`AddPayment` writes the payment row only), party edits, settings saves done by `ShopContextProvider.Save` (check each Settings handler: Not understood whether all write an audit row).
+- **The audit log** (`AuditService.Log(userId, action, entity, entityId, detail)`; `Recent(limit)`) is written for: issue, void, credit-note, order-cancelled, user-created/on/off/role-changed/password-changed/login-locked, printer-saved/removed, bill-printed, drawer-opened, labels-printed, advance, fine, charge, fine-waived, copy-lost, and every AI switch and service change (`ai.*`). It is **not** written for: an item price change, stock adjustment (`CatalogService.Adjust` writes the `stock_moves` row with reason and user instead, not an audit row), a payment taken later (`AddPayment` writes the payment row only), party edits, a plain `ShopContextProvider.Save` (it writes no audit row itself; the Settings handlers add one: `Settings.razor:626, 675, 686, 740` write `settings/shop`, and the theme, brand, printer and user stores write their own).
 - **Services do not check permissions.** Pages and endpoints do (`[Authorize(Policy = Perm.X)]`). Anything new that calls a service from outside a page (an endpoint, the assistant, a job) must check `Roles.Can(role, Perm.X)` itself (see 5.3).
 
 ### 2.2 The services (public surface that matters, and what each guarantees)
@@ -446,7 +457,7 @@ Where a module goes:
 **A new Settings tab** (`Web/Components/Pages/Settings.razor`, 873 lines, one component):
 1. Add `yield return ("key", "Label");` to `Tabs()` (`:490`), guarded with `if (Me.Can(Perm.X))` when it is owner-only. The Hub's AI tab is a **link to another page** (`OpenTab` redirects `"ai"` to `settings/ai`, `:529`); sub-pages `settings/ai`, `settings/events`, `settings/map` are separate components with `[Authorize(Policy = Perm.Ai)]`.
 2. Add `else if (tab == "key") { <section class="card"> ... </section> }` to the markup (the chain of `if/else if (tab == ...)` runs from `:24` to about `:456`).
-3. Fields, loading and saving go in the same `@code` block: read in `LoadAsync` (`:503`), save with `App.Shop.Save(s)` for shop settings (it also drops the `ShopContext` cache) or `App.SettingsStore.SetText("namespaced.key", json)` for your own data, wrapped in `Run(...)`, and write an `App.Audit.Log(Me.Id, "setting-changed", "settings", null, "what")` row (not every handler does today).
+3. Fields, loading and saving go in the same `@code` block: read in `LoadAsync` (`:503`), save with `App.Shop.Save(s)` for shop settings (it also drops the `ShopContext` cache) or `App.SettingsStore.SetText("namespaced.key", json)` for your own data, wrapped in `Run(...)`, and write an `App.Audit.Log(Me.Id, "settings", "shop", null, "what changed")` row as the existing handlers do (`Settings.razor:626`); `Shop.Save` does not audit by itself.
 4. A tab sees only what its role may see: check `Me.Can(...)` both in `Tabs()` and in the handler (the page is open to `Perm.Settings`, which is owner only).
 5. Tests: a web test with `HubWebFactory` (`tests/NextGenOS.Hub.Web.Tests`) or an e2e script.
 
@@ -578,7 +589,7 @@ Sources: `docs/OPEN-WORK.md` (7 October 2026), `docs/V2-ARCHITECTURE-ASSESSMENT.
 ### 8.3 Gaps and oddities found in this reading (each with where, so the next job does not rediscover it)
 
 **Money and documents**
-1. **No cess, no fixed-amount discount, no bill-level discount, no HSN, no MRP, no batch, no expiry, no cost layers** in documents or items (4.2). The engine already supports cess and fixed discounts; the Hub never passes them.
+1. **No cess, no fixed-amount discount, no bill-level discount, no HSN, no MRP, no batch, no expiry, no cost layers** in documents or items (4.2). The engine already supports cess and fixed discounts; the Hub never passes them. **No screen offers even the percent discount on a line or a country-pack customer discount** (`DocumentService.UpdateLine` and `LineInput.CustomerDiscount` exist and are tested through the service; searched `Sell.razor`, `Order.razor`, `Bill.razor` and the whole web program: no discount box, no customer-discount code in any page).
 2. **A credit note does not reduce what a customer owes.** A credit note against an unpaid credit sale refunds nothing (`refundable = min(note, paid)`), leaves the invoice's `paid_minor` alone, and `Outstanding` counts invoices and progress bills only. There is also **no customer ledger, no customer receipt document, no balance, no opening balance** (4.4, 3.2).
 3. **A credit note's money is worked out with the shop's current settings**, and the invoice's `registered`, regions are copied onto it afterwards without a recalculation (`DocumentService.cs:441`). The code comment says "a credit note never rounds" but the draft copies the shop's current `RoundTotal` (`:97`). No test pins either (4.4).
 4. **Cost = last purchase price** (`PurchaseService.Receive` overwrites `items.cost_minor`): no average cost, no profit report, no stock valuation by batch. `document_lines` carries no cost, so margin per sale cannot be recomputed later.
@@ -595,7 +606,7 @@ Sources: `docs/OPEN-WORK.md` (7 October 2026), `docs/V2-ARCHITECTURE-ASSESSMENT.
 **Web and data**
 12. `Shop.Settings` (not `Shop.Current`) reads and parses the settings row on every call (the layout calls it each render). Small, not measured.
 13. `ShopContextProvider.Current` is a process-wide cache; anything that edits the `shop` settings row other than `Shop.Save` must call `Invalidate()`.
-14. Settings handlers write an audit row only in some cases (3 places checked; not every handler was read): decide per port.
+14. `ShopContextProvider.Save` writes no audit row; every Settings handler that calls it adds one by hand (`Settings.razor:626, 675, 686, 740`), as do the theme, brand, printer and user stores. A new place that calls `Shop.Save` (set-up writes `setup`) must add its own.
 15. `AppointmentService.Hours()` reads opening hours from the **industry pack** only (`RuleText("openFrom")`), not from `ShopContext.Rule`, so the owner cannot override them in Settings (`ShopSettings.RuleOverrides` is not consulted there).
 16. `LibraryService.MemberTypes()` falls back to a built-in English "Member" label when the pack has none (`Lending/LibraryService.cs:41`); `ShopSettings.ReceiptFooter` defaults to the English "Thank you!" and `PaymentInput.Method` to "cash": small fixed words in code that the white-label audit does not count (it counts markets, not English).
 17. **The look is per shop, not per screen** and has no named presets (5.6); item choice on `/sell` is tiles only.
@@ -607,7 +618,7 @@ Sources: `docs/OPEN-WORK.md` (7 October 2026), `docs/V2-ARCHITECTURE-ASSESSMENT.
 | Old POS group | What the Hub has now | What must be added first | Recipe and place |
 |---|---|---|---|
 | Selling, returns, multi-payment | counter sale, drafts, split payments, change, credit notes, void | fixed-amount and bill discounts, cess, HSN on the bill, hold list, receipt for later payments, credit note offset against dues | 4.2 (engine inputs exist), 6.2, `DocumentService`, `Sell.razor` |
-| Estimates and quotations | quotes (numbered at draft, issued, no stock) | convert quote to invoice (not found in `DocumentService`: Not understood whether a screen does it by copying lines) | 6.2 |
+| Estimates and quotations | the `quote` document type exists (numbered at draft, issued, no stock, listed on `/documents`), **but the only code that makes one is `ProjectService.CreateQuote` (construction)**: no retail quote screen and no convert-to-invoice anywhere (searched `DocTypes.Quote`). `docs/MERGE-PLAN.md`'s "Have: quotes" is true for projects only | a quote screen on `/sell`, retrieve and convert to invoice (copy the lines into an invoice draft; the quote keeps its number) | 6.2, `DocumentService`, `Sell.razor` |
 | Buying | purchase orders, receive, pay, last cost | purchase returns, supplier ledger, GST purchase registers, inward notices | 6.2, 6.3, 6.1 |
 | Stock | items, on-hand by moves, adjust | locations and transfers, damage, settlement, movement report | 6.3 (side table keyed by `stock_moves.id` or a location on new moves), 6.1 |
 | Products | items with attrs, barcode, labels | bulk change, combo packs, variants, units, images, import/export | 6.3, `Items.razor` is the screen to extend; import needs a new service |
@@ -624,8 +635,6 @@ Sources: `docs/OPEN-WORK.md` (7 October 2026), `docs/V2-ARCHITECTURE-ASSESSMENT.
 ### 8.5 Things I could not confirm (so they are listed, not decided)
 
 - Whether Obfuscar renames enum members (1.3, rule 5).
-- Whether every Settings handler writes an audit row (8.3, 14).
-- Whether a screen turns a quote into an invoice and how (8.4).
 - Whether letting a cashier make a credit note is intended (8.3, 8).
 - Whether `HubDb.BackupProblem` is shown anywhere in the web program (searched: not in the pages).
 - The cost of a full gate in minutes: nothing was run.

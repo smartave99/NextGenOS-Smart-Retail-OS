@@ -1,12 +1,23 @@
 # Old Windows POS: selling, buying and stock (what it does, with numbers)
 
-**Status: in progress.** Each section below says DONE (saved, read from the code) or PENDING. A section marked PENDING has not been studied yet; do not trust it. This file is written once so that nobody has to read the old VB code again for these jobs.
+**Status: all sections written on 7 October 2026 (a reading of the code; nothing was built or run).** About 105 worked examples are included; each was worked by hand from the code and none was run against the old program or the Hub. Section 9 lists what was not understood. This file is written once so that nobody has to read the old VB code again for these jobs; add what you learn when you port.
+
+Related: `docs/old-programs/06-hub-map.md` (what the Hub is), `docs/old-programs/02-masters-accounting-reports.md` (masters, accounting, reports), `docs/MERGE-PLAN.md`, `docs/OWNER-REQUESTS.md`.
 
 Source: `apps/pos-desktop/Source/SmartAvenue99_POS_VB/SmartAvenue99 POS/BillPoint/*.vb` (recovered from compiled files; decompiler markers ignored). In this file `frmPOS.vb:11563` means that file, that line. Line numbers are of the recovered text and can be used to jump straight to the code.
 
 ## What to know first (10 lines)
 
-PENDING: written last, when the sections below are done.
+1. **Rounding:** the old POS works in `double` and rounds with `Math.Round(x, 2)`, which is **half to even**; the Hub works in whole minor units and rounds **half up**. They agree on every example except exact half-paisa ties: round-off of a total of 100.50 gives 100.00 in the old POS and 101.00 in the Hub; 5% GST on an exclusive 0.20 gives 0.00 + 0.00 against 0.01 + 0.01 (1.7, 7.1).
+2. **One set of till rules** (same in all four till screens): `gross = R2(qty x rate)`; discount by percent (R2) or by amount (kept as a percent to 4 places); tax on the discounted base; Exclusive adds tax, Inclusive carves it out (`gst = base - base/(1+r)`, CGST = SGST = R2(gst/2)); bill `total = taxable + taxes + freight - bill discount` (the bill discount comes **off after tax and does not reduce tax**), round-off half to even, grand total (1.3, 1.4).
+3. **Hub gaps in the money layer:** no bill discount, no discount by amount, no tax mode per item (one flag per document), no cess on documents (the tax engine already supports cess and amount discounts; `DocumentService` does not pass them), no estimate, no "convert quote to invoice" (7.1, 7.4).
+4. **Names that mislead when importing:** `InvoiceInfo.OtherCharges` = the bill discount; `SubTotal` = taxable plus tax (the Hub's `subtotal_minor` is taxable only); `Product.ReorderPoint` = the wholesale price; service `GrandTotal` is net of the upfront; an estimate adds no tax, so the bill made from it is dearer (8.2, 4.4).
+5. **Balances are ledgers, not invoices:** customer and supplier balance = credits minus debits in `CustomerLedgerBook` / `SupplierLedgerBook` (opening balance, advance, receipts on account); later receipts never change `InvoiceInfo.Balance`. The Hub has no ledger, no advance, no opening balance, and a credit note appears not to reduce what a customer owes (2.8, 7.2, 7.3).
+6. **Payments:** 16 payment modes (8 paid, 8 credit); all rows together must equal the grand total; credit limit applies only when the customer's switch is "Yes"; the Hub refuses credit for a customer with limit 0 (so import "not enforced" as a flag) (2.1, 2.2, 7.2).
+7. **Stock is per lot** (`Temp_Stock`: one row per barcode with MRP, prices, batch, expiry, size, colour, IMEI, cost per unit `EPPrice` = line taxable / qty). A sale only warns about low or negative stock (two switches); a purchase into an existing barcode overwrites that lot's prices and resets its minimum-stock mark. **The Hub has item-level stock only** (no lots, batch, expiry, serial, variant): the biggest gap (6.1, 5.4, 7.6).
+8. **Purchases:** the supplier's previous due is **added into the bill total**; reverse charge drops the tax from the total; payments to suppliers are on account; the Hub has no purchase return, no purchase discount or freight, no supplier ledger (5.3, 5.5, 7.5).
+9. **Returns, damage, transfers:** a sales return is recalculated from the original rate and discount percent, taxable value proportional, stock back into the same lot, Cash or Credit (the Hub's credit note copies the line exactly: same numbers except ties). Damage is only a counter. Branch transfers and godown use an online service and are **not to be ported as they are**. `StockMovement` can miss rows: take stock from `Temp_Stock` (3.2, 6.4, 6.5).
+10. **How to use this file:** write the vectors (L, B, P, R, U, S, E, Q, SV) as Hub tests; vectors marked "differ" need an owner decision first (8.1 step 2); read section 9 before trusting a rule that is not in a table.
 
 ## 0. How the old program is built (DONE)
 
@@ -294,7 +305,7 @@ For invoice number `INV`, customer `C` (id `P`):
 5. **Credit limit test uses the signed balance read before the bill**; a customer with an advance plus a credit sale larger than the advance is treated as owing only the difference. Correct in effect; keep.
 6. **`BankAccountLedger` uses the payment-date box**, not each row's own date. fix? (minor).
 7. **Cash drawer opens and SMS goes out inside the save chain**; failures there can stop later steps. fix: do such things after commit in the Hub.
-8. **Stock is only a warning** (switch off: nothing at all). The Hub refuses negative stock unless the shop allows it (`AllowNegativeStock`); keep the Hub's rule, add a "warn and go on" choice if the owner wants the old till behaviour.
+8. **Stock is only a warning** (switch off: nothing at all). The Hub has a shop setting `AllowNegativeStock` (`ShopSettings.cs:23`) that is **on by default**, so by default the Hub also lets stock go negative; when the owner turns it off the Hub refuses the sale ("Only N of X left", `DocumentService.cs:494`). Add a "warn and ask" choice if the owner wants the old till's behaviour.
 9. **Commission** ignores tax and bill discount and is not rounded. Keep for compatibility; decide for the Hub (salesperson module).
 10. **StockMovement second-read** (2.3 step 6). Do not port; the Hub's `stock_moves` is one row per movement.
 
@@ -365,9 +376,82 @@ Base sale line L2 (qty 3 x 33.33, 10% percent discount, GST 9+9 exclusive; taxab
 
 
 
-## 4. Estimates, quotations, service billing
+## 4. Estimates, quotations, service billing (DONE; hand-worked, not run)
 
-PENDING
+### 4.1 Screens (screen to purpose)
+
+- `frmEstimate` (title "ESTIMATE / DELIVERY NOTE"): a priced list for a customer that **adds no tax**. Lists: `frmEstimateRecord`; pick one to bill: `frmEstimateRetrieve`.
+- `frmQuotation` ("QUOTATION"): a priced offer **with tax** like a bill. Lists: `frmQuotationRecord`; pick one to bill: `frmQuotationRetrieve`.
+- `frmPOSNewTuch_Quotation` (touch till used as a quotation maker): the sale till's arithmetic (identical `Calc`), saved to `InvoiceInfo_Quotation` and `Invoiceinfo_Product_Quotation`; no stock movement (no stock update on save was found; one helper at `:28108` reduces stock for a barcode, its use was not traced); list screen `frmPOSNewTuch_QuotationRecord`.
+- `frmServices` (a repair or service job), `frmServiceBilling` (the bill for a job), `frmServiceBillingRecord`, `frmServiceDoneReport`, and the touch till `frmPOSNewTuch_Service` (a sale-style bill saved to `InvoiceInfo_Service` and `Invoice_Product_Service`).
+
+### 4.2 Estimate: exact rules (`frmEstimate.vb`)
+
+- **Line** (`Calc`, `frmEstimate.vb:3766`): `gross = R2(qty * price)`, `disc` percent or amount (R2 and R4 as on a sale), `base = gross - disc`. Tax amounts are worked out and **shown** (Exclusive: `R2(base * % / 100)`; Inclusive: carved out as on a sale, `R2(gst / 2)` each) but **the line total is `base`** in both Exclusive and Inclusive (`frmEstimate_Calc` line `num6 = num8`; extracted text lines 34 and 70). Exempt GST and NON GST add the four amounts, which are 0.
+- **Bill** (`SubTotal`, `frmEstimate.vb:2976`; `Compute`): `SubTotal = sum over lines of (qty * price - discountAmount)` with `qty * price` **not rounded** per line; `total = R2(SubTotal)`; round-off box as on a sale (`R0` half to even); `grand = R2(total + roundOff)`. **No tax, no freight, no bill discount.**
+- **Save** (`frmEstimate.vb:6766` to `6891`): needs customer details and at least one line (and the company profile). Writes `Estimate(Q_ID, QuotationNo, Date, TaxType, CustomerID, SubTotal, CGST, SGST, IGST, CESS, Total, RoundOff, GrandTotal, Remarks, CType, KP)` with **`TaxType` always "NON GST"**, `CType` Retail or Wholesale (from the till's price-tier choice), **`KP` always "P"**, and `Estimate_Join(QuotationID, ProductID, Barcode, Qty, Price, DiscountPer, DiscountAmt, CGSTPer, CGSTAmt, SGSTPer, SGSTAmt, IGSTPer, IGSTAmt, CESSPer, CESSAmt, TotalAmount, AltQty, AltUnit, STaxType)`. Header tax columns hold the sums of the shown (not added) tax. **No stock, no ledger, no payment.** Counter row `SrEstimate`.
+- **Number**: `Invcode.c20` prefix (default "ESTM") + "-" + N + "-" + `Invcode.c21` suffix (default year suffix, 2.7); N from `SrEstimate`.
+- Trial rule: more than 5 estimates in a month refused (a licence rule; do not port).
+- Delete removes `Estimate`, `Estimate_Join` and the counter row (`frmEstimate.vb:3954` to `3969`).
+
+### 4.3 Quotation: exact rules (`frmQuotation.vb`)
+
+- **Line** (`Calc`, `frmQuotation.vb:2830`; compared with the sale's `Calc` by extracting both): the same arithmetic per tax type as the sale (section 1.3): Exclusive adds the tax; Inclusive carves it out; Exempt GST forces CGST, SGST, IGST % to 0 and, as on a sale, **leaves CESS % in force**; No Taxes forces all four to 0. Differences from the sale: a blank item tax type is **not** treated as Exclusive, and there is no "NON GST" branch (a quotation always follows the item's tax type).
+- **Bill** (`Compute`, 18 lines): `total = R2( SubTotal + sumCGST + sumSGST + sumIGST + sumCESS )` where `SubTotal` = sum of column 20 (**taxable amount**); round-off as on a sale; `grand = R2(total + roundOff)`. **No freight and no bill discount** (unlike a sale).
+- **Save** (`frmQuotation.vb:5029` to `5103`): `Quotation(Q_ID, QuotationNo, Date, TaxType, CustomerID, SubTotal, CGST, SGST, IGST, CESS, Total, RoundOff, GrandTotal, Remarks, CType)` and `Quotation_Join` lines (as the estimate's plus `TaxableAmt`, `MainUnit`). No stock, ledger or payment. Counter `SrQuotation`. Number: `Invcode.c4` prefix (default "Q") + "-" + N + "-" + `Invcode.c14` suffix.
+
+### 4.4 Convert an estimate or a quotation into a bill (exact)
+
+1. In `frmEstimateRetrieve` or `frmQuotationRetrieve` the cashier opens a document by its number and **double-clicks one line**; the till (classic or touch) receives:
+   - the customer name (`cmbCustomerName`);
+   - the price tier (Retail or Wholesale, from `Estimate.CType`);
+   - the narration **"Ref : <estimate or quotation number>"** (`txtNar`);
+   - the line's barcode, then the till runs its normal barcode entry for that line (`BarcodeProgram1` for estimates, `BarcodeProgram2` for quotations; `frmPOS.vb:12928`, `13254`) which **takes from the document line: sale rate, discount %, quantity, unit, and the tax percents** (CGST % and SGST % are taken from the SGST and CGST columns respectively, which is harmless when they are equal; IGST % when the customer's state differs from the company's, `frmPOS.vb:13043` to `13066`), and **takes from stock and the product**: the item's tax type (`Product.STax`), the lot's MRP, batch, dates, size, colour, IMEI, purchase rate (`EPPrice`) and alt-unit data.
+   - The line is removed from the retrieve list on the screen.
+2. The till then works the line with the **sale's rules** (1.3). So **an estimate for an Exclusive item (which added no tax) becomes a bill with tax added on top** (vector E5).
+3. **The estimate or quotation is not marked as billed** (no update of it was found); it stays in the list and can be billed again. One line is pulled per double-click (the cashier repeats for each line).
+
+### 4.5 Service job and service bill (`frmServices`, `frmServiceBilling`)
+
+- **Job** (`frmServices.vb:1567`): `Service(S_ID, ServiceCode, CustomerID, ServiceType, ServiceCreationDate, ItemDescription, ProblemDescription, ChargesQuote, AdvanceDeposit, EstimatedRepairDate, Remarks, Status)`; Status is one of "Resolved", "Under Processing", "Unresolved"; counter `SrService`. If an upfront (advance) is taken, the job posts: `LedgerBook` and `CustomerLedgerBook` "Service Upfront" **Debit = upfront** for the customer and "Cash Account" "Receipt" **Credit = upfront** (`frmServices.vb` save). Optional SMS.
+- **Bill** (`Compute1`, `frmServiceBilling.vb:877`):
+  - `serviceTax = R2( repairCharges * taxPercent / 100 )` (one percent, **no CGST/SGST split**);
+  - `grand = R2( repairCharges + serviceTax - upfront )` (**the grand total is what is left to pay after the upfront**);
+  - `due = R2( grand - totalPayment )`.
+  - Checks: job chosen, charges entered, tax % entered, `totalPayment` not more than `grand`.
+  - Saves `InvoiceInfo1(Inv_ID, InvoiceNo, InvoiceDate, ServiceID, RepairCharges, Upfront, ServiceTaxPer, ServiceTax, GrandTotal, TotalPaid, Balance, Remarks)` and counter `SrSerBill`; ledgers: `LedgerBook` and `CustomerLedgerBook` "Services" **Debit = grand** and "Cash Account" "Receipt" **Credit = total payment** (`frmServiceBilling.vb:1351` to `1374`). **No stock, no parts**: parts are sold on a normal bill.
+- **Touch service till** (`frmPOSNewTuch_Service`): the sale's `Calc` and totals (identical code); saved to `InvoiceInfo_Service` and `Invoice_Product_Service`; reduces stock (`:24638`) and writes a `StockMovement` row like a sale.
+
+### 4.6 Test vectors (hand-worked)
+
+| # | Case | Arithmetic | Result |
+|---|---|---|---|
+| E1 | Estimate, Exclusive line, discount | qty 2, price 100.00, disc 10%, 9+9 | gross R2(200.00)=200.00; disc R2(20.00)=20.00; base 180.00; shown CGST R2(16.20)=16.20, SGST 16.20 (not added); line total 180.00; SubTotal = 2x100.00 - 20.00 = 180.00 |
+| E2 | Estimate, Inclusive line | qty 1, price 118.00, 9+9 | base 118.00; shown CGST 9.00, SGST 9.00; line total 118.00; SubTotal 118.00 |
+| E3 | Estimate bill, two lines, round-off OFF | E1 + E2 | SubTotal 180.00 + 118.00 = 298.00; total 298.00; grand 298.00 |
+| E4 | Estimate round-off ON, ties | total 180.40 -> R0 180, -0.40, grand 180.00; total 180.50 -> R0 180 (even), -0.50, grand 180.00; total 181.50 -> R0 182, +0.50, grand 182.00 | as listed |
+| E5 | Convert E1's line to a bill (item is Exclusive, 18%, retail price unchanged) | till gets price 100.00, qty 2, disc % 10.0000, 9+9: gross 200.00; disc 20.00; base 180.00; cgst R2(16.20)=16.20; sgst 16.20; total R2(180.00+32.40)=212.40 | bill total **212.40** against the estimate's 180.00 (the tax is added) |
+| E6 | Convert E2's line (item Inclusive, 18%) | gst R2(118-118/1.18)=18.00; total 118.00 | bill 118.00 = estimate 118.00 |
+| E7 | Convert, item now costs more | stock lot `SPrice` changed since | the bill uses the **estimate's** price (copied), not the new lot price |
+| Q1 | Quotation, same lines as B1 | taxable 100.00 + 89.99 = 189.99; CGST 9.00 + 8.10 = 17.10; SGST 17.10; total R2(189.99+17.10+17.10) = 224.19 | grand 224.19 (round-off OFF); with ON: 224.00 |
+| Q2 | Quotation has no freight or discount | any | total is only taxable + taxes |
+| SV1 | Service bill with upfront | charges 1000.00, tax 18%, upfront 300.00 | tax R2(180.00)=180.00; grand R2(1000.00+180.00-300.00)=880.00; pay 880.00: due 0.00. Pay 500.00: due R2(880.00-500.00)=380.00 |
+| SV2 | Service tax rounding | charges 99.99, 18%, upfront 0 | tax R2(17.9982)=18.00; grand 117.99 |
+| SV3 | Service tax tie | charges 12.50, 1% | tax R2(0.125) = 0.12 (half to even; 0.125 is exact in binary); grand 12.62 |
+| SV4 | Service payment too high | grand 880.00, payment 880.01 | refused "Total payment can not be more than grand total" |
+| SV5 | Service ledger, whole story | upfront 300.00 at job; bill charges 1000.00, tax 18%, pay 880.00 | job: customer Dr 300.00 ("Service Upfront"), Cr 300.00 (Receipt); bill: Dr 880.00 ("Services"), Cr 880.00 (Receipt); customer balance 0.00; revenue (repair + tax) = 1180.00 |
+
+### 4.7 Quirks and probable bugs (keep or fix?)
+
+1. **An estimate for a taxable item is cheaper than the bill made from it** (E5). The estimate screen is titled "Delivery Note"; users may quote the estimate price. fix? ask the owner whether an estimate should show tax or the conversion should carry the estimate's total.
+2. **Estimate `TaxType` is always "NON GST"** whatever the shop's mode. keep (it marks "not a tax document").
+3. **Estimates and quotations are never marked as billed**; no link from the bill to the estimate except the text "Ref : <number>" in the narration (E7). fix: the Hub should link `ref_document_id`.
+4. **Conversion works one line at a time** and re-reads current stock data. keep the idea of "copy price, quantity, discount", fix the one-by-one click (copy all lines).
+5. **The service bill's `GrandTotal` is net of the upfront** (SV1): a report that sums `GrandTotal` under-counts service sales by the upfronts, and the full value is `RepairCharges + ServiceTax`. keep when importing; the Hub keeps the full total and the advance apart.
+6. **Service tax is one percent**, never split into CGST and SGST. keep for old data; the Hub engine splits.
+7. **The touch quotation screen is a copy of the sale till**, so it carries all the sale code (hold, payments, loyalty) although it saves only a quotation. Do not port the copy; port the quotation.
+
+
 
 ## 5. Buying: purchase entry, orders, purchase return, MRP update, supplier payments (DONE; hand-worked, not run)
 
@@ -485,9 +569,118 @@ Writes, in order (no transaction):
 
 
 
-## 6. Stock: entry, adjustment, transfer, godown, damage, settlement, movement, opening, serial numbers, variants, negative stock
+## 6. Stock: entry, adjustment, transfer, godown, damage, settlement, movement, opening, serial numbers, variants, negative stock (DONE; hand-worked, not run)
 
-PENDING
+### 6.1 The model: what "stock" is in the old POS
+
+- **`Temp_Stock` is the live stock: one row per lot** (a lot = a product plus a barcode). Columns that matter (`PosSchemaData.cs`): `ProductID`, `Barcode`, **`Qty`** (on hand; decimal with 3 places), `Damage` (damaged units that are still counted inside `Qty`), `StLimit` (the lot's minimum-stock mark), `MRP`, `SPrice` (retail price), `WPrice` (wholesale price), `PPrice` (purchase price per main unit), **`EPPrice`** (effective cost per unit = purchase line taxable amount / qty, 5.4), `SalePrice`/`WSalePrice` (price cipher codes, text), `Batch`, `Mfgdate`, `Expdate`, `Size`, `Colour`, `IMEI1`, `IMEI2`, `SuplName` (the supplier, or "Opening Stock"), `Variant_id`, `QrBarcode` (an image), `SalesManPur`, `Serial_no`.
+- **A product's stock** = the sum of `Qty` over its lots (`frmStockAdjustment_Store.vb:1036` sums for one product and barcode). **Good stock = `Qty - Damage`** (`frmCurrentStock.vb:578`). **A sale does not look at `Damage`**: it only reduces `Qty` (and warns against `Qty`, `StLimit`).
+- **`Product_OpeningStock`** is the lot's master record (MRP, prices, ciphers, batch, dates, size, colour, IMEI, `PPrice`, `OPSValue`, `PAddDate`), written when a lot is first made (by a purchase, a product with opening stock, or the Excel opening-stock import).
+- **`StockMovement`** (`ProductID`, `OpeningStock`, `StockIn`, `StockOut`, `Date`, `TransID`) is an in/out history per product for the movement report. `OpeningStock` on a row is `sum(StockIn - StockOut)` of the product's rows with an **earlier date** (0 for the first row). Written (checked by searching each form for `ProductSMSave`) by: sale (`frmPOS`, touch tills), sale return, purchase, purchase return, stock entry, adjustment, opening stock (product screen and Excel import), godown outward and inward, the touch service bill, and settlement when it creates a new product. **Not written by**: damage, the transfer token, the touch branch stock-transfer and stock-inward screens, the touch quotation. So after a transfer the movement report no longer agrees with `Temp_Stock`. The "first row" and "second read" behaviour is in 2.3 step 6.
+- Documents of stock work: `Stock_Store` and `Stock_Store_Join` (stock entry), `StockAdjustment_Store` (adjustments), `P_Transfer`, `p_transfer_in` (transfer tokens), `InvoiceInfo_StockTransfer`, `InvoiceInfo_Product_StockTransfer`, `InvoiceInfo_StockInward`, `InvoiceInfo_Product_StockInward` (branch transfers), `tbl_product_serial*` (serial numbers), `Branch_Relation` (which branches may exchange stock).
+
+### 6.2 Stock entry (`frmStockEntry`, "Stock Entry": add quantity to an existing lot by barcode, no money)
+
+- The cashier gives a barcode (it must be a lot that already exists: the product name and unit are read from `Temp_Stock` by barcode, `frmStockEntry.vb:993`), a quantity (not empty, not zero), a date (inside the current financial year, else "Your selected date is not between current financial year"), remarks.
+- Save (`frmStockEntry.vb:1022`): for each line `Temp_Stock.Qty = Qty + qty` (if the lot is missing a bare lot row with only product, qty and barcode is inserted); `StockMovement` StockIn = qty (date = entry date); `Stock_Store(ST_ID, Date, Remarks)` and `Stock_Store_Join(StockID, ProductID, Qty, Barcode)`. **No ledger, no price, no tax.**
+- Delete (`frmStockEntry.vb:844`): `Temp_Stock.Qty = Qty - qty`, movement rows and the record deleted. Nothing stops this from making stock negative.
+
+### 6.3 Stock adjustment (`frmStockAdjustment_Store`)
+
+- Fields: product and barcode, date, **Plus or Minus**, quantity (not empty, not zero), **reason (required)**. The screen shows "Qty. Available in Store" (the lot's `Qty`) and loads the lot's prices, MRP, batch, dates, size, colour, IMEI, damage and minimum stock.
+- Save (`frmStockAdjustment_Store.vb:895` to `1000`): `StockAdjustment_Store(SA_ID, ProductID, Barcode, Date, AdjustmentType, Qty, Reason)`; Plus: `Qty = Qty + q`, `StockMovement` StockIn = q; Minus: `Qty = Qty - q`, StockOut = q. **No check that a Minus leaves the lot at zero or more.** No money, no ledger.
+- Edit (`:1172` to `1264`): reverses the old effect and applies the new (`Qty + old`/`- old`, then the new sign and quantity) and updates the movement row. Delete (`:769` to `820`): reverses the effect (`Plus` becomes `Qty - q`, `Minus` becomes `Qty + q`) and deletes the movement row.
+
+### 6.4 Damage and recover (`frmDamageProduct`)
+
+- **Damage is a counter on the lot, not a movement:** `Temp_Stock.Damage`. On-hand `Qty` does not change; good stock = `Qty - Damage`.
+- Add damage `d` (`btnSave_Click`, `frmDamageProduct.vb:1027`): new damage = `Damage + d` (`TextBox8`, `:736`). Refused ("Damage quantities are exceeded than avaliable quantities") when `d > Qty - Damage`, unless the override box `CheckBox2` is ticked.
+- Recover `r` (`:1067`): new damage = `Damage - r` (`TextBox10`, `:742`). Refused when `r > Damage`, unless the override is ticked.
+- Writes only `Temp_Stock.Damage` and a log line ("Damage qty ... are added in Product name ..."). **No `StockMovement`, no ledger, no loss value.** Totals shown: damage = `Sum(Damage)`, good = `Sum(Qty) - Sum(Damage)`, total = `Sum(Qty)` (`frmDamageProduct.vb:994`).
+
+### 6.5 Transfers between stores and branches (three different mechanisms)
+
+**A. Transfer token (`frmStockTransfer`)**: send chosen lots to another branch as a "token".
+- Token number = `Company.BCode` (branch code) + `(1000 + (highest P_Transfer.ID + 1))` (`GenerateTokan`, `frmStockTransfer.vb:845`).
+- Per chosen lot and quantity `T_Qty` it writes a **full copy of the product and lot** into `P_Transfer` (product code, name, HSN, part no, description, `CostPrice`, `MRP`, `SellingPrice`, `ReorderPoint`, `Discount`, `CGST`, `SGST`, `CESS`, units, `Conv`, `MinStock`, `GDown`, `Rack`, `DefQty`, lot prices, batch, dates, colour, size, IMEI, category, sub-category, `TocknNo`, `T_Qty`, `PStatus` = "p" = pending) (`frmStockTransfer.vb:753`) and **immediately reduces the sending lot: `Temp_Stock.Qty = Qty - T_Qty`** (`CheckBarcodeExists`, `:837`). No check against `Qty`. No movement row, no money.
+- The receiving branch loads the token into `p_transfer_in`; accepting it is "Settlement" (below), which sets `PStatus` to "f" (finished).
+
+**B. Branch stock-transfer document (`frmPOSNewTuch_StockTransfer`, touch till)**: a **sale-like bill** from this company to another branch (`Branch_Relation`: `to_company_id`, `CompanyName`): same lines, same tax and total arithmetic as a sale (section 1; the `Calc` is the same code), saved to `InvoiceInfo_StockTransfer` (with `from_company_id`, `to_company_id`, status 0) and `InvoiceInfo_Product_StockTransfer` (`frmPOSNewTuch_StockTransfer.vb:24096`, `24595`); sending lot `Temp_Stock.Qty = Qty - qty` (`:24316`); the same optional stock warnings as a sale. On the other side `frmStock_Inward_Notification` lists the documents addressed to this branch (status 0); "Stock Inward" (`frmPOSNewTuch_StockInward`) saves `InvoiceInfo_StockInward` and `InvoiceInfo_Product_StockInward` and **adds** `Temp_Stock.Qty = Qty + qty` (`:12281`), and the sender's document is set to status 1 (`frmStock_Inward_Notification.vb:1346`).
+**C. Settlement (`frmStock_Settlement`)**: takes in the lines of a token or an inward document into this branch's stock: if the barcode is already a lot here: `Temp_Stock.Qty = Qty + T_Qty` (`:1146`); if not, it **creates the missing category, sub-category, product (with its photo) and the lot** (`InsertProduct`, `:815` to `960`: `Product`, `Product_Join`, `Temp_Stock` with the prices from the token, a `StockMovement` row, a QR image for the barcode) and then sets statuses: `p_transfer_in.PStatus` = "f", `InvoiceInfo_StockTransfer.status` = 2, `InvoiceInfo_StockInward.status` = 1 (`:981` to `1019`).
+- Status codes seen: token `PStatus` p (pending) and f (finished); transfer document status 0 (sent), 1 (taken in by the receiver), 2 (settled); inward status 1.
+- **These flows move the documents between branches through an online service** (the receiving screens fetch documents from other companies; `frmGodownConfig` is titled "Multi Branch Cloud Stock Storage Configuration" with a web address field and a credential field; no credential value is in this file). Which exact channel carries each document was not traced (see Not understood). The owner's rule is that nothing goes to the cloud unless allowed (`CLAUDE.md` section 16), so this is **not to be ported as is**; the Hub's way for several counters is the main PC with the counters on the shop network, and for several stores a head-office summary of totals only.
+
+**D. Godown Outward and Inward (`frmGodownOutward`, `frmGodownInward`)**: "Outward Stock Transfer" and "Inward Stock Transfer" through the cloud (a pushed record per lot, `FirebaseCRUDData`). Outward (`frmGodownOutward.vb:1380` to `1545`): needs product, barcode, quantity, a receiver company or branch id different from this company, an internet connection and **sufficient stock** ("Sufficient stock is not available !" is a **hard block** here, unlike a sale); makes a new barcode `oldBarcode + "*" + token`; `Temp_Stock.Qty = Qty - qty`; movement StockOut. Inward (`frmGodownInward.vb:824` to `1030`): finds the lot by the new barcode: `Qty = Qty + qty`, or creates the product (from the pushed record) with its lot (`Temp_Stock`, `Product_OpeningStock`, `Product_Join`) and a movement StockIn. Cloud again: not to be ported.
+
+### 6.6 Opening stock
+
+- **With a new product** (`frmProduct`): the lots typed on the product screen become `Product_OpeningStock` and `Temp_Stock` rows (`SuplName` = "Opening Stock", `StLimit` = the product's `MinStock`) and one `StockMovement` StockIn row dated today (`frmProduct.vb:7448`, `7522`, `7670`).
+- **Excel import** (`frmExportImportExcel_OpeningStock`): reads `Sheet1` with columns product id, opening qty, MRP, sale price, wholesale price, batch, mfg, exp, size, colour, barcode, purchase price, IMEI 1, IMEI 2. Every row must have id, qty, MRP, sale price, wholesale price, barcode and purchase price (else "... Cell Blank Found"). **A barcode that already exists in `Product_OpeningStock` or `Temp_Stock` is refused** ("Barcode ... Already Exists"). Per row: `Product_OpeningStock` with `OPSValue = qty x purchase price` (`:594`, params `d16`), `Temp_Stock` with `Qty` = opening qty, `PPrice` = `EPPrice` = the typed purchase price (so cost per unit = typed price, no tax split), `SuplName` "Opening Stock"; a `StockMovement` StockIn row (date = today).
+
+### 6.7 Reports that read stock
+
+- **Stock movement report** (`frmStockMovementReport.vb:435` and `483`): for a date range (`Date >= from and Date < to`), grouped by `Date, product`: `Opening = Max(OpeningStock of that day's rows)`, `In = Sum(StockIn)`, `Out = Sum(StockOut)`, **`Closing = Opening + In - Out`**. For one product or all.
+- **Stock in and out report** (`frmStockInAndOutReport.vb:385`, `412`): in stock = lots with `Qty > 0` of products with `Product.Status = "Yes"`, with **cost value = `Product.CostPrice x Qty`** (the master's latest purchase price, not the lot's `EPPrice`) and **sale value = `Temp_Stock.SPrice x Qty`**; out of stock = lots with `Qty <= 0`; filter by supplier name (`SuplName`).
+- **Current stock** (`frmCurrentStock`): lot list with `Qty`, `Damage`, `Qty - Damage`, `PPrice`, `EPPrice`, `SPrice`, `WPrice`, `MRP`, batch, dates, size, colour, IMEI, product minimum stock, tax types, godown and rack.
+
+### 6.8 Serial numbers and variants
+
+- **Serial numbers exist only in the touch tills** (`frmPOSTouch`, `frmPOSNewTuch`; no serial code in `frmPOS.vb`) and in purchase entry, sales return and purchase return. Each unit can carry **two numbers** (`serialno1`, `serialno2`, for example a serial and an IMEI).
+- **Purchase** (`frmPurchaseEntry.vb:6618` to `6660`, `11762`): while entering, serials are kept in the working table `tbl_product_serial(productid, barcode, serialno1, serialno2, status, sys_user, invoice_no)`; **the number of serials for a barcode must equal the line's quantity** ("Quantity mismatch"). On Save they are copied to **`tbl_product_serial_final`** with the invoice number and the working rows are deleted. Status "PURCHASE" = in stock. Delete or edit of the purchase clears the final rows of that invoice (`:12267`).
+- **Sale** (`frmPOSTouch.vb:30688` to `30698`, `31526` to `31543`; the same in `frmPOSNewTuch.vb`): per sold serial a row in `tbl_product_serial_sale(productid, barcode, serialno, status, sys_user, invoice_no)` and `tbl_product_serial_final.status = "SALE"`.
+- **Sales return** (`frmSalesReturn.vb:3356`, `3366`): the returned serials go into `tbl_product_serial_saleReturn` and the final row's status goes back to "PURCHASE". The number of chosen serials must equal the return quantity.
+- **Purchase return** has `tbl_product_serial_purchaseReturn` (how it sets the status was not read).
+- Reports: `frmSerialwiseReport` (by serial number), `frmProductRec_serial`, `frmProductRec_serial_sale` (serial lists).
+- **Older, simpler way for one-unit items (phones)**: a lot of quantity 1 with `Temp_Stock.IMEI1`/`IMEI2` (copied onto the bill line, `Invoice_Product.IM1`/`IM2`).
+- **Variants**: `Temp_Stock.Variant_id` (text) groups several barcodes (lots, for example sizes and colours of one article); the purchase screen can load every barcode of a variant at once (`frmPurchaseEntry.vb:8586` to `8660`, from `Temp_product(variant_id, PID, qty, barcode)`); the variant screen is `frmProductRec_variant` (not read: see Not understood).
+
+### 6.9 Negative stock and the checks, in one place
+
+| Where | Check | Effect |
+|---|---|---|
+| Till sale and edit (all till screens) | `CInt(Round(qty)) > Qty` if switch `CheckBox6` is on; `CInt(Round(qty)) > Qty - StLimit` if switch `CheckBox8` is on | A Yes/No question only. With the switches off **nothing is checked**. Stock can go negative. |
+| Branch transfer document (touch) | same as a sale | question only |
+| Sale of an expired lot | bill date on or after `Expdate` | **blocked** (1.3) |
+| Godown outward | `qty > Qty` | **blocked** |
+| Token transfer, stock adjustment Minus, stock entry delete, purchase delete, purchase return | none found | stock may go negative |
+| Damage | `d > Qty - Damage` (override box) | blocked unless override |
+| Reports | lots with `Qty <= 0` are listed as out of stock | negative lots appear there |
+| Purchase | resets `StLimit` to 0 for the lot | later minimum-stock warnings stop |
+
+### 6.10 Test vectors (hand-worked)
+
+| # | Case | Arithmetic | Result |
+|---|---|---|---|
+| S1 | Stock entry | lot (P5, barcode 1004) Qty 7; entry qty 3 | Qty 10; StockMovement In 3, Opening = sum of earlier In - Out |
+| S2 | Adjustment minus below zero | Qty 10, Minus 12 | Qty -2 (no check); movement Out 12 |
+| S3 | Adjustment edit | saved Plus 5 (Qty 15), edited to Minus 2 | reverse: Qty 15 - 5 = 10; apply: 10 - 2 = 8; movement row updated to Out 2 |
+| S4 | Damage add | Qty 10, Damage 1, add 3 | check 3 > 10-1=9? no: Damage 4; good = 10-4 = 6; Qty stays 10 |
+| S5 | Damage refused | Qty 10, Damage 1, add 10 | 10 > 9: refused (unless override) |
+| S6 | Recover | Damage 4, recover 3 | Damage 1; recover 5 refused (5 > 4) |
+| S7 | Token transfer | Qty 10, transfer 4, last P_Transfer.ID 9, BCode "AB" | Qty 6; `P_Transfer` row `T_Qty` 4, `PStatus` p; token = "AB" + (1000 + 10) = "AB1010" |
+| S8 | Settlement, lot exists | receiving lot Qty 3, token T_Qty 4 | Qty 7; `PStatus` f |
+| S9 | Settlement, new product | token lot unknown here, T_Qty 4 | product, lot (Qty 4) created; **StockMovement StockIn = 10, not 4** (the code writes a fixed 10, `frmStock_Settlement.vb:921` and `938`; fix) |
+| S10 | Opening stock value | import row: qty 20, purchase price 12.50 | `OPSValue` R2(20 x 12.50) = 250.00; lot `EPPrice` 12.50 |
+| S11 | Movement report, one day | product rows on day D: (Opening 20, In 0, Out 5), (Opening 20, In 10, Out 0) | Opening Max = 20; In 10; Out 5; Closing 20 + 10 - 5 = 25 |
+| S12 | Stock value | lot Qty 7, `Product.CostPrice` 50.00, `SPrice` 80.00 | cost value 350.00; sale value 560.00; a lot with Qty 0 or less is not in the value list |
+| S13 | Minimum-stock warning | Qty 8, `StLimit` 5, sale qty 4, switch on | 4 > 8 - 5 = 3: asks; after a purchase of the same barcode `StLimit` = 0: 4 > 12? no question |
+| S14 | Fraction check | Qty 2.3, sale 2.4, switch on | `CInt(Round(2.4))` = 2; 2 > 2.3? no question although 2.4 > 2.3 |
+| S15 | Serial count | purchase qty 3, 2 serials entered | refused (count must equal quantity) |
+| S16 | Serial lifecycle | purchase of 3 serial units | final rows status PURCHASE; sale of 1: that row SALE and a `tbl_product_serial_sale` row; return of it: row back to PURCHASE |
+| S17 | Godown outward block | Qty 2, send 5 | refused "Sufficient stock is not available !" |
+
+### 6.11 Quirks and probable bugs (keep or fix?)
+
+1. **Damage is not a stock movement** (6.4): reports and the movement history miss it, and a damaged unit can still be sold (sale only looks at `Qty`). fix: in the Hub a damage is a stock move with a reason and a cost value.
+2. **Settlement writes a fixed StockIn of 10** for a product created from a token (S9). fix.
+3. **A purchase resets the lot's `StLimit` to 0 and overwrites the lot's prices and MRP** (5.4, S13). fix? decide with the owner (a new price should be a new lot).
+4. **Adjustment and transfer-out have no stock check**; godown outward does. keep the freedom to adjust, add a check for transfers (fix).
+5. **Whole-number stock check for fractions** (S14). fix.
+6. **Transfer flows depend on an online channel** and on `ExtDB*` tables whose use was not read. Do not port; design the Hub's own way (shop network, head-office summary).
+7. **`Product.OpeningStock`** (master column) is only a typed number; the live stock is `Temp_Stock`. When importing, read lots, not that column.
+8. **Stock value uses `Product.CostPrice`** (latest price), not the lot's cost: the same lot is valued differently here and in `EPPrice`-based margin. Keep for matching old reports; choose one in the Hub.
+
+
 
 ## 7. What the Hub has today, topic by topic, and where the numbers differ
 
@@ -578,16 +771,143 @@ Hub code read: `apps/business-hub/src/NextGenOS.Hub.Core/Documents/DocumentServi
 
 **Hub tests that should use the old vectors:** R1, R2, R3 (credit note of 1, 2 and 3 of 3 units of L2: 35.40, 70.79, 106.19; the Hub engine gives the same numbers, hand check: 1 unit: gross 33.33, discount R(3333 x 10000, 100000) = 333 -> 3.33, net 30.00, CGST R(3000 x 18000, 200000) = 270, total 35.40), R6 and R7 only after F2 is decided.
 
-### 7.4 Estimates, quotations, service billing: PENDING
+### 7.4 Estimates, quotations, service billing (status: DONE)
 
-### 7.5 Buying: PENDING
+**What the Hub does**
+- A document type `quote` exists in the money code: `CreateDraft` numbers it at once (`QUO-<fiscal year>-000001`, `DocumentService.cs:89`); `Issue` keeps that number, takes no payment, moves no stock (stock moves only for `invoice` out and `purchase`, `DocumentService.cs:314`), and the Documents list and receipt can show it. **The only place that creates one is `ProjectService.CreateQuote` (construction projects)** (`Projects/ProjectService.cs:117`); there is no retail quote screen, no estimate, no "convert a quote to an invoice" (no code copies a quote's lines into an invoice; a credit note is the only document that points back with `ref_document_id`).
+- Totals of a quote are the same as an invoice's (same engine: tax added or carved out by `prices_include_tax`, round-total setting), so a Hub quote matches the old **quotation** (not the old estimate, which adds no tax).
+- Service: items of a kind with a duration (`duration_min`), `appointments` (`Appointments` module), and ordinary invoice lines. **No repair job, no job status, no advance taken at the job and netted at the bill, no job number.** The engine has an `advance` adjustment (reduces `payable`, not `total`).
 
-### 7.6 Stock: PENDING
+**Where it differs from the old POS**
+
+| # | Old POS | Hub | Verdict |
+|---|---|---|---|
+| K1 | Estimate: no tax added, total = qty x price - discount (E1 to E4) | None | **GAP.** Decide: an estimate is a quote with prices that include whatever the customer is told (tax flagged off), or a document with its own rule. Vectors E1 to E4 pin the old numbers. |
+| K2 | Quotation with tax (Q1) | Quote type exists with the same engine | Port: retail quote screen. Vector Q1 gives the same answer as the engine (hand check: Hub 189.99 taxable + 34.20 tax = 224.19). |
+| K3 | Convert: copy price, discount %, quantity, tax %; items re-read from stock; "Ref : number" text; the source is not marked | Not found | **GAP.** In the Hub: copy all lines into an invoice draft and set `ref_document_id` to the quote; mark the quote "billed". Keep the old **price copy** (E7). Decide E5 (tax added on top for an Exclusive item) together with K1. |
+| K4 | Service job with upfront, status, charges quote, estimated repair date; bill nets the upfront; one service-tax percent | None | **GAP.** Needs a job record (number, status, quote, advance) that becomes an invoice; with the Hub's rule the invoice total is the full value and the advance is a payment already taken (so `GrandTotal` differs from old `GrandTotal` by the upfront, SV1). Tax split per country pack, not one percent. |
+| K5 | Touch quotation and touch service tills are copies of the sale till | One billing screen | Do not port the copies. |
+
+**Hub tests that should use the old vectors**: Q1 (a quote of the B1 lines: 224.19; with round-total on 224.00; the Hub rounds half up so 224.19 -> 224 is the same here), SV1 as an invoice of 1180.00 with an advance payment of 300.00 and a balance of 880.00 once the job record exists; E1 to E6 only after K1 is decided.
+
+### 7.5 Buying (status: DONE)
+
+**What the Hub does** (`PurchaseService.cs`, 59 lines; `DocumentService.Issue` for `purchase`):
+- `CreateOrder(supplierId, lines)`: a draft document of type `purchase`, direction "in", numbered at creation `PO-<fiscal year>-000001` (`DocumentService.cs:89`). A line is item, quantity (thousandths), cost per unit. **No line discount, no bill discount, no freight, no previous due, no reverse charge, no selling prices.**
+- `Receive(orderId)`: `DocumentService.Issue` (the number is kept; no payment taken; stock goes **up** by each tracked item's quantity: `MoveStock(+1, "purchase")`, `DocumentService.cs:315`); then each item's `cost_minor` is set to the line's unit price (`PurchaseService.cs:36` to `47`). The price is the entered unit price, **before** discount and tax (no discount exists), and the same price whether the shop's prices include tax or not.
+- `Pay(orderId, amount, method)`: `AddPayment` on the issued purchase; cannot be more than the balance. `Payable()`: issued, unpaid purchases.
+- Tax on a purchase goes through the same engine as a sale, with the document's `prices_include_tax`; the result is kept in `documents.result`.
+
+**Where it differs from the old POS**
+
+| # | Old POS | Hub | Verdict |
+|---|---|---|---|
+| H1 | Line discount (percent or amount), bill discount, freight, reverse charge, previous due, round-off on a purchase | None of these on a purchase | **GAP** (discount and amount discount: same gap as D3, D4; freight and reverse charge: `fee` adjustment exists but `PurchaseService` does not pass one). |
+| H2 | Each purchase line is a **lot**: barcode, MRP, retail and wholesale price, batch, mfg and exp dates, size, colour, IMEI, supplier | Item level only: no lot, no MRP, no batch, no expiry | **GAP** (see section 6 and the Hub map `docs/old-programs/06-hub-map.md`: no variant, batch or serial tables). |
+| H3 | Purchase overwrites `Product.CostPrice`, `MRP`, `SellingPrice` and the wholesale price; the lot keeps `EPPrice` = taxable / qty | Overwrites only `cost_minor` with the gross unit price | **Differs.** Hub cost = price entered; old lot cost = price after discount, without tax. Decide the meaning of "cost" (margin and stock value use it: `ReportService` stock value = on hand x `cost_minor`). |
+| H4 | Purchase types Cash, Credit, Bank with a paid amount on the bill; supplier credit limit | Receive takes no payment; pay later with `Pay`; no supplier credit limit | **GAP:** payment at receipt; supplier limit. |
+| H5 | **Purchase return** (cash or credit; stock goes out; supplier ledger debited) | **Not found** (`CreateCreditNote` takes only a sales invoice) | **GAP.** Needs a "debit note" or purchase credit note type. |
+| H6 | Supplier ledger: balance = credits - debits, includes opening balance; payments on account | No supplier ledger; payment is against one purchase; opening balance not found | **GAP** (same as E3, for suppliers). |
+| H7 | Purchase order is a separate paper with terms and conditions; becomes a purchase by "retrieve" (order stays) | The order **is** the purchase document; "receive" makes it final | Hub is simpler. Terms text and "order stays open after partial receipt" not found. |
+| H8 | Purchase tax mode separate from the sales mode; supplier state (blank = other state) decides IGST | One tax registration setting; supplier region code; a blank buyer region counts as the same region (`ComponentNames`, `TaxEngine.cs:279`) | Blank-state behaviour differs (see 5.2). Import maps state names to codes. |
+| H9 | Purchase numbering `PGST-0001-2025/26` | `PO-2026-000001` (the same number from draft to final) | Keep old numbers when importing. |
+| H10 | Hold purchase (`Stock_Hold`) | An open document | Same idea. |
+
+**Test vectors for the Hub:** U1, U2, U3 line amounts (hand check of U2 in the Hub engine: gross R(12000 x 3333, 1000) = 39996; discount R(39996 x 5000, 100000) = 2000; net 37996; CGST R(37996 x 18000, 200000) = 3420; total 44836 minor = 448.36; same as old) but only after H1 is closed; U4 to U9 after H1, H4 and H6 are decided.
+
+### 7.6 Stock (status: DONE)
+
+**What the Hub does** (`CatalogService.cs:89` to `109`, `DocumentService.MoveStock`, `DocumentService.cs:486`; table `stock_moves(item_id, qty_milli, reason, document_id, note, at, user_id)`):
+- Stock is **one number per item**: `on hand = sum(qty_milli)` of its moves. An item keeps stock only when `track_stock` is on (set by the item, the industry's `StockTracking` rule "never / always / optional").
+- Moves are added by: a sale (`-`, reason "sale"), a purchase receipt (`+`, "purchase"), a void (`+` or `-`), a credit note (`+`, "return"), and **`CatalogService.Adjust(item, delta, reason, note, user)`** for a count, damage or delivery (one signed number with a reason; the Items screen calls it, `Items.razor:416`). **The Hub has no separate adjustment document, no damage column, no transfer, no godown, no stock entry document.**
+- Negative stock: `ShopSettings.AllowNegativeStock` is **true by default** (`ShopSettings.cs:23`); if the owner sets it to false a sale or a purchase void that would leave less than zero is refused with "Only N of X left". `Adjust` never checks.
+- Low stock: `StockList(lowOnly)`: on hand at or below `reorder_milli` (an item field; the old `Product.MinStock`).
+- Report: `StockValue` = on hand x `cost_minor` (half-up rounding of the product, `ReportService.cs:154`), only items with on hand more than 0.
+- **No lots, no batch, no expiry, no MRP, no size or colour per lot, no serial numbers, no variants, no IMEI** (confirmed by the schema: `items`, `stock_moves`; the Hub map says the same). **No stock movement report by day; no opening-stock import** (the demo builder uses `Adjust(..., "opening stock")`).
+
+**Where it differs from the old POS**
+
+| # | Old POS | Hub | Verdict |
+|---|---|---|---|
+| T1 | Lot-level stock (`Temp_Stock` per barcode): price, MRP, batch, expiry, size, colour, IMEI per lot; sale picks a lot | Item-level stock; one price per item (per price level) | **Biggest gap for the owner's customers.** A lot table (`item_lots`) and lot-aware sale and purchase are needed; old data has real lots to import. |
+| T2 | Expired lot cannot be sold | Not found | Needs lots with expiry. |
+| T3 | Damage as a counter inside on-hand | Adjust with a reason | Better to keep the Hub's moves, with reason "damage" and a cost value. |
+| T4 | Transfer token, branch transfer document, settlement, godown | None | Decision needed (online channel vs the shop-network model). |
+| T5 | Stock entry document, adjustment document with ID and reason | One move with reason and note | Same facts; add a numbered adjustment document if auditors want one. |
+| T6 | Movement report (opening, in, out, closing per day) | Not found (moves exist, report does not) | Easy to build from `stock_moves`: opening = sum before the day. Vector S11. |
+| T7 | Stock value at `Product.CostPrice` x lot qty, and at sale price x qty | At `cost_minor` x on hand | Differences come from T1 (cost per lot) and the cost meaning (H3). |
+| T8 | Serial numbers on touch tills, purchase, returns | None | **GAP** (needs a serial table; per-unit status in stock / sold / returned). |
+| T9 | Negative stock allowed with a warning switch | Allowed by default; refused when turned off | Similar. |
+| T10 | `StockMovement` can miss rows (2.3 step 6) | Every move is one row | Hub is right. |
+
+**Test vectors for the Hub** after T1 is decided: S1, S2, S4 to S6, S10 to S14, S15 to S17. Before T1: S2 (`Adjust` -12 on 10 gives -2), S11 (a movement report over `stock_moves`), S12 with `cost_minor`.
 
 ## 8. Porting notes (order and traps)
 
-PENDING
+### 8.1 Order of work (smallest safe step first)
+
+1. **Pin the money first.** Write the vectors of this file as `HubFixture` tests. Three groups: (a) vectors where old and Hub agree (list in 7.1, 7.3, 7.5): write them as ordinary passing tests; (b) vectors where they differ only at a half-paisa tie (L7, B3, the 5% on 0.20 example, R5): write them with the **Hub's** answer and a comment naming the old answer; (c) vectors that need a missing feature (bill discount, amount discount, mixed tax modes, cess, estimate, service): write them as the target for that feature, skipped **by name with a reason** until the feature exists (the gate refuses silent skips, so keep them out of the test run until built, or keep them as a list in `docs/OPEN-WORK.md`).
+2. **Ask the owner once** (recorded in `docs/PLATFORM-DECISIONS.md` when answered): (a) rounding: keep the Hub's half-up (recommended) or copy the old half-to-even; (b) should a bill discount reduce tax (spread over lines before tax) or be taken off the total as the old POS did; (c) should an estimate show tax; (d) is a credit return a customer credit balance.
+3. **Close the gaps in the money layer** in this order, each with its vectors: (i) line discount by amount and per-line tax mode and cess in `DocumentService.Calculate` (the engine already supports all three; only the document layer and the line columns are missing); (ii) bill-level discount; (iii) customer and supplier balance (opening balance, advance, receipts on account with allocation oldest first, credit notes that reduce what is owed); (iv) purchase: discount, freight, reverse charge, supplier credit limit, **purchase return**; (v) quotes and estimates and "convert to invoice" with `ref_document_id`; (vi) service job.
+4. **Then stock:** lots first (`item_lots`: barcode, MRP, prices, batch, mfg, exp, size, colour, IMEI, cost per unit) with lot-aware sale, purchase, return and expiry block; then adjustment documents, damage as a move with a reason, the movement report (S11) over `stock_moves`, the opening-stock import (6.6), serial numbers; transfers last and only after the owner decides how stores talk to each other.
+5. **Import last:** the data reader (merge plan step 1) uses the mapping traps below; **never recompute an old bill**: store it as it was saved (taxes, round-off, totals) and only compute new bills with the Hub's engine.
+
+### 8.2 Traps when reading the old database
+
+- **Names that mislead**: `InvoiceInfo.OtherCharges` is the **bill discount**; `InvoiceInfo.BillDiscount` is only the part the cashier typed; `InvoiceInfo.SubTotal` is taxable plus tax; `Stock.OtherCharges` is the purchase bill discount; `Product.ReorderPoint` is the **wholesale price**; `Product.MinStock` is the minimum stock; `Stock.ReferenceNo2` holds the reverse-charge flag; `Stock.TaxableAmt` and `Stock.SubTotal` are the same figure; service `GrandTotal` is net of the upfront; `SalesReturn.PaymentMode` is "Cash" or "Credit".
+- **Text columns are padded** (`nchar`): the code trims everything with `RTRIM`. Trim on import, and compare trimmed.
+- **Balances live in the ledgers** (`CustomerLedgerBook`, `SupplierLedgerBook`: credit minus debit), not on invoices: `InvoiceInfo.Balance` is stale after later receipts. Import ledger rows or computed balances; do not rebuild from invoices.
+- **A deleted bill leaves nothing** (rows are physically deleted), so number gaps are normal; the last bill's number can be reused.
+- **`StockMovement` is not reliable** (2.3 step 6, 6.1). Rebuild history from documents if needed; take **stock from `Temp_Stock`**.
+- **Negative lots exist.** Import them as they are and report them in the match report.
+- **Invoice numbers**: keep `InvoiceNo` text exactly; the Hub's own counter must continue from a number that cannot clash (its numbers look different, so no clash, but a shop may want the old look: E8).
+- **Dates**: invoice dates are dates without time (`.Date`); payment rows carry their own date; the financial-year suffix is text.
+- **State names** are free text in `Customer.State`, `Supplier.State`, `Company.State`; map them to the country pack's region codes and list the ones that do not match.
+- **`PTax` and `STax` per product** decide Inclusive or Exclusive per item; the Hub has one flag per document, so import needs the per-item flag first (D5).
+- **Payment mode names** are the 16 texts in 2.1 (plus "ByReturn" on touch tills, "Cash"/"Credit" on returns, "By Online Transfer" on supplier payments).
+- **Trial-mode rules** (five vouchers a month) and `lblCPhone = "Trial"` are licence code; ignore them.
+
+### 8.3 Behaviours not to carry over
+
+Cloud transfers and the Firebase code, SMS and WhatsApp sends inside the save chain, text-keyed ledger deletes, the second read of `StockMovement`, the fixed `10` in settlement, the one-by-one estimate conversion, `ModFunc` global connection objects (`ModCommonClasses.con`, `cmd`, `rdr` are shared across screens), per-statement connections without a transaction.
+
+### 8.4 Where each piece of the old logic should live in the Hub (a suggestion)
+
+Tax and totals stay in `NextGenOS.Tax` (add nothing there unless a rule is wrong); document rules in `DocumentService`; lots, stock documents and the movement report in `CatalogService` or a new `StockService`; balances in a new `LedgerService` over `payments` plus a new `party_balances` side table (new tables need `tenant_id`, `site_id`, a rollback file and a test; see the Hub map).
 
 ## 9. Not understood (honest list)
 
-PENDING
+**About this file**
+- **Every example is worked by hand from the code. None was run** (the old program cannot be built or run here, and no old database was available). Floating-point effects (the old program uses `double`, this file uses exact decimals) were reasoned about only at the half-paisa ties flagged above.
+- The till screens were compared by extracting and comparing `Calc`, `Compute` and `GridCalc` (identical rules in `frmPOS`, `frmPOSNew`, `frmPOSNewTuch`, `frmPOSTouch`). The **save, hold, edit and delete code was read line by line only in `frmPOS.vb`**; for the touch tills I confirmed by search that the same SQL and ledger calls exist (and found the extra `ByReturn`, serial-number and loyalty-per-line code) but did not read their save handlers line by line.
+- Decompiled code can lose or reshape `If/Else` blocks. The one place where it matters here: the second `rdr.Read()` before the `StockMovement` insert on a sale (2.3 step 6, 6.1). In stock adjustment the same job came out as a proper `If ... Else`, so the sale code may be a recovery artefact. A real database would show whether sales produce movement rows.
+
+**Selling**
+- **What `CustomerOffer.DiscPerc` holds** (percent or amount) and **which screen creates a bill offer**: the till adds the value as an amount (`frmPOS.vb:16479`); `frmCustomerOffer` is a customer sales report; the form that writes the offers (possibly `frmPromotionalOffers` or `fromItemoffervalid`) was not read. Item offers (`Offer2.DiscPerc` by product and date) and free-quantity promotions (`Promotion`) were read only where the till uses them.
+- Loyalty points (rate `txtLpoint`, "calculate on", `LPoint` table, `Company.Loyality_perpoint`), coupons, gift cards (`giftstatus`, `giftamtsave`), and customer discount (`Customer.DiscPer`, `CustDiscApply`) were read only for how they enter the bill discount and the saved columns.
+- **TCS** (tax collected at source: `tcsconn`, `TCSValid`, `TCSPer`) and the **e-way bill** were not worked through.
+- **Broker (agent) commission** (`BrokerCalc`, `BrokerLdr`) formulas are in `frmPOS.vb:18943` (percent of `grand - tax` or of `grand`, or a typed amount) but the saved rows and reports were not checked.
+- Hardware: customer display, weighing scale (`ReadWeightPORT`), cash drawer, KOT (`PrintKOT`), UPI QR, WhatsApp and SMS sends.
+- **`Tender`/`Refund`/`BillCash` for a mixed bill**: `BillAmt` is the sum of "By Cash" rows only (2.1 item 5); what the till shows for `Tender` when the cashier uses only cards was not checked.
+- The default **invoice suffix** (`F1/F2`) assumes the company's financial-year dates are text in `dd/MM/yyyy` form; the real stored format was not seen.
+- `Invcode` columns: known `Code`, `c1`, `c2`, `c4`, `c10`, `c11`, `c12`, `c14`, `c20`, `c21` roles from the screens above; the other columns (`c3`, `c5` to `c9`, `c13`, `c15` to `c19`) were not read (probably the other document types).
+- `InvTemp` and `InvTempEst` (settings that hold a text `c1` per ID), `txtTempQty` (grid column 20) and the `b0` to `b9` variables of the till: purpose not traced.
+- Which user may edit or delete a saved bill (the `UserControl` table, `UserControlSettings`): not read.
+- **`By Return` on the touch till**: that `ByReturn` is excluded from `TotalPayment` was concluded from a search (it is not in the list of paid modes); `SalePOS_DGrandTotal`, called by the touch `Compute`, was not found in `frmPOSTouch.vb`.
+- `frmRefundAmt` (reads `Journal`): a voucher screen for refunds of money to customers or suppliers; not studied.
+- `frmMRP_Purchase_Update`, `frmMRPShow`, `frmMRPShow_Serial`: lot pickers over earlier purchases (MRP, rates, barcode, colour, size); their role in the sale was not traced.
+
+**Buying and stock**
+- **Who sets the barcode of a new lot** on the purchase screen: picking a product fills `Product.Barcode` (5.2); `GenerateBarcode` makes `1000 + next Product_OpeningStock.ID` into `tempbarcode`, which is not used anywhere in `frmPurchaseEntry.vb`.
+- **Purchase order to purchase**: `frmPurcOrderRetrieve` loads lines; no code marks the order as received (5.6).
+- `Stock_Hold` and `Stock_Product_Hold` (purchase hold): mirrored from the sale hold; not read line by line.
+- **Variants**: `Variant_id`, `Temp_product`, `frmProductRec_variant` (6.8) were only seen from the purchase screen.
+- **Transfers between branches**: the exact channel (`ExtDB`, `ExtDB1`, `ExtDB2`, the cloud storage configured in `frmGodownConfig`, `Inward_StockOnline`, `updatetoOffline`), how `Branch_Relation` is filled, and the check "Value not matched in local and online" in the touch transfer save were not traced. The status codes in 6.5 are as seen in the update statements.
+- `Estimate.KP` (only the value "P" was seen), and `Estimate.CType` use.
+- **Product master and tax setup screens** (`frmProduct`, `frmTaxSetting`, `Setting`, `Defaulttaxtype`, `TaxCat`, `BillSundry` types other than TCS, `cmbBSundry`) were not studied in this file (see `docs/old-programs/02-masters-accounting-reports.md` if it covers them).
+- The report screens beyond stock movement, stock in and out, and current stock (sales, purchase, GST registers, ledgers) were not read here.
+
+**The Hub**
+- I read the Hub's code, did not run it. Two behaviours must be tested before anyone relies on them: (1) a credit note on an unpaid credit sale appears not to reduce the customer's outstanding (`Outstanding` counts invoices only); (2) a credit note seems to follow the shop's round-total setting although a code comment says it never rounds.
+- `AllowNegativeStock` default true (`ShopSettings.cs:23`) was read from the settings class; whether the set-up wizard or the industry pack changes it was not checked.
+

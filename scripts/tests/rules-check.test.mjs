@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rulesProblems, REQUIRED_SECTIONS, POINTER_FILES } from '../checks/rules.mjs';
+import { rulesProblems, REQUIRED_SECTIONS, POINTER_FILES, DECISION_COUNT } from '../checks/rules.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const realRead = (f) => { try { return readFileSync(join(repo, f), 'utf8'); } catch { return ''; } };
@@ -41,4 +41,12 @@ test('the open-work list must exist, keep its three parts and say when it was la
   const open = realRead('docs/OPEN-WORK.md');
   assert.ok(rulesProblems(withChange({ 'docs/OPEN-WORK.md': open.replace('## Needs the owner', '## Other') })).some((p) => /lost its part "Needs the owner"/.test(p)));
   assert.ok(rulesProblems(withChange({ 'docs/OPEN-WORK.md': open.replace(/^Last updated: .*$/m, '') })).some((p) => /no "Last updated/.test(p)));
+});
+
+test('the owner\'s recorded decisions must stay: the file, every numbered decision and the owner\'s own description', () => {
+  assert.ok(rulesProblems(withChange({ 'docs/PLATFORM-DECISIONS.md': '' })).some((p) => /docs\/PLATFORM-DECISIONS\.md is missing/.test(p)));
+  const decisions = realRead('docs/PLATFORM-DECISIONS.md');
+  for (let n = 1; n <= DECISION_COUNT; n += 1) assert.equal((decisions.match(new RegExp(`^### ${n}\\. `, 'gm')) ?? []).length, 1, `decision ${n}`);
+  assert.ok(rulesProblems(withChange({ 'docs/PLATFORM-DECISIONS.md': decisions.replace(/^### 7\. .*$/m, '### Seven') })).some((p) => /lost decision 7/.test(p)));
+  assert.ok(rulesProblems(withChange({ 'docs/PLATFORM-DECISIONS.md': decisions.replace('The picture, in the owner', 'x') })).some((p) => /lost the owner's own description/.test(p)));
 });

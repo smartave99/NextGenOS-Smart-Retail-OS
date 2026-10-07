@@ -15,8 +15,12 @@ import { importList } from './csv.mjs';
 import { previewInput, previewHtml, brandCss, readAsset } from './preview.mjs';
 import { makeZip } from './zip.mjs';
 import { readBaseKit } from './basekit.mjs';
-import { buildPack, planPack, PackError } from './pack.mjs';
+// BEGIN built-in kit (the programs that travel inside this Studio; see kitsource.mjs)
+import { builtInKitFolder, programsInUse, programsLine } from './kitsource.mjs';
+// END built-in kit
+import { buildPack, planPack, packOf, PackError } from './pack.mjs';
 import { handoverFor } from './handover.mjs';
+import { tryoutFor } from './tryout.mjs';   // local try-out
 import { inside } from './fsx.mjs';
 import { askForProposal, preview as aiPreview, describeTools, ADAPTERS, AiError } from './ai/index.mjs';
 import { toolStatus, listModels, checkUpdate, updateTool, updateHow } from './ai/control.mjs';
@@ -43,8 +47,8 @@ const PREVIEW_CSP = "default-src 'none'; style-src 'self'; img-src 'self' data:;
  * Starts the Studio. Returns { server, url, token, close, state }. `folder` is the workspace folder (made at first use). `build` is for tests only: it points the build service
  * client at a stand-in on this PC (addresses, how often to look); the real Studio always talks to the one real address.
  */
-export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, build = {} } = {}) {
-  const hooks = { beat: onBeat, quit: onQuit };
+export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, onOpenFolder = null, builtInKit = builtInKitFolder(), build = {} } = {}) {
+  const hooks = { beat: onBeat, quit: onQuit, openFolder: onOpenFolder };
   const token = randomBytes(18).toString('base64url');
   const tokenBuf = Buffer.from(token);
   const state = { ws: Workspace.exists(folder) ? Workspace.open(folder) : null, folder, sessions: new Map(), aiRunning: new Set(), builds: null };
@@ -165,34 +169,30 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   });
 
   // ---- the programs folder, the customer pack, the hand-over sheet ------------------------------------------------------------------
-  const programsFolder = () => String(state.ws.settings().programs?.folder ?? '');
   const kitSummary = (kit) => ({ ok: kit.ok, folder: kit.folder, version: kit.version, trial: kit.trial, signing: kit.signing, problems: kit.problems, files: kit.files.map((f) => ({ name: f.name, role: f.role, os: f.os, arch: f.arch, bytes: f.bytes })) });
   const noKit = { ok: false, folder: '', version: null, trial: false, signing: { windows: 'unknown', android: 'unknown' }, problems: [], files: [] };
-  route('GET', '/api/programs', {}, async () => ({ programs: programsFolder() ? kitSummary(await readBaseKit(programsFolder())) : noKit }));
+  // BEGIN built-in kit: the programs in use are the folder an administrator chose, else the kit built into this Studio (the Complete Setup Studio), else none (kitsource.mjs).
+  const programsNow = (opts = {}) => programsInUse({ chosen: String(state.ws.settings().programs?.folder ?? ''), builtIn: builtInKit, ...opts });
+  const programsSummary = (use) => ({ ...(use.kit ? kitSummary(use.kit) : noKit), source: use.source, builtIn: { present: use.builtIn.present, version: use.builtIn.version, trial: use.builtIn.trial }, newerBuiltIn: use.newerBuiltIn });
+  route('GET', '/api/programs', {}, async () => ({ programs: programsSummary(await programsNow()) }));
   route('PUT', '/api/programs', { limit: 5_000 }, async ({ me, body }) => {
     if (!can(me, 'settings')) throw new StudioError('Only an administrator can choose the programs folder.', 403, 'role');
     const folder = String(body.folder ?? '').trim().replace(/^["']|["']$/g, '');
+    // An empty folder means "use the programs built into this Studio" (or none, when this Studio has none of its own).
+    if (!folder) { state.ws.saveSettings(me, { programs: { folder: '' } }); return { programs: programsSummary(await programsNow()), saved: true }; }
     const kit = await readBaseKit(folder);
-    if (!folder) { state.ws.saveSettings(me, { programs: { folder: '' } }); return { programs: noKit }; }
-    if (!kit.ok) return { programs: kitSummary(kit), saved: false };
+    if (!kit.ok) return { programs: { ...kitSummary(kit), source: 'chosen' }, saved: false };
     state.ws.saveSettings(me, { programs: { folder: kit.folder } });
-    return { programs: kitSummary(kit), saved: true };
+    return { programs: programsSummary(await programsNow()), saved: true };
   });
+  // END built-in kit
   // What the Studio still needs before it can give a customer their outputs, in plain words. The Studio builds nothing itself, so each output comes from somewhere else: say where.
   route('GET', '/api/readiness', {}, async () => {
-    const folder = programsFolder();
-    const kit = folder ? await readBaseKit(folder) : null;
+    const use = await programsNow();   // BEGIN built-in kit
+    const line = programsLine(use);   // END built-in kit
     const service = builds().connection();
     const items = [
-      {
-        id: 'programs', title: 'The shop program (installer)', where: 'settings',
-        state: !folder ? 'missing' : !kit.ok ? 'problem' : kit.trial ? 'trial' : 'ready',
-        text: !folder
-          ? 'The Studio does not build programs. It puts a customer\'s installer together from the files of a release. On GitHub open the release, download every file into one folder, then choose that folder in Settings, "The programs folder". Until then it cannot give anyone an installer.'
-          : !kit.ok ? `The programs folder has a problem: ${kit.problems?.[0] ?? 'it cannot be read'}. Fix it in Settings, "The programs folder".`
-          : kit.trial ? `These files (version ${kit.version}) come from a trial release without licence keys. The Studio can make a pack from them only to try it, never to give to a customer. A release made with your licence keys is needed for a real customer.`
-          : `Release ${kit.version} is in place.`,
-      },
+      { id: 'programs', title: 'The shop program (installer)', where: 'settings', source: use.source, version: use.kit?.version ?? null, state: line.state, text: line.text },
       {
         id: 'build-service', title: 'The website and the Android app for each customer', where: 'settings',
         state: service.ready ? 'ready' : 'missing',
@@ -210,21 +210,48 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   route('GET', '/api/customers/:id/outputs', {}, async ({ params }) => {
     const customer = state.ws.get(params.id);
     const n = latest(params.id);
-    if (!n) return { release: null, programs: noKit, items: [], builds: customer.builds };
+    if (!n) return { release: null, programs: programsSummary(await programsNow()), items: [], builds: customer.builds };
     const parts = state.ws.releaseParts(params.id, n);
-    const programs = programsFolder() ? await readBaseKit(programsFolder()) : null;
+    const use = await programsNow();   // BEGIN built-in kit
+    const programs = use.kit;   // END built-in kit
     // The website and the app made for this customer from this release (by the build service) count as if they were in the programs folder.
     const kit = programs?.ok ? await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(params.id), release: n, customerId: params.id }) : null;
     const items = kit ? planPack({ intake: parts.intake, kit, slug: params.id }).map((i) => ({ id: i.id, title: i.title, status: i.status, note: i.note, files: i.files.map((f) => f.name) })) : [];
-    return { release: parts.info, programs: programs ? kitSummary(programs) : noKit, items, trial: !!kit?.trial, builds: customer.builds };
+    // BEGIN local try-out: where the latest pack is on this PC, and the page of steps for trying it on a test PC (tryout.mjs)
+    const made = packMade(params.id, n);
+    return { release: parts.info, programs: programsSummary(use), items, trial: !!kit?.trial, builds: customer.builds,
+      packFolder: made?.dir ?? null,
+      tryout: tryoutFor({ intake: parts.intake, items, customerId: params.id, trial: !!kit?.trial, packMade: !!made }) };
+    // END local try-out
   });
+  // BEGIN local try-out. The Studio is a program on this PC, so it may show the folder it made in the PC's own file window. It opens only the folder it made itself
+  // (never a path that comes from the page), and only for a person whose role may make installers.
+  const packMade = (id, n) => {
+    const made = [...(state.ws.get(id).builds ?? [])].reverse().find((b) => b.kind === 'pack' && (n === undefined || b.release === n));
+    if (!made) return null;
+    const dir = inside(state.ws.buildsFolder(id, made.release), dirname(made.file));
+    return existsSync(dir) ? { dir, release: made.release } : null;
+  };
+  route('POST', '/api/customers/:id/outputs/open-folder', { limit: 1_000 }, ({ me, params }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot open the installers.', 403, 'role');
+    const made = packMade(params.id);
+    if (!made) throw new StudioError('No pack was made for this customer yet, or its folder is no longer there. Make the pack first, then open its folder.', 409, 'no-pack');
+    if (!hooks.openFolder) throw new StudioError(`This Studio cannot open a folder by itself here. The pack is in: ${made.dir}`, 409, 'no-opener', { folder: made.dir });
+    hooks.openFolder(made.dir);
+    state.ws.log(me, 'pack.folder.opened', params.id, `release ${made.release}`);
+    return { ok: true, folder: made.dir };
+  });
+  // END local try-out
   route('POST', '/api/customers/:id/outputs/pack', { limit: 2_000 }, async ({ me, params, body }) => {
     if (!can(me, 'build')) throw new StudioError('Your role cannot make installers.', 403, 'role');
     const n = latest(params.id);
     if (!n) throw new StudioError('Approve a setup first. Installers are made from an approved release.', 409);
-    if (!programsFolder()) throw new StudioError('Choose the programs folder first (the files of a NextGenOS release).', 409, 'no-programs');
-    const programs = await readBaseKit(programsFolder());
-    if (!programs.ok) throw new StudioError('The programs folder has problems:\n' + programs.problems.join('\n'), 409, 'programs', programs.problems);
+    // BEGIN built-in kit: a pack is always made from a full, fresh check of every file (the first screen may use a remembered one).
+    const use = await programsNow({ fresh: true });
+    if (!use.kit) throw new StudioError('This Studio has no programs to put in a pack. Choose the programs folder first (the files of a NextGenOS release), or use the Complete Setup Studio, which has them built in.', 409, 'no-programs');
+    const programs = use.kit;
+    // END built-in kit
+    if (!programs.ok) throw new StudioError((use.source === 'built-in' ? 'The programs built into this Studio have problems (install the Complete Setup Studio again, or choose a folder with a release\'s files in Settings):\n' : 'The programs folder has problems:\n') + programs.problems.join('\n'), 409, 'programs', programs.problems);
     // Every fingerprint of the website and app made for this customer is read again before they are copied into the pack.
     const kit = await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(params.id), release: n, customerId: params.id, verify: true });
     if (kit.siteProblems.length) throw new StudioError('The website or app made for this customer cannot be used:\n' + kit.siteProblems.join('\n'), 409, 'site', kit.siteProblems);
@@ -256,7 +283,7 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     if (!n) throw new StudioError('Approve a setup first.', 409);
     const parts = state.ws.releaseParts(params.id, n);
     const made = [...(state.ws.get(params.id).builds ?? [])].reverse().find((b) => b.kind === 'pack' && b.release === n);
-    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: made ? { ai: !!made.parts?.some((p) => p.id === 'ai' && p.status === 'ready') } : null }) };
+    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: made ? packOf(made.parts ?? []) : null }) };
   });
 
   // ---- the build service: a customer's website and Android app are made off this PC, for each customer, and come back into the pack ---------

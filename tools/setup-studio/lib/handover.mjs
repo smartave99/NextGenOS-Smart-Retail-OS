@@ -41,6 +41,9 @@ export function handoverFor({ intake: i, info, company = {}, pack = null }) {
   if (i.device.printer !== 'none') steps.push(`Connect the ${(printer?.label ?? 'printer').toLowerCase()}, then open Settings, then Devices, to choose it.`);
   steps.push('Make your first sale to try it.');
   if (pack?.ai) steps.push('Then, for the AI assistant, open the folder "2 - AI assistant (Windows)" and double-click its setup file. Keep the folder called "profile" next to it: it holds your own settings for the photos and posters.');
+  // Who gets which file: the shop program and the AI assistant go on the shop's own computer; the website is for whoever puts it online; the app goes to phones (and the store file to whoever publishes it).
+  if (pack?.website) steps.push('Your website is in the folder "3 - Website". It does not go on the shop computer: give it to the person who will put it online. It carries everything it needs to run, and the page inside lists the accounts (its database and its picture storage) that person sets up.');
+  if (pack?.android) steps.push('Your Android app is in the folder "4 - Android app". Copy the file ending in .apk to a phone and open it (if the phone asks, allow installing from this source). If the folder also has a file ending in .aab, that one is for whoever publishes the app in the Google Play Store: it cannot be opened on a phone. The app shows your website, so the website must be online first.');
 
   const contact = [company.supportPhone, company.supportEmail, company.website].filter(Boolean);
   const sections = [

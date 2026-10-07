@@ -135,6 +135,9 @@ export function websiteSettingsLine(intake) {
   return values.some((l) => l.includes(';')) ? null : values.join(';');
 }
 
+/** What of a pack really holds a program (not only a page of steps), as the hand-over sheet needs it. `plan` is planPack's list, or the parts a recorded pack remembers: [{ id, status }]. */
+export const packOf = (plan) => Object.fromEntries(['ai', 'website', 'android'].map((id) => [id, plan.some((p) => p.id === id && p.status === 'ready')]));
+
 /** The file name the release workflow gives a customer's website for one system (scripts/make-website-package.mjs): website-<customer>-<windows|linux>.zip. */
 export const websiteFileName = (customerId, os) => `website-${customerId}-${os}.zip`;
 
@@ -307,7 +310,7 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
 
   // The hand-over sheet, last, so it can name what is in the pack.
   const logoUri = logo ? `data:image/${logo.ext === 'jpg' ? 'jpeg' : logo.ext === 'svg' ? 'svg+xml' : logo.ext};base64,${logo.bytes.toString('base64')}` : null;
-  const sheet = handoverFor({ intake, info, company, pack: { ai: plan.some((p) => p.id === 'ai' && p.status === 'ready') } });
+  const sheet = handoverFor({ intake, info, company, pack: packOf(plan) });
   put('START HERE.html', handoverHtml(sheet, { colour: intake.look.primaryColor, logo: logoUri }));
 
   // What is in it, with every file's fingerprint.

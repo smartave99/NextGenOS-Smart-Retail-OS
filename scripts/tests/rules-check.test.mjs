@@ -50,3 +50,10 @@ test('the owner\'s recorded decisions must stay: the file, every numbered decisi
   assert.ok(rulesProblems(withChange({ 'docs/PLATFORM-DECISIONS.md': decisions.replace(/^### 7\. .*$/m, '### Seven') })).some((p) => /lost decision 7/.test(p)));
   assert.ok(rulesProblems(withChange({ 'docs/PLATFORM-DECISIONS.md': decisions.replace('The picture, in the owner', 'x') })).some((p) => /lost the owner's own description/.test(p)));
 });
+
+test('the owner\'s own words must stay: the file, the standing words, and the messages', () => {
+  assert.ok(rulesProblems(withChange({ 'docs/OWNER-REQUESTS.md': '' })).some((p) => /docs\/OWNER-REQUESTS\.md is missing/.test(p)));
+  const words = realRead('docs/OWNER-REQUESTS.md');
+  assert.ok(rulesProblems(withChange({ 'docs/OWNER-REQUESTS.md': words.replace('Standing words of the owner', 'x') })).some((p) => /lost the owner's standing words/.test(p)));
+  assert.ok(rulesProblems(withChange({ 'docs/OWNER-REQUESTS.md': words.split('## Messages, oldest first')[0] })).some((p) => /lost owner messages/.test(p)));
+});

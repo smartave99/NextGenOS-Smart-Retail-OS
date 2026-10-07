@@ -19,10 +19,11 @@ export const REQUIRED_SECTIONS = [
   [14, 'Everyone reads the same rules', 'AGENTS.md'],
   [15, 'Version 2', 'never depends on AI'],
   [16, 'How the platform works', 'docs/PLATFORM-DECISIONS.md'],
+  [17, 'Reuse first', 'docs/OWNER-REQUESTS.md'],
 ];
 
 /** The owner's decisions, recorded one by one in docs/PLATFORM-DECISIONS.md: every numbered decision must stay, so that no answer the owner gave is lost and asked again. */
-export const DECISION_COUNT = 23;
+export const DECISION_COUNT = 25;
 
 /** The files that only point to CLAUDE.md, so that an assistant that does not read CLAUDE.md by name still finds the rules. */
 export const POINTER_FILES = ['AGENTS.md', 'GEMINI.md', '.github/copilot-instructions.md', '.cursor/rules/project-rules.mdc'];
@@ -53,6 +54,12 @@ export function rulesProblems(read) {
   else {
     for (let n = 1; n <= DECISION_COUNT; n += 1) if (!new RegExp(`^### ${n}\\. `, 'm').test(decisions)) problems.push(`docs/PLATFORM-DECISIONS.md has lost decision ${n}.`);
     if (!decisions.includes('The picture, in the owner')) problems.push("docs/PLATFORM-DECISIONS.md has lost the owner's own description of the platform.");
+  }
+  const words = read('docs/OWNER-REQUESTS.md');
+  if (!words) problems.push("docs/OWNER-REQUESTS.md is missing: it keeps the owner's own messages word for word, so that nobody has to guess what the owner wanted.");
+  else {
+    if (!words.includes('Standing words of the owner')) problems.push("docs/OWNER-REQUESTS.md has lost the owner's standing words.");
+    if ((words.match(/^### \d{4}-\d{2}-\d{2}/gm) ?? []).length < 20) problems.push('docs/OWNER-REQUESTS.md has lost owner messages: it must keep every one, word for word (never shortened).');
   }
   const open = read('docs/OPEN-WORK.md');
   if (!open) problems.push('docs/OPEN-WORK.md is missing: it is where "what is left" and "what only the owner can do" are written.');

@@ -149,3 +149,14 @@ The owner answered these one by one on 7 October 2026. They are decided: **do no
 - **Payments:** the software records the amount and the method; it never sees a card number. Certified provider connections come later, per country.
 - **Hosting:** clients may put the website online themselves, or NextGenOS hosts it for a fee. **Staff first; partners (resellers) later.**
 - **Say what is built.** Most of this is **not built yet**. `docs/PLATFORM-DECISIONS.md` says for each decision what exists today, and `docs/OPEN-WORK.md` lists the work. No screen, guide or answer says the platform does what it does not (§11).
+
+## 17. Reuse first: edit and use what exists; ask before building something new instead
+
+The owner's words: "i wanted you to edit and use it or else i will be wasting resources to create from start" (`docs/OWNER-REQUESTS.md`, `docs/PLATFORM-DECISIONS.md` decision 25).
+
+- **Look before you build.** Before you write a new program, library, screen or tool, search the repository (`apps/`, `libs/`, `tools/`, `scripts/`, `licensing/`) for the one that already does the job, and say in your answer what you found.
+- **Reuse and edit it.** The existing programs (the Windows POS `apps/pos-desktop`, the AI add-on `apps/pos-ai-companion`, the dashboard `apps/pos-dashboard-service`, the website and Android app `apps/storefront-web-mobile`, the Business Hub `apps/business-hub`, the Studios) are the owner's product. Make them better; do not replace them.
+- **A new program instead of, or beside, an old one needs the owner's yes first.** Tell the owner in plain words what exists, why it is not enough, what the new one costs and what would be lost, then **wait**. "Continue" or silence is not a yes. If you think an old program cannot be reused, say so and ask; do not decide alone and do not build first.
+- **Write down what is reused and what is new** in `docs/OPEN-WORK.md`, so that the owner can see where the work went.
+- **The owner's own words are in `docs/OWNER-REQUESTS.md`.** Read it before you plan. Add each new message from the owner to the end of it, word for word, in the same session. If your summary and that file differ, that file is right.
+

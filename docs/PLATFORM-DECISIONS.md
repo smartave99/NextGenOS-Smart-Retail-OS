@@ -204,6 +204,13 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** The recovered Windows POS source (`apps/pos-desktop` and its companion libraries) **belongs to the owner. This is settled. No assistant and no document asks the owner for proof of ownership, a lawyer's opinion or original paperwork about it, and none lists it as an open item or as something "not verified".** It was removed from the gate's NOT VERIFIED list and from `docs/OPEN-WORK.md`. (Separate and still in force: the licences of third-party libraries are listed and noticed as `CLAUDE.md` section 3 says; that is a duty of the build, not a question to the owner.)
 - **Today:** Done: removed from the gate's list and from the documents that called it open (`docs/OPEN-WORK.md`, `docs/COMMERCIALIZATION_READINESS.md`, `docs/SECURITY-MODEL.md`, `docs/MERGE-PLAN.md`).
 
+### 28. The repository holds only four things; the rest is deleted, and the history too
+
+- **Said (the owner, in their own words):** "there should be only 4 thing in codebase one supper installer aka studio 2nd offline software all merged and greatest and user freindly as if created by apple for design and microsft for enterprises 3rd the website 4th the apk rest delete and delete git history nothing to be traced clean and smooth resporitory and dont waste my time and resource any doubt ask one by one".
+- **Rule:** The repository ends up with **four things**: (1) the **super installer, the Studio**; (2) the **offline software**, all merged (the older Windows POS, the Business Hub, the AI add-on and the dashboard become one program), with Apple-like design and Microsoft-like enterprise strength; (3) the **website**; (4) the **Android app (APK)**. Everything else is deleted, and **the git history is deleted so that nothing old can be traced**. Doubts are asked **one at a time**, and not repeated.
+- **Two steps cannot be undone** (deleting the older programs once their features are merged, and deleting the history), so they are done **last**, only after the owner has answered the questions below, and **the history is deleted only when the owner says "go" for that step** (`CLAUDE.md` section 12). The questions are asked one by one in the conversation and the answers are added here.
+- **Today:** Nothing is deleted yet. The merge (decision 26) is the work before any deletion: removing a program before its features are merged would lose them for good.
+
 ## Still to ask, and open items
 
 - Pricing details: how many PCs the one price covers; the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).

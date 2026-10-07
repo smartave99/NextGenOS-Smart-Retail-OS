@@ -23,7 +23,7 @@ export const REQUIRED_SECTIONS = [
 ];
 
 /** The owner's decisions, recorded one by one in docs/PLATFORM-DECISIONS.md: every numbered decision must stay, so that no answer the owner gave is lost and asked again. */
-export const DECISION_COUNT = 25;
+export const DECISION_COUNT = 26;
 
 /** The files that only point to CLAUDE.md, so that an assistant that does not read CLAUDE.md by name still finds the rules. */
 export const POINTER_FILES = ['AGENTS.md', 'GEMINI.md', '.github/copilot-instructions.md', '.cursor/rules/project-rules.mdc'];

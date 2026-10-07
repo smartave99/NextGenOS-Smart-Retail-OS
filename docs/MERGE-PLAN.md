@@ -1,0 +1,85 @@
+# Merge plan: one shop program, the best of the older Windows POS and the Business Hub
+
+Written on 7 October 2026. This page is a **plan and a list of facts, not finished work**. Nothing has been ported, built or deleted yet. The owner's decision is in `docs/PLATFORM-DECISIONS.md` (decisions 25 and 26) and the owner's own words are in `docs/OWNER-REQUESTS.md`.
+
+## What the owner said
+
+> merge it fool make the best out of it and delete rest instead of wasting the token
+
+(7 October 2026, in answer to: which program should be the shop program that customers get?)
+
+## How this plan reads it (if the reading is wrong, the owner says so and this page is changed)
+
+- **One shop program, not two.** Customers get one program.
+- **The Business Hub is the host.** The older Windows POS's features and business rules are **brought into it, screen by screen, from the recovered source**: not rewritten from nothing, and not guessed. Where the old POS does something better, its way is kept.
+- **"Delete the rest" is done carefully:** a piece of the old POS is removed from the repository only **after** the Hub does the same job and a test shows it. Git history keeps everything that is deleted, and a deletion is one commit that can be undone. Nothing is deleted before then.
+
+## Why the Hub is the host (facts, checked on 7 October 2026)
+
+| | Older Windows POS (`apps/pos-desktop`) | Business Hub (`apps/business-hub`) |
+|---|---|---|
+| Builds by itself | **No.** Only on a Windows PC with MSBuild; no workflow builds it | Yes (the release workflow; 38 gate checks) |
+| Can make a new customer's database | **No.** `DBscript.sql` and `CompanyMasterDBScript.sql` are named in its guide but are **not in the repository** | Yes (migrations; sample company) |
+| Runs on | Windows only, 32-bit, needs SQL Server | Windows and Linux, own database file |
+| Trades and countries | Retail, Indian GST (rupees, GST words, WhatsApp flows in thousands of places) | Retail, restaurant, library, construction, services, wholesale; country packs |
+| White-label, licence | Licence enforced and brand from the licence (edited already) | Built in |
+| Source | Recovered from compiled files; the owner still has to prove NextGenOS may resell it (`docs/OPEN-WORK.md`, item 6) | Written new, owned |
+
+The old POS has what the Hub does not yet have: **397 screens** of Indian retail and accounting features. That is what is worth bringing across.
+
+## What the older POS has, and what the Hub has today
+
+The old POS's screens (`apps/pos-desktop/Documentation/UI_SCREEN_INVENTORY.csv`) grouped by what they do. The counts come from the screens' names (a screen can be counted in one group only, so they are approximate). The "Hub today" column comes from the Hub's screens and a search of its code. **Each row is checked line by line when its turn comes; until then it is a first reading.**
+
+| Group (old POS screens) | Hub today | To bring across |
+|---|---|---|
+| Selling at the till: bills, touch till, hold, returns, refunds, multi-payment (27) | Have: sell, bill, hold, split payments, credit notes, void | India touch-till variants, cash refund details |
+| Estimates and quotations (6) | Have: quotes | Retrieve and convert flows, if different |
+| Buying: purchase entry, orders, returns, stock inward (23) | Partly: purchases, receive, pay | Purchase returns, GST purchase registers, inward notices |
+| Stock: entry, adjust, transfer, godown, damage, settlement, movement (20) | Partly: items and stock adjustment | Transfers between godowns and branches, damage, settlement, movement report |
+| Products: categories, units, bulk change, variants, serial numbers, combo packs, labels, import and export (61) | Partly: items, variants, serial numbers, barcodes | Bulk price and product change, combo packs, barcode label printing, Excel import and export, product images |
+| Customers: ledger, outstanding, receipts, loyalty, coupons, offers, gifts (39) | Partly: customers, credit and terms, balances | **Loyalty, coupons, gifts, offers, customer receipts and statements** |
+| Suppliers (8) | Partly | Supplier ledger and outstanding |
+| Accounting books: general ledger, day book, vouchers, bank, contra, income and expense, balance sheet, trial balance, profit and loss (41) | **Not found** | The accounting books, as a module |
+| India tax and compliance: GSTR-1, GSTR-3B, HSN, e-way bill, TCS, GST registers (21) | Partly: tax rates through the country pack | **GST returns and registers, e-way bill, TCS**, as the India country module |
+| Staff and salespeople: employees, attendance, salary, commission (13) | **Not found** | A staff and salesperson module |
+| Restaurant and kitchen: tables, kitchen section, orders, tokens (3) | Have | Token flows, if different |
+| Services and job billing (7) | Have: services, appointments | Service-done reports |
+| Branches, companies, year change (9) | Not built (one database is one shop; head-office view is decision 12) | Branch master and branch reports; financial-year change |
+| Messages: WhatsApp, SMS, email, chat, broadcast (21) | **Not found** as shop features | Only with the owner's permission for what leaves the shop (decision 4 and `CLAUDE.md` section 15) |
+| Leads, follow-up, support, reminders (10) | **Not found** | A small CRM module |
+| Reports (8) | Partly: reports page | The old POS's report set, one by one |
+| Settings, users, printing, backup, language, system (34) | Partly: users and roles, printing, theme | Backup (decision 11), shortcut keys, language conversion |
+| Extras: online shop link, gallery, camera, image reader, calculator, UPI QR (15) | The website and the dashboard are separate programs that already exist | UPI QR only as a payment provider later (decision 13); the rest as asked |
+| Left over, not grouped (31) | n/a | Look one by one (many are tests and dialogs) |
+
+## Order of work (a proposal; the owner can change it)
+
+1. **Move the data first.** A reader for the old POS's SQL Server database, so a customer who has the old POS can move to the merged program with their items, customers, balances and history (decision 17). The old POS's table layout survives in `apps/pos-ai-companion` (`Data/PosSchemaData.cs`); the owner can also give the database scripts or a backup, which would make it exact.
+2. **Customers: loyalty, coupons, gifts, offers, receipts, statements.**
+3. **India module: GST returns, registers, e-way bill, TCS.**
+4. **Products and stock tools:** bulk change, combo packs, labels, import and export, transfers, damage, settlement.
+5. **Accounting books.**
+6. **Staff and salespeople.**
+7. **Branches and the head-office view; messages (with permission); leads and reminders; the rest.**
+
+Each step: look at the old screen and its recovered code, port the rule with the old POS's numbers, write a test that pins the money, run the gate, then remove that part of the old POS in its own commit.
+
+## What is deleted, and when (nothing is deleted yet)
+
+| What | When |
+|---|---|
+| The helper agents' working folders (not product code) | **Done on 7 October 2026.** Their unfinished work is saved as commits on branches `worktree-agent-*` and nothing is lost. |
+| The old POS's screens and code, group by group | After the Hub does the same job and a test shows it (one commit per group, so each can be undone). |
+| The old POS's companion libraries (Firebase licence manager, ChromeDriver, WhatsApp automation, PhonePe, speech, transliteration...) | With the part of the old POS that uses them. The Firebase licence manager goes first: the signed licence replaces it. |
+| The whole of `apps/pos-desktop` | Last, once the data reader works on a real customer's database and every group is ported or dropped by the owner. |
+| The old trial releases `v1.0.0-trial7` and `v1.0.0-trial8` on GitHub (replaced by trial 9) | **Only when the owner says so**: deleting a release needs the owner's word for that action (`CLAUDE.md`, section 12). |
+| Git history | **Never.** One exception only, with the owner's word: removing old secrets from history (`docs/OPEN-WORK.md`, item 4). |
+
+**Keep outside the repository:** the owner's own copy of the old POS installers and a backup of a working database (the repository does not have them). Deleting code from the repository does not touch a customer's installed old POS.
+
+## What is needed from the owner
+
+- The two database scripts, or a backup of a working database of the old POS (a copy with no real customer data is fine).
+- The order in step "Order of work", if it is not right.
+- A list of the three or four screens of the old POS that customers use every day, so that those come first and are checked against how people really work.

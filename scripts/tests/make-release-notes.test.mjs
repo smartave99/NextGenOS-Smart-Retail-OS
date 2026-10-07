@@ -143,8 +143,8 @@ test('a template with a place the program does not know, or a missing folder, st
 test('the real template has every place the program fills, and no other', () => {
   const text = readFileSync(template, 'utf8');
   const used = new Set([...text.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]));
-  for (const p of ['TRIAL_BANNER', 'VERSION', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT']) assert.ok(used.has(p), `${p} is in the template`);
-  assert.equal(used.size, 7);
+  for (const p of ['TRIAL_BANNER', 'VERSION', 'CHANGELOG', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT']) assert.ok(used.has(p), `${p} is in the template`);
+  assert.equal(used.size, 8);
 });
 
 // ---- a release of the Setup Studio alone (a tag such as studio-v1.0.0) ----------------------------------------------------------------------
@@ -214,7 +214,20 @@ test('only the Studio can be asked for alone', () => {
 test('the Studio template has every place the program fills, and no other', () => {
   const text = readFileSync(join(repo, '.github', 'release-notes-studio.md'), 'utf8');
   const used = new Set([...text.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]));
-  for (const p of ['VERSION', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT']) assert.ok(used.has(p), `${p} is in the template`);
+  for (const p of ['VERSION', 'CHANGELOG', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT']) assert.ok(used.has(p), `${p} is in the template`);
   assert.ok(!used.has('TRIAL_BANNER'), 'a Studio release is never a trial without keys: it holds no keys at all');
-  assert.equal(used.size, 6);
+  assert.equal(used.size, 7);
+});
+
+test('a Studio release with a Windows installer has installer steps and changelog', () => {
+  const filesWithInstaller = [...STUDIO_FILES, 'NextGenOS-Setup-Studio-Setup-1.0.0.exe'];
+  const dir = folder(filesWithInstaller, { 'BUILD-STATUS.txt': STUDIO_STATUS });
+  try {
+    const { status, out } = studioNotes(dir);
+    assert.equal(status, 0);
+    assert.match(out, /### What changed in this version \(Change log\)/);
+    assert.match(out, /Download \*\*`NextGenOS-Setup-Studio-Setup-1\.0\.0\.exe`\*\*/);
+    assert.match(out, /Windows 1-click installer/);
+    assert.match(out, /\| The Setup Studio for Windows \(1-click installer\) \| `NextGenOS-Setup-Studio-Setup-1\.0\.0\.exe` \|/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

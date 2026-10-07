@@ -2,6 +2,7 @@
 
 **What it is.** The program your team uses to set up a new customer. A person opens it, starts a new project for a new company, fills in the company's details (name, country, kind of business, look, words, first items), and the Studio puts together the customer's setup for them. It holds no licence keys and no source code, and it sells nothing: a customer's licence key comes from the NextGenOS Licence Studio.
 
+{{CHANGELOG}}
 {{START_HERE}}
 {{MISSING}}
 ### Read this before you test

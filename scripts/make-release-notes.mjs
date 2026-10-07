@@ -17,7 +17,21 @@ import { fileURLToPath } from 'node:url';
 import { RULES } from './make-base-kit.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PLACES = ['TRIAL_BANNER', 'VERSION', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT'];
+const PLACES = ['TRIAL_BANNER', 'VERSION', 'CHANGELOG', 'START_HERE', 'MISSING', 'ALL_FILES', 'STATUS', 'COMMIT'];
+
+/** Reads the newest entry from the relevant changelog file. */
+function readChangelog(repo, only = '') {
+  const file = only === 'studio'
+    ? join(repo, 'tools', 'setup-studio', 'CHANGELOG.md')
+    : join(repo, 'apps', 'business-hub', 'CHANGELOG.md');
+  const fallback = join(repo, 'CHANGELOG.md');
+  const target = existsSync(file) ? file : existsSync(fallback) ? fallback : null;
+  if (!target) return '';
+  const text = readFileSync(target, 'utf8');
+  const m = /^##\s+[^\r\n]+[\r\n]+([\s\S]*?)(?=^##\s+|$)/m.exec(text);
+  if (!m) return '';
+  return `### What changed in this version (Change log)\n\n${m[0].trim()}\n\n`;
+}
 
 /** What each file that is not a program is, by its exact name. */
 const NOTES = new Map([
@@ -56,6 +70,8 @@ function inventory(dist) {
     }
     const studio = /^NextGenOS-Setup-Studio-(\d+\.\d+\.\d+)-(windows|linux)\.zip$/.exec(name);
     if (studio) { role = 'studio'; info = { os: studio[2] }; what = 'The Setup Studio for NextGenOS staff, with its own Node.js. Never for a customer.'; }
+    const studioSetup = /^NextGenOS-Setup-Studio-Setup-(\d+\.\d+\.\d+)\.exe$/.exec(name);
+    if (studioSetup) { role = 'studio-installer'; info = { os: 'windows' }; what = 'The Setup Studio for Windows: 1-click setup installer (NextGenOS staff only).'; }
     out.push({ name, role, ...info, bytes: statSync(path).size, what: what ?? 'Other file of this release.' });
   }
   return out;
@@ -136,23 +152,43 @@ function startHere(files, ctx) {
     sections.push(lines);
   }
 
-  const studios = files.filter((f) => f.role === 'studio');
+  const studios = files.filter((f) => f.role === 'studio' || f.role === 'studio-installer');
   if (studios.length) {
-    const win = studios.find((s) => s.os === 'windows');
-    const lin = studios.find((s) => s.os === 'linux');
+    const installer = studios.find((s) => s.role === 'studio-installer');
+    const win = studios.find((s) => s.role === 'studio' && s.os === 'windows');
+    const lin = studios.find((s) => s.role === 'studio' && s.os === 'linux');
+    const zips = studios.filter((s) => s.role === 'studio');
     const lines = [
       '#### For NextGenOS staff only: the Setup Studio',
-      `Download ${studios.map((s) => code(s.name) + (s.os === 'windows' ? ' (Windows)' : ' (Linux)')).join(' or ')}. **Never give it to a customer.**`,
-      '1. Unzip it, and open the folder "NextGenOS Setup Studio" inside.',
-      `2. ${[win ? 'Windows: double-click **Setup Studio** (the icon with the blue box)' : '', lin ? `Linux: type ${code('./setup-studio.sh')} in a terminal in that folder (the terminal can be closed at once; ${code('./setup-studio.sh --install-menu')} puts the Studio in the applications menu)` : ''].filter(Boolean).join('. ')}. The Studio opens in a window of its own. There is no black terminal window.`,
-      win ? '   Windows may say "Windows protected your PC", because the program is not signed yet. Click **More info**, then **Run anyway**.' : '',
-      '3. The first time, make the administrator account (a name and a password of at least 8 characters).',
-      '4. To stop the Studio, close its window, or press the power button at the bottom left of the Studio. Opening it again while it is open just brings up its window.',
-      studioOnly
-        ? '5. To make a customer\'s setup the Studio needs the programs of a full release (the shop program, the website and the Android app): download every file of that release into one folder and give that folder to the Studio (Settings, "The programs folder"). This release holds only the Studio.'
-        : '5. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
-      files.some((f) => f.name === 'HOW-TO-TRY.txt') ? `6. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.` : '',
     ];
+    if (installer) {
+      lines.push(
+        `Download **${code(installer.name)}** (the Windows 1-click installer) or ${zips.map((s) => code(s.name) + (s.os === 'windows' ? ' (Windows portable zip)' : ' (Linux zip)')).join(' or ')}. **Never give it to a customer.**`,
+        '',
+        `1. **Windows 1-click install:** double-click ${code(installer.name)} and follow the setup wizard. It adds shortcuts to your Desktop and Start menu and opens Setup Studio in a window of its own (no terminal).`,
+        installer && !ctx.windowsSigned ? '   Windows may say "Windows protected your PC", because the program is not signed yet. Click **More info**, then **Run anyway**.' : '',
+        `2. **Or run portable from zip:** unzip ${code((win ?? lin).name)} and double-click **Setup Studio** (or ${code('./setup-studio.sh')} on Linux).`,
+        '3. The first time, make the administrator account (a name and a password of at least 8 characters).',
+        '4. To stop the Studio, close its window, or press the power button at the bottom left of the Studio. Opening it again while it is open just brings up its window.',
+        studioOnly
+          ? '5. To make a customer\'s setup the Studio needs the programs of a full release (the shop program, the website and the Android app): download every file of that release into one folder and give that folder to the Studio (Settings, "The programs folder"). This release holds only the Studio.'
+          : '5. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
+        files.some((f) => f.name === 'HOW-TO-TRY.txt') ? `6. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.` : '',
+      );
+    } else {
+      lines.push(
+        `Download ${studios.map((s) => code(s.name) + (s.os === 'windows' ? ' (Windows)' : ' (Linux)')).join(' or ')}. **Never give it to a customer.**`,
+        '1. Unzip it, and open the folder "NextGenOS Setup Studio" inside.',
+        `2. ${[win ? 'Windows: double-click **Setup Studio** (the icon with the blue box)' : '', lin ? `Linux: type ${code('./setup-studio.sh')} in a terminal in that folder (the terminal can be closed at once; ${code('./setup-studio.sh --install-menu')} puts the Studio in the applications menu)` : ''].filter(Boolean).join('. ')}. The Studio opens in a window of its own. There is no black terminal window.`,
+        win ? '   Windows may say "Windows protected your PC", because the program is not signed yet. Click **More info**, then **Run anyway**.' : '',
+        '3. The first time, make the administrator account (a name and a password of at least 8 characters).',
+        '4. To stop the Studio, close its window, or press the power button at the bottom left of the Studio. Opening it again while it is open just brings up its window.',
+        studioOnly
+          ? '5. To make a customer\'s setup the Studio needs the programs of a full release (the shop program, the website and the Android app): download every file of that release into one folder and give that folder to the Studio (Settings, "The programs folder"). This release holds only the Studio.'
+          : '5. To make a customer\'s setup, download every file of this release into one folder and give that folder to the Studio (Settings, "The programs folder"). It uses `base-kit.json` to check that no file is damaged.',
+        files.some((f) => f.name === 'HOW-TO-TRY.txt') ? `6. The whole walk-through, with what to look for, is in ${code('HOW-TO-TRY.txt')}.` : '',
+      );
+    }
     sections.push(lines.filter((l) => l !== ''));
   }
 
@@ -172,7 +208,8 @@ function startHere(files, ctx) {
       ['The shop program on Linux', studioOnly ? [] : by('hub-linux-deb').map((f) => f.name)],
       ['The online shop (website)', studioOnly ? [] : by('website').map((f) => f.name)],
       ['The Android app', studioOnly ? [] : by('android-apk').map((f) => f.name)],
-      ['The Setup Studio (NextGenOS staff only)', files.filter((f) => f.role === 'studio').map((f) => f.name)],
+      ['The Setup Studio for Windows (1-click installer)', files.filter((f) => f.role === 'studio-installer').map((f) => f.name)],
+      [files.some((f) => f.role === 'studio-installer') ? 'The Setup Studio (portable zip)' : 'The Setup Studio (NextGenOS staff only)', files.filter((f) => f.role === 'studio').map((f) => f.name)],
     ].filter(([, names]) => names.length).map(([what, names]) => `| ${what} | ${names.map(code).join('<br>')} |`),
   ].join('\n');
   // A blank line after the heading and after the "Download ..." line, so every list is drawn as a list.
@@ -191,7 +228,7 @@ function missing(files, status, only = '') {
     ['The website for Windows', !has('website', 'windows'), /^Website/],
     ['The website for Linux', !has('website', 'linux'), /^Website/],
     ['The Android app', !has('android-apk'), /^Android/],
-    ['The Setup Studio for Windows', !has('studio', 'windows'), /^Setup Studio/],
+    ['The Setup Studio for Windows', !has('studio', 'windows') && !has('studio-installer', 'windows'), /^Setup Studio/],
     ['The Setup Studio for Linux', !has('studio', 'linux'), /^Setup Studio/],
   ].filter(([what, absent]) => absent && (only !== 'studio' || /Setup Studio/.test(what)));
   if (!parts.length) return '';
@@ -209,7 +246,7 @@ export function makeNotes({ dist, template, commit, tag = '', version = '', only
   const files = inventory(dist);
   const hub = files.find((f) => f.role?.startsWith('hub-'));
   const fromName = hub ? /(\d+\.\d+\.\d+)/.exec(hub.name)?.[1] : '';
-  const fromStudio = /(\d+\.\d+\.\d+)/.exec(files.find((f) => f.role === 'studio')?.name ?? '')?.[1] ?? '';
+  const fromStudio = /(\d+\.\d+\.\d+)/.exec(files.find((f) => f.role === 'studio' || f.role === 'studio-installer')?.name ?? '')?.[1] ?? '';
   const fromTag = /^(?:studio-)?v?(\d+\.\d+\.\d+)/.exec(tag)?.[1] ?? '';
   const status = readText(dist, 'BUILD-STATUS.txt');
   const trial = existsSync(join(dist, 'NO-LICENCE-KEYS-TRIAL-ONLY.txt'));
@@ -224,6 +261,7 @@ export function makeNotes({ dist, template, commit, tag = '', version = '', only
       ? '> **TRIAL BUILD, NO LICENCE KEYS.** The programs in this release can never be activated. They are only for trying the install, the service and the uninstall. Never give them to a customer.\n\n'
       : '',
     VERSION: version || (only === 'studio' ? fromStudio : fromName) || fromTag || 'unknown',
+    CHANGELOG: readChangelog(resolve(here, '..'), only),
     START_HERE: startHere(files, ctx),
     MISSING: missing(files, status, only),
     ALL_FILES: allFiles(files),

@@ -37,6 +37,7 @@ import { auditFolder, findSecrets } from './audit-package.mjs';
 import { auditPrerequisites } from './audit-prerequisites.mjs';
 import { writeZipFile } from '../tools/setup-studio/lib/zip.mjs';
 import { buildLauncher } from './lib/build-launcher.mjs';
+import { PUBLIC_SETTINGS as RULES_PUBLIC_SETTINGS, parseSettings as parseWithRules } from '../apps/storefront-web-mobile/src/lib/customer/rules.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repo = resolve(here, '..');
@@ -78,46 +79,14 @@ export const packageName = (customer, os) => `website-${checkCustomer(customer)}
 // The customer's public settings
 // ---------------------------------------------------------------------------------------------------------------------
 
-const plain = (max) => (v) => (v.length > max ? `is longer than ${max} letters` : /[<>\u0000-\u001f\u007f]/.test(v) ? 'has a character that is not allowed (< > or a control character)' : null);
-const webAddress = (secure) => (v) => {
-  let u;
-  try { u = new URL(v); } catch { return 'is not a web address (write it like https://shop.example.com)'; }
-  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && !secure)) return secure ? 'must start with https://' : 'must start with http:// or https://';
-  if (u.username || u.password) return 'must not hold a user name or a password';
-  if (u.search || u.hash) return 'must not have a ? or a # part';
-  return v.length > 200 ? 'is too long' : null;
-};
-const pattern = (re, example) => (v) => (re.test(v) ? null : `is not in the form ${example}`);
+// The checks of each public setting are written once, in the website's own folder (apps/storefront-web-mobile/src/lib/customer/rules.mjs): the running website
+// reads a customer's settings with the same rules, and so does the assemble step. Here only the scan for keys is added (the release gate's own).
 
 /**
- * The public settings the website knows (NEXT_PUBLIC_*: compiled into the pages every visitor receives). Anything else is refused: a private setting
+ * The public settings the website knows (NEXT_PUBLIC_*, as the Setup Studio writes them in website-settings.env). Anything else is refused: a private setting
  * (database address, password, key) belongs in private-settings.env on the computer that runs the website, never in the package.
  */
-export const PUBLIC_SETTINGS = {
-  NEXT_PUBLIC_SITE_NAME: { required: true, check: (v) => (v ? plain(80)(v) : 'is empty') },
-  NEXT_PUBLIC_SITE_URL: { check: webAddress(false) },
-  NEXT_PUBLIC_COUNTRY: { check: pattern(/^[A-Z]{2}$/, 'two capital letters, such as PH') },
-  NEXT_PUBLIC_REGION_CODE: { check: pattern(/^[A-Z]{2}$/, 'two capital letters, such as PH') },
-  NEXT_PUBLIC_INDUSTRY: { check: pattern(/^[a-z][a-z-]{1,30}$/, 'small letters, such as retail') },
-  NEXT_PUBLIC_SHOP_PLACE: { check: plain(120) },
-  NEXT_PUBLIC_SUPABASE_URL: { check: webAddress(true) },
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: { check: (v) => (/^sb_publishable_[A-Za-z0-9_-]{10,}$/.test(v) ? null : 'must be the publishable key (sb_publishable_...). A secret key is never put in a website') },
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: {
-    check: (v) => {
-      const m = /^eyJ[\w-]+\.([\w-]+)\.[\w-]+$/.exec(v);
-      if (!m) return 'is not a public (anon) key';
-      try { return JSON.parse(Buffer.from(m[1], 'base64url').toString()).role === 'anon' ? null : 'is not the public (anon) key: a key with another role is never put in a website'; } catch { return 'is not a public (anon) key'; }
-    },
-  },
-  NEXT_PUBLIC_FIREBASE_API_KEY: { check: pattern(/^[A-Za-z0-9_-]{20,60}$/, 'the web API key from the Firebase console') },
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: { check: pattern(/^[a-z0-9.-]{4,100}$/, 'a host name') },
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: { check: pattern(/^[a-z0-9-]{4,40}$/, 'a project id') },
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: { check: pattern(/^[a-z0-9._-]{4,100}$/, 'a bucket name') },
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: { check: pattern(/^\d{4,20}$/, 'a number') },
-  NEXT_PUBLIC_FIREBASE_APP_ID: { check: pattern(/^\d+:\d+:web:[a-f0-9]+$/, '1:123:web:abc') },
-  NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: { check: pattern(/^[A-Za-z0-9_-]{2,60}$/, 'a cloud name') },
-  NEXT_PUBLIC_CLOUDINARY_API_KEY: { check: pattern(/^\d{6,20}$/, 'a number') },
-};
+export const PUBLIC_SETTINGS = RULES_PUBLIC_SETTINGS;
 
 /** The country and industry packs this repository knows (a website for a country that has no pack would silently use the wrong money and dates). */
 export function knownPacks(root = repo) {
@@ -128,39 +97,10 @@ export function knownPacks(root = repo) {
 /**
  * Reads the text of a settings file (KEY=value lines, # comments, CRLF or LF, a value may be in quotes).
  * Returns { values, problems }: every problem is a sentence a person can act on; nothing is built while there is one.
+ * A value that looks like a key is refused (the package check would refuse the finished package).
  */
-export function parseSettings(text, { countries = null, industries = null, requireName = true } = {}) {
-  const values = {};
-  const problems = [];
-  String(text ?? '').split(/\r?\n/).forEach((raw, i) => {
-    const line = raw.replace(/^\uFEFF/, '').trim();
-    if (!line || line.startsWith('#')) return;
-    const at = `Line ${i + 1}`;
-    const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
-    if (!m) { problems.push(`${at} is not a setting. Write one setting per line, like NEXT_PUBLIC_SITE_NAME=My Shop.`); return; }
-    const key = m[1];
-    let value = m[2].trim();
-    if (/^(".*"|'.*')$/.test(value) && value.length >= 2) value = value.slice(1, -1);
-    if (!key.startsWith('NEXT_PUBLIC_')) {
-      problems.push(`${at}: ${key} is not a public setting. Passwords, keys and the database address never go into the website package: they go in private-settings.env on the computer that runs the website.`);
-      return;
-    }
-    const rule = PUBLIC_SETTINGS[key];
-    if (!rule) { problems.push(`${at}: ${key} is not a setting this website knows.`); return; }
-    if (key in values) { problems.push(`${at}: ${key} is written twice.`); return; }
-    const why = value === '' && !rule.required ? null : rule.check(value);
-    if (why) { problems.push(`${at}: ${key} ${why}.`); return; }
-    const secret = findSecrets(value);
-    if (secret.length) {
-      problems.push(`${at}: ${key} looks like a secret key (${secret.join(', ')}). The package check refuses any value that looks like a key, so it cannot be put in a website.`);
-      return;
-    }
-    if (value !== '') values[key] = value;
-  });
-  if (requireName) for (const [key, rule] of Object.entries(PUBLIC_SETTINGS)) if (rule.required && !values[key]) problems.push(`${key} is missing: the website needs the shop's name.`);
-  if (values.NEXT_PUBLIC_COUNTRY && countries && !countries.includes(values.NEXT_PUBLIC_COUNTRY)) problems.push(`NEXT_PUBLIC_COUNTRY: there is no country pack for ${values.NEXT_PUBLIC_COUNTRY} (the packs are: ${countries.join(', ')}).`);
-  if (values.NEXT_PUBLIC_INDUSTRY && industries && !industries.includes(values.NEXT_PUBLIC_INDUSTRY)) problems.push(`NEXT_PUBLIC_INDUSTRY: there is no industry pack called ${values.NEXT_PUBLIC_INDUSTRY} (the packs are: ${industries.join(', ')}).`);
-  return { values, problems };
+export function parseSettings(text, options = {}) {
+  return parseWithRules(text, { findSecrets, ...options });
 }
 
 /** The public settings a brand kit gives (brand-kits/<name>/brand.json): the same fields the Setup Studio writes into website-settings.env. */

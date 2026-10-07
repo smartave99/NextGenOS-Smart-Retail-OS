@@ -291,6 +291,12 @@ test('only THE website is accepted as the program: not one that already has a cu
     writeFileSync(join(old, 'customer-rules.mjs'), 'export const a = 1;\n');
     await refused(base(root, { genericPackage: old }), /does not have readCustomerFolder/);
     rmSync(old, { recursive: true, force: true });
+    if (process.platform !== 'win32') {
+      const linked = genericFolder(root);
+      symlinkSync('/etc/hostname', join(linked, 'app', 'taken.txt'));
+      await refused(base(root, { genericPackage: linked }), /holds a link \(app\/taken\.txt\)/);
+      rmSync(linked, { recursive: true, force: true });
+    }
     const odd = join(root, 'something-else');
     put(odd, { 'PACKAGE-INFO.json': '{}' });
     await refused(base(root, { genericPackage: odd }), /is not THE website/);

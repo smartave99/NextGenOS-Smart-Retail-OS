@@ -161,6 +161,13 @@ export function inspectLicence(text, { siteUrl = '', now = new Date() } = {}) {
 // Assembling
 // ---------------------------------------------------------------------------------------------------------------------
 
+/** Every link (symbolic link) under a folder: a program folder may hold none, or a copy of it could carry a file of this computer into the zip. */
+const linksIn = (root, prefix = '') => fs.readdirSync(root, { withFileTypes: true }).flatMap((e) => {
+  const rel = prefix ? `${prefix}/${e.name}` : e.name;
+  if (e.isSymbolicLink()) return [rel];
+  return e.isDirectory() ? linksIn(path.join(root, e.name), rel) : [];
+});
+
 const walk = (root, prefix = '') => fs.readdirSync(root, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1)).flatMap((e) => {
   const rel = prefix ? `${prefix}/${e.name}` : e.name;
   return e.isDirectory() ? walk(path.join(root, e.name), rel) : [rel];
@@ -222,6 +229,8 @@ export async function assembleWebsite({ genericPackage, customerFolder, licenceF
       top = unpacked.tops[0];
     }
     const base = path.join(work, 'pkg', top);
+    const links = linksIn(base);
+    if (links.length) throw new AssembleError(`The website program holds a link (${links[0]}), which is not allowed: a link could carry a file of this computer into the finished website.`);
     if (!/^website-(windows|linux)$/.test(top)) throw new AssembleError(`The folder ${top} is not THE website (it must be called website-windows or website-linux).`);
     let info;
     try { info = JSON.parse(fs.readFileSync(path.join(base, 'PACKAGE-INFO.json'), 'utf8')); } catch { throw new AssembleError('The website program has no PACKAGE-INFO.json, so it is not a finished website.'); }

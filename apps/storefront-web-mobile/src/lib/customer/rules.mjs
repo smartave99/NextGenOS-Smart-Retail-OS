@@ -300,7 +300,7 @@ export function fallbackFromEnvironment(environment, { countries = null, industr
 // ---------------------------------------------------------------------------------------------------------------------
 
 /** The files the customer folder may hold at its top, and the sizes allowed (a bigger file is refused: nobody needs a 5 MB settings file). */
-export const FOLDER_FILES = { 'brand.json': 262144, 'setup.json': 262144, 'theme.json': 262144, 'website-settings.env': 65536 };
+export const FOLDER_FILES = { 'brand.json': 262144, 'setup.json': 2097152, 'theme.json': 262144, 'website-settings.env': 65536 };   // setup.json is the shop program's own file and may hold its starter items
 export const MAX_PICTURE_BYTES = 3 * 1024 * 1024;
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 

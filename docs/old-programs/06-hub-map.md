@@ -549,4 +549,84 @@ Other helpers: `DemoCompany.Fill(path, new DemoOptions { Industry, Country })` m
 
 ## 8. Known gaps and debt
 
-TO FILL.
+Sources: `docs/OPEN-WORK.md` (7 October 2026), `docs/V2-ARCHITECTURE-ASSESSMENT.md` sections 5 to 8, `docs/MERGE-PLAN.md`, and what this reading of the code found (marked "found here"). Re-read `docs/OPEN-WORK.md` before you quote this; it is the file that is kept true.
+
+### 8.1 What nobody has been able to verify (from the gate's NOT VERIFIED list and `docs/OPEN-WORK.md`)
+
+- **Real hardware**: printing on real receipt and label printers, real Bluetooth or USB, the Windows spooler, a real cash drawer, a real scanner. Everything printed is tested against stand-in printers on one PC.
+- **A real Windows PC**: the setup, the service `NextGenOSHub`, the window shortcuts (look for a black window flashing), the Windows Credential Manager store for AI keys (`Core/Ai/Secrets.cs`, written from the documentation and never run).
+- **An update of a real old shop database**: migrations 2 to 4 and their rollbacks have run on freshly made and test files only. The first step (the shop's own tables) has **no way back** and has never been upgraded from an older shape because there has been only one shape.
+- **A real AI service** and real GPUs: only a stand-in web server was used.
+- **Tax rules of any country** were not checked by a local adviser; every pack has `review: null` and the screens say so.
+- **Several counters at once** (see 8.3, concurrency): not designed, not tested.
+- The complete gate on the fix for the intermittent `hub-release` failure (OPEN-WORK item 9) was still to be re-run when that file was written.
+
+### 8.2 Debt the project already knows (OPEN-WORK item 8, V2 assessment section 5)
+
+- **One PC only.** Kestrel listens on `127.0.0.1:5280`, `AllowedHosts` is `localhost;127.0.0.1`. The owner's decision (one main PC holding the data, counters connecting over the shop's network, `docs/PLATFORM-DECISIONS.md`) is **not built**; sync, backup and updates depend on it. Several shops in one database is not built either (one database is one shop; no branch column anywhere).
+- **Backups**: only the copy made before a migration (`HubDb.Backup`, `VACUUM INTO`). No nightly local backup, no restore screen, no online backup. A failed copy before an update is recorded in `HubDb.BackupProblem` and **no screen shows it** (found here: only tests read it).
+- **Migrations**: forward-only for step 1, no checksum of the migration files, no "downgrade" button anywhere in the program (`HubDb.Rollback` is for an engineer).
+- **`audit_log`** is append-only by convention (no trigger, no hash chain, no index).
+- **Roles are fixed in code and services do not check permissions** (pages and endpoints do). An assistant or a new endpoint that calls a service must check `Roles.Can` itself (5.3).
+- **Licence limits** (number of PCs, stores, users) in the signed licence are **not enforced** by the Hub.
+- **No tenancy** on the shop tables of step 1 (`tenant_id`/`site_id` exist only from step 2); the AI parts hard-code `local`/`main`.
+- **No event or outbox layer**, no idempotency keys for sales (safety comes from status checks and unique constraints); **nothing in the shop writes business events yet**; there is no way in for other programs.
+- **Fonts and a light/dark default from a brand kit** are allowed by the licence but not applied by the Hub (`docs/OPEN-WORK.md` item 5).
+- **Words are English** and written in the pages (a customer's own words are only the four renameable terms and the receipt footer). Translations are a later decision (`CLAUDE.md` section 16).
+- The AI parts that are interfaces only: speech, vision, OCR, detection, tracking; the command-line assistants and the AI add-on's adapters are not connected; the waiting line (`JobQueue.cs`) is in memory only; the use record is never pruned; no removal of names from text sent to an allowed online service.
+
+### 8.3 Gaps and oddities found in this reading (each with where, so the next job does not rediscover it)
+
+**Money and documents**
+1. **No cess, no fixed-amount discount, no bill-level discount, no HSN, no MRP, no batch, no expiry, no cost layers** in documents or items (4.2). The engine already supports cess and fixed discounts; the Hub never passes them.
+2. **A credit note does not reduce what a customer owes.** A credit note against an unpaid credit sale refunds nothing (`refundable = min(note, paid)`), leaves the invoice's `paid_minor` alone, and `Outstanding` counts invoices and progress bills only. There is also **no customer ledger, no customer receipt document, no balance, no opening balance** (4.4, 3.2).
+3. **A credit note's money is worked out with the shop's current settings**, and the invoice's `registered`, regions are copied onto it afterwards without a recalculation (`DocumentService.cs:441`). The code comment says "a credit note never rounds" but the draft copies the shop's current `RoundTotal` (`:97`). No test pins either (4.4).
+4. **Cost = last purchase price** (`PurchaseService.Receive` overwrites `items.cost_minor`): no average cost, no profit report, no stock valuation by batch. `document_lines` carries no cost, so margin per sale cannot be recomputed later.
+5. **Purchases** use the shop's `PricesIncludeTax` flag for supplier prices and the sale tax codes of the item; there is no purchase return, no supplier invoice number, no partial receipt, no supplier ledger (2.2).
+6. **Stock** is quantity only: no location (godown, branch), no transfer, no damage or settlement document, no reservation by an order or quote. `stock_moves` has no index on time (`ix_stock_item` only) and on-hand is a `SUM` per item every time (`CatalogService.StockList` runs a correlated sum per item): with years of imported moves this will slow down; an opening-balance move per item (a periodic "carry forward") is the cheap fix. Not measured.
+7. **No day close, shift, cash-in/out or float**; no hold-and-recall list on `/sell` (a sale in progress is an open draft that `Upkeep` deletes after a day); `RestaurantService.SplitByLines` is tested but no screen calls it.
+8. A cashier who can open a bill can **create a credit note** (no permission of its own; only voiding needs `void`, `Bill.razor:149`). Whether that is wanted is Not understood.
+9. `Numbering` has an `RCT` prefix and no code that makes a receipt; numbering is per type and fiscal year, never per branch or counter.
+10. `ReportService.Summary` average is integer division (truncates); `TopItems` reads `documents.result` with `json_each` for every document in the period and strips the dot of `lineTotal` text (`REPLACE(..., '.', '')`), which assumes the amount text is `digits[.digits]` with the currency's decimals: correct for the engine's output, but each report that reads the JSON costs time proportional to the number of lines in the period.
+
+**Concurrency (found here; reasoned from the code and SQLite's rules, not tested)**
+11. `HubDb.InTransaction` starts a **deferred** transaction (`BeginTransaction()`), and `Issue`, `Numbering.Next`, `MoveStock` and the credit-limit check read first and write afterwards. In WAL mode a second writer that commits between a transaction's first read and its first write makes the first fail at once with a busy error (the 5-second `busy_timeout` does not help in that case). With one counter this does not happen; with several counters on one main PC a sale could fail with "Something went wrong, and nothing was saved". The numbering's unique index on `documents.number` would stop a duplicate number. Before the store network is built: write a test with two threads checking out at once, and consider `BEGIN IMMEDIATE` for the money transactions.
+
+**Web and data**
+12. `Shop.Settings` (not `Shop.Current`) reads and parses the settings row on every call (the layout calls it each render). Small, not measured.
+13. `ShopContextProvider.Current` is a process-wide cache; anything that edits the `shop` settings row other than `Shop.Save` must call `Invalidate()`.
+14. Settings handlers write an audit row only in some cases (3 places checked; not every handler was read): decide per port.
+15. `AppointmentService.Hours()` reads opening hours from the **industry pack** only (`RuleText("openFrom")`), not from `ShopContext.Rule`, so the owner cannot override them in Settings (`ShopSettings.RuleOverrides` is not consulted there).
+16. `LibraryService.MemberTypes()` falls back to a built-in English "Member" label when the pack has none (`Lending/LibraryService.cs:41`); `ShopSettings.ReceiptFooter` defaults to the English "Thank you!" and `PaymentInput.Method` to "cash": small fixed words in code that the white-label audit does not count (it counts markets, not English).
+17. **The look is per shop, not per screen** and has no named presets (5.6); item choice on `/sell` is tiles only.
+18. The page chain in `Settings.razor` is 873 lines in one component, and `Sell.razor`, `Items.razor`, `Setup.razor` are 300 to 450 lines each: new features should go into new components, not into these files, to keep edits small.
+19. Tests and the gate need big disk space (several GB of build folders, 7.6) and a Chromium download; a machine without them SKIPs the browser checks.
+
+### 8.4 What each group of old-POS screens needs from the Hub (from `docs/MERGE-PLAN.md`, mapped to the plug-in points of this map)
+
+| Old POS group | What the Hub has now | What must be added first | Recipe and place |
+|---|---|---|---|
+| Selling, returns, multi-payment | counter sale, drafts, split payments, change, credit notes, void | fixed-amount and bill discounts, cess, HSN on the bill, hold list, receipt for later payments, credit note offset against dues | 4.2 (engine inputs exist), 6.2, `DocumentService`, `Sell.razor` |
+| Estimates and quotations | quotes (numbered at draft, issued, no stock) | convert quote to invoice (not found in `DocumentService`: Not understood whether a screen does it by copying lines) | 6.2 |
+| Buying | purchase orders, receive, pay, last cost | purchase returns, supplier ledger, GST purchase registers, inward notices | 6.2, 6.3, 6.1 |
+| Stock | items, on-hand by moves, adjust | locations and transfers, damage, settlement, movement report | 6.3 (side table keyed by `stock_moves.id` or a location on new moves), 6.1 |
+| Products | items with attrs, barcode, labels | bulk change, combo packs, variants, units, images, import/export | 6.3, `Items.razor` is the screen to extend; import needs a new service |
+| Customers, loyalty, coupons, gifts, offers | parties with price level, credit limit, terms | **loyalty, coupons, gift cards, offers, customer ledger and statement, receipts** | 6.3 with the sale hook (6.3 step 3) |
+| Accounting books | none | ledger, vouchers, day book, trial balance, P&L as a new module with its own tables | 6.3, 6.1 |
+| India returns and registers | tax by rate and part in `TaxSummary`, regions on documents | HSN, GSTR-1 and 3B, e-way bill, TCS | 6.4 |
+| Staff and salespeople | `parties` kind `staff`, sales by staff for bookings | attendance, salary, commission | 6.3 |
+| Branches, year change | none (one database = one shop; fiscal year only in numbering) | branch master and reports, year-end change | 6.3, and the store-network work (8.2) |
+| Messages, leads, CRM | none | only with the owner's permission for what leaves the shop (`CLAUDE.md` section 15) | 6.3 + data-class rules |
+| Settings, users, backup, language | users and five roles, printers, look, licence | backup (decision 11), shortcut keys, language | 3.4, 5.3, 6.5 |
+
+**Old data first** (`docs/MERGE-PLAN.md` step 1): a reader of the old SQL Server database must write through the **services** (`Catalog.Create`, `Parties.Create`, then documents) or in bulk through `HubDb.InTransaction` with the same column rules (3.1), never by writing `documents` totals itself: the Hub's own numbers come from `Recalculate`, and a document imported with its old totals would not equal what the Hub would compute. The match report (old total vs `TotalMinor` after import) is the check, and 4.7 lists the numbers to compare.
+
+### 8.5 Things I could not confirm (so they are listed, not decided)
+
+- Whether Obfuscar renames enum members (1.3, rule 5).
+- Whether every Settings handler writes an audit row (8.3, 14).
+- Whether a screen turns a quote into an invoice and how (8.4).
+- Whether letting a cashier make a credit note is intended (8.3, 8).
+- Whether `HubDb.BackupProblem` is shown anywhere in the web program (searched: not in the pages).
+- The cost of a full gate in minutes: nothing was run.
+

@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path';
 import { startStudio, defaultWorkspaceFolder } from './lib/server.mjs';
 import { Workspace } from './lib/workspace.mjs';
 import { configFolder } from './lib/secrets.mjs';
-import { clearRunning, findRunning, idleWatch, openAppWindow, windowWasClosedByPerson, writeRunning } from './lib/launch.mjs';
+import { clearRunning, findRunning, HANDED_OFF_IDLE_MS, idleWatch, openAppWindow, whatNextAfterWindow, writeRunning } from './lib/launch.mjs';
 
 const BOOLEAN = new Set(['open', 'app', 'nowindow']);
 const [command = 'serve', ...rest] = process.argv.slice(2);
@@ -77,14 +77,15 @@ try {
     process.exit(0);
   };
 
-  studio = await startStudio({ folder, port: Number(opts.port ?? 0), onBeat: () => watch?.beat(), onQuit: stop });
+  let lastBeat = 0;   // when a page last said it is there
+  studio = await startStudio({ folder, port: Number(opts.port ?? 0), onBeat: () => { lastBeat = Date.now(); watch?.beat(); }, onQuit: stop });
   writeRunning({ url: studio.url, folder: studio.state.folder });
   say('NextGenOS Setup Studio is running, on this PC only.');
   say(`  Open this address in your web browser: ${studio.url}`);
   say(`  Its files are in: ${studio.state.folder}`);
 
   // With no window to watch (a tab in the PC's usual browser, or a terminal run), the Studio stops by itself after a long time with no page open.
-  const watchForTheTab = () => { watch ??= idleWatch({ onIdle: stop }); };
+  const watchForTheTab = (idleMs) => { watch ??= idleWatch({ idleMs, onIdle: stop }); };
 
   if (opts.app) {
     say('  Close its window to stop it.');
@@ -93,10 +94,13 @@ try {
       appWindow = openAppWindow(studio.url);
       if (!appWindow) { openWithSystem(studio.url); watchForTheTab(); }
       else {
-        appWindow.closed.then((ended) => {
-          if (windowWasClosedByPerson(ended)) return stop();
-          // The browser handed the page on to another program (or could not start): show it in the PC's usual browser instead.
+        const { started } = appWindow;
+        appWindow.closed.then(async (ended) => {
+          const next = await whatNextAfterWindow(ended, { pageSeen: () => lastBeat >= started, waitMs: Number(process.env.NEXTGENOS_WINDOW_WAIT_MS) || undefined });
+          if (next === 'stop') return stop();
           appWindow = null;
+          if (next === 'handed-off') { watchForTheTab(HANDED_OFF_IDLE_MS); return undefined; }   // the window is open in a browser we cannot watch: do not open it a second time
+          // The browser could not start, or the page never appeared: show it in the PC's usual browser instead.
           openWithSystem(studio.url);
           watchForTheTab();
           return undefined;

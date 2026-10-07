@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { configFolder } from './secrets.mjs';
 import * as window from './app-window.mjs';
 
-export { findAppBrowser, appWindowArgs, windowWasClosedByPerson, idleWatch } from './app-window.mjs';
+export { findAppBrowser, appWindowArgs, windowWasClosedByPerson, whatNextAfterWindow, waitUntil, HANDED_OFF_IDLE_MS, idleWatch } from './app-window.mjs';
 
 export const runningFile = (env = process.env) => window.runningFile(configFolder(env));
 export const writeRunning = (note, env = process.env) => window.writeRunning(note, configFolder(env));

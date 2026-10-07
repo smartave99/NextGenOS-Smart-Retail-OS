@@ -23,7 +23,7 @@ import { join, resolve } from 'node:path';
 import { listKits, loadKit, saveKit, check, blank, countryCodes, industryIds, kitFolder, repoRoot, readLogo } from './lib/kit.mjs';
 import { makeExports } from './lib/exports.mjs';
 import { startServer } from './lib/server.mjs';
-import { clearRunning, findRunning, idleWatch, openAppWindow, windowWasClosedByPerson, writeRunning } from './lib/app-window.mjs';
+import { clearRunning, findRunning, HANDED_OFF_IDLE_MS, idleWatch, openAppWindow, whatNextAfterWindow, writeRunning } from './lib/app-window.mjs';
 
 const [command, ...rest] = process.argv.slice(2);
 const positional = [];
@@ -156,13 +156,14 @@ try {
         await studio.close();
         process.exit(0);
       };
-      studio = await startServer({ root, port: Number(opts.port || 0), onBeat: () => watch?.beat(), onQuit: stop });
+      let lastBeat = 0;   // when a page last said it is there
+      studio = await startServer({ root, port: Number(opts.port || 0), onBeat: () => { lastBeat = Date.now(); watch?.beat(); }, onQuit: stop });
       const { url } = studio;
       if (opts.app) writeRunning({ url, folder: root }, configDir());
       say('Brand Studio is open on this PC only. Open this address in your web browser:\n');
       say(`  ${url}\n`);
       // With no window to watch (a tab in the usual browser, or a terminal run), it stops by itself after a long time with no page open.
-      const watchForTheTab = () => { watch ??= idleWatch({ onIdle: stop }); };
+      const watchForTheTab = (idleMs) => { watch ??= idleWatch({ idleMs, onIdle: stop }); };
       if (opts.app) {
         say('Close its window to stop it.');
         if (opts.nowindow) watchForTheTab();
@@ -170,10 +171,13 @@ try {
           appWindow = openAppWindow(url, { profileDir: join(configDir(), 'window') });
           if (!appWindow) { openWithSystem(url); watchForTheTab(); }
           else {
-            appWindow.closed.then((ended) => {
-              if (windowWasClosedByPerson(ended)) return stop();
-              // The browser handed the page on to another program (or could not start): show it in the usual browser instead.
+            const { started } = appWindow;
+            appWindow.closed.then(async (ended) => {
+              const next = await whatNextAfterWindow(ended, { pageSeen: () => lastBeat >= started, waitMs: Number(process.env.NEXTGENOS_WINDOW_WAIT_MS) || undefined });
+              if (next === 'stop') return stop();
               appWindow = null;
+              if (next === 'handed-off') { watchForTheTab(HANDED_OFF_IDLE_MS); return undefined; }   // the window is open in a browser we cannot watch: do not open it a second time
+              // The browser could not start, or the page never appeared: show it in the usual browser instead.
               openWithSystem(url);
               watchForTheTab();
               return undefined;

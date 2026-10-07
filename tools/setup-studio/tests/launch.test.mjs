@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { startStudio } from '../lib/server.mjs';
-import { appWindowArgs, clearRunning, findAppBrowser, findRunning, idleWatch, runningFile, windowWasClosedByPerson, writeRunning } from '../lib/launch.mjs';
+import { appWindowArgs, clearRunning, findAppBrowser, findRunning, idleWatch, runningFile, waitUntil, whatNextAfterWindow, windowWasClosedByPerson, writeRunning } from '../lib/launch.mjs';
 
 const studio = join(dirname(fileURLToPath(import.meta.url)), '..', 'studio.mjs');
 const temp = (name) => mkdtempSync(join(tmpdir(), `${name}-`));
@@ -38,12 +38,29 @@ test('the window is only the Studio\'s page, with a profile of its own', () => {
   assert.ok(args.includes('--app=http://127.0.0.1:5391/?k=abc'));
   assert.ok(args.includes('--user-data-dir=/home/a/.config/nextgenos-setup-studio/window'));
   assert.ok(args.includes('--no-first-run'));
+  assert.ok(args.includes('--disable-background-mode'), 'a closed window must not leave the browser running in the background (the next start would hand its page to it and end at once)');
 });
 
 test('a window that ends at once, or could not start, is not "the person closed it"; one that was open a while is', () => {
   assert.equal(windowWasClosedByPerson({ code: 0, ms: 90_000 }), true);
   assert.equal(windowWasClosedByPerson({ code: 0, ms: 800 }), false);
   assert.equal(windowWasClosedByPerson({ error: new Error('no such file'), ms: 5 }), false);
+});
+
+test('a browser that ends at once is only "handed off" when the page really appears; otherwise the page is shown in the usual browser', async () => {
+  let t = 0;
+  const timing = { now: () => t, sleep: async (ms) => { t += ms; }, waitMs: 1000, pollMs: 100 };
+  assert.equal(await waitUntil(() => true, timing), true);
+  assert.equal(await waitUntil(() => false, timing), false, 'the time runs out');
+  let calls = 0;
+  assert.equal(await waitUntil(() => { calls += 1; return calls > 3; }, timing), true, 'seen after a little while');
+
+  const closedByPerson = { code: 0, ms: 90_000 };
+  const quick = { code: 0, ms: 300 };
+  assert.equal(await whatNextAfterWindow(closedByPerson, { pageSeen: () => false, ...timing }), 'stop');
+  assert.equal(await whatNextAfterWindow(quick, { pageSeen: () => true, ...timing }), 'handed-off', 'the page is there: do not open it a second time');
+  assert.equal(await whatNextAfterWindow(quick, { pageSeen: () => false, ...timing }), 'show-elsewhere', 'no page appeared');
+  assert.equal(await whatNextAfterWindow({ error: new Error('no such file'), ms: 4 }, { pageSeen: () => true, ...timing }), 'show-elsewhere', 'it could not even start');
 });
 
 test('a Studio that is running is found; one that is gone, or a note that is wrong, is not (and the note is removed)', async () => {
@@ -201,18 +218,36 @@ test('opened as a program with a window: the window is the browser it is told to
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });
 
-test('a browser that ends at once hands the page on: the Studio opens it in the usual browser and keeps running', { skip: process.platform === 'win32', timeout: 60_000 }, async () => {
+test('a browser that ends at once but whose page appears (it handed the page to a copy of itself that was already running): the usual browser is NOT opened as well', { skip: process.platform === 'win32', timeout: 60_000 }, async () => {
+  const home = temp('handedoff');
+  const bin = join(home, 'bin'); mkdirSync(bin);
+  const standIn = join(bin, 'stand-in-browser');
+  // ends at once, like Edge or Chrome handing the page to a copy that is already running; a second later "the page" says it is there
+  writeFileSync(standIn, `#!/bin/sh\nurl="\${1#--app=}"\nkey="\${url#*k=}"\norigin="$(echo "$url" | sed 's#/?k=.*##')"\n( sleep 1; "${process.execPath}" -e "fetch(process.argv[1] + '/api/alive', { headers: { 'x-studio-key': process.argv[2] } }).catch(() => {})" "$origin" "$key" ) >/dev/null 2>&1 &\nexit 0\n`); chmodSync(standIn, 0o755);
+  const opener = join(bin, 'xdg-open');
+  writeFileSync(opener, `#!/bin/sh\necho "$1" > "${join(home, 'opened.txt')}"\n`); chmodSync(opener, 0o755);
+  const env = { SETUP_STUDIO_HOME: join(home, 'cfg'), SETUP_STUDIO_WORKSPACE: join(home, 'ws'), SETUP_STUDIO_BROWSER: standIn, NEXTGENOS_WINDOW_WAIT_MS: '3000', PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
+  const run = start(['serve', '--app'], env);
+  try {
+    await run.url;
+    await wait(7000);
+    assert.equal(existsSync(join(home, 'opened.txt')), false, 'the page was not opened a second time in the usual browser');
+    assert.equal(run.child.exitCode, null, 'the Studio is still running');
+  } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
+});
+
+test('a browser that ends at once and whose page never appears: the Studio opens it in the usual browser and keeps running', { skip: process.platform === 'win32', timeout: 60_000 }, async () => {
   const home = temp('handoff');
   const bin = join(home, 'bin'); mkdirSync(bin);
   const standIn = join(bin, 'stand-in-browser');
   writeFileSync(standIn, '#!/bin/sh\nexit 0\n'); chmodSync(standIn, 0o755);
   const opener = join(bin, 'xdg-open');
   writeFileSync(opener, `#!/bin/sh\necho "$1" > "${join(home, 'opened.txt')}"\n`); chmodSync(opener, 0o755);
-  const env = { SETUP_STUDIO_HOME: join(home, 'cfg'), SETUP_STUDIO_WORKSPACE: join(home, 'ws'), SETUP_STUDIO_BROWSER: standIn, PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
+  const env = { SETUP_STUDIO_HOME: join(home, 'cfg'), SETUP_STUDIO_WORKSPACE: join(home, 'ws'), SETUP_STUDIO_BROWSER: standIn, NEXTGENOS_WINDOW_WAIT_MS: '1500', PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
   const run = start(['serve', '--app'], env);
   try {
     const url = await run.url;
-    for (let i = 0; i < 50 && !existsSync(join(home, 'opened.txt')); i += 1) await wait(100);
+    for (let i = 0; i < 80 && !existsSync(join(home, 'opened.txt')); i += 1) await wait(100);
     assert.equal(readFileSync(join(home, 'opened.txt'), 'utf8').trim(), url, 'the page was handed to the usual browser');
     assert.equal(run.child.exitCode, null, 'the Studio is still running');
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }

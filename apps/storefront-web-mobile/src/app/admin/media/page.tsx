@@ -7,9 +7,10 @@ import { Loader2, Images } from "lucide-react";
 import CloudinaryWidget from "@/components/admin/CloudinaryWidget";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { publicSetting } from "@/lib/runtime-settings";
 
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "";
-const CLOUDINARY_API_KEY = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY ?? "";
+const CLOUDINARY_CLOUD_NAME = publicSetting("NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME") ?? "";
+const CLOUDINARY_API_KEY = publicSetting("NEXT_PUBLIC_CLOUDINARY_API_KEY") ?? "";
 
 export default function MediaLibraryPage() {
     const { user, loading: authLoading } = useAuth();

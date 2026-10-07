@@ -1,3 +1,5 @@
+import { publicSetting } from "@/lib/runtime-settings";
+
 // The Live shop section (admin panel): the owner's own Supabase project, where the shop PC running Smart Retail POS
 // sends the shop's figures. Only the project's URL and its public key belong on the website; the secret key is
 // refused, so it can never reach a browser.
@@ -12,10 +14,10 @@ export const NOT_SET_UP =
 export const SECRET_KEY =
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY holds the project's secret key, which must never be on a website. Replace it with the publishable (or anon public) key.";
 
-/** The project's settings, checked. Next.js puts the NEXT_PUBLIC_ values into the page when it is built. */
+/** The project's settings, checked. The values are the customer's own settings, read when the website starts and handed to the browser in the page. */
 export function readLiveShopConfig(
-    url: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL,
-    key: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    url: string | undefined = publicSetting("NEXT_PUBLIC_SUPABASE_URL"),
+    key: string | undefined = publicSetting("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") || publicSetting("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
 ): LiveShopConfig {
     const address = projectUrl(url);
     const publicKey = (key ?? "").trim();

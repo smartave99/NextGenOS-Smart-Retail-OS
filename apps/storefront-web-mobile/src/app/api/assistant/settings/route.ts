@@ -10,6 +10,9 @@ import { NextResponse } from "next/server";
 import { getPublicAISettings } from "@/app/actions/ai-settings-actions";
 import { SHOP_NAME } from "@/lib/shop-name";
 
+// Answered when asked, in the shop's own name (the website is built once for every customer), never from what the build saw.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
     try {
         const settings = await getPublicAISettings();

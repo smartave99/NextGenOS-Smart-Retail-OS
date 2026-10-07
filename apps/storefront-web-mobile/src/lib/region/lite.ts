@@ -1,6 +1,7 @@
 import lite from "./generated/lite.json";
 import { formatMoney } from "./money";
 import type { CurrencyInfo } from "./types";
+import { publicSetting } from "@/lib/runtime-settings";
 
 /**
  * The shop's country as every page and component can read it, in the browser as well: money, locale, language and the name of the
@@ -18,7 +19,7 @@ interface Lite {
 }
 
 const table = lite as unknown as Record<string, Lite>;
-const code = (process.env.NEXT_PUBLIC_COUNTRY || "IN").trim().toUpperCase();
+const code = (publicSetting("NEXT_PUBLIC_COUNTRY") || "IN").trim().toUpperCase();
 const entry = table[code];
 if (!entry) {
     throw new Error(`There is no country pack for "${code}" (NEXT_PUBLIC_COUNTRY). Add one with: node country-packs/tools/cli.mjs new ${code}`);
@@ -33,7 +34,7 @@ export const TAX_NAME = entry.taxName;
 export const PRICES_INCLUDE_TAX = entry.pricesIncludeTax;
 
 /** The town or area the shop is in, for the words on the site (for example "Patna, India"); empty when not set. */
-export const SHOP_PLACE = (process.env.NEXT_PUBLIC_SHOP_PLACE || "").trim();
+export const SHOP_PLACE = (publicSetting("NEXT_PUBLIC_SHOP_PLACE") || "").trim();
 
 /** 1234.5 → "₹1,234.50" (or "1.234,50 €" and so on, by country). A value that is not a number gives "". */
 export function money(amount: number | string | null | undefined): string {

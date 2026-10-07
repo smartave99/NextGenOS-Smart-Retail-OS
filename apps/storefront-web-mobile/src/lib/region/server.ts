@@ -2,6 +2,7 @@ import "server-only";
 
 import packs from "./generated/packs.json";
 import type { CountryPack } from "./types";
+import { publicSetting } from "@/lib/runtime-settings";
 
 /**
  * What the website needs to know about the shop's country: its money, language and tax words. It comes from the country pack
@@ -27,7 +28,7 @@ export interface RegionInfo {
 const all = packs as unknown as Record<string, CountryPack>;
 export const DEFAULT_COUNTRY = "IN";
 
-export function getPack(country: string | undefined = process.env.NEXT_PUBLIC_COUNTRY): CountryPack {
+export function getPack(country: string | undefined = publicSetting("NEXT_PUBLIC_COUNTRY")): CountryPack {
     const code = (country || DEFAULT_COUNTRY).trim().toUpperCase();
     const pack = all[code];
     if (!pack) {
@@ -50,8 +51,8 @@ export function getRegion(): RegionInfo {
         languages: pack.languages,
         taxName: pack.tax.name,
         pricesIncludeTax: pack.tax.pricesIncludeTaxDefault,
-        place: (process.env.NEXT_PUBLIC_SHOP_PLACE || "").trim(),
-        regionCode: (process.env.NEXT_PUBLIC_REGION_CODE || "").trim(),
+        place: (publicSetting("NEXT_PUBLIC_SHOP_PLACE") || "").trim(),
+        regionCode: (publicSetting("NEXT_PUBLIC_REGION_CODE") || "").trim(),
         reviewed: pack.review !== null,
     };
 }

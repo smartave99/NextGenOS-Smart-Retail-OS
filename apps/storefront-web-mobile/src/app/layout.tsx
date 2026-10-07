@@ -7,6 +7,8 @@ import { getSiteConfig } from "@/app/actions/site-config";
 import { DEFAULT_SITE_CONFIG } from "@/types/site-config";
 import { Suspense } from "react";
 import Script from "next/script";
+import { PublicSettingsProvider } from "@/lib/runtime-settings/PublicSettingsProvider";
+import { PAGE_BLOCK_ID, getPublicSettings, publicSetting, serializeForPage } from "@/lib/runtime-settings";
 
 // The licence brand and the licence gate depend on the licence at run time, not on the build: every page is rendered per request
 // (the shop's own data stays cached for an hour by getSiteConfig).
@@ -29,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const config = await getSiteConfig();
 
   return {
-    metadataBase: new URL(config.seo.jsonLd.url || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+    metadataBase: new URL(config.seo.jsonLd.url || publicSetting("NEXT_PUBLIC_SITE_URL") || 'http://localhost:3000'),
     title: {
       default: config.seo.siteTitle,
       template: config.seo.titleTemplate,
@@ -158,14 +160,23 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The customer's public settings (name, address, country, ...): read from the customer's folder when the website started, and handed to the browser in the page.
+  const settings = getPublicSettings();
   return (
     <html lang="en">
+      <head>
+        {/* Data, not a program: its type is application/json, so a browser never runs it and the page's security policy has nothing to allow for it.
+            Only the public settings are in it, written so that no value can end the block early (see serializeForPage). The browser's code reads it through getPublicSettings(). */}
+        <script id={PAGE_BLOCK_ID} type="application/json" dangerouslySetInnerHTML={{ __html: serializeForPage(settings) }} />
+      </head>
       <body
         className={`${inter.variable} ${outfit.variable} antialiased bg-slate-50 text-slate-900 flex flex-col min-h-screen`}
       >
-        <Suspense fallback={<ClientLayout initialConfig={DEFAULT_SITE_CONFIG}>{children}</ClientLayout>}>
-          <ConfigLoader>{children}</ConfigLoader>
-        </Suspense>
+        <PublicSettingsProvider settings={settings}>
+          <Suspense fallback={<ClientLayout initialConfig={DEFAULT_SITE_CONFIG}>{children}</ClientLayout>}>
+            <ConfigLoader>{children}</ConfigLoader>
+          </Suspense>
+        </PublicSettingsProvider>
 
         <SpeedInsights />
       </body>

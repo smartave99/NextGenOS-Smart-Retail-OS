@@ -143,6 +143,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // The shop's logo is /logo.png everywhere in the website. The customer's own logo is a file in the folder "customer" beside the program (the Setup Studio puts it there), so
+  // the address is answered by a small route that serves that file, or the plain built-in picture when the shop has none (src/app/customer-logo/route.ts).
+  async rewrites() {
+    return { beforeFiles: [{ source: "/logo.png", destination: "/customer-logo" }], afterFiles: [], fallback: [] };
+  },
   async headers() {
     return [
       {

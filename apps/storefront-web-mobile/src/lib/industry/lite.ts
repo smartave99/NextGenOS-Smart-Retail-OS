@@ -1,4 +1,5 @@
 import industries from "./generated/industries.json";
+import { publicSetting } from "@/lib/runtime-settings";
 
 /**
  * The words of the shop's kind of business (restaurant: "Menu items", library: "Titles", construction: "Rate items"), from the
@@ -15,7 +16,7 @@ interface IndustryLite {
 }
 
 const table = industries as unknown as Record<string, IndustryLite>;
-const id = (process.env.NEXT_PUBLIC_INDUSTRY || "retail").trim().toLowerCase();
+const id = (publicSetting("NEXT_PUBLIC_INDUSTRY") || "retail").trim().toLowerCase();
 const entry = table[id];
 if (!entry) {
     throw new Error(`There is no industry pack "${id}" (NEXT_PUBLIC_INDUSTRY). Choose one of: ${Object.keys(table).join(", ")}.`);

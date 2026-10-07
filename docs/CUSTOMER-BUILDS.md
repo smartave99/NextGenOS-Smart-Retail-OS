@@ -2,27 +2,55 @@
 
 *For the owner of NextGenOS, and for engineers. Staff only need the Setup Studio: they press one button and wait.*
 
-A customer's **website** (for Linux and for Windows) and **Android app** have that customer's own settings built into them, and building them needs the program source. The source never goes to a staff PC (`CLAUDE.md`, section 3), so the build runs where the source is: on GitHub. This page says how the Setup Studio asks for a build, what GitHub does, what comes back, and **what you, the owner, must set up once**.
+A customer's **Android app** has that customer's own settings built into it, and building it needs the program source. The source never goes to a staff PC (`CLAUDE.md`, section 3), so the build runs where the source is: on GitHub. This page says how the Setup Studio asks for a build, what GitHub does, what comes back, and **what you, the owner, must set up once**.
+
+**The website is different since 7 October 2026 (decisions 23 and 24).** It is **one program, the same for every customer**, built once per release with no customer's settings inside. Each customer's own settings are a **customer folder** that is read when the website starts. The first section below says how that works; the rest of the page still describes the build service, and says where the website part of it changed.
 
 Staff never see GitHub, Node.js or a terminal. In the Studio this is called **the build service**.
 
-## Work in progress: the website becomes one program for every customer (decisions 23 and 24)
+## The website: one program for every customer, with the customer's own folder beside it
 
-This page still describes the build service as it was written. The website is being changed so that it is **built once per release without any customer's settings** and reads each customer's settings **when it starts**, from a customer folder placed beside it. The inventory below is what was fixed at build time before this change (found by reading `apps/storefront-web-mobile`, 7 October 2026). The next sections of this page are updated as each piece is finished; `docs/OPEN-WORK.md` says what exists.
+**What it is.** The website (`apps/storefront-web-mobile`) is built once per release as **THE website**: `website-windows.zip` and `website-linux.zip`. It holds no customer's name, address, country, colours, logo or licence, and a check refuses a package that does. Each customer's website is **THE website + the customer's folder + the customer's licence file**, put together by *assembling* (a copy of files and checks: no build, no network, no tool, no source code).
 
-**Fixed at build time before the change (every one is now read at start-up instead):**
+**What the website reads when it starts** (before this change every one of these was fixed when the program was built, from `NEXT_PUBLIC_*` values):
 
-| What | Where (storefront `src/`) | What it was |
-|---|---|---|
-| Shop name | `lib/shop-name.ts`, `types/site-config.ts` | `NEXT_PUBLIC_SITE_NAME`, default "our store" / "My Shop"; also the upload folder name |
-| Web address | `lib/site-url.ts`, `types/site-config.ts`, `app/layout.tsx`, `lib/licence/manager.ts` | `NEXT_PUBLIC_SITE_URL`, default `https://example.com` / `http://localhost:3000` |
-| Country: money, tax name, locale, languages | `lib/region/lite.ts`, `lib/region/server.ts` | `NEXT_PUBLIC_COUNTRY`, **default India (`IN`)** |
-| Town or area, tax region | `lib/region/lite.ts`, `lib/region/server.ts` | `NEXT_PUBLIC_SHOP_PLACE`, `NEXT_PUBLIC_REGION_CODE` |
-| Kind of business (the words "Products", "Menu items") | `lib/industry/lite.ts` | `NEXT_PUBLIC_INDUSTRY`, default `retail` |
-| Colours, tagline, contact lines of the starting design | `types/site-config.ts` | fixed neutral blue and amber; empty contact; never taken from the customer's brand |
-| Language of the pages | `app/layout.tsx` | `<html lang="en">` fixed |
-| Logo | `public/logo.png` | the build copied the customer's logo over it |
-| Live shop (Supabase), sign-in (Firebase), pictures (Cloudinary): the public parts | `lib/live-shop/config.ts`, `lib/firebase.ts`, `lib/firebase-admin.ts`, `app/admin/media/page.tsx` | `NEXT_PUBLIC_SUPABASE_*`, `NEXT_PUBLIC_FIREBASE_*`, `NEXT_PUBLIC_CLOUDINARY_*` |
+| What | Where it is read (storefront `src/`) | Before | Now |
+|---|---|---|---|
+| Shop name | `lib/shop-name.ts`, `types/site-config.ts` | `NEXT_PUBLIC_SITE_NAME`, default "our store" / "My Shop"; also the upload folder name | the customer's name |
+| Web address | `lib/site-url.ts`, `types/site-config.ts`, `app/layout.tsx`, `lib/licence/manager.ts` | `NEXT_PUBLIC_SITE_URL` | the customer's address |
+| Country: money, tax name, locale, languages | `lib/region/lite.ts`, `lib/region/server.ts` | `NEXT_PUBLIC_COUNTRY`, **default India (`IN`)** | the customer's country; **with none, neutral: no country, no money symbol** |
+| Town or area, tax region | `lib/region/*` | `NEXT_PUBLIC_SHOP_PLACE`, `NEXT_PUBLIC_REGION_CODE` | the customer's |
+| Kind of business (the words "Products", "Menu items") | `lib/industry/lite.ts` | `NEXT_PUBLIC_INDUSTRY`, default `retail` | the customer's; **with none, the general kind ("Items")** |
+| Colours, tagline, contact lines of the starting design | `types/site-config.ts` | fixed neutral blue; empty contact; never from the customer's brand | the customer's `brand.json` |
+| Language of the pages and of dates and numbers | `app/layout.tsx`, `lib/region/lite.ts` | `<html lang="en">` fixed | the customer's language, else the country's |
+| Logo | `public/logo.png` | the build copied the customer's logo over it | served from the customer folder (`/customer-assets/<file>`); the built-in neutral logo when there is none |
+| Live shop (Supabase), sign-in (Firebase), pictures (Cloudinary): the public parts | `lib/live-shop/config.ts`, `lib/firebase.ts`, `lib/firebase-admin.ts`, `app/admin/media/page.tsx` | `NEXT_PUBLIC_SUPABASE_*`, `NEXT_PUBLIC_FIREBASE_*`, `NEXT_PUBLIC_CLOUDINARY_*` | the same values, from `website-settings.env` in the customer folder |
+
+`robots.txt`, the site map and the offer pages used to be made at build time; they are now made when asked.
+
+**The customer folder** (`customer/`, beside `app/` and `node/` in the package; or the folder named by the setting `NGOS_CUSTOMER_DIR`; the start program sets it). Everything in it is optional and nothing in it is a secret:
+
+| File | What it holds |
+|---|---|
+| `brand.json` | the brand kit's file: name, short name, tagline, colours (`primaryColor`, `accentColor`), `country`, `industry`, `language`, `contact`, `storefront.siteUrl`, `logo` (the name of a picture file) |
+| `setup.json` | the shop program's setup file; the website uses `business.name`, `business.country`, `business.industry` (so one folder can serve the shop program too) |
+| `website-settings.env` | the public settings the Setup Studio already writes (`NEXT_PUBLIC_*`); **wins over `brand.json`** where both say something |
+| `theme.json` | the look of the shop program; allowed, **not used by the website yet** |
+| `assets/` | pictures only: the logo (png, jpg, webp, svg) and `favicon.ico`; a logo beside `brand.json` (the brand kit's way) is also found |
+
+**How a value is chosen:** `website-settings.env`, then `brand.json`, then `setup.json`, then (for a developer only) the old `NEXT_PUBLIC_*` values in the computer's own environment, then **neutral**. The checks are the ones the package maker has always made on these settings (moved, not weakened, into `apps/storefront-web-mobile/src/lib/customer/rules.mjs`): a name has no `<` or `>`, an address must be an address, a country needs its pack, a Supabase key must be the publishable one, a colour must be one white words can be read on, and so on. A value that fails is **left out and named in plain words** (the website writes it once in its log) and the rest still counts. The server reads the folder once, when it starts, and puts the checked values in every page (`window.__NGOS_SETTINGS__`) and at `/api/settings`; the browser never reads a file. To change a setting, replace the folder and start the website again.
+
+**Assembling** (`tools/setup-studio/lib/website-assemble.mjs`, with a command, `scripts/assemble-website.mjs`):
+
+    node scripts/assemble-website.mjs --program website-linux.zip --customer-folder <folder> --licence <licence.ngos> --customer luzon-fresh-mart --person "Asha Admin" --out dist --audit
+
+It takes THE website (zip or folder), the customer's folder and the customer's licence file, and writes `website-<customer>-<system>/` and its zip. The library lives in the Studio's own folder because the Studio travels without `scripts/` and holds no source; the command is for people who work on the repository and for the release workflow (the package audit lives in `scripts/`). It **refuses**, in plain words and before writing anything: a customer name that could leave the folder; a customer folder that holds anything but the files above (an environment file, source code, a source map, a database, a key, a licence, a script, a link, a folder inside a folder); a value in it that looks like a secret or that the website's own rules would leave out; a missing, too big or wrongly shaped licence file, or one for a PC instead of a website; a program that is not THE website (it must say so in `PACKAGE-INFO.json` and carry its rules file `customer-rules.mjs`, the same file the website reads the folder with). It writes the customer folder, `licence/licence.ngos`, the customer's name in `PACKAGE-INFO.json`, a few lines in front of `READ ME FIRST.txt`, and **a hidden mark** (decision 24): `app/.next/server/.build-info`, a line of JSON with the customer, the person who made it, the time, and a short fingerprint of the licence, so that a copy that leaks points back to where it was made. (The mark is plain data in a file the package audit accepts; it is easy to find for someone who looks, and easy to remove by someone who knows it is there. It makes a leak traceable, not impossible.)
+
+The signature of the licence is **not** checked while assembling: the signing key is the owner's alone and is never on a staff computer. The website checks it every time it runs. Assembling only checks the licence's shape and reads what it says about itself to warn about the usual mistakes (another web address, a trial, an end date that has passed, a licence for PCs).
+
+**What the GitHub build service still does for the website.** Nothing of the build service's steps changed for staff. Behind the button, the website job now builds THE website (`make-website-package.mjs --os ... --customer ... --settings ...`: the older command still works, and now means: build THE website, then put this customer's folder beside it, with no licence file yet) and the result is still `website-<customer>-linux.zip` and `website-<customer>-windows.zip`. Nothing of the customer is compiled in any more. Building the same program again for every customer is wasteful and is only kept so that the first real run of the build service (which has never run) is not changed at the same time; once the Studio assembles locally (decision 23) this job is not needed for the website.
+
+**What the release workflow does for the website.** It builds THE website once per release (`website-windows.zip`, `website-linux.zip`), audits it, starts it from its zip (it must refuse to work without a licence) and puts both zips on the release. `base-kit.json` lists them with the role `website-generic`, apart from a website made for one customer (role `website`). The two inputs "Website customer" and "Website settings" still work, and now mean: **also** put that customer's settings beside the program this run made (assemble; nothing is built again) and add that customer's zip to the release.
 
 ## The pieces
 
@@ -41,7 +69,7 @@ This page still describes the build service as it was written. The website is be
 2. The Studio makes a **draft release** `customer-<name>-<number>` in R and puts `inputs.zip` on it. (The number is the Studio's own count of builds for that customer. A draft is seen only by people who can write to R.)
 3. The Studio asks S to run the workflow *Build for one customer*, giving only three small things: the customer's short name, the number, and the name of R. No setting travels in that request. **Only one build per customer runs at a time**; a build that is running is never cancelled by a newer one.
 4. The workflow takes `inputs.zip` from R and checks it again (the name, the sizes, the files, nothing that looks like a secret, no unknown part). Then it builds what was asked for:
-   - **the website for Linux** and **the website for Windows**, each on its own kind of machine (the database engine and the picture library are different files for each system). Each is audited (no source, no key, no database, nothing a factory-new computer lacks), started from its zip (it must refuse to work without a licence), and the Windows one is opened the way a person opens it (double-click, one copy, closing the window stops it);
+   - **the website for Linux** and **the website for Windows**, each on its own kind of machine (the database engine and the picture library are different files for each system): THE website is built, and the customer's settings are put beside it as a folder (nothing of the customer is compiled in). Each is audited (no source, no key, no database, nothing a factory-new computer lacks), started from its zip (it must refuse to work without a licence), and the Windows one is opened the way a person opens it (double-click, one copy, closing the window stops it);
    - **the Android app**, with the customer's name, colour, logo and web address; the build number is the app's version code, so a phone takes each new build as an update.
 5. Each part that worked puts its files on the draft release in R. The last job then writes `result.json` (also when a part failed, with plain words about it) and `SHA256SUMS.txt`, takes away any file that no successful part claims, and **publishes the release, last of all**. A published release with a `result.json` means "finished".
 6. The Studio checks regularly (about every 20 seconds, for at most 90 minutes), downloads the files, checks each against `SHA256SUMS.txt`, puts them in the customer's pack, and writes the build in the activity record. If a part failed it says which one and why, in plain words, and offers *Try again* (a new build number).
@@ -54,7 +82,7 @@ On the release in R:
 
 | File | What it is |
 |---|---|
-| `website-<name>-linux.zip`, `website-<name>-windows.zip` | The customer's website for each system. Carries its own Node.js; nothing to install first. |
+| `website-<name>-linux.zip`, `website-<name>-windows.zip` | The customer's website for each system: THE website with the customer's folder beside it (no licence file yet). Carries its own Node.js; nothing to install first. |
 | `SmartRetailPOS-<name>-<version>.apk`, `.aab` | The Android app: the `.apk` to try on a phone, the `.aab` for a store. |
 | `ANDROID-SIGNING.txt` | Says which key signed the app (see "Android signing" below). |
 | `NO-LICENCE-KEYS-TRIAL-ONLY.txt` | Only on a **trial**. |
@@ -177,7 +205,7 @@ Write what happened (how long it took, what it cost, what failed) into `docs/OPE
 
 - **No source leaves S.** R and the Studio hold only settings and finished programs. The programs are the same ones a customer is given; they carry no source (`scripts/audit-package.mjs` checks every website zip, and the app is checked for source files).
 - **No secret travels.** The bundle is checked by the Studio and again by the workflow (the same secret patterns as the release gate). `result.json`, the messages and the logs hold no token; the helper scripts take the token out of any message before they print it, and only send it to GitHub's own address.
-- **Nothing about a customer is written in the workflow file or in program code.** The customer's name, brand, logo and settings arrive in the bundle; a test checks that the workflow names no customer.
+- **Nothing about a customer is written in the workflow file or in program code.** The customer's name, brand, logo and settings arrive in the bundle; a test checks that the workflow names no customer. For the website they stay data all the way: they are never compiled in, they are a folder beside the program.
 - **A part that fails hands over nothing.** Its half-made files are taken away from R, and `result.json` says what happened in words a person can act on.
 
 ## What was checked, and what was NOT

@@ -182,3 +182,25 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-07 14:56 (about; the owner's answer to the question "What do you mean by the longitudinal look?", chosen from three readings)
 
 > A vertical, list-style look on a normal monitor
+
+### 2026-10-07 15:40 (about; the owner's answers, one by one, to questions the assistant asked while the older programs were being studied)
+
+> Points per item, with a money value per point (Recommended)
+
+(Question: which loyalty scheme the shop program keeps. Decision 31.)
+
+> Proper double-entry books (Recommended)
+
+(Question: what the accounting books should be. Decision 32.)
+
+> Discount lowers the tax too (Recommended)
+
+(Question: what a discount on the whole bill does to the tax. Decision 33.)
+
+> Cashier chooses: cash back or credit on the account (Recommended)
+
+(Question: what happens to the money when goods are brought back. Decision 34.)
+
+> Show the tax, so the bill matches (Recommended)
+
+(Question: whether an estimate shows the tax. Decision 35.)

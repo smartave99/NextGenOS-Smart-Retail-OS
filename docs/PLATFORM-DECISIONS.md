@@ -229,6 +229,41 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Rule:** the offline software has **two looks**. The **vertical look ("longitudinal")** is for people using a normal PC or laptop monitor: the menu at the top, and the screens laid out as long vertical lists and forms that are scrolled down (the bill below the items). The **wide look ("lateral/latitudinal")** is for **touch counter screens**: big touch targets, the menu on the left, the items in the middle and the bill on the right, all visible at once. Every screen works and looks right in **both**; none is usable in only one. The look is a **setting** of the device (the theme already has density, menu position and bill position settings; the two looks are presets of them plus the screen layouts): **automatic** (touch screen: wide; otherwise: vertical) and **changeable by the owner per device**. The website and the Android app follow the same idea for the shopper's screen shape. Tested in both looks.
 - **Today:** **Built in the Business Hub (7 October 2026), with these limits.** *Settings → Look → The two looks*: the owner picks **As it was**, **Each screen decides** (a touch screen gets the wide look, any other screen the vertical look), **List look** or **Counter look** for the whole shop; and each computer can have its own look (**On this computer only**, kept in that browser). The vertical look is the menu along the top, the items as rows you scroll down, the bill below; the wide look is big buttons (touch size), the menu on the left, the items in the middle, the bill on the right. A look is a bundle of the settings the theme already had (button size, menu place, bill place, text size), so **no licence-format change was needed**. Tests: `ShopLookTests` (the values in code and in `theme.js` are equal; the choice is kept) and the browser test `e2e/looks.e2e.mjs` (both looks on the sell screen, "each screen decides" on a mouse screen and on a touch screen, the per-computer choice, going back). **Not done yet:** (1) the default is still **As it was** until the owner chooses; making "each screen decides" the default for new shops is a one-line change but moves the existing shop's screens, so it needs the owner's word; (2) only the sell screen has a different shape in the two looks, the other screens follow the menu, button-size and bill-place settings and are not yet checked one by one in both looks; (3) a customer's profile (`theme.json`) cannot yet carry the look; (4) the website and the Android app do not have the two looks yet. The older Windows POS's touch till (`frmPOSNewTuch`) remains the model for the wide look.
 
+### 31. Loyalty points: per item, with a money value per point
+
+- **Asked (7 October 2026):** The older POS has two ways to give loyalty points (a percent of the whole bill; or points per item with a money value per point, kept in a points ledger). Which one should customers get? (`docs/old-programs/02-masters-accounting-reports.md`, A1.6)
+- **Answer (the owner chose):** "Points per item, with a money value per point (Recommended)".
+- **Rule:** The shop program has **one** loyalty scheme: each product earns its own points, a point is worth a set amount of money when spent, and every customer has a points ledger. The percent-of-the-bill scheme is not ported. The traps the study lists (a cancelled bill must not burn a voucher; gift expiry must expire; a coupon's start date must be checked) are fixed, not copied. Old customers' points come across as opening points (decision 17).
+- **Today:** Not built. Study 02 has the formulas and test vectors.
+
+### 32. Accounting books: proper double entry
+
+- **Asked (7 October 2026):** The older POS keeps accounts as one line per event and its trial balance does not add up (the study's worked example is out by 4,900). Copy the old books, build proper double-entry books, or leave the books for last?
+- **Answer (the owner chose):** "Proper double-entry books (Recommended)".
+- **Rule:** The Hub gets **real double-entry books**: every sale, purchase, receipt, payment, return and stock change is posted so that debits equal credits, and the trial balance, profit and loss and balance sheet always agree. Old customers' and suppliers' balances and the stock value come across as **opening entries**; old bills are never re-posted or recalculated. The old books' reports (day book, bank, contra, income and expense and the rest) are rebuilt on the new books, with the old POS's numbers as test examples only where they are right.
+- **Today:** Not built. The Hub has no accounting module (`docs/old-programs/06-hub-map.md`).
+
+### 33. A discount on the whole bill lowers the tax too
+
+- **Asked (7 October 2026):** The older POS takes a bill discount off the total after tax and leaves the tax unchanged (bill 194.19 with 34.20 tax stays 34.20). What should the new program do?
+- **Answer (the owner chose):** "Discount lowers the tax too (Recommended)".
+- **Rule:** A discount on the whole bill is **spread over the items first, and the tax is worked out on what is left.** Line discounts (percent or amount) work the same way. Old bills are not recalculated. A test pins the example from the study (`docs/old-programs/01-selling-buying-stock.md`, B4).
+- **Today:** Not built. The Hub has no bill discount and no line discount screen (`docs/old-programs/06-hub-map.md`).
+
+### 34. Returns: the cashier chooses cash back or credit on the account
+
+- **Asked (7 October 2026):** A customer brings goods back: always cash back, always credit on the account, or the cashier chooses?
+- **Answer (the owner chose):** "Cashier chooses: cash back or credit on the account (Recommended)".
+- **Rule:** Every return asks **cash back now, or keep it as credit on the customer's account** for a later bill. Both are written in the customer's account and in the books. A return on an unpaid credit sale **lowers what the customer owes** (today a Hub credit note does not). Credit on the account needs a named customer.
+- **Today:** Not built. The Hub's credit note exists but does not touch what a customer owes.
+
+### 35. An estimate shows the tax, so the bill matches
+
+- **Asked (7 October 2026):** In the older POS an estimate shows no tax, so the bill made from it is dearer (estimate 180.00 became bill 212.40). What should an estimate do?
+- **Answer (the owner chose):** "Show the tax, so the bill matches (Recommended)".
+- **Rule:** An estimate (quotation) for a shop sale is worked out **exactly like a bill, with the same tax**; turning it into a bill gives the same total unless prices changed. Estimates for shop sales are new in the Hub (today it has quotes for construction projects only).
+- **Today:** Not built.
+
 ## Still to ask, and open items
 
 - Pricing details: how many PCs the one price covers; the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).

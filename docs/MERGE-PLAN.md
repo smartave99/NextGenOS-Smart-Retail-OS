@@ -64,10 +64,19 @@ The old POS's screens (`apps/pos-desktop/Documentation/UI_SCREEN_INVENTORY.csv`)
 ## What reading the older POS's masters, books and reports added (study 02, 7 October 2026)
 
 1. **A customer's or supplier's money is a running account, not a list of unpaid bills:** balance = sum of credits minus sum of debits (`CustomerLedgerBook`, `SupplierLedgerBook`). The credit limit has an on/off flag: with "No" the customer has unlimited credit. **The Hub treats a limit of 0 as no credit at all, the opposite meaning.** The old check can also refuse a customer who is already over the limit on a full cash sale (test vectors L1 to L10 in the study).
-2. **The old books are not double entry:** one row (or a pair) per event, a credit sale writes only the customer's row, the trial balance does not balance (worked example out by 4,900), and edits rewrite rows in place. The Hub has no accounting module at all. **Decision for the owner (to ask): copy the old books as they are, or build proper double-entry books?**
+2. **The old books are not double entry:** one row (or a pair) per event, a credit sale writes only the customer's row, the trial balance does not balance (worked example out by 4,900), and edits rewrite rows in place. The Hub has no accounting module at all. **Decided (decision 32): proper double-entry books, with the old balances coming across as opening entries.**
 3. **Profit and loss in the old POS is cash-style** (no closing stock), and a per-line cost profit uses the last purchase price saved on the sale line. The Hub does not save a cost on the document line, so it can produce neither figure yet.
 4. **Column names mislead:** `Product.ReorderPoint` holds the wholesale price (the reorder level is `MinStock`); `Gift.DiscPerc` and `CustomerOffer.DiscPerc` hold money amounts; `Product.Barcode` is always "0" (the real barcodes are rows in `Temp_Stock` and `Product_OpeningStock`); GST is stored as two half rates. The data reader must use the study's maps, not the column names.
-5. **Loyalty, coupons and gifts have traps the Hub must not copy:** two loyalty schemes exist (percent of the bill in the older till, per-line points with a money value per point in the touch tills; **the owner picks one**); coupons and gifts are marked used when the cashier confirms, before the bill is saved, so a cancelled bill burns the voucher; gift expiry never expires; a coupon's start date is never checked; a quantity outside every discount band gets the largest band's discount; purchase totals include the supplier's previous due; a supplier who owes the shop can be "paid". Each has test vectors and a "keep or fix?" note in the study.
+5. **Loyalty, coupons and gifts have traps the Hub must not copy:** two loyalty schemes exist (percent of the bill in the older till, per-line points with a money value per point in the touch tills; **decided, decision 31: per-line points with a money value per point**); coupons and gifts are marked used when the cashier confirms, before the bill is saved, so a cancelled bill burns the voucher; gift expiry never expires; a coupon's start date is never checked; a quantity outside every discount band gets the largest band's discount; purchase totals include the supplier's previous due; a supplier who owes the shop can be "paid". Each has test vectors and a "keep or fix?" note in the study.
+
+## Money rules the owner decided (7 October 2026)
+
+- **Loyalty:** points per item with a money value per point (decision 31).
+- **Books:** proper double entry; old balances and stock value come across as opening entries (decision 32).
+- **Bill discount:** spread over the items first, tax worked out on what is left (decision 33).
+- **Returns:** the cashier chooses cash back or credit on the customer's account; a return on an unpaid credit sale lowers what the customer owes (decision 34).
+- **Estimates:** worked out like a bill, with the tax (decision 35).
+- **Not yet asked:** whether to keep the old rule that a customer already over the credit limit cannot even buy for cash, and what a credit limit of "not enforced" means in the Hub; the rounding rule (the study recommends the Hub's own rounding and never recalculating old bills).
 
 ## Order of work (a proposal; the owner can change it)
 

@@ -150,6 +150,7 @@ The owner answered these one by one on 7 October 2026. They are decided: **do no
 - **Payments:** the software records the amount and the method; it never sees a card number. Certified provider connections come later, per country.
 - **Hosting:** clients may put the website online themselves, or NextGenOS hosts it for a fee. **Staff first; partners (resellers) later.**
 - **One shop program (decision 26, `docs/MERGE-PLAN.md`):** the Business Hub is the host, the older Windows POS's features are merged into it screen by screen from the recovered source, and the rest is deleted only after the Hub does the same job and a test shows it. Reuse first (§17).
+- **Money rules of the merged shop program (decisions 31 to 35):** loyalty points per item with a money value per point; proper double-entry books (old balances as opening entries); a bill discount is spread over the items and lowers the tax; a return is cash back or credit on the customer's account, the cashier chooses; an estimate shows the tax like a bill.
 - **Say what is built.** Most of this is **not built yet**. `docs/PLATFORM-DECISIONS.md` says for each decision what exists today, and `docs/OPEN-WORK.md` lists the work. No screen, guide or answer says the platform does what it does not (§11).
 
 ## 17. Reuse first: edit and use what exists; ask before building something new instead

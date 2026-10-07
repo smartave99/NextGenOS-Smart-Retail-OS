@@ -27,8 +27,9 @@ export default function LicencePage() {
         <div style={{ maxWidth: 560, margin: "48px auto", padding: "0 16px", fontFamily: "system-ui, sans-serif" }}>
             <h1 style={{ fontSize: 28, letterSpacing: "-0.02em" }}>Licence</h1>
             {view && (
-                <p style={{ padding: 16, borderRadius: 14, background: view.usable ? "#e6f4ea" : "#fbe7e5", color: view.usable ? "#1f7a3d" : "#b3261e" }}>
+                <p style={{ padding: 16, borderRadius: 14, background: !view.usable ? "#fbe7e5" : view.banner ? "#fff4e0" : "#e6f4ea", color: !view.usable ? "#b3261e" : view.banner ? "#8a5300" : "#1f7a3d" }}>
                     {view.message}
+                    {view.banner && view.status === "Valid" ? <><br />{view.banner}</> : null}
                     {view.usable && view.customer ? <><br /><small>For {view.customer}{view.edition ? `, ${view.edition} plan` : ""}{view.ends ? `, until ${view.ends}` : ""}.</small></> : null}
                 </p>
             )}

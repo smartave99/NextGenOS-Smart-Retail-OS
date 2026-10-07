@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { activateWithKey, getLicenceState, hostOf, serverUrl, type ActivationResult } from "@/lib/licence/manager";
-import { describe, isUsable } from "@/lib/licence/evaluate";
+import { banner, describe, isUsable } from "@/lib/licence/evaluate";
 import { allowServerAction } from "@/lib/server-action-rate-limit";
 import { requireAdminSession } from "@/lib/auth-server";
 
@@ -15,6 +15,8 @@ export interface LicenceView {
     ends?: string;
     domains?: string[];
     canActivate: boolean;
+    /** Something the owner should know while the site keeps working (the licence ended, a trial is running out), or null. */
+    banner: string | null;
 }
 
 /** What the licence says, in words. Safe for anyone: it shows no key and nothing secret. */
@@ -31,6 +33,7 @@ export async function getLicenceView(): Promise<LicenceView> {
         ends: isUsable(state) && lic?.exp ? new Date(lic.exp * 1000).toISOString().slice(0, 10) : undefined,
         domains: isUsable(state) ? lic?.bind.domains : undefined,
         canActivate: !!serverUrl(),
+        banner: banner(state),
     };
 }
 

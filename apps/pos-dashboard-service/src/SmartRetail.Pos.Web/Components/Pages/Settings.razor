@@ -161,8 +161,8 @@
     <section class="panel">
         <div class="setting">
             <div>
-                <h3>@(Licence.State.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : Licence.State.IsUsable ? "Active, please check in" : "Not active")</h3>
-                <p>@Licence.State.Message</p>
+                <h3>@(Licence.State.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : Licence.State.Status == NextGenOS.Licensing.LicenceStatus.Ended ? "Ended, still working" : Licence.State.IsUsable ? "Active, please check in" : "Not active")</h3>
+                <p>@(Licence.State.Banner ?? Licence.State.Message)</p>
                 @if (Licence.State.Licence is { } claims)
                 {
                     <p class="small muted">

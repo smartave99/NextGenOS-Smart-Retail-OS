@@ -63,7 +63,7 @@ namespace NextGenOS.Licensing.Tests
                 // The same PC activating again does not use a second seat.
                 Assert.Equal(LicenceStatus.Valid, (await a.Manager().ActivateAsync(lic.Item2)).Status);
 
-                LiveStudio.Cli("free-devices", lic.Item1);
+                LiveStudio.Cli("free-devices", lic.Item1, "--reason", "the old counter PC broke");
                 Assert.Equal(LicenceStatus.Valid, (await b.Manager().ActivateAsync(lic.Item2)).Status);
 
                 // The first PC learns at its next check-in that it was released, and asks for activation again.
@@ -124,18 +124,19 @@ namespace NextGenOS.Licensing.Tests
             {
                 await pc.Manager().ActivateAsync(lic.Item2);
 
-                pc.ClockOffset = TimeSpan.FromDays(3);
+                // The Studio asks a PC to check in about monthly and gives 60 days of warnings (spec section 13.2).
+                pc.ClockOffset = TimeSpan.FromDays(20);
                 Assert.Equal(LicenceStatus.Valid, pc.Manager().Evaluate().Status);
 
-                pc.ClockOffset = TimeSpan.FromDays(10); // check-in is overdue, the server cannot be reached
+                pc.ClockOffset = TimeSpan.FromDays(40); // check-in is overdue, the server cannot be reached
                 pc.Server = "http://127.0.0.1:1";
                 var grace = await pc.Manager().CheckInAsync(force: true);
                 Assert.Equal(LicenceStatus.Grace, grace.Status);
                 Assert.True(grace.IsUsable);
-                Assert.InRange(grace.GraceDaysLeft, 10, 12);
+                Assert.InRange(grace.GraceDaysLeft, 49, 51); // 60 days of warnings, 10 of them used
                 Assert.Contains("Internet", grace.Message);
 
-                pc.ClockOffset = TimeSpan.FromDays(30);
+                pc.ClockOffset = TimeSpan.FromDays(100);
                 var locked = await pc.Manager().CheckInAsync(force: true);
                 Assert.Equal(LicenceStatus.NeedsCheckIn, locked.Status);
                 Assert.False(locked.IsUsable);
@@ -345,6 +346,133 @@ namespace NextGenOS.Licensing.Tests
                 await a.Manager().DeactivateAsync();
                 Assert.Equal(LicenceStatus.Missing, a.Manager().Evaluate().Status);
                 Assert.Equal(LicenceStatus.Valid, (await b.Manager().ActivateAsync(lic.Item2)).Status);
+            }
+        }
+
+        [LiveFact]
+        public async Task A_paid_licence_has_no_end_date_keeps_working_with_a_banner_and_checks_in_monthly_with_60_days_of_warnings()
+        {
+            var lic = LiveStudio.NewLicence("business", "perpetual");
+            using (var pc = new FakePc("one-time-purchase"))
+            {
+                var state = await pc.Manager().ActivateAsync(lic.Item2);
+                Assert.Equal(LicenceStatus.Valid, state.Status);
+                Assert.Null(state.Licence.Expires);
+                Assert.Null(state.ExpiresUtc);
+                Assert.Equal("banner", state.Licence.OnEnd);
+                Assert.False(state.Licence.Trial);
+                Assert.Equal(30, state.Licence.Terms.CheckInDays);
+                Assert.Equal(60, state.Licence.Terms.GraceDays);
+                Assert.Equal(30 * 86400L, state.Activation.NextCheckIn - state.Activation.IssuedAt);
+                Assert.Equal(60 * 86400L, state.Activation.Until - state.Activation.NextCheckIn);
+                Assert.Null(state.Banner);
+            }
+        }
+
+        [LiveFact]
+        public async Task A_paid_licence_that_ended_keeps_working_with_a_banner_checks_in_and_still_obeys_a_hold()
+        {
+            // A licence that started in 2020 for one year, signed to keep working after its end.
+            var lic = LiveStudio.NewLicence("business", "y1", "--start", "2020-01-01", "--on-end", "banner");
+            using (var pc = new FakePc("long-time-customer"))
+            {
+                var state = await pc.Manager().ActivateAsync(lic.Item2);
+                Assert.Equal(LicenceStatus.Ended, state.Status);
+                Assert.True(state.IsUsable);
+                Assert.True(state.EndedDaysAgo > 365);
+                Assert.Contains("keeps working", state.Banner);
+                Assert.Equal("banner", state.Licence.OnEnd);
+                Assert.True(state.Activation.NextCheckIn > state.Licence.Expires.Value + 86400L * 365, "the check-in is not cut at the end date");
+
+                // It goes on checking in, and still learns about a hold the owner's team puts on it.
+                Assert.Equal(LicenceStatus.Ended, (await pc.Manager().CheckInAsync(force: true)).Status);
+                LiveStudio.Cli("suspend", lic.Item1, "--reason", "test");
+                var held = await pc.Manager().CheckInAsync(force: true);
+                Assert.Equal(LicenceStatus.Revoked, held.Status);
+                Assert.False(held.IsUsable);
+                LiveStudio.Cli("resume", lic.Item1);
+                Assert.Equal(LicenceStatus.Ended, (await pc.Manager().CheckInAsync(force: true)).Status);
+
+                // A second PC can still be activated (the licence has three seats).
+                using (var other = new FakePc("second-counter"))
+                {
+                    Assert.Equal(LicenceStatus.Ended, (await other.Manager().ActivateAsync(lic.Item2)).Status);
+                }
+            }
+        }
+
+        [LiveFact]
+        public async Task A_licence_that_is_set_to_stop_is_refused_after_its_end_in_plain_words()
+        {
+            var lic = LiveStudio.NewLicence("business", "y1", "--start", "2020-01-01", "--on-end", "stop");
+            using (var pc = new FakePc("strict"))
+            {
+                var ex = await Assert.ThrowsAsync<LicenceServerException>(() => pc.Manager().ActivateAsync(lic.Item2));
+                Assert.Equal("expired", ex.Code);
+            }
+        }
+
+        [LiveFact]
+        public async Task A_trial_runs_for_its_days_stops_at_its_end_and_extending_or_buying_brings_it_back()
+        {
+            var lic = LiveStudio.NewLicence("business", "trial", "--trial-days", "14");
+            using (var pc = new FakePc("trial-shop"))
+            {
+                var state = await pc.Manager().ActivateAsync(lic.Item2);
+                Assert.Equal(LicenceStatus.Valid, state.Status);
+                Assert.True(state.Licence.Trial);
+                Assert.Equal("stop", state.Licence.OnEnd);
+                Assert.Equal(14, state.TrialDaysLeft);
+                Assert.Equal("This is a trial. 14 days left.", state.Banner);
+
+                // Past its end the trial stops, and keeps stopping even if it checks in.
+                pc.ClockOffset = TimeSpan.FromDays(20);
+                Assert.Equal(LicenceStatus.Expired, pc.Manager().Evaluate().Status);
+                Assert.Equal(LicenceStatus.Expired, (await pc.Manager().CheckInAsync(force: true)).Status);
+                Assert.False(pc.Manager().Evaluate().IsUsable);
+
+                // Staff extend it: the PC learns at its next check-in.
+                LiveStudio.Cli("extend", lic.Item1, "--days", "30");
+                var extended = await pc.Manager().CheckInAsync(force: true);
+                Assert.Equal(LicenceStatus.Valid, extended.Status);
+                Assert.InRange(extended.TrialDaysLeft.Value, 23, 25);
+
+                // The customer buys: no end date, banner at its end, no longer a trial.
+                LiveStudio.Cli("convert", lic.Item1);
+                var paid = await pc.Manager().CheckInAsync(force: true);
+                Assert.Equal(LicenceStatus.Valid, paid.Status);
+                Assert.False(paid.Licence.Trial);
+                Assert.Null(paid.Licence.Expires);
+                Assert.Equal("banner", paid.Licence.OnEnd);
+                Assert.Null(paid.TrialDaysLeft);
+            }
+        }
+
+        [LiveFact]
+        public async Task A_customer_can_move_the_licence_to_a_new_PC_twice_and_the_third_time_must_ask_the_supplier()
+        {
+            var lic = LiveStudio.NewLicence("starter", "perpetual"); // starter: one PC
+            using (var a = new FakePc("first-pc"))
+            using (var b = new FakePc("second-pc"))
+            using (var c = new FakePc("third-pc"))
+            using (var d = new FakePc("fourth-pc"))
+            {
+                await a.Manager().ActivateAsync(lic.Item2);
+                await a.Manager().DeactivateAsync();                               // move 1
+                await b.Manager().ActivateAsync(lic.Item2);
+                await b.Manager().DeactivateAsync();                               // move 2
+                await c.Manager().ActivateAsync(lic.Item2);
+                var ex = await Assert.ThrowsAsync<LicenceServerException>(() => c.Manager().DeactivateAsync());
+                Assert.Equal("move_limit_reached", ex.Code);
+                Assert.False(ex.IsNetwork);
+                Assert.Contains("contact your supplier", ex.Message);
+                Assert.Equal(LicenceStatus.Valid, c.Manager().Evaluate().Status);  // the PC keeps its licence and its seat
+                var noRoom = await Assert.ThrowsAsync<LicenceServerException>(() => d.Manager().ActivateAsync(lic.Item2));
+                Assert.Equal("limit_reached", noRoom.Code);
+
+                // The supplier frees it, with a reason; that is not limited.
+                LiveStudio.Cli("free-devices", lic.Item1, "--reason", "customer called, old PC is gone");
+                Assert.Equal(LicenceStatus.Valid, (await d.Manager().ActivateAsync(lic.Item2)).Status);
             }
         }
     }

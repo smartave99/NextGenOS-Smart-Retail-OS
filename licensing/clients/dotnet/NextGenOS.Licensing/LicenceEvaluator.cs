@@ -97,7 +97,14 @@ namespace NextGenOS.Licensing
             }
 
             if (input.Now < lic.NotBefore) { state.Status = LicenceStatus.NotYetValid; return state; }
-            if (lic.Expires.HasValue && input.Now > lic.Expires.Value) { state.Status = LicenceStatus.Expired; return state; }
+
+            // The end date (spec section 10.1). Only a licence signed exactly "banner" goes on after it; everything else stops.
+            var ended = lic.Expires.HasValue && input.Now > lic.Expires.Value;
+            if (ended && lic.OnEnd != "banner") { state.Status = LicenceStatus.Expired; return state; }
+            if (ended) state.EndedDaysAgo = (int)Math.Min(int.MaxValue, (input.Now - lic.Expires.Value) / 86400);
+            if (lic.Trial && lic.Expires.HasValue && !ended) state.TrialDaysLeft = (int)Math.Min(int.MaxValue, Math.Max(0, (lic.Expires.Value - input.Now + 86399) / 86400));
+            // Past its end, a licence that would be Valid is Ended: it runs, with a banner. Every other result stays as it is.
+            var valid = ended ? LicenceStatus.Ended : LicenceStatus.Valid;
 
             if (input.RequiredModule != null && !lic.Modules.Contains(input.RequiredModule))
             {
@@ -108,17 +115,17 @@ namespace NextGenOS.Licensing
             switch (lic.Bind.Mode)
             {
                 case "none":
-                    state.Status = LicenceStatus.Valid;
+                    state.Status = valid;
                     return state;
 
                 case "domain":
-                    state.Status = HostMatches(input.Host, lic.Bind.Domains) ? LicenceStatus.Valid : LicenceStatus.DomainMismatch;
+                    state.Status = HostMatches(input.Host, lic.Bind.Domains) ? valid : LicenceStatus.DomainMismatch;
                     return state;
 
                 case "device":
                     if (act == null) { state.Status = LicenceStatus.NotActivated; return state; }
                     if (!DeviceFingerprint.Matches(act.Fingerprint, act.FingerprintMin, input.Fingerprint)) { state.Status = LicenceStatus.DeviceMismatch; return state; }
-                    if (input.Now <= act.NextCheckIn) { state.Status = LicenceStatus.Valid; return state; }
+                    if (input.Now <= act.NextCheckIn) { state.Status = valid; return state; }
                     if (input.Now <= act.Until)
                     {
                         state.Status = LicenceStatus.Grace;

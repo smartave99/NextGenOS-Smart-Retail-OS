@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace NextGenOS.Licensing
 {
@@ -102,6 +103,19 @@ namespace NextGenOS.Licensing
         [JsonProperty("act")] public ActivationTerms Terms { get; set; }
         [JsonProperty("trial")] public bool Trial { get; set; }
         [JsonProperty("white")] public WhiteLabel White { get; set; }
+
+        /// <summary>The signed "onEnd" claim exactly as it was written (spec section 10.1). Read <see cref="OnEnd"/>, not this.</summary>
+        [JsonProperty("onEnd")] public JToken OnEndClaim { get; set; }
+
+        /// <summary>
+        /// What happens after the end date: "banner" (keeps working, shows a banner) only when the signed claim is exactly the text
+        /// "banner"; anything else, or nothing, is "stop". Nothing but the signed licence can change it.
+        /// </summary>
+        [JsonIgnore]
+        public string OnEnd
+        {
+            get { return OnEndClaim != null && OnEndClaim.Type == JTokenType.String && (string)OnEndClaim == "banner" ? "banner" : "stop"; }
+        }
     }
 
     public sealed class ActivationClaims

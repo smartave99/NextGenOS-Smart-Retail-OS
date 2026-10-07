@@ -7,7 +7,9 @@ import crypto from "node:crypto";
 
 export type LicenceStatus =
     | "Valid" | "Grace" | "NotActivated" | "NeedsCheckIn" | "Expired" | "NotYetValid" | "Revoked"
-    | "DeviceMismatch" | "DomainMismatch" | "ClockTampered" | "Invalid" | "Missing" | "ModuleNotLicensed";
+    | "DeviceMismatch" | "DomainMismatch" | "ClockTampered" | "Invalid" | "Missing" | "ModuleNotLicensed"
+    // A paid licence past its end date that is signed "onEnd: banner": it still works, with a banner (spec 10.1).
+    | "Ended";
 
 export interface TrustedKey { kid: string; publicKey: string }
 
@@ -26,6 +28,8 @@ export interface LicenceClaims {
     brand: BrandProfile | null; reseller: { id: string; name: string } | null;
     act: { online: boolean; checkInDays: number; graceDays: number; offlineDays: number };
     trial: boolean; white?: { level: "none" | "theme" | "full" };
+    /** What happens after `exp`: exactly "banner" keeps working with a banner; anything else, or nothing, stops (spec 10.1). Signed: never read from anywhere else. */
+    onEnd?: string;
 }
 
 export interface ActivationClaims {
@@ -49,6 +53,10 @@ export interface LicenceState {
     licence?: LicenceClaims;
     activation?: ActivationClaims;
     graceDaysLeft: number;
+    /** Whole days since the end date, rounded down (0 on the first day). Set when the licence is "banner" and past its end, whatever the status. */
+    endedDaysAgo?: number;
+    /** Whole days until the end of a trial, rounded up. Set for a trial that has not ended. */
+    trialDaysLeft?: number;
 }
 
 export const PRODUCT_ID = "smart-retail-os";
@@ -160,18 +168,24 @@ function evaluateCore(input: EvaluationInput): LicenceState {
     const floor = Math.max(input.lastSeen ?? 0, lic.iat, act ? act.iat : 0, crl ? crl.iat : 0);
     if (input.now < floor - CLOCK_SLACK) return { ...state, status: "ClockTampered" };
     if (input.now < lic.nbf) return { ...state, status: "NotYetValid" };
-    if (lic.exp != null && input.now > lic.exp) return { ...state, status: "Expired" };
+    // The end date (spec 10.1). Only a licence signed exactly "banner" goes on after it; everything else stops.
+    const ended = lic.exp != null && input.now > lic.exp;
+    if (ended && lic.onEnd !== "banner") return { ...state, status: "Expired" };
+    if (ended) state.endedDaysAgo = Math.floor((input.now - (lic.exp as number)) / 86400);
+    if (lic.trial === true && lic.exp != null && !ended) state.trialDaysLeft = Math.max(0, Math.ceil((lic.exp - input.now) / 86400));
+    // Past its end, a licence that would be "Valid" is "Ended": it runs, with a banner. Every other result stays as it is.
+    const valid = ended ? "Ended" : "Valid";
     if (input.requiredModule && !lic.modules.includes(input.requiredModule)) return { ...state, status: "ModuleNotLicensed" };
 
     switch (lic.bind.mode) {
         case "none":
-            return { ...state, status: "Valid" };
+            return { ...state, status: valid };
         case "domain":
-            return { ...state, status: hostMatches(input.host, lic.bind.domains) ? "Valid" : "DomainMismatch" };
+            return { ...state, status: hostMatches(input.host, lic.bind.domains) ? valid : "DomainMismatch" };
         case "device": {
             if (!act) return { ...state, status: "NotActivated" };
             if (!fingerprintMatches(act.fp, act.fpMin, input.fingerprint)) return { ...state, status: "DeviceMismatch" };
-            if (input.now <= act.next) return { ...state, status: "Valid" };
+            if (input.now <= act.next) return { ...state, status: valid };
             if (input.now <= act.until) return { ...state, status: "Grace", graceDaysLeft: Math.max(0, Math.floor((act.until - input.now + 86399) / 86400)) };
             return { ...state, status: "NeedsCheckIn" };
         }
@@ -180,7 +194,20 @@ function evaluateCore(input: EvaluationInput): LicenceState {
     }
 }
 
-export const isUsable = (s: LicenceState) => s.status === "Valid" || s.status === "Grace";
+/** May the site run? A licence that ended but is signed to keep working ("Ended") may: it only shows a banner. */
+export const isUsable = (s: LicenceState) => s.status === "Valid" || s.status === "Grace" || s.status === "Ended";
+
+const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+
+/** A line for the owner when the site runs but something needs their attention (a licence that ended, a trial running out), or null. */
+export function banner(s: LicenceState): string | null {
+    if (!isUsable(s)) return null;
+    const parts: string[] = [];
+    if (s.status === "Grace") parts.push(describe(s));
+    if (s.endedDaysAgo !== undefined) parts.push(s.endedDaysAgo === 0 ? "The licence has ended, but the site keeps working. Please renew it with your supplier." : `The licence ended ${days(s.endedDaysAgo)} ago, but the site keeps working. Please renew it with your supplier.`);
+    else if (s.trialDaysLeft !== undefined) parts.push(s.trialDaysLeft === 0 ? "This is a trial. It ends today." : `This is a trial. ${days(s.trialDaysLeft)} left.`);
+    return parts.length ? parts.join(" ") : null;
+}
 
 /** A short sentence for the person using the site, with no technical words. */
 export function describe(s: LicenceState): string {
@@ -189,6 +216,7 @@ export function describe(s: LicenceState): string {
         case "Grace": return `The licence server could not be reached. The site keeps working for ${s.graceDaysLeft} more day(s).`;
         case "NotActivated": return "This site needs to be activated with a licence key.";
         case "NeedsCheckIn": return "The site has not been able to confirm its licence for too long.";
+        case "Ended": return s.endedDaysAgo ? `The licence ended ${days(s.endedDaysAgo)} ago, but the site keeps working. Please renew it with your supplier.` : "The licence has ended, but the site keeps working. Please renew it with your supplier.";
         case "Expired": return "The licence has ended. Please renew it with your supplier.";
         case "NotYetValid": return "The licence has not started yet.";
         case "Revoked": return "This licence has been withdrawn. Please contact your supplier.";

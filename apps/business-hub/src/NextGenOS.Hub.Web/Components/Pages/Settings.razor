@@ -438,7 +438,7 @@ else if (tab == "licence")
     <section class="card">
         <h2>Licence</h2>
         <dl class="facts">
-            <dt>Status</dt><dd><span class="chip @(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "ok" : "warn")">@(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : state.IsUsable ? "Active, please connect to the internet soon" : "Not active")</span></dd>
+            <dt>Status</dt><dd><span class="chip @(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "ok" : "warn")">@(state.Status == NextGenOS.Licensing.LicenceStatus.Valid ? "Active" : state.Status == NextGenOS.Licensing.LicenceStatus.Ended ? "Ended, still working" : state.IsUsable ? "Active, please connect to the internet soon" : "Not active")</span></dd>
             @if (state.Licence is { } claims)
             {
                 <dt>Licensed to</dt><dd>@(claims.Customer?.Name ?? "")</dd>
@@ -448,7 +448,7 @@ else if (tab == "licence")
                 else { <dt>Valid until</dt><dd>No end date</dd> }
             }
         </dl>
-        <p class="muted">@state.Message</p>
+        <p class="muted">@(state.Banner ?? state.Message)</p>
         <div class="row"><button type="button" class="btn secondary" @onclick="RecheckLicence">Check again</button></div>
         <p class="muted small">Need help or a new licence? @(brandHelp())</p>
     </section>

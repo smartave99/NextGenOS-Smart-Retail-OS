@@ -85,15 +85,49 @@ const cases = [
   { name: 'domain_lookalike', lic: lic({ bind: { mode: 'domain', domains: ['shop.example.com'] } }), act: null, host: 'shop.example.com.evil.test', fp: A, expect: 'DomainMismatch' },
   { name: 'domain_no_host', lic: lic({ bind: { mode: 'domain', domains: ['shop.example.com'] } }), act: null, host: null, fp: A, expect: 'DomainMismatch' },
   { name: 'unbound_licence', lic: lic({ bind: { mode: 'none', domains: [] } }), act: null, fp: A, expect: 'Valid' },
+
+  // ----- What happens at the end date: onEnd "banner" or "stop" (spec section 10.1) -----
+  // A licence with no onEnd (all the cases above) stops: `expired` is the proof. These are the explicit ones.
+  { name: 'expired_when_on_end_is_stop', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'stop' }), act: goodAct, fp: A, expect: 'Expired' },
+  { name: 'expired_when_on_end_is_unknown_text', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'carry-on' }), act: goodAct, fp: A, expect: 'Expired' },
+  { name: 'expired_when_on_end_is_not_text', lic: lic({ exp: NOW - 5 * DAY, onEnd: true }), act: goodAct, fp: A, expect: 'Expired' },
+  { name: 'expired_when_on_end_has_other_case', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'Banner' }), act: goodAct, fp: A, expect: 'Expired' },
+  { name: 'ended_banner_runs', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, expect: 'Ended', endedDaysAgo: 5 },
+  { name: 'ended_banner_first_day_is_day_zero', lic: lic({ exp: NOW - 3600, onEnd: 'banner' }), act: goodAct, fp: A, expect: 'Ended', endedDaysAgo: 0 },
+  { name: 'ended_banner_one_second_after_the_end', lic: lic({ exp: NOW - 1, onEnd: 'banner' }), act: goodAct, fp: A, expect: 'Ended', endedDaysAgo: 0 },
+  { name: 'ended_banner_days_round_down', lic: lic({ exp: NOW - (5 * DAY + 86399), onEnd: 'banner' }), act: goodAct, fp: A, expect: 'Ended', endedDaysAgo: 5 },
+  { name: 'banner_licence_at_its_end_second_is_still_valid', lic: lic({ exp: NOW, onEnd: 'banner' }), act: goodAct, fp: A, expect: 'Valid' },
+  { name: 'banner_licence_without_end_date_is_valid', lic: lic({ exp: null, onEnd: 'banner' }), act: goodAct, fp: A, expect: 'Valid' },
+  { name: 'ended_banner_in_grace_stays_grace', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, now: NOW + 10 * DAY, expect: 'Grace', endedDaysAgo: 15 },
+  { name: 'ended_banner_after_grace_needs_check_in', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, now: NOW + 19 * DAY, expect: 'NeedsCheckIn', endedDaysAgo: 24 },
+  { name: 'ended_banner_still_revoked_by_crl', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, crl: crl(['L-TEST0001']), fp: A, expect: 'Revoked' },
+  { name: 'ended_banner_copied_to_another_pc', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: pc('pc-b'), expect: 'DeviceMismatch' },
+  { name: 'ended_banner_not_activated', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: null, fp: A, expect: 'NotActivated' },
+  { name: 'ended_banner_module_not_licensed', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, module: 'chain', expect: 'ModuleNotLicensed' },
+  { name: 'ended_banner_module_present_runs', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, module: 'ai', expect: 'Ended', endedDaysAgo: 5 },
+  { name: 'ended_banner_clock_rolled_back_by_state', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, now: NOW, lastSeen: NOW + 3 * DAY, expect: 'ClockTampered' },
+  { name: 'ended_banner_not_yet_valid', lic: lic({ nbf: NOW + 5 * DAY, exp: NOW - 5 * DAY, onEnd: 'banner' }), act: goodAct, fp: A, expect: 'NotYetValid' },
+  { name: 'ended_banner_website_runs', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner', bind: { mode: 'domain', domains: ['shop.example.com'] } }), act: null, host: 'shop.example.com', fp: A, expect: 'Ended', endedDaysAgo: 5 },
+  { name: 'ended_banner_website_other_address', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner', bind: { mode: 'domain', domains: ['shop.example.com'] } }), act: null, host: 'other.example.com', fp: A, expect: 'DomainMismatch' },
+  { name: 'ended_banner_unbound_runs', lic: lic({ exp: NOW - 5 * DAY, onEnd: 'banner', bind: { mode: 'none', domains: [] } }), act: null, fp: A, expect: 'Ended', endedDaysAgo: 5 },
+  { name: 'tampered_on_end_to_banner', lic: tamper(lic({ exp: NOW - 5 * DAY, onEnd: 'stop' }), (o) => { o.onEnd = 'banner'; }), act: goodAct, fp: A, expect: 'Invalid' },
+  { name: 'tampered_on_end_added', lic: tamper(lic({ exp: NOW - 5 * DAY }), (o) => { o.onEnd = 'banner'; }), act: goodAct, fp: A, expect: 'Invalid' },
+
+  // ----- Trials: they stop at the end; the days left are reported for the banner -----
+  { name: 'trial_running_reports_days_left', lic: lic({ trial: true, exp: NOW + 10 * DAY, onEnd: 'stop' }), act: goodAct, fp: A, expect: 'Valid', trialDaysLeft: 10 },
+  { name: 'trial_days_left_round_up', lic: lic({ trial: true, exp: NOW + 10 * DAY - 3600, onEnd: 'stop' }), act: goodAct, fp: A, expect: 'Valid', trialDaysLeft: 10 },
+  { name: 'trial_last_day_is_one_day_left', lic: lic({ trial: true, exp: NOW + 100, onEnd: 'stop' }), act: goodAct, fp: A, expect: 'Valid', trialDaysLeft: 1 },
+  { name: 'trial_ended_stops', lic: lic({ trial: true, exp: NOW - DAY, onEnd: 'stop' }), act: goodAct, fp: A, expect: 'Expired' },
+  { name: 'trial_without_on_end_stops', lic: lic({ trial: true, exp: NOW - DAY }), act: goodAct, fp: A, expect: 'Expired' },
 ];
 
 const out = {
-  about: 'Generated by studio/scripts/make-testvectors.js. Every client must return `expect` for each case. `now` defaults to the top-level now.',
+  about: 'Generated by studio/scripts/make-testvectors.js. Every client must return `expect` for each case. `now` defaults to the top-level now. When `endedDaysAgo` or `trialDaysLeft` is a number, the client must report exactly that number too (spec section 10.1).',
   now: NOW,
   publicKeys: [{ kid: key.kid, publicKey: key.publicKey }],
   fingerprintKinds: kinds,
   fingerprintExample: { kind: 'bios', value: 'ABC123', listed: 'bios:' + require('node:crypto').createHash('sha256').update('ngos-fp-v1:bios:ABC123').digest('hex').slice(0, 32), part: require('node:crypto').createHash('sha256').update('ngos-fp-v1:bios:ABC123').digest('hex').slice(0, 32) },
-  cases: cases.map((c) => ({ name: c.name, lic: c.lic, act: c.act || null, crl: c.crl || null, fp: c.fp, host: c.host === undefined ? null : c.host, module: c.module || null, now: c.now || NOW, lastSeen: c.lastSeen || null, expect: c.expect })),
+  cases: cases.map((c) => ({ name: c.name, lic: c.lic, act: c.act || null, crl: c.crl || null, fp: c.fp, host: c.host === undefined ? null : c.host, module: c.module || null, now: c.now || NOW, lastSeen: c.lastSeen || null, expect: c.expect, endedDaysAgo: c.endedDaysAgo === undefined ? null : c.endedDaysAgo, trialDaysLeft: c.trialDaysLeft === undefined ? null : c.trialDaysLeft })),
 };
 
 const file = path.join(__dirname, '..', '..', 'testvectors', 'vectors.json');

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace NextGenOS.Licensing
 {
@@ -18,6 +19,12 @@ namespace NextGenOS.Licensing
         Invalid,
         Missing,
         ModuleNotLicensed,
+
+        /// <summary>
+        /// The end date has passed, and the signed licence says "onEnd: banner": the program keeps working and shows a banner
+        /// (spec section 10.1). Added last so that the numbers of the older statuses do not change.
+        /// </summary>
+        Ended,
     }
 
     /// <summary>The result of looking at the licence files: a status, the claims, and words for a person.</summary>
@@ -30,14 +37,51 @@ namespace NextGenOS.Licensing
         /// <summary>For <see cref="LicenceStatus.Grace"/>: whole days left before the licence stops until it checks in.</summary>
         public int GraceDaysLeft { get; set; }
 
+        /// <summary>
+        /// Whole days since the end date, rounded down (0 on the first day). Set when the signed licence is "banner" and past its end,
+        /// whatever the status (so a banner can also show it next to a check-in warning). Null otherwise.
+        /// </summary>
+        public int? EndedDaysAgo { get; set; }
+
+        /// <summary>Whole days until the end of a trial, rounded up. Set for a trial that has not ended; null otherwise.</summary>
+        public int? TrialDaysLeft { get; set; }
+
         /// <summary>When the licence ends, or null for no end date.</summary>
         public DateTime? ExpiresUtc
         {
             get { return Licence != null && Licence.Expires.HasValue ? (DateTime?)Epoch.AddSeconds(Licence.Expires.Value) : null; }
         }
 
-        /// <summary>True when the app may run: <see cref="LicenceStatus.Valid"/> or <see cref="LicenceStatus.Grace"/>.</summary>
-        public bool IsUsable { get { return Status == LicenceStatus.Valid || Status == LicenceStatus.Grace; } }
+        /// <summary>
+        /// True when the app may run: <see cref="LicenceStatus.Valid"/>, <see cref="LicenceStatus.Grace"/>, or <see cref="LicenceStatus.Ended"/>
+        /// (a licence that ended but is signed to keep working with a banner). Every place that decides "may the program run" asks this.
+        /// </summary>
+        public bool IsUsable { get { return Status == LicenceStatus.Valid || Status == LicenceStatus.Grace || Status == LicenceStatus.Ended; } }
+
+        /// <summary>
+        /// A line to show the owner while the program runs but something needs their attention: a licence that ended, a missed check-in,
+        /// a trial running out. Null when there is nothing to say (and always null when the program may not run).
+        /// </summary>
+        public string Banner
+        {
+            get
+            {
+                if (!IsUsable) return null;
+                var parts = new List<string>();
+                if (Status == LicenceStatus.Grace) parts.Add(Message);
+                if (EndedDaysAgo.HasValue) parts.Add(EndedMessage());
+                else if (TrialDaysLeft.HasValue) parts.Add(TrialDaysLeft.Value == 0 ? "This is a trial. It ends today." : "This is a trial. " + Days(TrialDaysLeft.Value) + " left.");
+                return parts.Count == 0 ? null : string.Join(" ", parts);
+            }
+        }
+
+        private static string Days(int n) { return n + " day" + (n == 1 ? string.Empty : "s"); }
+
+        private string EndedMessage()
+        {
+            var days = EndedDaysAgo.GetValueOrDefault();
+            return (days == 0 ? "Your licence has ended" : "Your licence ended " + Days(days) + " ago") + ", but the program keeps working. Please renew it with your supplier.";
+        }
 
         /// <summary>The brand to show: the licence's, or NextGenOS's own.</summary>
         public BrandProfile Brand
@@ -71,6 +115,8 @@ namespace NextGenOS.Licensing
                         return "This program needs to be activated. Enter your licence key.";
                     case LicenceStatus.NeedsCheckIn:
                         return "This PC has not checked in with the licence server for too long. Connect it to the Internet and press Check now, or activate without Internet.";
+                    case LicenceStatus.Ended:
+                        return EndedMessage();
                     case LicenceStatus.Expired:
                         return "Your licence has ended. Please renew it with your supplier.";
                     case LicenceStatus.NotYetValid:

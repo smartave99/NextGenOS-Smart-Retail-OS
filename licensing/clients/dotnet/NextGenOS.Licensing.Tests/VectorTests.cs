@@ -47,6 +47,10 @@ namespace NextGenOS.Licensing.Tests
             });
 
             Assert.Equal((string)c["expect"], state.Status.ToString());
+
+            // The numbers behind the banners must agree too, where the vectors give them (spec section 10.1).
+            if (c["endedDaysAgo"] != null && c["endedDaysAgo"].Type != JTokenType.Null) Assert.Equal((int?)(int)c["endedDaysAgo"], state.EndedDaysAgo);
+            if (c["trialDaysLeft"] != null && c["trialDaysLeft"].Type != JTokenType.Null) Assert.Equal((int?)(int)c["trialDaysLeft"], state.TrialDaysLeft);
         }
 
         [Fact]

@@ -117,7 +117,8 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked:** Warn, then sell-only, then read-only; stop selling straight after the end date; or keep working and only show a banner.
 - **Answer:** "3 but my team can stop it problem is since my company is new we are starting with one time fee and software forever".
 - **Rule:** The software **keeps working and only shows a banner** for a licence that has ended (for example a trial or a later yearly plan); it does not stop the till on an end date. **The owner's team can still stop a licence** (switch it off), and that always works (decision 16). The owner's own data is never locked away or deleted. The "keep working" behaviour must be written in the signed licence, **never a local setting** (`CLAUDE.md` section 3: no switch that skips the check).
-- **Today:** **Not built.** The licence rules today say that an ended licence stops the program (`licensing/spec/LICENCE-FORMAT.md` section 10, "Expired"). Changing it is a change to the licence format: the spec first, new test vectors, and **all three** implementations (`CLAUDE.md` section 4). **Not decided:** how a **trial** licence stops, since "banner only" would make a trial unlimited; the owner has to say.
+- **Trials (asked next, answered):** *Should a trial licence for a sales demo really stop at its end date, even though a paid licence never stops on a date?* **Answer:** "Yes: a trial stops, a paid licence only warns (Recommended)". **Rule:** each licence says in itself, in its signed content, **what happens at its end date**: a paid licence shows a banner, a **trial stops**. A trial runs for 14 days by default (staff can change the length per client), shows a clear "Trial" banner, and when it ends the till stops selling; the owner can still see and export their own data. Staff can extend a trial or turn it into a full licence in one click in the Licence Studio. The "when it ends" choice is set only by staff in the Licence Studio, never by the client's program or a local setting.
+- **Today:** **Not built.** The licence rules today say that an ended licence stops the program (`licensing/spec/LICENCE-FORMAT.md` section 10, "Expired"), for every licence. Changing it is a change to the licence format (a signed "when it ends" choice, banner or stop): the spec first, new test vectors, and **all three** implementations (`CLAUDE.md` section 4).
 
 ### 16. How often a PC checks in, and what happens when it cannot
 
@@ -128,7 +129,6 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 
 ## Still to ask, and open items
 
-- **Trial licences:** how a trial stops (decision 15 leaves this open).
 - Pricing details: the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).
 - Moving a client's old data in (from a previous POS or a spreadsheet); languages and training; the support process and who answers the phone.
 - A sentence for the contract about what may go to an outside AI service (decision 10) and about the final unlock (decision 16): counsel.

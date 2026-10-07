@@ -86,7 +86,8 @@ describe("with no customer folder the website is neutral: no country, no currenc
         expect(w.config.theme.primaryColor).toBe("#0f6cbd");
         expect(w.config.contact).toMatchObject({ email: "", phone: "", address: "" });
         const everything = JSON.stringify(w.config);
-        expect(everything).not.toMatch(/₹|India|Hindi|Smart ?Avenue|Luzon|rupee/i);
+        expect(everything).not.toMatch(/₹|India|Hindi|Smart ?Avenue|Luzon|rupee|stationery|décor|soft toys/i);
+        expect(w.config.seo.keywords).toEqual(["My Shop", "items online", "online shopping", "shop near me"]);
     });
 
     it("a folder that is missing, empty, or holds only unknown files gives the same neutral settings", () => {

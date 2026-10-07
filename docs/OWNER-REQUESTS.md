@@ -170,3 +170,7 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-07 11:45 (about)
 
 > yes but first learn from old one so that you do not waste resource rethinking rewriting and retesting it thats why i wanted to merge and upgrade it
+
+### 2026-10-07 14:45 (about; sent while assistants were working)
+
+> make sure software has longitudnal and well as lateral look because when people using software they like longitudnal and when using touch screen then latitudnal

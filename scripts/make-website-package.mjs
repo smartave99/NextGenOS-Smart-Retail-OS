@@ -734,6 +734,18 @@ export async function zipPackage(folder, zipFile) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
+ * Writes the customer folder that the older way (--settings, --kit, --logo) stands for: the brand kit's brand.json when there is one, the public settings as website-settings.env
+ * (checked already), and the logo in assets/. The website reads the folder when it starts (apps/storefront-web-mobile/src/lib/customer).
+ */
+export function writeCustomerFolder(into, { kitFolder = null, values, logo = null }) {
+  mkdirSync(join(into, 'assets'), { recursive: true });
+  if (kitFolder) copyFileSync(join(kitFolder, 'brand.json'), join(into, 'brand.json'));
+  writeFileSync(join(into, 'website-settings.env'), Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\r\n') + '\r\n');
+  if (logo) copyFileSync(logo, join(into, 'assets', 'logo.png'));
+  return into;
+}
+
+/**
  * Builds, packs, checks and zips THE website (the same for every customer). Returns { folder, zip, sha256, trial, files }.
  * `source` is the website's folder. Only the end-to-end test of the licence (licensing/e2e/website-package-e2e.mjs) gives another one, a copy of it with a throw-away Studio's
  * public key built in, so that a licensed website can be tried; the command line has no such switch, and the repository's own files are never changed.
@@ -817,12 +829,7 @@ export async function makeWebsitePackage(opts) {
     const { assembleWebsite } = await import('../tools/setup-studio/lib/website-assemble.mjs');
     const folderOfCustomer = join(mkdtempSync(join(tmpdir(), 'ngos-customer-')), 'customer');
     try {
-      mkdirSync(join(folderOfCustomer, 'assets'), { recursive: true });
-      if (customerFiles.kitFolder) {
-        copyFileSync(join(customerFiles.kitFolder, 'brand.json'), join(folderOfCustomer, 'brand.json'));
-      }
-      writeFileSync(join(folderOfCustomer, 'website-settings.env'), Object.entries(customerFiles.values).map(([k, v]) => `${k}=${v}`).join('\r\n') + '\r\n');
-      if (customerFiles.logo) copyFileSync(customerFiles.logo, join(folderOfCustomer, 'assets', 'logo.png'));
+      writeCustomerFolder(folderOfCustomer, customerFiles);
       const made = await assembleWebsite({ genericPackage: folder, customerFolder: folderOfCustomer, customer, out, person: 'the build service', allowNoLicence: true, packs: customerFiles.packs, now: new Date() });
       rmSync(folder, { recursive: true, force: true });   // only the customer's website is handed on
       return { folder: made.folder, zip: made.zip, files: made.files, trial, sha256: sha256(readFileSync(made.zip)) };

@@ -10,9 +10,10 @@ import { spawnSync } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { listZip } from '../../tools/setup-studio/lib/zip.mjs';
+import { assembleWebsite } from '../../tools/setup-studio/lib/website-assemble.mjs';
 import {
   CUSTOMER_FOLDER, LAUNCHER, RULES_COPY, RULES_FILE, START_BAT, START_BAT_NAME, START_SH, TRIAL_FILE, WebsiteError, assemblePackage, buildEnvironment, checkCustomer, checkLogo, checkPackage, checkSystem, checkVersion, copyAppSource,
-  genericName, keysBuiltIn, librariesMatchLock, licenceProblems, packageName, parseSettings, readmeFor, settingsFromKit, zipPackage,
+  genericName, keysBuiltIn, knownPacks, writeCustomerFolder, librariesMatchLock, licenceProblems, packageName, parseSettings, readmeFor, settingsFromKit, zipPackage,
 } from '../make-website-package.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -461,6 +462,38 @@ test('a customer folder, a customer\'s name or a licence file in THE website is 
       rmSync(at(rel));
     }
   } finally { clean(p.root); }
+});
+
+test('THE website, as this program writes it, is assembled into one customer\'s website (the build service\'s way: settings, brand kit and logo) that passes the package check and the audit, and THE website itself is not changed', async () => {
+  const p = make('linux');
+  const root = tmp();
+  try {
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32)]);
+    put(root, { 'kit/brand.json': JSON.stringify({ schema: 1, name: 'Luzon Fresh Mart', country: 'PH', industry: 'retail', logo: 'logo.png', contact: { address: 'Rizal Ave, Quezon City, Philippines' }, storefront: { siteUrl: 'https://shop.luzonfresh.example' } }) });
+    writeFileSync(join(root, 'logo.png'), png);
+    const before = JSON.stringify(readdirSync(p.folder).sort());
+    const folder = writeCustomerFolder(join(root, 'customer'), { kitFolder: join(root, 'kit'), values: SETTINGS, logo: join(root, 'logo.png') });
+    assert.deepEqual(readdirSync(folder).sort(), ['assets', 'brand.json', 'website-settings.env']);
+    const made = await assembleWebsite({ genericPackage: p.folder, customerFolder: folder, customer: 'luzon-fresh-mart', person: 'the build service', allowNoLicence: true, out: join(root, 'out'), packs: knownPacks() });
+    assert.equal(made.name, 'website-luzon-fresh-mart-linux');
+    assert.deepEqual(checkPackage(made.folder, { os: 'linux', kind: 'customer' }).problems, []);
+    const a = spawnSync(process.execPath, [join(scripts, 'audit-package.mjs'), made.folder, made.zip, '--node-app', '--customer-package'], { encoding: 'utf8' });
+    assert.equal(a.status, 0, a.stdout + a.stderr);
+    const b = spawnSync(process.execPath, [join(scripts, 'audit-prerequisites.mjs'), made.folder, '--os', 'linux'], { encoding: 'utf8' });
+    assert.equal(b.status, 0, b.stdout + b.stderr);
+    const info = JSON.parse(readFileSync(join(made.folder, 'PACKAGE-INFO.json'), 'utf8'));
+    assert.deepEqual([info.customer, info.name, info.generic, info.licenceIncluded], ['luzon-fresh-mart', 'Luzon Fresh Mart', false, false]);
+    assert.equal(made.settings.country, 'PH');
+    assert.equal(made.settings.shopPlace, 'Quezon City, Philippines');
+    assert.equal(JSON.stringify(readdirSync(p.folder).sort()), before, 'THE website was not changed');
+    assert.deepEqual(checkPackage(p.folder, { os: 'linux' }).problems, []);
+    // a second customer from the same program: another name, another country, nothing of the first
+    const second = writeCustomerFolder(join(root, 'second'), { values: { NEXT_PUBLIC_SITE_NAME: 'Second Shop', NEXT_PUBLIC_COUNTRY: 'GB' } });
+    const made2 = await assembleWebsite({ genericPackage: p.folder, customerFolder: second, customer: 'second-shop', person: 'the build service', allowNoLicence: true, out: join(root, 'out'), packs: knownPacks() });
+    assert.equal(made2.settings.country, 'GB');
+    assert.doesNotMatch(readFileSync(join(made2.folder, 'READ ME FIRST.txt'), 'utf8') + readFileSync(join(made2.folder, 'PACKAGE-INFO.json'), 'utf8'), /Luzon|Quezon/);
+    assert.deepEqual(readdirSync(join(made2.folder, 'customer')).sort(), ['website-settings.env']);
+  } finally { clean(p.root, root); }
 });
 
 test('the zip holds the package under its own folder name, with the files that can be run marked so, and the audit passes it', async () => {

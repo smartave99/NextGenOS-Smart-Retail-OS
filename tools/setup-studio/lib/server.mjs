@@ -21,8 +21,9 @@ import { inside } from './fsx.mjs';
 import { askForProposal, preview as aiPreview, describeTools, ADAPTERS, AiError } from './ai/index.mjs';
 import { toolStatus, listModels, checkUpdate, updateTool, updateHow } from './ai/control.mjs';
 import { cleanToolConfig, EFFORTS } from './ai/options.mjs';
-import { keyStatus, saveKey, removeKey, PROVIDERS, BUILD_CODES, saveBuildCode, removeBuildCode } from './secrets.mjs';
+import { keyStatus, saveKey, removeKey, PROVIDERS, BUILD_CODES, saveBuildCode, removeBuildCode, LICENCE_CODE, saveLicenceCode, removeLicenceCode } from './secrets.mjs';
 import { createBuildService, withSiteBuilds } from './builds.mjs';
+import { createLicenceService } from './licences.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const UI = resolve(here, '..', 'ui');
@@ -41,16 +42,19 @@ const PREVIEW_CSP = "default-src 'none'; style-src 'self'; img-src 'self' data:;
 
 /**
  * Starts the Studio. Returns { server, url, token, close, state }. `folder` is the workspace folder (made at first use). `build` is for tests only: it points the build service
- * client at a stand-in on this PC (addresses, how often to look); the real Studio always talks to the one real address.
+ * client at a stand-in on this PC (addresses, how often to look); the real Studio always talks to the one real address. `licence` is for tests only too (how long to wait for the
+ * Licence Studio); the Licence Studio's address is a setting that an administrator saves, and a stand-in on this PC is given as that address.
  */
-export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, build = {} } = {}) {
+export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, build = {}, licence = {} } = {}) {
   const hooks = { beat: onBeat, quit: onQuit };
   const token = randomBytes(18).toString('base64url');
   const tokenBuf = Buffer.from(token);
-  const state = { ws: Workspace.exists(folder) ? Workspace.open(folder) : null, folder, sessions: new Map(), aiRunning: new Set(), builds: null };
+  const state = { ws: Workspace.exists(folder) ? Workspace.open(folder) : null, folder, sessions: new Map(), aiRunning: new Set(), builds: null, licences: null };
   const studioVersion = () => JSON.parse(readFileSync(resolve(here, '..', 'package.json'), 'utf8')).version;
   /** The build service (made when first needed, because the workspace may only be made after the Studio has started). */
   const builds = () => (state.builds ??= createBuildService({ ws: state.ws, env, studioVersion: studioVersion(), ...build }));
+  /** The licence service (the Licence Studio's staff calls), made when first needed. */
+  const licences = () => (state.licences ??= createLicenceService({ ws: state.ws, env, studioVersion: studioVersion(), ...licence }));
   const checkKey = (given) => { const g = Buffer.from(String(given ?? '')); return g.length === tokenBuf.length && timingSafeEqual(g, tokenBuf); };
 
   const send = (res, status, body, type = 'application/json; charset=utf-8', extra = {}) => {
@@ -107,7 +111,7 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   route('POST', '/api/signout', { open: true }, ({ req }) => { state.sessions.delete(String(req.headers['x-studio-session'] ?? '')); return { ok: true }; });
 
   // ---- facts -------------------------------------------------------------------------------------------------------------------------------
-  route('GET', '/api/me', {}, ({ me }) => ({ member: me, can: Object.fromEntries(['team', 'backup', 'settings', 'customer.edit', 'proposal.edit', 'review.submit', 'review.decide', 'build', 'deliver', 'override'].map((p) => [p, can(me, p)])) }));
+  route('GET', '/api/me', {}, ({ me }) => ({ member: me, can: Object.fromEntries(['team', 'backup', 'settings', 'customer.edit', 'proposal.edit', 'review.submit', 'review.decide', 'build', 'deliver', 'override', 'licence.key', 'licence.manage', 'licence.admin'].map((p) => [p, can(me, p)])) }));
   route('GET', '/api/options', {}, () => ({ options: OPTIONS, countries: countries(), industries: industries(), roles: ROLES, efforts: EFFORTS }));
 
   // ---- customers -------------------------------------------------------------------------------------------------------------------------
@@ -256,8 +260,43 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     return result;
   });
   route('GET', '/api/customers/:id/website-app', {}, ({ me, params }) => builds().status(params.id, me));
-  route('POST', '/api/customers/:id/website-app/build', { limit: 2_000 }, ({ me, params, body }) => builds().start(me, params.id, { which: Array.isArray(body.parts) ? body.parts.map(String) : null }));
+  // One button makes everything for a customer. First the licence (only when the licence service is connected and the customer has none yet: asked once, whatever is pressed twice),
+  // then the website and the app. A build that could not start for another reason asks for no licence. `withoutLicence` is the person's own choice to build now and make the licence later.
+  route('POST', '/api/customers/:id/website-app/build', { limit: 2_000 }, async ({ me, params, body }) => {
+    builds().gate(me, params.id);
+    const licence = await licences().ensureForBuild(me, params.id, { skip: body.withoutLicence === true });
+    return { ...(await builds().start(me, params.id, { which: Array.isArray(body.parts) ? body.parts.map(String) : null, licence })), licence };
+  });
   route('POST', '/api/customers/:id/website-app/look', { limit: 2_000 }, ({ me, params }) => builds().look(me, params.id));
+
+  // ---- the licence service: the Licence Studio's staff calls (a customer's licence, its PCs, and what staff may do) ---------------------------------------------------------
+  route('GET', '/api/licence-service', {}, () => ({ connection: licences().connection() }));
+  route('PUT', '/api/licence-service', { limit: 5_000 }, ({ me, body }) => ({ connection: licences().saveAddress(me, body) }));
+  route('PUT', '/api/licence-service/code', { limit: 5_000 }, ({ me, body }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can save the staff access code.', 403, 'role');
+    try { saveLicenceCode(body.code, env); } catch (e) { throw new StudioError(e.message); }
+    state.ws.log(me, 'key.saved', null, `licence service: ${LICENCE_CODE.label.toLowerCase()}`);   // the code itself is never written anywhere but its own file
+    return { connection: licences().connection() };
+  });
+  route('DELETE', '/api/licence-service/code', {}, ({ me }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can remove the staff access code.', 403, 'role');
+    removeLicenceCode(env);
+    state.ws.log(me, 'key.removed', null, `licence service: ${LICENCE_CODE.label.toLowerCase()}`);
+    return { connection: licences().connection() };
+  });
+  route('POST', '/api/licence-service/test', { limit: 2_000 }, async ({ me }) => {
+    if (!can(me, 'settings')) throw new StudioError('Only an administrator can test the connection.', 403, 'role');
+    const result = await licences().testConnection(me);
+    state.ws.log(me, 'licence.service.tested', null, result.ok ? 'every check passed' : `${result.checks.filter((c) => c.ok === false).length} check(s) need attention`);
+    return result;
+  });
+  route('GET', '/api/customers/:id/licences', {}, ({ me, params }) => licences().view(me, params.id));
+  route('POST', '/api/customers/:id/licences/:lid/key', { limit: 1_000 }, ({ me, params }) => licences().showKey(me, params.id, params.lid));
+  route('POST', '/api/customers/:id/licences/:lid/devices/:device/free', { limit: 3_000 }, ({ me, params, body }) => licences().freeDevice(me, params.id, params.lid, params.device, body.reason));
+  route('POST', '/api/customers/:id/licences/:lid/extend', { limit: 2_000 }, ({ me, params, body }) => licences().extend(me, params.id, params.lid, body.days));
+  route('POST', '/api/customers/:id/licences/:lid/convert', { limit: 2_000 }, ({ me, params }) => licences().convert(me, params.id, params.lid));
+  route('POST', '/api/customers/:id/licences/:lid/revoke', { limit: 3_000 }, ({ me, params, body }) => licences().revoke(me, params.id, params.lid, body.reason));
+  route('POST', '/api/customers/:id/licences/:lid/restore', { limit: 2_000 }, ({ me, params }) => licences().restore(me, params.id, params.lid));
 
   // ---- team, record, safe keeping -------------------------------------------------------------------------------------------------
   route('GET', '/api/team', {}, () => ({ team: state.ws.team() }));
@@ -400,5 +439,5 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   });
   await new Promise((r, j) => { server.once('error', j); server.listen(port, '127.0.0.1', r); });
   const url = `http://127.0.0.1:${server.address().port}/?k=${token}`;
-  return { server, url, token, state, close: () => new Promise((r) => { state.builds?.close(); server.close(() => r()); server.closeAllConnections?.(); }) };
+  return { server, url, token, state, close: () => new Promise((r) => { state.builds?.close(); state.licences?.close(); server.close(() => r()); server.closeAllConnections?.(); }) };
 }

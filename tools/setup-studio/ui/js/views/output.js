@@ -72,7 +72,7 @@ export async function render(ctx) {
     result.append(h('div', { class: 'notice ok mt', id: 'last-pack' }, icon('check'), h('div', {}, h('b', {}, 'The latest pack is ready.'), h('div', { class: 'small' }, `Saved in this Studio's folder, under builds.${absent.length ? ' Not in it yet: ' + absent.join(', ') + '.' : ''}`))));
   }
   box.append(h('div', { class: 'card' }, h('h3', {}, 'Before it goes to the customer'),
-    h('ul', {}, h('li', {}, 'Make their licence key in the Licence Studio (their number of PCs, and the look level you chose). The key is never in the pack.'),
+    h('ul', {}, h('li', {}, h('span', {}, 'Check their licence on the '), h('a', { href: `#/customers/${ctx.id}/licence`, id: 'installer-open-licence' }, 'Licence step'), h('span', {}, '. It is asked for from the Licence Studio when the website and the app are made. If it says "no licence made yet", make it in the Licence Studio (their number of PCs, and the look level you chose). The key is never in the pack: give it to the customer by hand.')),
       h('li', {}, 'Open the pack\'s "START HERE" page and the page of steps for their computer, and check they say the right things.'),
       h('li', {}, 'Open the pack on a clean computer of the same kind once, if you can. The Studio cannot do that for you.'))));
   return box;

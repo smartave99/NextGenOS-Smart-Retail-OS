@@ -20,13 +20,16 @@ export const ROLES = [
   { id: 'reviewer', label: 'Reviewer', hint: 'Checks and approves setups, builds installers, hands over.' },
   { id: 'sales', label: 'Sales', hint: 'Adds customers and prepares their setup. Someone else approves.' },
 ];
+// The licence rights (the Licences section of a customer's page): 'licence.key' shows an activation key for the hand-over; 'licence.manage' frees a PC, extends a trial and turns a
+// trial into a paid licence; 'licence.admin' switches a licence off and on again and goes past the yearly limit on moving a licence to another PC. Connecting the licence
+// service is 'settings'; asking for a customer's licence while making their website and app is 'build'. Everyone signed in may look.
 const PERMS = {
-  admin: ['team', 'backup', 'settings', 'customer.edit', 'proposal.edit', 'review.submit', 'review.decide', 'build', 'deliver', 'override'],
-  reviewer: ['customer.edit', 'proposal.edit', 'review.submit', 'review.decide', 'build', 'deliver'],
+  admin: ['team', 'backup', 'settings', 'customer.edit', 'proposal.edit', 'review.submit', 'review.decide', 'build', 'deliver', 'override', 'licence.key', 'licence.manage', 'licence.admin'],
+  reviewer: ['customer.edit', 'proposal.edit', 'review.submit', 'review.decide', 'build', 'deliver', 'licence.key', 'licence.manage'],
   sales: ['customer.edit', 'proposal.edit', 'review.submit'],
 };
 export const can = (member, perm) => !!member && (PERMS[member.role] ?? []).includes(perm);
-const need = (member, perm, what) => {
+export const need = (member, perm, what) => {
   if (!member) throw new StudioError('Please sign in first.', 401, 'signin');
   if (can(member, perm)) return;
   const who = ROLES.filter((r) => PERMS[r.id].includes(perm)).map((r) => r.label.toLowerCase());

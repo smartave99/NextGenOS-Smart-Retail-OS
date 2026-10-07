@@ -36,6 +36,13 @@ const ACTIVE = new Set(['running', 'fetching']);
 const MAX_FILE = 3 * 1024 * 1024 * 1024;
 const MAX_TEXT = 2_000_000;
 
+/** What the licence step before a build did, as the little record kept with the build (never a key): made, found already there, not asked because the licence service is not connected, or skipped on purpose. */
+function licenceNote(licence) {
+  const outcome = ['made', 'existing', 'not-connected', 'skipped'].includes(licence?.outcome) ? licence.outcome : null;
+  if (!outcome) return null;
+  return { outcome, ...(typeof licence.lid === 'string' && /^[A-Za-z0-9_-]{3,40}$/.test(licence.lid) ? { lid: licence.lid } : {}), ...(typeof licence.plan === 'string' ? { plan: clean(licence.plan, 60) } : {}), ...(typeof licence.trial === 'boolean' ? { trial: licence.trial } : {}) };
+}
+
 /** What can be built for a customer: the website (for each system) and the Android app. */
 export const PARTS = [
   { id: 'website-linux', want: 'website', words: 'The website for Linux' },
@@ -428,11 +435,18 @@ export function createBuildService({ ws, env = process.env, studioVersion = '', 
    * Starts a build for the customer's latest approved release. `which` says what to build ('website', 'android'); by default what is wanted and not yet built (or everything,
    * when all of it is built already). Waits only until the build service has accepted the request; the rest is followed in the background. Returns the customer's status.
    */
-  async function start(me, id, { which = null } = {}) {
+  /** What would stop a build from starting now, in plain words (thrown), before anything is done: the first checks `start` makes. Returns the plan of the customer. */
+  function gate(me, id) {
     if (!can(me, 'build')) throw new BuildError('Your role cannot start builds. Ask a reviewer or an administrator.', 'role', { status: 403 });
     const p = plan(id);
     const why = p.blockers[0] ?? missing() ?? (p.active || starting.has(id) ? 'A build is already running for this customer. Wait for it to finish.' : null);
     if (why) throw new BuildError(why, 'blocked');
+    return p;
+  }
+
+  /** `licence` says what the licence step before the build did (lib/licences.mjs, ensureForBuild); it is kept with the build and shown, so a build made with no licence says so. */
+  async function start(me, id, { which = null, licence = null } = {}) {
+    const p = gate(me, id);
     const s = settings();
     const doable = { website: p.wants.website, android: p.wants.android && !p.partBlocked.android };
     let chosen;
@@ -462,6 +476,7 @@ export function createBuildService({ ws, env = process.env, studioVersion = '', 
       const rec = {
         n, tag, release: p.release, state: 'running', phase: 'wait', startedAt: new Date(dispatchedAt).toISOString(), startedBy: person(me), dispatchedAt, watchedFrom: dispatchedAt,
         wants: chosen, releaseId: Number(release.id), inputsSha256: sha(inputs.zip), runId: null, jobs: [], problem: '', code: '', trial: false, parts: [], files: [], sourceCommit: null,
+        licence: licenceNote(licence),
       };
       const st = load(id);
       st.builds.push(rec);
@@ -718,7 +733,7 @@ export function createBuildService({ ws, env = process.env, studioVersion = '', 
   function view(rec) {
     return {
       n: rec.n, tag: rec.tag, release: rec.release, state: rec.state, startedAt: rec.startedAt, startedBy: rec.startedBy?.name ?? '', finishedAt: rec.finishedAt ?? null,
-      wants: rec.wants, steps: stepsOf(rec), problem: rec.problem, code: rec.code, trial: !!rec.trial, signing: rec.signing ?? '',
+      wants: rec.wants, steps: stepsOf(rec), problem: rec.problem, code: rec.code, trial: !!rec.trial, signing: rec.signing ?? '', licence: rec.licence ?? null,
       parts: (rec.parts ?? []).map((p) => ({ id: p.id, words: partWords(p.id), status: p.status, message: p.message })), canLook: rec.state === 'stopped' || (rec.state === 'failed' && rec.code === 'checksum'),
     };
   }
@@ -731,13 +746,16 @@ export function createBuildService({ ws, env = process.env, studioVersion = '', 
     if (me && can(me, 'build') && last && ACTIVE.has(last.state) && !followers.has(id) && !starting.has(id) && last.releaseId) { patch(id, last.n, { watchedFrom: Date.now() }); follow(me, id, last.n); }
     const inputs = p.parts ? (() => { try { const made = makeInputs({ customerId: id, n: 0, parts: p.parts, studioVersion, wants: p.wants, forbid: secretsNow() }); return { problem: '', files: made.entries, brand: made.brand, settings: made.settings }; } catch (e) { if (e instanceof BuildError) return { problem: e.message, files: [], brand: '', settings: '' }; throw e; } })() : null;
     const problems = [...p.blockers, ...(inputs?.problem ? [inputs.problem] : [])];
+    // Which Android files the newest good build brought back (the page says which one goes to whom).
+    const androidRec = p.good.android ? st.builds.find((b) => b.n === p.good.android.build) : null;
+    const android = androidRec ? { build: androidRec.n, apk: (androidRec.files ?? []).some((f) => f.role === 'android-apk'), aab: (androidRec.files ?? []).some((f) => f.role === 'android-aab'), signing: androidRec.signing ?? '' } : null;
     const doable = p.wants.website || (p.wants.android && !p.partBlocked.android);
     const why = problems[0] ?? missing() ?? (doable ? null : p.partBlocked.android);
     return {
       service: connection(), release: p.release, wants: p.wants, need: p.need, parts: p.partList, blockers: problems, notes: p.notes, canStart: !why && !p.active && !starting.has(id), why: why ?? (p.active ? 'A build is already running for this customer.' : null),
-      inputs, current: last ? view(last) : null, builds: [...st.builds].sort((a, b) => b.n - a.n).slice(0, 12).map(view),
+      inputs, android, current: last ? view(last) : null, builds: [...st.builds].sort((a, b) => b.n - a.n).slice(0, 12).map(view),
     };
   }
 
-  return { connection, saveNames, testConnection, plan, status, start, look, followers, close: () => closing.abort(), settings };
+  return { connection, saveNames, testConnection, plan, status, gate, start, look, followers, close: () => closing.abort(), settings };
 }

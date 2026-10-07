@@ -8,9 +8,9 @@ const ADMIN = () => app.can.settings;
 
 export async function render() {
   const [settings, tools] = await Promise.all([get('/api/settings'), get('/api/ai/tools')]);
-  const root = h('div', { class: 'view' }, h('div', { class: 'page-head' }, h('div', { class: 'grow' }, h('h1', {}, 'Settings'), h('p', { class: 'sub' }, 'Your company, the build service, the AI tools, and keeping things safe.'))));
+  const root = h('div', { class: 'view' }, h('div', { class: 'page-head' }, h('div', { class: 'grow' }, h('h1', {}, 'Settings'), h('p', { class: 'sub' }, 'Your company, the build service, the licence service, the AI tools, and keeping things safe.'))));
   if (!ADMIN()) root.append(h('div', { class: 'notice mt', style: { 'margin-bottom': '18px' } }, icon('lock'), 'Only an administrator can change settings. You can look at them here.'));
-  root.append(companyCard(settings), await programsCard(), await buildServiceCard(), aiCard(settings, tools), keysCard(settings), safeCard(settings));
+  root.append(companyCard(settings), await programsCard(), await buildServiceCard(), await licenceServiceCard(), aiCard(settings, tools), keysCard(settings), safeCard(settings));
   return root;
 }
 
@@ -244,4 +244,46 @@ function safeCard(settings) {
     h('dl', { class: 'kv' }, h('dt', {}, 'Studio folder'), h('dd', { class: 'small', id: 'ws-folder' }, settings.folder)),
     app.can.backup ? h('div', { class: 'row mt' }, h('button', { class: 'btn', id: 'backup', type: 'button', onclick: async () => { try { const r = await post('/api/backup'); info.textContent = `Backup saved: ${r.file} (${r.files} files).`; toast('Backup made.'); } catch (e) { toast(e.message, 'bad'); } } }, icon('download', 's'), 'Make a backup now')) : null, info);
 }
+// ---------- the licence service ----------
+// Licences are made and kept by the Licence Studio, a separate private program on the owner's own server. This Studio asks it, with a staff access code of its own (kept only in
+// the Studio's secret store, never shown again), and never has the key that signs licences. "Test the connection" says in plain words what is wrong.
+async function licenceServiceCard() {
+  const { connection: conn } = await get('/api/licence-service');
+  const url = h('input', { type: 'text', id: 'licence-url', value: conn.url, disabled: !ADMIN(), spellcheck: 'false', autocomplete: 'off', placeholder: 'https://licence.yourcompany.example' });
+  const say = h('div', { id: 'licence-test-result', class: 'col mt-s' });
+  const status = h('div', { id: 'licence-connected' });
+  const code = h('div', { class: 'col', id: 'licence-code-box' });
+  const showConnected = (c) => status.replaceChildren(c.ready ? h('div', { class: 'notice ok' }, icon('check'), 'The address and the staff access code are saved. Press "Test the connection" to check them.') : h('div', { class: 'notice warn' }, icon('warn'), c.why));
+  showConnected(conn);
+  const drawCode = (c) => {
+    const input = h('input', { type: 'password', id: 'licence-code', placeholder: c.code.set ? 'Paste a new code to replace it' : 'Paste the code', autocomplete: 'off', 'aria-label': c.code.label, disabled: !ADMIN() });
+    code.replaceChildren(h('div', { class: 'field', 'data-code': 'licence' },
+      h('label', { for: 'licence-code' }, c.code.label),
+      h('div', { class: 'row wrap' }, h('div', { class: 'grow', style: { 'min-width': '220px' } }, input),
+        ADMIN() ? h('button', { class: 'btn small', type: 'button', id: 'licence-code-save', onclick: async () => { try { const r = await put('/api/licence-service/code', { code: input.value }); input.value = ''; drawCode(r.connection); showConnected(r.connection); toast('Staff access code saved.'); } catch (e) { toast(e.message, 'bad'); } } }, 'Save') : null,
+        ADMIN() && c.code.set ? h('button', { class: 'btn small danger', type: 'button', id: 'licence-code-remove', onclick: async () => { try { const r = await del('/api/licence-service/code'); drawCode(r.connection); showConnected(r.connection); toast('Staff access code removed.'); } catch (e) { toast(e.message, 'bad'); } } }, 'Remove') : null,
+        c.code.set ? h('span', { class: 'pill ok' }, icon('check', 's'), 'Saved') : h('span', { class: 'pill' }, 'Not added')),
+      h('span', { class: 'hint' }, 'Made in the Licence Studio by an administrator there, one for each Studio that uses it, so it can be switched off on its own. It lets this Studio look at a customer\'s licences and do the few things your role allows, and nothing else.')));
+  };
+  drawCode(conn);
+  const showTest = (r) => say.replaceChildren(
+    h('div', { class: 'notice ' + (r.ok ? 'ok' : 'warn'), id: 'licence-test-summary' }, icon(r.ok ? 'check' : 'warn'), r.ok ? 'The Licence Studio answers and accepts the staff access code.' : 'Something needs attention. Each line below says what.'),
+    h('ul', { class: 'col', style: { 'list-style': 'none', padding: 0, margin: 0, gap: '6px' } }, r.checks.map((c) => h('li', { class: 'row', 'data-check': c.id, 'data-ok': String(c.ok), style: { 'align-items': 'flex-start', gap: '10px' } }, h('span', { class: c.ok === true ? 'tone-ok' : c.ok === false ? 'tone-warn' : 'muted' }, icon(c.ok === true ? 'check' : c.ok === false ? 'warn' : 'info', 's')), h('span', { class: 'grow' }, c.words)))));
+  return h('div', { class: 'card', id: 'licence-settings' }, h('h2', {}, 'Connect the licence service'),
+    h('p', { class: 'lead' }, 'Licences are made and kept by NextGenOS\'s own Licence Studio, a separate private program on the owner\'s server. This Studio asks it for a customer\'s licence when the customer\'s website and app are made, and shows what it answers on the customer\'s Licence step. The key that signs licences stays in the Licence Studio: this Studio never has it. An administrator connects it once.'),
+    status,
+    h('div', { class: 'field mt' }, h('label', { for: 'licence-url' }, 'Address of the Licence Studio'), url, h('span', { class: 'hint' }, 'The address the owner opens the Licence Studio at, for example https://licence.yourcompany.example. It must start with https://.')),
+    h('div', { class: 'mt' }, code),
+    ADMIN() ? h('div', { class: 'row mt wrap' },
+      h('button', { class: 'btn primary', id: 'licence-save', type: 'button', onclick: async (e) => {
+        const b = e.currentTarget; b.classList.add('busy');
+        try { const r = await put('/api/licence-service', { url: url.value }); url.value = r.connection.url; showConnected(r.connection); toast('Saved.'); } catch (x) { toast(x.message, 'bad'); } finally { b.classList.remove('busy'); }
+      } }, 'Save the address'),
+      h('button', { class: 'btn', id: 'licence-test', type: 'button', onclick: async (e) => {
+        const b = e.currentTarget; b.classList.add('busy'); say.replaceChildren(h('p', { class: 'small muted' }, 'Asking the Licence Studio…'));
+        try { showTest(await post('/api/licence-service/test')); } catch (x) { say.replaceChildren(h('div', { class: 'err' }, icon('warn', 's'), x.message)); } finally { b.classList.remove('busy'); }
+      } }, icon('refresh', 's'), 'Test the connection')) : null,
+    say);
+}
+
 void sheet;

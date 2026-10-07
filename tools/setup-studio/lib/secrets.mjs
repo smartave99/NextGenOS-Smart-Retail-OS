@@ -99,3 +99,65 @@ export function removeBuildCode(which, env = process.env) {
   delete all[c.key];
   writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
 }
+
+// ---- the staff access code for the Licence Studio, and the activation keys of the licences it made ----------------------------------------------------------
+// The Licence Studio is a separate private program on the owner's own server. It gives this Studio one staff access code of its own (it may ask about a customer's licences and
+// do the few things staff may do, and nothing else; it can be switched off alone). The Studio never holds the licence SIGNING key: only this limited code. Both the code and the
+// activation keys (the "NGOS-..." text a customer types when they first start the program) are kept like the other secrets: in the small file in this person's own user folder, never
+// in the workspace, a backup, a pack, the activity record or a message, and sent only to the Licence Studio.
+export const LICENCE_CODE = { label: 'Staff access code for the Licence Studio', key: 'licence-service' };
+
+const printable = (v, min) => typeof v === 'string' && v.length >= min && v.length <= 400 && /^[\x21-\x7e]+$/.test(v);
+
+/** The staff access code for the Licence Studio, or null. */
+export function getLicenceCode(env = process.env) {
+  const saved = readFile(env)[LICENCE_CODE.key];
+  return typeof saved === 'string' && saved ? saved : null;
+}
+
+/** Says whether the code is there, never the code. */
+export function licenceCodeStatus(env = process.env) {
+  return { label: LICENCE_CODE.label, set: !!getLicenceCode(env) };
+}
+
+export function saveLicenceCode(code, env = process.env) {
+  const value = String(code ?? '').trim();
+  if (!printable(value, 16)) throw new Error('That does not look like a staff access code. Paste the whole code, without spaces.');
+  for (const which of Object.keys(BUILD_CODES)) if (getBuildCode(which, env) === value) throw new Error('That is one of the build service\'s access codes. The Licence Studio gives out a staff access code of its own: paste that one.');
+  const all = readFile(env);
+  all[LICENCE_CODE.key] = value;
+  mkdirSync(configFolder(env), { recursive: true, mode: 0o700 });
+  writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
+  try { chmodSync(file(env), 0o600); } catch { /* the folder is the person's own on this system */ }
+}
+
+export function removeLicenceCode(env = process.env) {
+  const all = readFile(env);
+  delete all[LICENCE_CODE.key];
+  writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
+}
+
+const keyName = (customerId, lid) => `${customerId}/${lid}`;
+
+/** The activation key of a licence that this Studio asked for, or null. (The Licence Studio shows the whole key only once, when it makes the licence.) */
+export function getLicenceKey(customerId, lid, env = process.env) {
+  const held = readFile(env)['licence-keys'];
+  const v = held && typeof held === 'object' ? held[keyName(customerId, lid)] : null;
+  return typeof v === 'string' && v ? v : null;
+}
+
+/** Every activation key held, as the texts only (used to keep them out of any message). */
+export function heldLicenceKeys(env = process.env) {
+  const held = readFile(env)['licence-keys'];
+  return held && typeof held === 'object' ? Object.values(held).filter((v) => typeof v === 'string' && v) : [];
+}
+
+export function saveLicenceKey(customerId, lid, key, env = process.env) {
+  const value = String(key ?? '').trim();
+  if (!printable(value, 8)) throw new Error('The Licence Studio sent a key the Studio could not read.');
+  const all = readFile(env);
+  all['licence-keys'] = { ...(all['licence-keys'] && typeof all['licence-keys'] === 'object' ? all['licence-keys'] : {}), [keyName(customerId, lid)]: value };
+  mkdirSync(configFolder(env), { recursive: true, mode: 0o700 });
+  writeAtomic(file(env), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
+  try { chmodSync(file(env), 0o600); } catch { /* the folder is the person's own on this system */ }
+}

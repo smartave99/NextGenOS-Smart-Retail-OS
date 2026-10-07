@@ -13,9 +13,10 @@ export const STEPS = [
   { id: 'review', label: 'Review', sub: 'A second person approves' },
   { id: 'site', label: 'Website and app', sub: 'Made for this customer' },
   { id: 'installer', label: 'Installer', sub: 'What goes to the customer' },
+  { id: 'licence', label: 'Licence', sub: 'PCs, trial and key' },
   { id: 'handover', label: 'Hand over', sub: 'Papers and sign-off' },
 ];
-const MODULES = { details: () => import('./details.js'), look: () => import('./look.js'), prepare: () => import('./prepare.js'), review: () => import('./review.js'), site: () => import('./site.js'), installer: () => import('./output.js'), handover: () => import('./handover.js') };
+const MODULES = { details: () => import('./details.js'), look: () => import('./look.js'), prepare: () => import('./prepare.js'), review: () => import('./review.js'), site: () => import('./site.js'), installer: () => import('./output.js'), licence: () => import('./licence.js'), handover: () => import('./handover.js') };
 
 /**
  * What of the customer's website and Android app is still to be made for the latest approved release (from the customer's record of builds). The website is made for Windows
@@ -39,6 +40,8 @@ function stepInfo(c) {
     review: { done: ['approved', 'built', 'delivered'].includes(c.state), locked: !c.proposal, why: 'Prepare the setup first' },
     site: { done: hasRelease && !site.website && !site.android, locked: !hasRelease, why: 'Approve a setup first' },
     installer: { done: ['built', 'delivered'].includes(c.state), locked: !hasRelease, why: 'Approve a setup first' },
+    // The licence lives in the Licence Studio, so this step never says "done" by itself; it can be looked at at any time (a licence may have been made there before).
+    licence: { done: false, locked: false },
     handover: { done: c.state === 'delivered', locked: !hasRelease, why: 'Approve a setup first' },
   };
 }

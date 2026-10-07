@@ -1,6 +1,6 @@
 // The Setup Studio in a real browser, as the people who use it would: first-time welcome, signing in, adding a customer, filling in the details, seeing the look in a real
 // preview, preparing the setup, a second person approving it, the website and app made by the build service, and the hand-over. A stand-in AI tool answers when asked, and a stand-in
-// build service makes the website and app. Nothing leaves this PC.
+// build service makes the website and app, and a stand-in Licence Studio makes and keeps the customer's licence. Nothing leaves this PC.
 import assert from 'node:assert';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync, mkdirSync, readFileSync } from 'node:fs';
@@ -11,6 +11,7 @@ import { startStudio } from '../lib/server.mjs';
 import { listZip } from '../lib/zip.mjs';
 import { makeBaseKit } from '../../../scripts/make-base-kit.mjs';
 import { standInGitHub } from './stand-in-github.mjs';
+import { standInLicenceStudio } from './stand-in-licence-studio.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { chromium } = createRequire(resolve(here, '..', '..', '..', 'apps', 'business-hub', 'e2e', 'package.json'))('playwright');
@@ -30,7 +31,8 @@ process.env.PATH = tools + delimiter + oldPath;
 process.env.ANTHROPIC_API_KEY = 'sk-ant-test-123456';
 
 const github = await standInGitHub({ stepMs: 80 });
-const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, build: { api: github.url, pollMs: 100, ceilingMs: 60_000, requestTimeoutMs: 3000 } });
+const licenceStudio = await standInLicenceStudio({});
+const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, build: { api: github.url, pollMs: 100, ceilingMs: 60_000, requestTimeoutMs: 3000 }, licence: { requestTimeoutMs: 3000 } });
 const browser = await chromium.launch();
 const problems = [];
 const step = (s) => console.log('✓ ' + s);
@@ -38,7 +40,9 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `studio-${name}
 // A message appears when the page has its answer (a wrong password is answered by the Studio, not by the page itself), so the test waits for it to show: reading the line at once reads it before the answer.
 const sees = async (page, pattern) => { await page.locator('.err', { hasText: pattern }).first().waitFor({ state: 'visible', timeout: 10000 }); };
 const newPage = async (width = 1360, height = 900) => {
-  const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' })).newPage();
+  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(studio.url).origin });
+  const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error' && !/status of (400|401|403|409)/.test(m.text())) problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   page.on('requestfailed', (r) => { if (r.failure()?.errorText !== 'net::ERR_ABORTED') problems.push('requestfailed: ' + r.url() + ' ' + r.failure()?.errorText); });
@@ -188,6 +192,14 @@ try {
   assert.strictEqual(await page.locator('#ai-festival-chips .chip').count(), 2);
   step('the AI assistant\'s own settings appear when it is ordered, stay neutral until typed, explain live what they change, offer the country\'s languages, and a mistake is named where it was typed');
   await page.locator('[data-path="licence.whiteLabel"] [data-value="theme"]').click();
+  // how they are licensed: paid or a trial (a trial shows its days), the plan, the number of PCs
+  await page.locator('[data-path="licence.trial"] [data-value="true"]').click();
+  await page.locator('input[data-path="licence.trialDays"]').waitFor();
+  assert.strictEqual(await page.locator('input[data-path="licence.trialDays"]').inputValue(), '14', 'a trial runs for 14 days unless chosen otherwise');
+  await page.locator('[data-path="licence.trial"] [data-value="false"]').click();
+  await page.locator('input[data-path="licence.trialDays"]').waitFor({ state: 'detached' });
+  await page.locator('input[data-path="licence.plan"]').fill('business');
+  await page.locator('input[data-path="licence.seats"]').fill('3');
   await page.locator('#save').click();
   await page.locator('.toast', { hasText: 'Saved' }).last().waitFor();
   await page.locator('[data-step="look"]').click();
@@ -310,6 +322,8 @@ try {
   assert.strictEqual(await page.locator('#site-build').isDisabled(), true, 'no build before the build service is connected');
   await page.locator('#site-parts [data-part="website-linux"][data-state="missing"]').waitFor();
   await page.locator('#site-parts [data-part="android"][data-state="missing"]').waitFor();
+  await page.locator('#site-licence[data-licence="not-connected"]').waitFor();
+  assert.match(await page.locator('#site-licence').innerText(), /No licence will be made\..*marked "no licence made yet"/s);
   await shot(page, '14f-site-not-connected');
   await page.locator('#signout').click();
   await signIn(page, 'Sam Sales', 'sam-long-password');
@@ -354,11 +368,47 @@ try {
   assert.strictEqual(await page.locator('#build-test-result [data-ok="false"]').count(), 0);
   await shot(page, '14i-settings-build-connected');
   step('an administrator connects the build service: a wrong access code is explained in plain words, a right one passes every check, and a code is never shown again');
+  await page.locator('#licence-settings').waitFor();
+  assert.match(await page.locator('#licence-connected').innerText(), /has not connected the licence service yet/);
+  await page.locator('#licence-url').fill('http://licence.example.com'); await page.locator('#licence-save').click();
+  await page.locator('.toast.bad', { hasText: 'must start with https://' }).last().waitFor();
+  await page.locator('#licence-url').fill(licenceStudio.url); await page.locator('#licence-save').click();
+  await page.locator('.toast', { hasText: 'Saved' }).last().waitFor();
+  await page.locator('#licence-code').fill('wrong-staff-code-for-the-test-0000');
+  await page.locator('#licence-code-save').click();
+  await page.locator('.toast', { hasText: 'Staff access code saved' }).last().waitFor();
+  await page.locator('#licence-test').click();
+  await page.locator('#licence-test-summary.warn').waitFor();
+  assert.match(await page.locator('#licence-test-result [data-check="code"]').innerText(), /did not accept the staff access code/);
+  await page.locator('#licence-code').fill(licenceStudio.token);
+  await page.locator('#licence-code-save').click();
+  await page.locator('.toast', { hasText: 'Staff access code saved' }).last().waitFor();
+  await page.locator('#licence-test').click();
+  await page.locator('#licence-test-summary.ok').waitFor();
+  assert.strictEqual(await page.locator('#licence-test-result [data-check]').count(), 4);
+  assert.strictEqual(await page.locator('#licence-test-result [data-ok="false"]').count(), 0);
+  assert.doesNotMatch(await page.locator('#licence-settings').innerText(), /wrong-staff-code-for-the-test|licence-staff-code-0001/, 'a code is never shown again');
+  await shot(page, '14m-settings-licence-connected');
+  step('an administrator connects the licence service: an address that is not safe is refused, a wrong staff access code is explained, a right one passes, and a code is never shown again');
   await page.locator('#signout').click();
   await signIn(page, 'Rita Reviewer', 'rita-long-password');
   await page.goto(siteUrl);
   await page.locator('#site-step').waitFor();
   assert.strictEqual(await page.locator('#site-build').isDisabled(), false);
+  await page.locator('#site-licence[data-licence="will-ask"]').waitFor();
+  assert.match(await page.locator('#site-licence').innerText(), /plan "business", 3 PCs, paid, with no end date/);
+  // the Licence Studio cannot be reached: nothing is built, and the person is offered a way on
+  licenceStudio.options.down = true;
+  await page.locator('#site-build').click();
+  await page.locator('.sheet', { hasText: 'The licence could not be made' }).waitFor();
+  assert.match(await page.locator('.sheet').innerText(), /could not reach the Licence Studio/);
+  assert.match(await page.locator('.sheet').innerText(), /marked "no licence made yet"/);
+  await shot(page, '14n-site-licence-down');
+  await page.locator('.sheet button', { hasText: 'Cancel' }).click();
+  await page.locator('.sheet').waitFor({ state: 'detached' });
+  assert.strictEqual(github.seen.filter((r) => r.path.endsWith('/dispatches')).length, 0, 'nothing was built');
+  licenceStudio.options.down = false;
+  step('when the Licence Studio cannot be reached the build does not start, and the person is told why and offered to build without a licence for now');
   github.options.holdPublish = true;
   await page.locator('#site-build').click();
   await page.locator('#site-current').waitFor();
@@ -373,8 +423,14 @@ try {
   assert.match(await page.locator('#site-state').innerText(), /Finished/);
   assert.strictEqual(await page.locator('#site-steps li[data-step-state="done"]').count() >= 8, true);
   assert.strictEqual(await page.locator('#site-parts [data-state="built"]').count(), 3);
+  await page.locator('#site-licence-made').waitFor();
+  assert.strictEqual(licenceStudio.made().length, 1, 'one licence was made');
+  await page.locator('#site-android-note').waitFor();
+  assert.match(await page.locator('#site-android-note [data-android="apk"]').innerText(), /quick sharing/);
+  assert.match(await page.locator('#site-android-note [data-android="aab"]').innerText(), /customer's own Google Play account/);
+  assert.match(await page.locator('#site-android-note').innerText(), /never on a staff PC/);
   await shot(page, '14k-site-done');
-  step('a reviewer starts the build, sees each step in plain words while it goes on, and is told when the website and the app are ready');
+  step('a reviewer starts the build, sees each step in plain words while it goes on, and is told when the website and the app are ready; the licence was asked for first, and the Android note says which file goes to whom');
   await page.locator('#site-to-installer').click();
   await page.waitForURL(/\/installer/);
   const phoneSite = await newPage(420, 860);
@@ -384,6 +440,89 @@ try {
   assert.strictEqual(await phoneSite.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'the step fits a narrow window without sideways scrolling');
   await shot(phoneSite, '14l-site-narrow');
   step('the step fits a narrow window too');
+
+  // the Licence step: a reviewer shows the key and frees a PC, extends and converts a trial; a salesperson only looks; an administrator switches off and on
+  const first = licenceStudio.made()[0];
+  licenceStudio.addDevice(first.lid, { label: 'Front counter' }); licenceStudio.addDevice(first.lid, { label: 'Back office', lastCheckIn: 1_790_100_000 });
+  licenceStudio.seed('luzon-fresh-mart', { lid: 'L-TRIAL0001', plan: 'starter', trial: true, trialDaysLeft: 5, exp: 1_790_400_000, onEnd: 'stop', limits: { devices: 1, stores: 1, users: 3 } });
+  const licenceUrl = studio.url.replace(/\?k=.*/, '') + '#/customers/luzon-fresh-mart/licence';
+  await page.goto(licenceUrl);
+  await page.locator('#licence-step').waitFor();
+  const card = page.locator(`#licence-${first.lid}`);
+  await card.waitFor();
+  assert.match(await card.locator('[data-kind]').innerText(), /^Paid$/);
+  assert.match(await card.locator('[data-ends]').innerText(), /No end date: it keeps working/);
+  assert.match(await card.locator('[data-pcs-words]').innerText(), /2 of 3 PCs in use/);
+  assert.match(await card.locator('[data-moves]').innerText(), /Moves used: 0 of 2 this year/);
+  assert.strictEqual(await card.locator('[data-pc]').count(), 2);
+  assert.strictEqual(await page.locator(`#licence-key-${first.lid}`).getAttribute('data-shown'), 'no');
+  assert.doesNotMatch(await card.innerText(), /NGOS-[A-Z0-9]{5}-/, 'the key is hidden');
+  await shot(page, '14o-licence-reviewer');
+  await page.locator(`#licence-show-${first.lid}`).click();
+  await page.locator(`#licence-key-${first.lid}[data-shown="yes"]`).waitFor();
+  assert.strictEqual(await page.locator(`#licence-key-${first.lid}`).innerText(), first.key);
+  await page.locator(`#licence-copy-${first.lid}`).click();
+  await page.locator('.toast', { hasText: 'Copied' }).last().waitFor();
+  assert.strictEqual(await page.evaluate(() => navigator.clipboard.readText()), first.key);
+  await page.locator(`#licence-show-${first.lid}`).click();
+  await page.locator(`#licence-key-${first.lid}[data-shown="no"]`).waitFor();
+  assert.doesNotMatch(await card.innerText(), /NGOS-[A-Z0-9]{5}-/, 'and hidden again');
+  step('the Licence step says in plain words which plan, what happens when it ends, the PCs and the moves used; the key is hidden until Show, can be copied for the hand-over, and hides again');
+  await card.locator('[data-free="pc-1"]').click();
+  await page.locator('.sheet', { hasText: 'Free Front counter?' }).waitFor();
+  await page.locator('#licence-ask-yes').click();
+  await page.locator('.toast.bad', { hasText: 'Please say why' }).last().waitFor();
+  assert.strictEqual(await card.locator('[data-pc]').count(), 2, 'nothing is freed without a reason');
+  await card.locator('[data-free="pc-1"]').click();
+  await page.locator('#licence-ask').fill('The old counter PC was replaced');
+  await page.locator('#licence-ask-yes').click();
+  await page.locator('.toast', { hasText: 'Front counter is freed' }).last().waitFor();
+  assert.strictEqual(await page.locator(`#licence-${first.lid} [data-pc]`).count(), 1);
+  assert.match(await page.locator(`#licence-${first.lid} [data-moves]`).innerText(), /Moves used: 1 of 2 this year/);
+  const trial = page.locator('#licence-L-TRIAL0001');
+  assert.match(await trial.locator('[data-kind]').innerText(), /Trial: 5 days left/);
+  assert.match(await trial.locator('[data-ends]').innerText(), /the till stops selling/);
+  await trial.locator('[data-extend]').click();
+  await page.locator('#licence-ask').fill('7');
+  await page.locator('#licence-ask-yes').click();
+  await page.locator('.toast', { hasText: 'The trial is extended' }).last().waitFor();
+  assert.match(await page.locator('#licence-L-TRIAL0001 [data-kind]').innerText(), /Trial: 12 days left/);
+  assert.strictEqual(await page.locator('[data-revoke]').count(), 0, 'a reviewer cannot switch a licence off');
+  await shot(page, '14p-licence-trial');
+  await page.locator('#licence-L-TRIAL0001 [data-convert]').click();
+  await page.locator('.sheet button', { hasText: 'Make it a paid licence' }).click();
+  await page.locator('.toast', { hasText: 'It is a paid licence now' }).last().waitFor();
+  assert.match(await page.locator('#licence-L-TRIAL0001 [data-kind]').innerText(), /^Paid$/);
+  step('a reviewer frees a PC (a reason is needed), extends a trial and turns it into a paid licence, and has no way to switch a licence off');
+  await page.locator('#signout').click();
+  await signIn(page, 'Sam Sales', 'sam-long-password');
+  await page.goto(licenceUrl);
+  await page.locator(`#licence-${first.lid}`).waitFor();
+  assert.strictEqual(await page.locator('[data-free], [data-extend], [data-convert], [data-revoke], [data-restore]').count(), 0);
+  assert.strictEqual(await page.locator(`#licence-show-${first.lid}`).count(), 0);
+  assert.match(await page.locator(`#licence-${first.lid}`).innerText(), /Only a reviewer or an administrator can show the key/);
+  await shot(page, '14q-licence-sales');
+  await page.locator('#signout').click();
+  await signIn(page, 'Asha Admin', 'a-long-password');
+  await page.goto(licenceUrl);
+  await page.locator(`#licence-${first.lid} [data-revoke]`).click();
+  await page.locator('#licence-ask').fill('The customer asked to stop');
+  await page.locator('#licence-ask-yes').click();
+  await page.locator('.toast', { hasText: 'The licence is switched off' }).last().waitFor();
+  assert.match(await page.locator(`#licence-${first.lid} .pill`).first().innerText(), /Switched off/);
+  await page.locator(`#licence-${first.lid} [data-restore]`).click();
+  await page.locator('.sheet button', { hasText: 'Switch it on again' }).click();
+  await page.locator('.toast', { hasText: 'The licence is on again' }).last().waitFor();
+  assert.match(await page.locator(`#licence-${first.lid} .pill`).first().innerText(), /Working/);
+  step('a salesperson can only look at a licence; an administrator switches it off and on again');
+  const phoneLicence = await newPage(420, 860);
+  await signIn(phoneLicence, 'Rita Reviewer', 'rita-long-password');
+  await phoneLicence.goto(licenceUrl);
+  await phoneLicence.locator(`#licence-${first.lid}`).waitFor();
+  assert.strictEqual(await phoneLicence.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'the Licence step fits a narrow window');
+  await shot(phoneLicence, '14r-licence-narrow');
+  await page.locator('#signout').click();
+  await signIn(page, 'Rita Reviewer', 'rita-long-password');
 
   // the installer: an administrator tells the Studio where the released programs are; a reviewer makes the customer's pack
   const programs = join(root, 'programs'); mkdirSync(programs);
@@ -464,5 +603,6 @@ try {
   await browser.close();
   await studio.close();
   await github.close();
+  await licenceStudio.close();
   rmSync(root, { recursive: true, force: true });
 }

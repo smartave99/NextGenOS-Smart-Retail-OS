@@ -150,6 +150,10 @@ function extras(ctx) {
   const drawAi = () => { const wanted = ctx.draft.ecosystem.aiAddon.wanted; if (wanted && !aiBuilt) { ai.append(aiSection(ctx)); aiBuilt = true; } ai.hidden = !wanted; };
   drawAi();
   const level = () => ctx.opts.options.whiteLabel.find((l) => l.id === d.licence.whiteLabel);
+  // Paid or a trial, and for a trial how many days. What is typed here is read when a setup is approved, and asked of the Licence Studio when the customer's outputs are made.
+  const days = h('div', { class: 'mt-s', style: { 'max-width': '240px' } });
+  const drawDays = () => show(days, d.licence.trial ? text(ctx, 'licence.trialDays', { label: 'Days of the trial', type: 'number', inputmode: 'numeric', hint: 'A trial runs for 14 days unless you choose another number, from 1 to 90.' }) : null);
+  drawDays();
   return [
     section('The rest of the ecosystem', 'Does this customer also get a website and a phone app?',
       h('div', { class: 'grid2' }, h('div', { class: 'col' }, toggle(ctx, 'ecosystem.website.wanted', { label: 'A website', text: 'An online shop for their products', onChange: drawSite }), site),
@@ -159,6 +163,12 @@ function extras(ctx) {
     section('What their licence will allow', 'How much of the look the owner can change on their own. This is what you choose when you make their licence.',
       cards(ctx, 'licence.whiteLabel', ctx.opts.options.whiteLabel, { minWidth: 230 }),
       h('div', { class: 'mt-s', style: { 'max-width': '240px' } }, text(ctx, 'licence.seats', { label: 'Number of PCs', type: 'number', inputmode: 'numeric' }))),
+    section('How they are licensed', 'What is asked of the Licence Studio when their licence is made, when their website and app are made. It is read when a setup is approved: to change it later, prepare the setup again and have it approved again.',
+      seg(ctx, 'licence.trial', [{ value: false, label: 'Paid (one-time fee)' }, { value: true, label: 'Trial' }], { label: 'Paid or trial', onChange: drawDays }), days,
+      h('div', { class: 'mt-s', style: { 'max-width': '320px' } }, text(ctx, 'licence.plan', { label: 'Plan', placeholder: 'for example business', hint: 'The plan\'s short name, written the way the Licence Studio has it (see its list of plans).' })),
+      h('div', { class: 'mt-s' }, cards(ctx, 'licence.onEnd', ctx.opts.options.licenceEnds, { label: 'When the licence ends', hint: 'A paid licence has no end date today, so this only matters if one is set later. A trial ends after its days.', minWidth: 230 })),
+      h('details', { class: 'more mt-s' }, h('summary', {}, icon('gear', 's'), 'More options'),
+        h('div', { class: 'mt-s', style: { 'max-width': '320px' } }, text(ctx, 'licence.brandId', { label: 'Brand in the Licence Studio (optional)', hint: 'Which look and names the licence carries for this customer, as the Licence Studio has it. Leave it empty if you are not sure.' })))),
     section('Notes', 'Anything the next person should know.', area(ctx, 'notes', { rows: 5, maxlength: 4000, placeholder: 'For example: opens at 8, sells mostly rice and canned goods, wants the screens in warm colours.', hint: 'If you use an AI tool to improve the setup, these notes are shown to it. Do not write phone numbers, passwords or other private things here.' })),
   ];
 }

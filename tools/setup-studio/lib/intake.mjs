@@ -6,6 +6,10 @@ import { colourProblem } from '../../brand-studio/lib/kit.mjs';
 import { checkImages, LIMITS as IMAGE_LIMITS, POSTER_KINDS, POSTER_KIND_LABELS } from './aiprofile.mjs';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{1,40}$/;
+/** The plan's short name as the Licence Studio writes it, and the Licence Studio's own number or short name for a brand. */
+export const PLAN = /^[a-z0-9][a-z0-9_-]{0,29}$/;
+export const BRAND_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
+export const TRIAL_DAYS = { min: 1, max: 90, usual: 14 };
 
 /** The choices on the forms, with the words people see. One list, used by the screens, the checks and the proposal. */
 export const OPTIONS = {
@@ -50,6 +54,12 @@ export const OPTIONS = {
   // The kinds of poster that can have a ready-made second-language line, and the limits the AI assistant's profile is read by (lib/aiprofile.mjs).
   posterKinds: POSTER_KINDS.map((id) => ({ id, label: POSTER_KIND_LABELS[id] })),
   imageLimits: IMAGE_LIMITS,
+  // What happens when a licence reaches its end. "auto" follows the kind of licence: a paid one only shows a banner, a trial stops (docs/PLATFORM-DECISIONS.md, decision 15).
+  licenceEnds: [
+    { id: 'auto', label: 'As usual', hint: 'A paid licence only shows a banner; a trial stops.' },
+    { id: 'banner', label: 'Only a banner', hint: 'The shop keeps working and shows a message.' },
+    { id: 'stop', label: 'The till stops', hint: 'The shop cannot sell any more. The owner can still see and export their own data.' },
+  ],
   states: [
     { id: 'draft', label: 'Details' }, { id: 'proposed', label: 'Prepared' }, { id: 'review', label: 'In review' },
     { id: 'approved', label: 'Approved' }, { id: 'built', label: 'Installer ready' }, { id: 'delivered', label: 'Handed over' },
@@ -82,7 +92,7 @@ export function blankIntake(overrides = {}) {
     features: {},
     starter: { items: [], people: [] },
     ecosystem: { website: { wanted: false, domain: '' }, android: { wanted: false, appId: '' }, aiAddon: { wanted: false } },
-    licence: { whiteLabel: 'none', seats: 1 },
+    licence: { whiteLabel: 'none', seats: 1, plan: '', trial: false, trialDays: TRIAL_DAYS.usual, onEnd: 'auto', brandId: '' },
     notes: '',
     ...overrides,
   };
@@ -185,7 +195,19 @@ export function checkIntake(input) {
   }
 
   const lic = isObj(src.licence) ? src.licence : {};
-  value.licence = { whiteLabel: ids(OPTIONS.whiteLabel).includes(lic.whiteLabel) ? lic.whiteLabel : 'none', seats: Number.isInteger(lic.seats) && lic.seats >= 1 && lic.seats <= 500 ? lic.seats : 1 };
+  value.licence = { whiteLabel: ids(OPTIONS.whiteLabel).includes(lic.whiteLabel) ? lic.whiteLabel : 'none', seats: Number.isInteger(lic.seats) && lic.seats >= 1 && lic.seats <= 500 ? lic.seats : 1,
+    plan: '', trial: lic.trial === true, trialDays: TRIAL_DAYS.usual, onEnd: ids(OPTIONS.licenceEnds).includes(lic.onEnd) ? lic.onEnd : 'auto', brandId: '' };
+  // What is asked of the Licence Studio when the licence is made (lib/licences.mjs). A mistake is named where it was typed; an empty plan only means none is chosen yet.
+  const plan = str(lic.plan, 60).trim().toLowerCase();
+  if (plan && !PLAN.test(plan)) bad('licence.plan', 'Write the plan\'s short name the way the Licence Studio has it: small letters, numbers, dashes, up to 30 characters.');
+  else value.licence.plan = plan;
+  if (lic.trialDays !== undefined && lic.trialDays !== '' && lic.trialDays !== null) {
+    if (Number.isInteger(lic.trialDays) && lic.trialDays >= TRIAL_DAYS.min && lic.trialDays <= TRIAL_DAYS.max) value.licence.trialDays = lic.trialDays;
+    else bad('licence.trialDays', `A trial lasts a whole number of days, from ${TRIAL_DAYS.min} to ${TRIAL_DAYS.max}.`);
+  }
+  const brandId = str(lic.brandId, 60).trim();
+  if (brandId && !BRAND_ID.test(brandId)) bad('licence.brandId', 'Write the brand\'s number or short name the way the Licence Studio has it: letters, numbers and dashes.');
+  else value.licence.brandId = brandId;
   value.notes = clean(str(src.notes, 6000), 4000) ?? '';
   if (value.licence.whiteLabel === 'none' && (value.look.primaryColor !== base.look.primaryColor || value.look.logo)) warn('licence.whiteLabel', 'With a "fixed look" licence, the colours and logo come from the brand on the licence, not from this setup. Choose "Their own colours and logo" if the profile\'s colours must show.');
   if (value.licence.whiteLabel !== 'full' && value.look.poweredBy === false) warn('look.poweredBy', 'Only a "fully their own name" licence can remove "by NextGenOS".');

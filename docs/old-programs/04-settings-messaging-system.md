@@ -1,6 +1,6 @@
 # Old Windows POS, study 04: users, printing, backup, settings, language, messages, small CRM, branches, extras
 
-**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
+**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A, B.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
 
 ## What to know first (10 lines)
 
@@ -314,7 +314,7 @@ The layouts were not opened. To know exactly which field a given style prints, a
 ### B.5 Barcode labels
 
 - **Data** (`B/frmBarcodeLabelPrinting.vb:2068`, the query, built from the lots in stock): `ProductCode, ProductName, Category, Barcode, Qty (available), PartNo, HSNCode, MRP, SPrice (sale), WPrice (wholesale), Batch, Mfgdate, Expdate, Size, Colour, GST (CGST + SGST as stored), QrBarcode, Discount`. Only lots with `Temp_Stock.Qty > 0` and `Product.Status = 'Yes'` appear. A lot with no stock cannot be labelled (the same barcode is silently dropped). Label table columns passed on: `PCode, ProductName, Category, Barcode, AvlQty, NoCopy, PartNo, HSNC, MRP, SalePrice, WholesalePrice, Batch, Mfg, Exp, Size, Colour, GST, PurInv, QrBarcode, Discount` (20).
-- **Search types:** Product Name, Category, Barcode, Part No, HSNC, Batch, Size, Colour (a drop-down, `Designer:170`). Buttons "B-1" and "B-2" (the second reads a different barcode source; not followed up).
+- **Search types:** Product Name, Category, Barcode, Part No, HSNC, Batch, Size, Colour (a drop-down, `Designer:170`). Two radio buttons "B-1" and "B-2" (their meaning was not followed up).
 - **Copies.** Two modes: per product (the "No(s) of Copy" column on each row) or one number for all products (tick box "No(s) of Copy for All Products"). After the rows are repeated, the table is **sorted by barcode**, so copies of different products can mix with equal barcodes grouped (`:1798`).
 - **Template.** 14 shape names in `ComboBox2` ("Standard A4 Size (2 x 1)", "Standard (L) Single (2 x 1)", "TVS Printer Dual (2 x 1)", "Standard Single (1 x 0.5)", "Standard (C) Single (2 x 1)", "Standard Single (1.5x1.5)", "Standard Single (3 x 1.5)", "Double Size Dual (2 x 1)", "Standard Dual (2 x 1)", "Standard Single (1.5 x 3)", "Standard A4 4PCS(2 x 1)", "Standard A4 8PCS(2 x 1)", "Barcode Customise Single", "Barcode Customise A4"; sizes are inches) are only picture previews read from `Bill_barcode\<name>.JPG`. The real choice is the **active style** in `BarcodePreview` (20 styles): style 1 to 5 are compiled reports (`BarcodeT1` to `T5`), 6 to 12 and 15 to 20 are `BarcodeT6` to `BarcodeT18` loaded from `CryReport\`, 13 and 14 are `BarcodeCustomise1` and `2` (`B/frmBarcodeLabelPrinting.vb:1808-1990`). Parameter `P1` is the company name text.
 - **Cipher labels** (`frmCustomiseBarcode`): the "sticker code" is a coded price. Where the code table lives was not read.
@@ -340,7 +340,7 @@ The layouts were not opened. To know exactly which field a given style prints, a
 - **TV-B3 (copies for all).** Same rows, tick box on, number 2: each product twice; result B,B,A,A (4 labels), whatever the per-row copy numbers were.
 - **TV-B4 (drawer).** The bytes sent are `1B 70 30 40 40`; sent only to the Windows printer name stored on this PC's row where `CashDrawer = 'Yes'`.
 - **TV-B5 (cash tendered).** Tendered box 0 and bill amount 1,180.00: the parameters are `TendAmt = 1180.00` and `RefundAmt = 0.00`. Tendered 2,000 and refund 820.00: `TendAmt = 2000`, `RefundAmt = 820.00`.
-- **TV-B6 (name line).** A line "Phone X" with IMEI(1) 123 and IMEI(2) 456 prints as "Phone X", new line, "IMEI(1): 123" and the second IMEI as the code builds it (the exact join text was cut off in the read; not copied).
+- **TV-B6 (name line).** A line "Phone X" with IMEI(1) 123 and IMEI(2) 456, with the particulars tick box on, gives the name column the text "Phone X", a line break, "IMEI(1): 123", a line break, "IMEI(2): 456" (`B/frmPOS.vb:8247`). In the same row the report columns `Total` and `Amount` both receive the grid's line total (grid column 16), so they are always equal; `IM1` and `IM2` also carry the two numbers separately.
 
 ### B.8 What the Hub has and how it differs
 

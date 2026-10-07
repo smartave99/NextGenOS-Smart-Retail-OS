@@ -1,12 +1,21 @@
 # Old Windows POS, study 02: masters, accounting books and reports
 
-Status: in progress (written one topic at a time and saved after each; a topic marked "TO FILL" is not written yet).
+Status: first pass of every topic is written (A1 customers, A2 products, A3 suppliers, B accounting books, C reports). Nothing here was run: it was read from the source. Section D lists what was not understood; it is the work list for a second pass.
 
 Written 7 October 2026 by reading the recovered source of `apps/pos-desktop` (read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27). File and line numbers are of the files as they were on that day. Where a thing was not understood it says "Not understood".
 
 ## 0. What to know first
 
-TO FILL (written last, after every topic).
+1. **Money position is a running account per party** (`CustomerLedgerBook`, `SupplierLedgerBook`): balance = sum(Credit) - sum(Debit). Customer normally negative (they owe), supplier normally positive (we owe). The Hub works per unpaid document; add an account view and golden tests A1.2, A3.2.
+2. **Credit limit has an on/off flag** (`Lstatus`); "No" means unlimited. Check: refuse when (balance - credit on this bill) < 0 and its size > limit and flag Yes. The Hub treats limit 0 as no credit. Tests L1 to L10 (A1.3).
+3. **The books are not double entry.** One row or a pair of rows per event; Cash, Bank, expense and income names use a mirrored sign (Credit = money in). The trial balance does not balance; the balance sheet is built from windowed sums (B). Rebuild on a real journal; convert signs on import.
+4. **Profit and loss is cash-style** (sales + income - purchases - expenses - payroll - opening stock; no closing stock). The real cost profit is `sum(Margin)` per bill line, using the last purchase price snapshot (`EPPrice`). The Hub keeps no line cost: add it (B6).
+5. **Loyalty has two schemes** (percent of bill into `LPoint`; per-line points into a ledger with `Company.Loyality_perpoint` money value). The owner must pick one for the Hub (A1.6). Coupons and gift vouchers are marked used **before** the bill is saved, and gift expiry is tested wrongly (A1.7, A1.8).
+6. **Several columns hold the wrong thing by name:** `Product.ReorderPoint` = wholesale price; `Gift.DiscPerc` and `CustomerOffer.DiscPerc` = money amounts; `Product.Barcode` = "0" (real barcodes are per stock row in `Temp_Stock`). Import with the maps in this file.
+7. **Discount that wins on a line:** customer percent (if on) > item offer (`Offer2`) > product discount; the quantity bands (`Product_discount`) then override on a quantity change, and a quantity outside every band gets the **largest** band discount (probable bug) (A1.9, A2.8).
+8. **GST is stored as two half rates** (CGST = SGST = rate / 2); bulk GST change matches on the old half rate; .NET banker's rounding breaks odd rates (A2.1, A2.6).
+9. **Stock movement report is fragile:** opening figure is saved at event time and goes stale for back-dated entries; purchase `GrandTotal` includes the supplier's previous due, so it must be subtracted in any total (C3, C7).
+10. **Not read:** every Crystal report layout (`rpt*.rpt`). Section D lists the open questions; the data import should check balances against the old ledgers (sum Credit - sum Debit per party) before go-live.
 
 ## 0.1 How to read this file
 
@@ -218,7 +227,7 @@ Rules (`B/frmPOSNewTuch.vb`):
 2. Points of the bill = sum of the line points (`:13253`, `:13276`), saved in `InvoiceInfo.TotalLoyalityPoints` and per line in `Invoice_Product.LoyalityPoints`.
 3. Points balance = `sum(Credit) - sum(Debit)` of `CustomerLedgerBook_Loyality` for the customer (`:18887`). Money value = balance * `Company.Loyality_perpoint` (`:18906`).
 4. Redeeming (`alldiscountcalc_Loyality`, `:18978-18996`), input box `TextBox43`: if the tick box "redeem in points" is ticked, the input is **points**: remaining points = balance - input, and the bill discount (`txtbilldisc`) = input * perPoint. If not ticked, the input is **money**: bill discount = input, remaining points = balance - input / perPoint. The remaining money value = remaining points * perPoint.
-5. On save, when the customer's loyalty is on (`is_loyalityDisable = 0`): a **Credit** row of the points earned (label = bill number, remarks "Sale") and, when points were used, a **Debit** row of `balanceBefore - remaining` points (`:24715-24733`). Loyalty ledger rows use the customer **code** as `LedgerNo` and the bill number as `Label` (the reverse of the money ledger). `InvoiceInfo.LoyalityReedemPoints` = points used, `LoyalityReedemAmt` = money value used (`:24593-24595`).
+5. On save, when the customer's loyalty is on (`is_loyalityDisable = 0`): a **Credit** row of the points earned (label = bill number, remarks "Sale") and, when points were used, a **Debit** row of `balanceBefore - remaining` points (`:24715-24733`). Loyalty ledger rows use the customer **code** as `LedgerNo` and the bill number as `Label` (the reverse of the money ledger). `InvoiceInfo.LoyalityReedemPoints` = points used, `LoyalityReedemAmt` = money value used (`:24585-24587`).
 6. The redeemed money is part of the bill discount (A1.9 shows the order of adding).
 7. Editing a bill deletes the two loyalty rows of that bill number and writes new ones (`:25716-25730`, `LedgerDelete_Loyality1`, `CustomerLedgerDelete_Loyality1`).
 8. I found **no** check that the points redeemed in scheme 2 do not exceed the balance (the message exists only for the old "apply point" box, `:24374-24377`). Not fully traced.
@@ -308,7 +317,7 @@ Scheme 2 (`Company.Loyality_perpoint` = 0.50):
 | G1 | Rule 1,000 to 4,999, amount 100, dates 1 Oct to 31 Oct; bill 2,500 on 10 Oct, named customer | voucher of 100.00, code of 8 characters, valid 1 Oct to 31 Oct |
 | G2 | Same bill, customer "Cash" | no voucher |
 | G3 | Bill 999.99 | no rule matches, no voucher |
-| G4 | Bill 5,000 on a rule 1,000 to 4,999 | no voucher (to-amount is inclusive: 4,999 matches, 5,000 does not, and 4,999.50 matches) |
+| G4 | Rule 1,000 to 4,999; bills of 4,999, 4,999.50 and 5,000 | 4,999 gets the voucher (the to-amount is inclusive); 4,999.50 and 5,000 do not (a gap between bands is not covered) |
 | G5 | Two rules both match | the first row returned by the database is used |
 | G6 | Voucher valid 1 Oct to 31 Oct, used on 20 Nov (window 30 days) | accepted in the old POS (bug) |
 | G7 | Voucher valid 5 Oct to 5 Oct (window 0 days) | refused "expired" even on 5 Oct (bug) |
@@ -325,6 +334,8 @@ Four different things feed a bill's discount. All are in the till (`B/frmPOSNewT
 2. **Item offer (`Offer2`).** Screen `fromItemoffervalid`: per product, a discount **percent** `DiscPerc` for a date window (`:853-940`). Till (`itemofferstatus`, `:16528-16549`) puts it in `txtItemOffer`.
 3. **Buy X get Y free (`Promotion`).** Screen `frmPromotionalOffers` ("Promotional Offer (Buy 'X' and Get 'X')"): `Promotion(ID, EntryDate, ProductID, MinQty, FreeQty, IsExpired, ExpiryDate, Active)`. A product can have one live promotion: a second is refused while one is active or not yet expired (`B/frmPromotionalOffers.vb:1536`). Buttons deactivate all, delete all inactive, delete all expired.
 4. **Customer discount.** `Customer.DiscPer` with `DiscStatus = "Yes"`.
+
+Note: the screen `frmCustomerOffer` is **not** a discount rule. It is a customer list for sending an offer message: per customer in a date window it shows name, contact, state, GSTIN, number of bills and total sale (`B/frmCustomerOffer.vb:691`, `sum(GrandTotal)` and `count` of `InvoiceInfo`), with tick boxes and "Send Bulk SMS" / WhatsApp. Sending anything out of the shop needs the owner's permission in the Hub (rule 15). Bill-range offers are saved by `frmCustomerValid`, item offers by `fromItemoffervalid`.
 
 **Line discount percent: which one wins** (`B/frmPOSNewTuch.vb:14406-14418`, repeated at every product pick): 
 1. the customer's `DiscPer` when it is above 0 and `DiscStatus = "Yes"`;
@@ -351,7 +362,7 @@ Only one of them is used; they do not add up.
 | Y1 | Promotion Min 3, Free 1; buy 7 | line qty 7 + floor(1*7/3) = 9; PromoQty 2 |
 | Y2 | Promotion Min 3, Free 1; buy 2 (new line) | no free goods; qty 2 |
 | Y3 | Promotion Min 5, Free 2; buy 12 | 12 + floor(2*12/5) = 12 + 4 = 16; PromoQty 4 |
-| Y4 | Promotion Min 3, Free 5; buy 2 as a second scan merged into a line | floor(5*2/3) = 3 free; line qty 5 (quirk: below minimum) |
+| Y4 | Promotion Min 3, Free 5; a line already holds 1 paid, a second scan adds 1 (paid now 2) | the merge branch does not test the minimum: floor(5*2/3) = 3 free; line qty 5 (quirk: below the minimum). A first scan of 2 on a new line gets nothing |
 | Y5 | Expired yesterday | no promotion; today is last valid day: `ExpiryDate >= today` is true |
 
 **Hub today.** Price levels (`Party.PriceLevel` retail or trade; `Item.PriceFor`) and a per-line discount percent (`document_lines.discount_pct_milli`, 0 to 100 percent in thousandths, error "discount" outside that, `DocumentService.cs:129`). A line also has `customer_discount`, but that is a **country-pack code** checked against `context.Country.Tax.CustomerDiscounts` (`DocumentService.cs:133`), not the old "customer percent". No offers, promotions, coupons, gifts, customer percent or quantity bands. **Port:** these are separate small tables and one "discount resolver" with the priority above and golden tests D1 to D4, Y1 to Y5, B3, B4.
@@ -418,12 +429,12 @@ Status of this topic: written (first pass). Covers the product master and its st
 | `GDown`, `Rack`, `Kitchen` | Store, rack and kitchen section names |
 | `DefQty` | Default sale quantity; "0" or empty is saved as "1" (`:7404-7409`) |
 | `AddDate` | Date added |
-| `LastPrice` | Last price (read by the till; set by purchase entry; not set here) |
+| `LastPrice` | The **last sales rate charged** for the product: set when a bill is saved (`update Product set LastPrice = rate`, `B/frmPOSNewTuch.vb:24876`, `frmPOSNew.vb:10985`) and shown on the till as "last price"; not set on this screen |
 | `loyality_mode`, `loyality_value` | Loyalty rule of this product, copied from `tbl_loyalty_setting` at creation (A1.6) |
 
 **Validation on save** (`:7140-7230`, in this order, first failure stops): company profile exists; product name; category; sub-category; sale tax type; purchase tax type; purchase price typed; discount % typed; GST % chosen; minimum stock typed; purchase unit; sales main unit; alternate unit; conversion value; default sale quantity; MRP above 0; retail price above 0; wholesale price above 0; barcode typed. A barcode that already exists in `Product_OpeningStock` or `Temp_Stock` is refused (`:7270-7340`). A trial copy was limited to 5 products.
 
-**Writes on creating a product** (`:7369-7710`): one `Product` row; one `Product_Join` row per image (JPEG); one `Product_OpeningStock` row per opening-stock grid row (or one row from the main fields when the grid is empty: quantity = typed opening stock, prices from the screen, `PPrice` = cost, `OPSValue` = `round(PPrice * quantity, 2)`); one `Temp_Stock` row per barcode with `Qty`, `Barcode`, `SPrice` (retail), `WPrice` (wholesale), `StLimit` (= min stock), `MRP`, batch, dates, size, colour, `SalePrice`, `WSalePrice`, `SuplName` = "Opening Stock", IMEI, `PPrice` and `EPPrice` (= cost), a QR image, `SalesManPur` 0 and `Variant_id` = the product id; and, for each barcode with quantity above 0, a `StockMovement(ProductID, OpeningStock, StockIn, StockOut, Date, TransID)` row: `OpeningStock` = the movement balance before today (0 the first time), `StockIn` = the quantity, `StockOut` 0, `Date` today, `TransID` = product code (`ModFunc.ProductSMSave`, `:119-139`). Two rows are also written to `ExtDB1(a1, a2)` for the sales and alternate unit (the unit link, `:7695-7710`).
+**Writes on creating a product** (`:7369-7710`): one `Product` row; one `Product_Join` row per image (JPEG); one `Product_OpeningStock` row per opening-stock grid row (or one row from the main fields when the grid is empty: quantity = typed opening stock, prices from the screen, `PPrice` = cost, `OPSValue` = `round(PPrice * quantity, 2)`); one `Temp_Stock` row per barcode with `Qty`, `Barcode`, `SPrice` (retail), `WPrice` (wholesale), `StLimit` (= min stock), `MRP`, batch, dates, size, colour, `SalePrice`, `WSalePrice`, `SuplName` = "Opening Stock", IMEI, `PPrice` and `EPPrice` (= cost), a QR image, `SalesManPur` 0 and `Variant_id` = the product id; and, for each barcode with quantity above 0, a `StockMovement(ProductID, OpeningStock, StockIn, StockOut, Date, TransID)` row: `OpeningStock` = the movement balance before today (0 the first time), `StockIn` = the quantity, `StockOut` 0, `Date` today, `TransID` = product code (`ModFunc.ProductSMSave`, `:119-139`). Two rows are also written to `ExtDB1(a1, a2)`: the product id with the sales unit and with the alternate unit (`:7695-7710`); what reads this table was not found (**not understood**).
 
 **Update** (`:3446-4153`, `:7767-8479`): rewrites the `Product` row; rewrites price fields of every `Temp_Stock` row of the product (`SalePrice`, `WSalePrice`, `StLimit`); rewrites the stock and opening-stock rows by barcode; and, **when a barcode changes, rewrites the old barcode in every transaction table** (`Invoice_Product`, `Stock_Product`, `Quotation_Join`, `Estimate_Join`, `PurchaseOrder_Join`, `SalesReturn_Join`, `PurchaseReturn_Join`, `Stock_Store_Join`, `StockAdjustment_Store`) so history follows the new barcode (`:3777-4059`). The Hub keeps history by item id, so it does not need this.
 
@@ -1132,8 +1143,37 @@ Rules are in A1.5 and A3.5 (grouping by `CustNameid` / `SuplNameid`, sign rules,
 
 ## D. Not understood (all topics)
 
-TO FILL.
+This is the consolidated list. The topic sections hold the detail.
+
+**Customers (A1.12):** statement opening line and running balance (Crystal); which of two functions fills `TextBox18` before the limit check; whether credit-term days age bills; the fifth outstanding filter; whether coupon or gift discount is capped at the bill total; column types of `LPoint`, `Lpointstatus`, `Coupondb`, `GiftInfo`, `Promotion`; the receipt-number suffix text.
+
+**Products (A2.12):** the second combo save path; whether deleting a product removes its stock and image rows; what the other product screens (`frmProductSmart`, `frmProductPlus`, `frmProductNew`, `frmProductEntry`) do differently; expiry-first picking at sale; whether a category rename updates its sub-categories; where the second-language name is saved.
+
+**Suppliers (A3.8):** which list the supplier part of the debtors report shows under which heading; cipher code details; `Stock.PreviousDue` on edit; supplier delete checks.
+
+**Books (B10):** the Crystal layouts; which bank balance function runs last in `BalanceSheetForm`; the last boxes of `frmBalancesheet` and the "difference" box; default account heads and the income voucher's head list; other `Invcode` columns; salesman and broker ledgers.
+
+**Reports (C12):** layouts and totals; "D-Sale" and "Net Sale"; the feeder of the product-wise profit screen; low stock and expiry screens; the three summary variants.
+
+**Not looked at at all in this study (the list asked for them but the time went to the rules above):** coupon and gift SMS or WhatsApp sending; customer contact list, bulk update and Excel import or export screens for customers, suppliers and products (`frmCustomerBulkUpdate`, `frmSupplierBulkUpdate`, `frmExportImportExcel_*`); `frmCustomerMobileRpt`; product image maker; `frmProductListWeigh` (weighing scale list); `frmKeyBordProduct`; the GST return forms. Each is a small screen over the tables in this file; read it when its port starts.
 
 ## E. Porting notes (all topics)
 
-TO FILL.
+**Order of work, smallest safe step first (a proposal; the owner decides):**
+1. Golden-test file for the Hub from the test vectors here (one test class per topic; inputs and outputs as written). Start with A1.3 (credit limit), A3.3 (supplier limit), A2.1 M1 to M15 (codes, GST split, margins), B6 M1 to M5 and P1 to P9 (profit), C2 R6 to R7 (payments by mode).
+2. Put the cost on the document line (needed for profit), then profit by bill, by item and by day.
+3. Customer account view and receipts with allocation; supplier account view and payments (A1.2, A1.4, A3.2, A3.4).
+4. The discount resolver (A1.9) with the owner's choice on the quantity bands (A2.8).
+5. Loyalty (one scheme), coupons, gift vouchers with the fixes (A1.6 to A1.8).
+6. Product tools: units and conversion, bulk price and bulk tax-rate change with a log, barcode labels, quick groups (combos), serials (A2.3 to A2.9).
+7. The accounts module on a double-entry journal (B2 posting table, B3 vouchers, B4 cash and bank, B5 trial balance that balances, B7 balance sheet).
+8. Reports from C that the Hub lacks: purchase register, stock movement with running balance, multi-payment per bill, salesman commission (with the staff module).
+
+**Data import (the old SQL Server database, read-only, decision 17):**
+- Parties: `Customer` and `Supplier` rows, then the balance per party from the ledger tables (sum Credit - sum Debit by `PartyID`); report any difference to the typed opening balance plus movements.
+- Products: map `Product` + `Temp_Stock` per barcode; `ReorderPoint` is the wholesale price; `MinStock` is the reorder level; ignore `Product.Barcode` "0"; GST = `CGST + SGST`.
+- Money books: import opening balances and the cash and bank balances, not every old ledger row; keep the old rows as read-only history if the owner wants them.
+- Loyalty: points balance per customer from `CustomerLedgerBook_Loyality` (scheme 2) or `LPoint` (scheme 1); unused coupons and gift vouchers with dates.
+- Check list after import: customer balances, supplier balances, stock quantities per barcode, bank balances per account, cash in hand, all against the old screens.
+
+**Rules for anyone using this file:** do not re-read the old code to find these rules; if something here is wrong, fix it here with the line that proves it. Add what you learn at the end of the topic. Do not call any part of this file verified by a run: it was read, not run.

@@ -166,3 +166,7 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-07 11:20 (about)
 
 > there should be only 4 thing in codebase one supper installer aka studio 2nd offline software all merged and greatest and user freindly as if created by apple for design and microsft for enterprises  3rd the website  4th the apk rest delete and delete git history nothing to be traced clean and smooth resporitory and dont waste my time and resource any doubt ask one by one
+
+### 2026-10-07 11:45 (about)
+
+> yes but first learn from old one so that you do not waste resource rethinking rewriting and retesting it thats why i wanted to merge and upgrade it

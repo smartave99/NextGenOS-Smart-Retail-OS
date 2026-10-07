@@ -216,6 +216,12 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Order of work:** (1) merge the older programs' features into the one offline software, in this repository, using its present folders (`docs/MERGE-PLAN.md`); (2) delete each older program once it is merged and tested (git history still holds it until the end); (3) move to the final four-folder layout (`studio/`, `software/`, `website/`, `apk/`, plus the rules and a few documents) **as the first commit of the new repository**, so nothing is moved twice.
 - **Today:** Nothing is deleted yet. The merge (decision 26) is the work before any deletion: removing a program before its features are merged would lose them for good.
 
+### 29. Learn from the old programs first, once, and write it down
+
+- **Said (the owner, in their own words):** "yes but first learn from old one so that you do not waste resource rethinking rewriting and retesting it thats why i wanted to merge and upgrade it".
+- **Rule:** Before an older program's feature is ported, it is **studied once** and written into a knowledge file in `docs/old-programs/`: what a person sees, the tables and columns, **the rules and formulas step by step with source file and line**, the flow, quirks and probable bugs, **worked test examples** (they become golden tests in the Hub, so nothing is retested from scratch), what the Hub already has and where the numbers would differ, porting notes, and what is not understood. **Porting reads those files and not the raw source again;** a person who learns something new adds it to the file. The files: `01-selling-buying-stock.md`, `02-masters-accounting-reports.md`, `03-india-tax-and-staff.md`, `04-settings-messaging-system.md`, `05-ai-addon-and-dashboard.md`, `06-hub-map.md` (where a new feature plugs into the Hub), `DATABASE.md` (which column means what). The old programs' existing tests (the AI add-on has about 540) are reused as characterization tests where they apply. Same rule as `CLAUDE.md` section 17.
+- **Today:** The study is being written (started 7 October 2026). Nothing is ported until the file of its area exists.
+
 ## Still to ask, and open items
 
 - Pricing details: how many PCs the one price covers; the price of extra PCs and extra features such as AI; what the one-time fee includes (updates and support for how long).

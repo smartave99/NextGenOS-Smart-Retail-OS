@@ -127,10 +127,25 @@ The Studio says it in plain words. These are the usual causes.
 | "Only one of the two licence values is set …" | `NGOS_PUBLIC_KEYS` or `NGOS_LICENCE_URL` is missing | Step 7 |
 | "A real build … is only made from the main branch" | The build was started from another branch | Start it from the main branch (the Studio always does) |
 | One part failed (the message says which step it stopped at) | A real build problem, or a passing problem at GitHub | Look at that run in S, Actions; then *Try again* in the Studio (a new build number) |
+| "The build service could not start the build: GitHub gave it no machine to build on, so nothing was built." | The GitHub account's build time or spending limit has run out, or Actions is switched off for S. Every job fails at once, before it starts | The owner opens GitHub, **Settings**, **Billing and plans**, and checks the Actions minutes and the spending limit (and S, **Settings**, **Actions**, that Actions is allowed). Then press *Try again* in the Studio |
+| "The build service could not take this customer's settings: the key that lets it read the results place is missing, has run out, or is for the wrong place." | The secret `RESULTS_TOKEN` in S is missing, has expired, or is the token of another repository | Steps 3 and 4 above (a new RESULTS token, then the secret), then *Try again* |
 | The build never finishes | GitHub is slow, or the run was stopped | The Studio waits at most 90 minutes, then says so. Look at the run in S, Actions |
 | A token stopped working | It ran out (the date in step 2 or 3) | Make a new one |
 
 A finished build is never changed: *Try again* always makes a new build number.
+
+## The first build: a trial for a made-up customer
+
+Do this once, after steps 1 to 6, **before** any real customer. It costs a few build minutes and shows whether the whole chain works on your GitHub. It needs no licence keys and no Android signing secrets, so it is a **trial** and is never given to anyone.
+
+1. In the Setup Studio, make a new project called for example `Test Shop` (a made-up name, not a real customer). Fill in the company details as for a real one, and choose a logo that is a PNG.
+2. Get the project's setup approved (the Studio's normal review step: the build is made from an approved setup). Then open the project's step **Website and app** and press the button **Build Test Shop's website and app** (it carries the project's name). Only a reviewer or an administrator sees the button work.
+3. Watch the progress. The Studio shows each part (the website, the app) as waiting, building, built or failed, and keeps going if you close it: open the step again and it picks the build up. Expect something like 20 to 60 minutes the first time (a guess: nobody has timed it yet).
+4. When it finishes, the Studio shows **trial** next to the build and puts the files in the project's folder. Make the project's pack again (it then holds them), and install the Android file on a test phone if you like.
+5. If a part fails, the Studio says in words which part and what to do (see the table below). Fix that one thing and press **Try again**; every try is a new build number, and nothing a failed build made is kept.
+6. When a trial works, set the public licence values (step 7) and the Android signing secrets (step 8), and build again: the result is then a real build, not marked trial.
+
+Write what happened (how long it took, what it cost, what failed) into `docs/OPEN-WORK.md` so the next person knows.
 
 ## Limits you should know
 
@@ -162,7 +177,7 @@ A finished build is never changed: *Try again* always makes a new build number.
 - That the two tokens, with exactly the permissions above, can do what they should and no more, on your account or organisation (the Studio's *Test the connection* shows it).
 - That GitHub keeps what the jobs hand on to each other as the workflow expects (the outputs of the first job, the small reports of the parts) when a job fails or is stopped.
 - The Windows website opened as a window on a real Windows machine (the workflow does it at GitHub; it was not run); the Android app built from a customer's brand (the steps are those of the full release, with the brand taken from the settings; not run here).
-- The Studio's side (the button, the progress, the download) is another piece of work; this page is the agreement between the two (see below), and the two have not yet been run together.
+- The Studio's side (the button, the progress, the download, the checking of the fingerprints, the plain messages) **is built and is tested against a stand-in for GitHub** (`tools/setup-studio/tests/builds.test.mjs`, in the gate). The stand-in is written from GitHub's documentation, not from a real run, so the Studio and the real GitHub have **not** yet been run together.
 
 ## For engineers: what the Setup Studio can rely on
 

@@ -34,6 +34,7 @@ export function readZipFiles(buffer) {
 export async function standInGitHub({ source = 'acme/programs', results = 'acme/customer-builds', tokens = { start: 'test-start-access-code-0001', results: 'test-results-access-code-0002' }, stepMs = 15 } = {}) {
   const options = {
     outcome: 'success',            // success | partly | trial | all-fail | run-fails (the run dies before it publishes) | no-result (published with no report)
+                                   // | never-started (GitHub gives the run no machine, as when the account's minutes or spending limit are used up) | settings-not-taken (the first job cannot read the settings: the results key is missing)
     tamper: false,                 // serve a changed file, so it no longer matches its fingerprint
     holdPublish: false,            // the build keeps working and does not publish until this is false again
     startCanReadContents: false, resultsCanReadContents: false, startSeesResults: false, resultsReadOnly: false, startCannotDispatch: false, noWorkflow: false, workflowDisabled: false,
@@ -89,10 +90,23 @@ export async function standInGitHub({ source = 'acme/programs', results = 'acme/
     const parts = { 'website-linux': request.parts.website, 'website-windows': request.parts.website, android: request.parts.android };
     const job = (name) => ({ name, status: 'queued', conclusion: null });
     run.jobs = [job("Reading the customer's settings"), ...(request.parts.website ? [job('Building the website for Linux'), job('Building the website for Windows')] : []), ...(request.parts.android ? [job('Building the Android app')] : []), job('Writing the result and publishing it')];
+    if (options.outcome === 'never-started') {
+      // No machine was ever given: every job fails in a moment, with no runner and no steps, and the run ends at once.
+      for (const j of run.jobs) { j.status = 'completed'; j.conclusion = 'failure'; j.runner_id = 0; j.steps = []; }
+      run.status = 'completed'; run.conclusion = 'failure';
+      return;
+    }
     await wait(stepMs);
     run.status = 'in_progress';
     run.jobs[0].status = 'in_progress';
     await wait(stepMs);
+    if (options.outcome === 'settings-not-taken') {
+      run.jobs[0].status = 'completed'; run.jobs[0].conclusion = 'failure'; run.jobs[0].runner_id = 7;
+      run.jobs[0].steps = [{ name: 'Set up job', conclusion: 'success' }, { name: 'Take the settings from the results place', conclusion: 'failure' }];
+      for (const j of run.jobs.slice(1)) { j.status = 'completed'; j.conclusion = 'skipped'; }
+      run.status = 'completed'; run.conclusion = 'failure';
+      return;
+    }
     if (options.outcome === 'run-fails') {
       run.jobs[0].status = 'completed'; run.jobs[0].conclusion = 'failure';
       for (const j of run.jobs.slice(1)) { j.status = 'completed'; j.conclusion = 'skipped'; }

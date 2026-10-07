@@ -54,6 +54,7 @@ A **public key** is written as `b64u` of the 65-byte uncompressed point (`0x04 |
 | `act` | `{online: bool, checkInDays, graceDays, offlineDays}` |
 | `trial` | `true` for an evaluation licence |
 | `white` | `{level}`: how much of the look the customer may change on their own PC (see 5.1) |
+| `onEnd` | What happens after `exp`: `"banner"` (the program keeps working and shows a banner) or `"stop"` (the program stops). Absent, or anything other than exactly `"banner"`, means `"stop"`. It has no effect when `exp` is `null`. See 10.1 |
 
 ### 4.2 `act`, the activation certificate (this licence on this PC)
 
@@ -66,6 +67,8 @@ A **public key** is written as `b64u` of the 65-byte uncompressed point (`0x04 |
 | `fpMin` | How many of `fp` must still match this PC (the Studio sets it to 60% of the parts, rounded up) |
 | `next` | When the next check-in is due |
 | `until` | When the activation stops working if no check-in happened |
+
+For a licence with `onEnd = "banner"` the Studio does **not** cut `next` and `until` short at `exp`, so a PC keeps checking in after the end date. For `"stop"` (and for licences from before `onEnd` existed) they are cut at `exp`, as before.
 
 ### 4.3 `crl`, the revocation list
 
@@ -183,9 +186,17 @@ Every response is JSON. Errors: `{"error": {"code", "message"}}` with an HTTP st
 | `GET /api/v1/crl` | | `{crl}` |
 | `GET /api/v1/health` | | `{ok:true}` |
 
-`key` is the human licence key, `NGOS-XXXXX-XXXXX-XXXXX-XXXXX` (Crockford base 32: no `I L O U`). Error codes: `unknown_key`, `revoked`, `suspended`, `expired`, `not_started`, `limit_reached`, `device_mismatch`, `bad_request`, `rate_limited`.
+`key` is the human licence key, `NGOS-XXXXX-XXXXX-XXXXX-XXXXX` (Crockford base 32: no `I L O U`). Error codes: `unknown_key`, `revoked`, `suspended`, `expired`, `not_started`, `limit_reached`, `device_mismatch`, `move_limit_reached`, `bad_request`, `rate_limited`.
+
+| Code | HTTP | What it means, in the words a person sees |
+|---|---|---|
+| `expired` | 403 | "This licence has ended. Please renew it." Only for a licence whose `onEnd` is `"stop"`: a `"banner"` licence is still activated and checked in after its end date. |
+| `limit_reached` | 409 | "This licence is already used on N PCs, which is all it allows. Free a PC in the Licence Studio, or ask your supplier for more." |
+| `move_limit_reached` | 409 | "This licence has already been moved to a new PC 2 times in the last 12 months, which is all a customer can do alone. To move it again, please contact your supplier: they can free the old PC for you." |
 
 On `activate` the Studio counts devices: a licence with `limits.devices = 3` can be active on 3 PCs. `deactivate`, or "Free this PC" in the Studio, releases a seat.
+
+**Moves.** A customer freeing the old PC themselves (a client's own `deactivate` call) is allowed at most **2 times per licence in any rolling 365 days**. The third call inside that window is refused with HTTP 409 and `move_limit_reached`, and the seat stays taken. A `deactivate` for a PC that is not an active seat any more changes nothing and does not count. Staff freeing a PC in the Studio ("Free this PC", or the staff calls in `STAFF-API.md`) is not counted and not limited, but needs a written reason and is recorded with who did it. The Studio keeps a history per licence (every activation, every move by the customer, every PC freed by staff with who and why) and shows it on the licence page. The number 2 and the window of 365 days belong to the Studio, never to a client or a local setting.
 
 ## 9. Offline activation
 
@@ -203,11 +214,12 @@ Given a licence token, an optional activation token, an optional CRL and the clo
 
 | Status | When | May the app run? |
 |---|---|---|
-| `Valid` | signatures good, `nbf <= now <= exp`, activation matches and `now <= next` | yes |
+| `Valid` | signatures good, `nbf <= now`, (`exp` is `null` or `now <= exp`), activation matches and `now <= next` | yes |
 | `Grace` | as `Valid` but `next < now <= until` | yes, with a warning that shows the days left |
+| `Ended` | `onEnd` is exactly `"banner"`, `exp` is not `null`, `now > exp`, and every other rule would have given `Valid` (see 10.1) | yes, with a banner that shows how long ago the licence ended |
 | `NotActivated` | licence good, no (matching) activation | no, show the activation screen |
 | `NeedsCheckIn` | `now > until` | no, ask to connect to the Internet or use offline activation |
-| `Expired` | `now > exp` | no |
+| `Expired` | `now > exp` and `onEnd` is not exactly `"banner"` | no |
 | `NotYetValid` | `now < nbf` | no |
 | `Revoked` | `lid` is in the CRL | no |
 | `DeviceMismatch` | fewer than `fpMin` parts match | no |
@@ -221,6 +233,17 @@ The app **fails closed**: any unexpected error is `Invalid`.
 
 For `bind.mode = "domain"` (the storefront) no activation is needed: the licence is valid when the site's host name matches one of `bind.domains` (`example.com` matches itself and `*.example.com` matches any sub-domain). For `bind.mode = "none"` no activation or domain check is made.
 
+The order of the steps is part of the contract (the shared vectors check it): `Missing`, `Invalid` (licence signature, type, product, claims), `Revoked`, `Invalid` (activation signature or licence id), `ClockTampered`, `NotYetValid`, the end date (10.1), `ModuleNotLicensed`, then the binding: `Valid` or `DomainMismatch` for a website, `Valid` for no binding, and for a PC `NotActivated`, `DeviceMismatch`, `Valid`, `Grace` or `NeedsCheckIn`.
+
+### 10.1 The end date: banner or stop
+
+- `onEnd` is read only from the signed licence. Absent, not a string, or any value other than exactly `"banner"` counts as `"stop"`. This is the safe direction: a client that does not know the claim yet (an older program) treats every licence as `"stop"`.
+- **`"stop"`:** `now > exp` is `Expired`, as before.
+- **`"banner"`:** `now > exp` stops nothing. The client goes on with the steps after the end date, in the same order. When they would give `Valid`, the status is `Ended`. Any other result is returned unchanged: `Grace` stays `Grace` (the missed check-in is the more urgent of the two), and `NeedsCheckIn`, `NotActivated`, `DeviceMismatch`, `DomainMismatch` and `ModuleNotLicensed` still stop the app. The steps before the end date (`Missing`, `Invalid`, `Revoked`, `ClockTampered`, `NotYetValid`) are never skipped. So the owner's team can still stop a licence that has ended, and a copy on another PC still fails.
+- A client also reports two numbers for the banner. **`endedDaysAgo`**: whole days since `exp`, rounded down (so `0` during the first 24 hours), reported whenever `onEnd` is `"banner"` and `now > exp`, whatever the status. **`trialDaysLeft`**: for a licence with `trial = true`, `exp` not `null` and `now <= exp`, the whole days until `exp`, rounded up (never less than `0`).
+- **Nothing local can change it.** `onEnd` is part of the signed payload: editing it breaks the signature (the vectors `tampered_on_end_to_banner` and `tampered_end_date` must give `Invalid`). No setting, environment variable, file or build option may make a client treat a `"stop"` licence as `"banner"`.
+- The Studio always writes `onEnd: "stop"` for a licence with `trial = true` (13.1). A paid licence has no end date unless staff set one.
+
 ## 11. Local storage in the client
 
 The client keeps, in a machine-wide folder (`%ProgramData%\NextGenOS\<product>\` on Windows): `licence.ngos` (the `lic` token), `activation.ngos` (the `act` token), `crl.ngos` and `state.json` (`{lastSeen, lastCheckIn}`, with an HMAC keyed by the PC's fingerprint, to catch a rolled-back clock). The signed tokens cannot be edited; copying them to another PC fails the fingerprint match.
@@ -230,3 +253,32 @@ The client keeps, in a machine-wide folder (`%ProgramData%\NextGenOS\<product>\`
 - The private key never leaves the Studio. It is stored encrypted (scrypt and AES-256-GCM) and unlocked with a passphrase held in the server's environment.
 - Every client embeds the public key list; to rotate, add the new key to a client release first, then switch the Studio to sign with it.
 - Never put a private key, a passphrase, a licence database or `studio/data/` in a code repository or a customer package.
+
+## 13. What the Studio writes when it issues a licence
+
+These are rules for the Studio; the clients only read the result. They carry the owner's decisions of 7 October 2026 (`docs/PLATFORM-DECISIONS.md`, decisions 3, 14, 15 and 16).
+
+### 13.1 Paid and trial
+
+| | Paid licence | Trial licence |
+|---|---|---|
+| `trial` | `false` | `true` |
+| `exp` | `null` (no end date), unless staff choose an end (1, 2 or 3 years, or a date) | now plus the trial length: 14 days by default; staff may choose 1 to 365 days for each client |
+| `onEnd` | `"banner"`; staff may choose `"stop"` for a paid licence that has an end date | `"stop"`, always; a request for `"banner"` on a trial is refused |
+
+Staff choose all of this when they issue the licence (the Studio's "New licence" page, `cli.js create-licence`, or the staff calls in `STAFF-API.md`). Two operations change a licence after it was issued; both raise `rev`, so PCs pick the change up at their next check-in:
+
+- **Extend** adds a number of days (1 to 3650) to `exp`, or to today when the licence has already ended (so an ended trial runs again from today). A licence with no end date cannot be extended.
+- **Convert trial to paid** sets `trial = false`, `onEnd = "banner"` and `exp = null`. It works only on a trial.
+
+### 13.2 Check-in and warnings
+
+An online licence is written with `act = {online: true, checkInDays: 30, graceDays: 60, offlineDays: 365}`: the PC checks in about monthly and, when it cannot, shows warnings for 60 days (`Grace`); after that it is `NeedsCheckIn` and asks for an Internet check-in or an offline code that staff give by phone. The two numbers are Studio settings (Settings, "Rules for PCs") that staff can change; the values above are the defaults. A stop by the owner's team (a hold or a withdrawal) reaches a PC at its next check-in, so within about a month.
+
+### 13.3 After the end date
+
+The Studio keeps answering `activate` and `checkin` for a licence with `onEnd = "banner"` after `exp`, and does not cut its activation short at `exp` (4.2). For `"stop"` it refuses with `expired` and cuts the activation at `exp`.
+
+## 14. Staff calls
+
+The main Setup Studio talks to the Licence Studio with a small JSON API of its own, signed in with a token that an administrator makes in the Licence Studio for it. It never sees a signing key. The calls, the roles, the error format and the rules (idempotency, audit, rate limits) are in `STAFF-API.md` in this folder. The `/api/v1/` calls in section 8 are for the programs a customer runs; the `/api/staff/v1/` calls are for NextGenOS staff tools only.

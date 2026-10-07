@@ -1,23 +1,28 @@
 #!/usr/bin/env node
 /**
- * Makes the website for ONE customer as one folder and one zip that runs on a factory-new computer of its system with nothing installed first:
+ * Makes THE website, the one program that every customer gets, as one folder and one zip that runs on a factory-new computer of its system with nothing installed first:
  * it carries its own Node.js, the built server, the static files, the libraries it needs and the native parts for that system.
  *
- *   node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 --customer <short-name> --settings <website-settings.env>
- *        (--node-runtime <folder> | --download-node 22.22.0)  [--out dist] [--allow-no-key] [--deps-from <installed libraries>] [--logo <logo.png>]
- *   node scripts/make-website-package.mjs --os linux --version 1.0.0 --kit <brand-kits folder name> ...     (settings and logo come from the customer's brand kit)
+ *   node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 (--node-runtime <folder> | --download-node 22.22.0)
+ *        [--out dist] [--allow-no-key] [--deps-from <installed libraries>]
  *
- *   --settings        the customer's public settings: the file the Setup Studio writes as website-settings.env (name, address, country, kind of business, place).
- *                     They are compiled into the website, which is why each customer needs a build of their own. No password or key may be in it.
- *   --kit             a folder name under brand-kits/: the settings and the logo are taken from its brand.json (a --settings file adds to them or overrides them).
- *   --customer        the short name used in the file names: website-<customer>-<os>.zip (letters, digits and hyphens). With --kit it defaults to the kit's name.
+ * The package holds NO customer's settings: it is built once per release and is the same for every customer (CLAUDE.md, section 16; docs/PLATFORM-DECISIONS.md, decisions 23 and 24).
+ * Each customer's name, address, country, language, colours, logo and the rest are data in a customer folder that is placed beside the program and read when it starts
+ * (apps/storefront-web-mobile/src/lib/customer). The Setup Studio places that folder, with the customer's licence file, by "assembling" (tools/setup-studio/lib/website-assemble.mjs):
+ * a copy of files and checks, no build.
+ *
+ *   --os              windows or linux: the website is built on the system it is for (see below)
  *   --node-runtime    a folder with an official Node.js of that system already unpacked (node.exe, or bin/node)
  *   --download-node   fetches nodejs.org's own build of that version and checks it against nodejs.org's published SHA-256 list
  *   --deps-from       a node_modules folder that matches package-lock.json (saves the install on a developer's computer); without it the libraries are installed with "npm ci"
  *   --allow-no-key    only for trying the build: the licence keys are not built in, the website refuses every licence, and the package says so on its face
  *
+ * The older way is still accepted so that the GitHub build service keeps working: with  --customer <short-name> and  --settings <website-settings.env>  (or  --kit <brand kit name>)
+ * the one generic package is made first, and then the customer's folder is put beside it (no licence file yet) and the result is named website-<customer>-<os>. Nothing of
+ * the customer is built in.
+ *
  * What goes in: the website's built server and static files, the production libraries it needs (checked for their licences), Node.js, the start scripts, a plain README,
- * prerequisites.json and the EULA and notices. What never goes in: source (.ts, .tsx, .map), tests, .env files, keys, databases, a licence, the build tools' leftovers
+ * prerequisites.json and the EULA and notices. What never goes in: source (.ts, .tsx, .map), tests, .env files, keys, databases, a licence, a customer's settings, the build tools' leftovers
  * (scripts/audit-package.mjs and scripts/audit-prerequisites.mjs check it, and this script stops when they find anything).
  *
  * A website is built on the system it is for (a Windows website on Windows, a Linux one on Linux): Prisma's database engine and the picture library are different files
@@ -48,6 +53,10 @@ export class WebsiteError extends Error {}
 
 export const SYSTEMS = ['windows', 'linux'];
 export const TRIAL_FILE = 'NO-LICENCE-KEYS-TRIAL-ONLY.txt';
+/** The customer's folder, beside the program, and the copy of the rules that checks it (the file apps/storefront-web-mobile/src/lib/customer/rules.mjs, unchanged). */
+export const CUSTOMER_FOLDER = 'customer';
+export const RULES_COPY = 'customer-rules.mjs';
+export const RULES_FILE = join(appDir, 'src', 'lib', 'customer', 'rules.mjs');
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Names
@@ -72,6 +81,8 @@ export function checkVersion(version) {
   if (!/^\d+\.\d+\.\d+$/.test(String(version ?? ''))) throw new WebsiteError('Say the version as three numbers: --version 1.0.0');
   return String(version);
 }
+/** The folder and the zip of THE website (the same for every customer) for one system: website-windows, website-linux. */
+export const genericName = (os) => `website-${checkSystem(os)}`;
 /** The folder and the zip of one customer's website for one system. The Setup Studio looks for this exact name (tools/setup-studio/lib/pack.mjs). */
 export const packageName = (customer, os) => `website-${checkCustomer(customer)}-${checkSystem(os)}`;
 
@@ -243,7 +254,8 @@ export function buildEnvironment(settings, extra = {}) {
   return { ...env, ...settings, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1', PRISMA_HIDE_UPDATE_MESSAGE: '1', CHECKPOINT_DISABLE: '1', NODE_OPTIONS: '--max-old-space-size=4096', ...extra };
 }
 
-const SKIP_TOP = new Set(['node_modules', '.next', 'android', 'android-shell', 'assets', '.vscode', 'dist-electron', 'releases', 'coverage', 'out', 'build', 'tmp', '.git', '.vercel', '.licence']);
+// A customer folder (customer/) on a developer's computer is never part of a build: the program is the same for every customer.
+const SKIP_TOP = new Set(['node_modules', '.next', 'android', 'android-shell', 'assets', '.vscode', 'dist-electron', 'releases', 'coverage', 'out', 'build', 'tmp', '.git', '.vercel', '.licence', 'customer']);
 const GENERATED_PUBLIC = /^public[\\/](sw\.js(\.map)?|swe-worker-[^\\/]+\.js|workbox-[^\\/]+\.js|version\.json)$/;
 
 /** Copies the website's source into a build folder, leaving out what is generated, what is for the phone app, and anything private (.env files, a licence). */
@@ -303,13 +315,13 @@ function run(cmd, args, opts = {}) {
 
 /**
  * Builds the website in a copy of its folder (the repository is not touched) and returns where the pieces are: { standalone, staticDir, publicDir, keys }.
- * The libraries come from --deps-from (hard-linked) or from "npm ci"; the database library is made for THIS system; the pages are built with the customer's public settings only.
+ * The libraries come from --deps-from (hard-linked) or from "npm ci"; the database library is made for THIS system. The build sees no setting of any customer
+ * (buildEnvironment lets through the tools and nothing else), and a customer folder is never copied: what belongs to a customer is read when the website starts.
  */
-export function buildWebsite({ work, settings, source = appDir, depsFrom = null, logo = null, allowNoKey = false, log = () => {} }) {
+export function buildWebsite({ work, source = appDir, depsFrom = null, allowNoKey = false, log = () => {} }) {
   const app = join(work, 'app');
   log('Copying the website\'s source into a build folder');
   copyAppSource(source, app);
-  if (logo) { checkLogo(logo); copyFileSync(logo, join(app, 'public', 'logo.png')); }
 
   const keys = keysBuiltIn(app);
   if ((keys.count === 0 || !keys.url) && !allowNoKey) {
@@ -327,7 +339,7 @@ export function buildWebsite({ work, settings, source = appDir, depsFrom = null,
     run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'], { cwd: app, env: buildEnvironment({}, { NODE_ENV: 'development' }), shell: process.platform === 'win32' });
   }
 
-  const env = buildEnvironment(settings, { NGOS_PACKAGE_BUILD: '1' });
+  const env = buildEnvironment({}, { NGOS_PACKAGE_BUILD: '1' });
   log('Making the database library for this system (Prisma)');
   run(process.execPath, [join(modules, 'prisma', 'build', 'index.js'), 'generate', '--schema', join(app, 'prisma', 'schema.prisma')], { cwd: app, env });
   run(process.execPath, [join(app, 'scripts', 'generate-version.js')], { cwd: app, env });
@@ -390,7 +402,7 @@ export function privateSettingsExample(os) {
     '# Private settings for this website.',
     '# Copy this file to "private-settings.env" (in this same folder) and fill in what you use.',
     '# That file holds passwords and keys: keep it on this computer only. Never e-mail it, and never put it in a zip you share.',
-    '# The shop\'s name, address, country and kind of business are already inside the website; they are not set here.',
+    '# The shop\'s name, address, country, kind of business, language, colours and logo are the shop\'s own settings, read from the folder "customer"; they are not set here.',
     '',
     '# Where the website keeps its products and pages: a PostgreSQL database with the "vector" add-on (for example from Supabase or Neon).',
     'DATABASE_URL=',
@@ -520,20 +532,25 @@ fi
 exec ./node/bin/node start-website.js "$@"
 `;
 
-/** The page of steps for the shop owner or the person who looks after the computer. */
-export function readmeFor({ name, os, customer, trial, version, nodeVersion }) {
+/**
+ * The page of steps for the shop owner or the person who looks after the computer. It is the same for every customer: the folder the Setup Studio makes for one customer puts
+ * a few lines about that customer in front of it (tools/setup-studio/lib/website-assemble.mjs).
+ */
+export function readmeFor({ os, trial, version, nodeVersion }) {
   const windows = os === 'windows';
   const start = windows ? 'Start Website (with a window, for problems).bat' : './start-website.sh';
+  const title = 'Smart Retail POS: the website';
   return CRLF([
     ...(trial ? ['*** TRIAL BUILD, NO LICENCE KEYS ***', 'This website was made without the licence keys. It can never be licensed: it only shows the page "not available". It is for trying the start-up only.', 'Never give it to a customer.', ''] : []),
-    `${name}: the website`,
-    '='.repeat(`${name}: the website`.length),
+    title,
+    '='.repeat(title.length),
     '',
-    `This folder holds the website of ${name}, ready to run (version ${version}). Nothing has to be installed first: it carries its own copy of everything it needs${nodeVersion ? ` (Node.js ${nodeVersion})` : ''}.`,
+    `This folder holds the website, ready to run (version ${version}). Nothing has to be installed first: it carries its own copy of everything it needs${nodeVersion ? ` (Node.js ${nodeVersion})` : ''}.`,
     windows ? 'It is for Windows 10 (22H2) or Windows 11, 64-bit.' : 'It is for Ubuntu 22.04 or 24.04, Linux Mint 21 or later, or Debian 12 or later, 64-bit Intel/AMD.',
     '',
     'WHAT YOU NEED BESIDES THIS FOLDER',
-    '  - The licence for this website: the licence key, or the licence file, from NextGenOS. It is tied to the website\'s web address.',
+    '  - The licence for this website: the licence file (licence.ngos) from NextGenOS, in the folder "licence", or the licence key. It is tied to the website\'s web address.',
+    '  - The shop\'s own settings, in the folder "customer" (NextGenOS puts it there).',
     '  - The website\'s own accounts: a database (PostgreSQL), and the picture storage, sign-in and AI services you use. They are listed in private-settings.example.env.',
     '',
     'TO TRY IT (about 5 minutes)',
@@ -549,11 +566,13 @@ export function readmeFor({ name, os, customer, trial, version, nodeVersion }) {
     '  - The licence is tied to the website\'s web address: open the website by that address (through the web server), not by 127.0.0.1.',
     windows ? '  - To keep it running all day without anyone opening a window, run it as a service (a tool such as NSSM can run node\\node.exe with start-website.js), or as a scheduled task at start-up. The "Start Website" icon is for opening it as a program on a laptop or counter PC.' : '  - To keep it running all day without anyone opening a window, run it from a systemd service (ExecStart=./node/bin/node start-website.js). ./start-website.sh --app is for opening it as a program on a laptop or counter PC.',
     '',
-    'WHAT IS BUILT IN',
-    '  The shop\'s name, address, country, kind of business and place are part of the website itself (see PACKAGE-INFO.json). To change them, ask NextGenOS for a new build of the website: they cannot be changed by editing a file in this folder.',
+    'THE SHOP\'S OWN SETTINGS',
+    '  This website is the same program for every shop. The shop\'s name, address, country, kind of business, language, colours and logo are read when the website starts, from the folder "customer"',
+    '  beside this file (NextGenOS puts it there). To change them, ask NextGenOS for a new folder, put it in place of the old one, close the website\'s window and open it again.',
+    '  With no folder the website shows plain, neutral words: no name, no country, no money symbol.',
     '',
     'WHAT IS NOT IN THIS FOLDER, ON PURPOSE',
-    '  No password, no key, no database and no licence. Keep private-settings.env and the folder "licence" to yourself and back them up.',
+    '  No password, no key and no database. Keep private-settings.env and the folder "licence" to yourself and back them up.',
     '',
     'MORE',
     `  EULA.txt is the licence agreement. THIRD-PARTY-NOTICES.md lists the other software inside. The licence texts of the libraries are in their own folders under app${windows ? '\\' : '/'}node_modules.`,
@@ -564,14 +583,15 @@ export function readmeFor({ name, os, customer, trial, version, nodeVersion }) {
 export const TRIAL_TEXT = 'This website was built WITHOUT licence keys: it can never be licensed and refuses every visitor. It was made only to try the start-up. Do not give it to a customer.\n';
 
 /**
- * Writes the package folder from the pieces of a built website. Nothing here builds anything, so it is also what the tests use with stand-in pieces.
+ * Writes the package folder from the pieces of a built website. It is THE website, the same for every customer: no customer's name, settings, logo or licence goes in.
+ * Nothing here builds anything, so it is also what the tests use with stand-in pieces.
  *   standalone, staticDir, publicDir   the build's server folder, its .next/static and its public folder
  *   node                               { root, version }: an unpacked Node.js of that system
  *   returns the folder
  */
-export function assemblePackage({ out, os, customer, version, settings, standalone, staticDir, publicDir, node, trial = false, keyCount = 0, notices = {}, now = new Date() }) {
+export function assemblePackage({ out, os, version, standalone, staticDir, publicDir, node, trial = false, keyCount = 0, notices = {}, now = new Date() }) {
   checkSystem(os);
-  const name = packageName(customer, os);
+  const name = genericName(os);
   checkVersion(version);
   const pkg = join(out, name);
   rmSync(pkg, { recursive: true, force: true });
@@ -585,14 +605,14 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
       const rel = relative(standalone, from);
       if (!rel) return true;
       const top = rel.split(sep)[0];
-      if (top === 'src' || top.startsWith('.env') || top === 'package.json') return false;
+      if (top === 'src' || top.startsWith('.env') || top === 'package.json' || top === 'customer') return false;
       if (rel.includes(`node_modules${sep}.cache`)) return false;
       return true;
     },
   });
   cpSync(staticDir, join(app, '.next', 'static'), { recursive: true });
   cpSync(publicDir, join(app, 'public'), { recursive: true });
-  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: `website-${customer}`, version, private: true }, null, 2) + '\n');
+  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'website', version, private: true }, null, 2) + '\n');
   const pruned = pruneApp(app, os);
 
   // Node.js, as nodejs.org built it, with its licence.
@@ -602,10 +622,12 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
   for (const f of ['LICENSE', 'LICENSE.md']) if (existsSync(join(node.root, f))) copyFileSync(join(node.root, f), join(pkg, 'node', f));
   if (os !== 'windows') chmodSync(join(pkg, 'node', nodePath), 0o755);
 
-  const name2 = settings.NEXT_PUBLIC_SITE_NAME || customer;
   writeFileSync(join(pkg, 'start-website.js'), LAUNCHER);
   // The window code is one file for every program of ours (scripts/lib/app-window.mjs); the package carries it unchanged.
   copyFileSync(join(here, 'lib', 'app-window.mjs'), join(pkg, 'app-window.mjs'));
+  // The rules for a customer's settings are one file too (the website reads the customer folder with it); the package carries it unchanged, so that the assemble step can check
+  // a customer's folder with exactly the rules this website will use, on a computer that has no source code.
+  copyFileSync(RULES_FILE, join(pkg, RULES_COPY));
   if (os === 'windows') {
     // "Start Website.exe" starts the website's own Node.js with no terminal window; the website then opens in a window of its own.
     buildLauncher({ outFile: join(pkg, 'Start Website.exe'), name: 'Smart Retail POS website', program: 'node\\node.exe', args: 'start-website.js --app', check: 'start-website.js', icon: join(here, 'launcher', 'product.ico'), version: /^\d+\.\d+\.\d+/.exec(version)?.[0] ?? '1.0.0' });
@@ -618,10 +640,10 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
   mkdirSync(join(pkg, 'licence'), { recursive: true });
   writeFileSync(join(pkg, 'licence', 'READ ME.txt'), CRLF(['Put the website\'s licence file here, named licence.ngos, or type the licence key on the page /admin/licence of the running website (it saves the file here).', 'Do not give this folder to anyone: the licence is for this website only.']));
   writeFileSync(join(pkg, 'PACKAGE-INFO.json'), JSON.stringify({
-    schema: 1, product: 'Smart Retail POS website', customer, name: name2, version, os, arch: 'x64', builtAt: now.toISOString(), node: node.version,
-    licenceKeysBuiltIn: keyCount, trialWithoutLicenceKeys: Boolean(trial), publicSettings: settings,
+    schema: 1, product: 'Smart Retail POS website', generic: true, version, os, arch: 'x64', builtAt: now.toISOString(), node: node.version,
+    licenceKeysBuiltIn: keyCount, trialWithoutLicenceKeys: Boolean(trial), customerFolder: CUSTOMER_FOLDER,
   }, null, 2) + '\n');
-  writeFileSync(join(pkg, 'READ ME FIRST.txt'), readmeFor({ name: name2, os, customer, trial, version, nodeVersion: node.version }));
+  writeFileSync(join(pkg, 'READ ME FIRST.txt'), readmeFor({ os, trial, version, nodeVersion: node.version }));
   if (trial) writeFileSync(join(pkg, TRIAL_FILE), TRIAL_TEXT);
   for (const [file, from] of Object.entries({ 'EULA.txt': notices.eula, 'THIRD-PARTY-NOTICES.md': notices.thirdParty })) if (from && existsSync(from)) copyFileSync(from, join(pkg, file));
   if (os !== 'windows') chmodSync(join(pkg, 'start-website.sh'), 0o755);
@@ -630,7 +652,7 @@ export function assemblePackage({ out, os, customer, version, settings, standalo
 
 /** What must be in a finished package. */
 export const requiredFiles = (os) => [
-  'start-website.js', 'app-window.mjs', os === 'windows' ? 'Start Website.exe' : 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json',
+  'start-website.js', 'app-window.mjs', RULES_COPY, os === 'windows' ? 'Start Website.exe' : 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json',
   os === 'windows' ? 'node/node.exe' : 'node/bin/node', 'node/LICENSE', 'app/server.js', 'app/package.json', 'app/.next/BUILD_ID', 'app/.next/static', 'app/public',
 ];
 
@@ -661,17 +683,26 @@ function foreignPrograms(root, os) {
 /**
  * Looks at a finished package folder the way a customer's machine would: the files that must be there, nothing that must not be (scripts/audit-package.mjs, with the website's
  * node_modules allowed and still checked), nothing it needs that a factory-new machine lacks (scripts/audit-prerequisites.mjs), the right native parts for the system, and the libraries' licences.
+ * kind: 'generic' (the default) is THE website, the same for every customer, and holds no customer folder, no licence file and no customer's settings;
+ *       'customer' is one customer's folder from the assemble step (it holds the customer folder, and the licence file when it was given).
  * Returns { problems, files, programs }.
  */
-export function checkPackage(folder, { os }) {
+export function checkPackage(folder, { os, kind = 'generic' }) {
   checkSystem(os);
   const root = resolve(folder);
   const problems = [];
   for (const f of requiredFiles(os)) if (!existsSync(join(root, ...f.split('/')))) problems.push(`${f} is missing from the package`);
-  const audit = auditFolder(root, { nodeApp: true });
+  const audit = auditFolder(root, { nodeApp: true, ...(kind === 'customer' ? { customerPackage: true } : {}) });
   problems.push(...audit.problems);
   problems.push(...auditPrerequisites(root, { os, arch: 'x64' }).problems);
   problems.push(...foreignPrograms(root, os));
+  if (kind === 'generic') {
+    if (existsSync(join(root, CUSTOMER_FOLDER))) problems.push(`${CUSTOMER_FOLDER}/ is in the package: THE website is the same for every customer, and holds no customer's settings`);
+    try {
+      const info = JSON.parse(readFileSync(join(root, 'PACKAGE-INFO.json'), 'utf8'));
+      if (info.generic !== true || 'customer' in info || 'publicSettings' in info || 'name' in info) problems.push('PACKAGE-INFO.json holds a customer\'s name or settings: THE website is the same for every customer');
+    } catch { /* a missing or unreadable file is reported above */ }
+  }
   const engines = join(root, 'app', 'node_modules', '.prisma', 'client');
   const engineName = os === 'windows' ? /^query_engine-windows\.dll\.node$/ : /^libquery_engine-debian-openssl-3\.0\.x\.so\.node$/;
   if (!existsSync(engines) || !readdirSync(engines).some((f) => engineName.test(f))) problems.push(`the database engine for ${os} is missing (app/node_modules/.prisma/client): the database part of the website would not start`);
@@ -703,9 +734,13 @@ export async function zipPackage(folder, zipFile) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * Builds, packs, checks and zips the website of one customer. Returns { folder, zip, sha256, trial, files }.
+ * Builds, packs, checks and zips THE website (the same for every customer). Returns { folder, zip, sha256, trial, files }.
  * `source` is the website's folder. Only the end-to-end test of the licence (licensing/e2e/website-package-e2e.mjs) gives another one, a copy of it with a throw-away Studio's
  * public key built in, so that a licensed website can be tried; the command line has no such switch, and the repository's own files are never changed.
+ *
+ * The older way is still accepted for the GitHub build service: with `customer` and `settingsFile` (or `kit`), the one generic package is made and checked first, and then the customer's
+ * folder is put beside it by the assemble step (no licence file: the customer's licence is added later). The customer's name and settings are never built in. The result is
+ * website-<customer>-<os>, as before.
  */
 export async function makeWebsitePackage(opts) {
   const { os, version, out, allowNoKey = false, depsFrom = null, kit = null, settingsFile = null, logo = null, nodeGiven = null, nodeDownload = null, source = appDir, log = (m) => console.log(`\n== ${m}`) } = opts;
@@ -716,55 +751,84 @@ export async function makeWebsitePackage(opts) {
   }
   if (process.arch !== 'x64') throw new WebsiteError('Only 64-bit Intel/AMD websites are built (this computer is ' + process.arch + ').');
 
-  // The customer's public settings: from the brand kit, and from the settings file (which adds to them or overrides them).
-  const packs = knownPacks();
-  let values = {};
-  let kitLogo = null;
+  // Without a customer there is nothing more to say: THE website is made. With one, the customer's settings are checked now, before anything is built (a mistake is found in a second, not after the build).
+  const forCustomer = Boolean(opts.customer || kit || settingsFile);
   let customer = opts.customer || null;
-  if (!kit && !settingsFile) throw new WebsiteError('Give the customer\'s public settings: --settings <website-settings.env> or --kit <brand kit name>.');
-  if (kit) {
-    if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(kit)) throw new WebsiteError(`"${String(kit).slice(0, 60)}" is not a brand kit name.`);
-    const k = settingsFromKit(join(repo, 'brand-kits', kit));
-    values = { ...k.values };
-    kitLogo = k.logo;
-    customer = customer || kit;
+  let customerFiles = null;
+  if (forCustomer) {
+    const packs = knownPacks();
+    let values = {};
+    let kitLogo = null;
+    let kitFolder = null;
+    let settingsText = null;
+    if (!kit && !settingsFile) throw new WebsiteError('Give the customer\'s public settings: --settings <website-settings.env> or --kit <brand kit name>.');
+    if (kit) {
+      if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(kit)) throw new WebsiteError(`"${String(kit).slice(0, 60)}" is not a brand kit name.`);
+      kitFolder = join(repo, 'brand-kits', kit);
+      const k = settingsFromKit(kitFolder);
+      values = { ...k.values };
+      kitLogo = k.logo;
+      customer = customer || kit;
+    }
+    if (settingsFile) {
+      if (!existsSync(settingsFile)) throw new WebsiteError(`The settings file ${settingsFile} was not found.`);
+      settingsText = readFileSync(settingsFile, 'utf8');
+      const own = parseSettings(settingsText, { ...packs, requireName: !kit });
+      if (own.problems.length) throw new WebsiteError(`The settings in ${basename(settingsFile)} cannot be used:\n  ${own.problems.join('\n  ')}`);
+      values = { ...values, ...own.values };
+    }
+    checkCustomer(customer);
+    const parsed = parseSettings(Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n'), packs);
+    if (parsed.problems.length) throw new WebsiteError(`The settings cannot be used:\n  ${parsed.problems.join('\n  ')}`);
+    const chosenLogo = logo ? resolve(logo) : kitLogo;
+    if (chosenLogo) checkLogo(chosenLogo);
+    customerFiles = { values: parsed.values, settingsText, kitFolder, logo: chosenLogo, packs };
   }
-  if (settingsFile) {
-    if (!existsSync(settingsFile)) throw new WebsiteError(`The settings file ${settingsFile} was not found.`);
-    const own = parseSettings(readFileSync(settingsFile, 'utf8'), { ...packs, requireName: !kit });
-    if (own.problems.length) throw new WebsiteError(`The settings in ${basename(settingsFile)} cannot be used:\n  ${own.problems.join('\n  ')}`);
-    values = { ...values, ...own.values };
-  }
-  checkCustomer(customer);
-  const parsed = parseSettings(Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n'), packs);
-  if (parsed.problems.length) throw new WebsiteError(`The settings cannot be used:\n  ${parsed.problems.join('\n  ')}`);
-  const chosenLogo = logo ? resolve(logo) : kitLogo;
-  if (chosenLogo) checkLogo(chosenLogo);
 
   const work = mkdtempSync(join(tmpdir(), 'ngos-site-'));
   try {
     log('Node.js to carry');
     const node = await nodeRuntime({ os, given: nodeGiven, download: nodeDownload, work });
-    const built = buildWebsite({ work, settings: parsed.values, source, depsFrom, logo: chosenLogo, allowNoKey, log });
+    const built = buildWebsite({ work, source, depsFrom, allowNoKey, log });
     const trial = built.keys.count === 0 || !built.keys.url;
     log('Putting the package together');
     mkdirSync(out, { recursive: true });
     const { folder, name, pruned } = assemblePackage({
-      out, os, customer, version, settings: parsed.values, standalone: built.standalone, staticDir: built.staticDir, publicDir: built.publicDir, node, trial,
+      out, os, version, standalone: built.standalone, staticDir: built.staticDir, publicDir: built.publicDir, node, trial,
       keyCount: built.keys.count, notices: { eula: join(repo, 'EULA.txt'), thirdParty: join(repo, 'THIRD-PARTY-NOTICES.md') },
     });
     console.log(`Removed from the build: ${pruned.files} source/type/map files${pruned.other.length ? `; other systems' parts: ${pruned.other.join(', ')}` : ''}.`);
     rmSync(work, { recursive: true, force: true });   // the build folder is large: free it before the checks and the zip
 
-    log('Checking the package (no source, no secret, nothing a factory-new computer lacks, the right native parts, licences)');
+    log('Checking the package (no source, no secret, no customer, nothing a factory-new computer lacks, the right native parts, licences)');
     const checked = checkPackage(folder, { os });
     if (checked.problems.length) throw new WebsiteError(`The package holds what it must not, or lacks what it needs:\n  ${checked.problems.slice(0, 40).join('\n  ')}${checked.problems.length > 40 ? `\n  ... and ${checked.problems.length - 40} more` : ''}`);
-    console.log(`${checked.files} files checked (${checked.programs} program files): nothing that is source, secret, a test or a database; each program file needs only what is inside or the base system.`);
+    console.log(`${checked.files} files checked (${checked.programs} program files): nothing that is source, secret, a test, a database or a customer's; each program file needs only what is inside or the base system.`);
 
-    log('Writing the zip');
-    const zip = join(out, `${name}.zip`);
-    const count = await zipPackage(folder, zip);
-    return { folder, zip, files: count, trial, sha256: sha256(readFileSync(zip)) };
+    if (!forCustomer) {
+      log('Writing the zip');
+      const zip = join(out, `${name}.zip`);
+      const count = await zipPackage(folder, zip);
+      return { folder, zip, files: count, trial, sha256: sha256(readFileSync(zip)) };
+    }
+
+    // The older way, for the build service: the customer's folder is put beside the one generic program (no build, no licence yet).
+    log(`Putting ${customer}'s settings beside it (assemble)`);
+    const { assembleWebsite } = await import('../tools/setup-studio/lib/website-assemble.mjs');
+    const folderOfCustomer = join(mkdtempSync(join(tmpdir(), 'ngos-customer-')), 'customer');
+    try {
+      mkdirSync(join(folderOfCustomer, 'assets'), { recursive: true });
+      if (customerFiles.kitFolder) {
+        copyFileSync(join(customerFiles.kitFolder, 'brand.json'), join(folderOfCustomer, 'brand.json'));
+      }
+      writeFileSync(join(folderOfCustomer, 'website-settings.env'), Object.entries(customerFiles.values).map(([k, v]) => `${k}=${v}`).join('\r\n') + '\r\n');
+      if (customerFiles.logo) copyFileSync(customerFiles.logo, join(folderOfCustomer, 'assets', 'logo.png'));
+      const made = await assembleWebsite({ genericPackage: folder, customerFolder: folderOfCustomer, customer, out, person: 'the build service', allowNoLicence: true, packs: customerFiles.packs, now: new Date() });
+      rmSync(folder, { recursive: true, force: true });   // only the customer's website is handed on
+      return { folder: made.folder, zip: made.zip, files: made.files, trial, sha256: sha256(readFileSync(made.zip)) };
+    } finally {
+      rmSync(dirname(folderOfCustomer), { recursive: true, force: true });
+    }
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -776,7 +840,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const has = (n) => args.includes(n);
   try {
     if (has('--help') || args.length === 0) {
-      console.log('Usage: node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 --customer <short-name> --settings <website-settings.env> (--node-runtime <folder> | --download-node 22.22.0) [--out dist] [--allow-no-key] [--deps-from <node_modules>] [--logo <logo.png>]\n       node scripts/make-website-package.mjs --os linux --version 1.0.0 --kit <brand kit name> --download-node 22.22.0');
+      console.log('Usage: node scripts/make-website-package.mjs --os windows|linux --version 1.0.0 (--node-runtime <folder> | --download-node 22.22.0) [--out dist] [--allow-no-key] [--deps-from <node_modules>]\n       (makes THE website, the same for every customer: website-<os>.zip)\n       The build service\'s older way also works: add --customer <short-name> --settings <website-settings.env> [--logo <logo.png>], or --kit <brand kit name>.');
       process.exit(args.length ? 0 : 2);
     }
     const r = await makeWebsitePackage({

@@ -1,4 +1,4 @@
-// Tests for scripts/make-website-package.mjs: what goes into a customer's website package, what never does, how the settings are checked, which names are refused,
+// Tests for scripts/make-website-package.mjs: what goes into THE website package (the one program every customer gets), what never does (no customer's settings), how the settings are checked, which names are refused,
 // how the start program behaves, and that the audits pass a good package and refuse a package with a planted source file, .env file, key or database.
 // A real build (next build, Node.js, the package, started) is run by the release gate: scripts/checks/website.mjs.
 import test from 'node:test';
@@ -11,8 +11,8 @@ import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { listZip } from '../../tools/setup-studio/lib/zip.mjs';
 import {
-  LAUNCHER, START_BAT, START_BAT_NAME, START_SH, TRIAL_FILE, WebsiteError, assemblePackage, buildEnvironment, checkCustomer, checkLogo, checkPackage, checkSystem, checkVersion, copyAppSource,
-  keysBuiltIn, librariesMatchLock, licenceProblems, packageName, parseSettings, readmeFor, settingsFromKit, zipPackage,
+  CUSTOMER_FOLDER, LAUNCHER, RULES_COPY, RULES_FILE, START_BAT, START_BAT_NAME, START_SH, TRIAL_FILE, WebsiteError, assemblePackage, buildEnvironment, checkCustomer, checkLogo, checkPackage, checkSystem, checkVersion, copyAppSource,
+  genericName, keysBuiltIn, librariesMatchLock, licenceProblems, packageName, parseSettings, readmeFor, settingsFromKit, zipPackage,
 } from '../make-website-package.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -135,7 +135,7 @@ const SETTINGS = { NEXT_PUBLIC_SITE_NAME: 'Luzon Fresh Mart', NEXT_PUBLIC_SITE_U
 function make(os, extra = {}) {
   const b = fakeBuild(os);
   const out = join(b.root, 'out');
-  const r = assemblePackage({ out, os, customer: 'luzon-fresh-mart', version: '1.2.3', settings: SETTINGS, standalone: b.standalone, staticDir: b.staticDir, publicDir: b.publicDir, node: b.node, keyCount: 1, now: new Date('2026-01-01T00:00:00Z'), ...extra });
+  const r = assemblePackage({ out, os, version: '1.2.3', standalone: b.standalone, staticDir: b.staticDir, publicDir: b.publicDir, node: b.node, keyCount: 1, now: new Date('2026-01-01T00:00:00Z'), ...extra });
   return { ...b, out, ...r };
 }
 
@@ -271,7 +271,7 @@ test('the build folder gets the website\'s source and nothing private: no .env, 
   try {
     put(join(root, 'app'), {
       'src/app/page.tsx': 'x', 'package.json': '{}', 'package-lock.json': '{}', 'next.config.ts': 'x', 'prisma/schema.prisma': 'x', 'public/logo.png': 'x', 'scripts/generate-version.js': 'x',
-      '.env.local': 'SECRET=1', '.env.example': 'A=', '.env': 'B=', '.licence/licence.ngos': 'token', 'src/licence.ngos': 'token', 'android/app/build.gradle': 'x', 'node_modules/a/index.js': 'x', '.next/BUILD_ID': 'x',
+      'customer/brand.json': '{"name":"A customer"}', 'customer/assets/logo.png': 'x', '.env.local': 'SECRET=1', '.env.example': 'A=', '.env': 'B=', '.licence/licence.ngos': 'token', 'src/licence.ngos': 'token', 'android/app/build.gradle': 'x', 'node_modules/a/index.js': 'x', '.next/BUILD_ID': 'x',
       'public/sw.js': 'x', 'public/workbox-1.js': 'x', 'public/version.json': '{}', 'tsconfig.tsbuildinfo': '{}', 'next-env.d.ts': 'x',
     });
     copyAppSource(join(root, 'app'), join(root, 'copy'));
@@ -286,7 +286,7 @@ test('a Linux package is put together from the build: what goes in, what is left
   const p = make('linux');
   try {
     const at = (f) => join(p.folder, ...f.split('/'));
-    for (const f of ['start-website.js', 'app-window.mjs', 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json', 'node/bin/node', 'node/LICENSE', 'EULA.txt'.replace('EULA.txt', 'licence/READ ME.txt'),
+    for (const f of ['start-website.js', 'app-window.mjs', RULES_COPY, 'start-website.sh', 'READ ME FIRST.txt', 'private-settings.example.env', 'prerequisites.json', 'PACKAGE-INFO.json', 'node/bin/node', 'node/LICENSE', 'EULA.txt'.replace('EULA.txt', 'licence/READ ME.txt'),
       'app/server.js', 'app/package.json', 'app/.next/BUILD_ID', 'app/.next/server/app/page.js', 'app/.next/static/chunks/main-abc.js', 'app/public/favicon.ico', 'app/node_modules/next/index.js', 'app/node_modules/next/LICENSE',
       'app/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node', 'app/node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64.node']) assert.ok(existsSync(at(f)), `${f} is in the package`);
     // Left out: the build's source, its .env, the other systems' picture parts, type files and maps, the build's own package.json.
@@ -305,8 +305,11 @@ test('a Linux package is put together from the build: what goes in, what is left
     assert.deepEqual(pre.system, ['glibc-2.35-or-newer', 'libstdc++6-libgcc-s1', 'openssl-3']);
     assert.ok(pre.bundled.some((b) => /nodejs-runtime/.test(b)) && pre.minimumSystem.includes('Ubuntu 22.04'));
     const info = JSON.parse(readFileSync(at('PACKAGE-INFO.json'), 'utf8'));
-    assert.deepEqual([info.customer, info.name, info.version, info.os, info.node, info.licenceKeysBuiltIn, info.trialWithoutLicenceKeys], ['luzon-fresh-mart', 'Luzon Fresh Mart', '1.2.3', 'linux', 'v22.22.0', 1, false]);
-    assert.deepEqual(info.publicSettings, SETTINGS);
+    assert.deepEqual([info.generic, info.version, info.os, info.node, info.licenceKeysBuiltIn, info.trialWithoutLicenceKeys, info.customerFolder], [true, '1.2.3', 'linux', 'v22.22.0', 1, false, CUSTOMER_FOLDER]);
+    assert.ok(!('customer' in info) && !('name' in info) && !('publicSettings' in info), 'the package says nothing about a customer');
+    assert.equal(p.name, 'website-linux');
+    assert.equal(readFileSync(at(RULES_COPY), 'utf8'), readFileSync(RULES_FILE, 'utf8'), 'the rules that check a customer folder travel with the program, unchanged');
+    assert.ok(!existsSync(at(CUSTOMER_FOLDER)), 'no customer folder in the program');
 
     const checked = checkPackage(p.folder, { os: 'linux' });
     assert.deepEqual(checked.problems, []);
@@ -410,18 +413,54 @@ test('a trial build (no licence keys) says so on its face; a real one does not',
   } finally { clean(trial.root, real.root); }
 });
 
-test('nothing about a customer is fixed in the program: the name comes from the settings, and changing it changes the result', () => {
+test('the package is the same for every customer: no customer folder, no name, no settings, no logo; changing what the build was given about a customer changes nothing', () => {
   const a = make('linux');
-  const b = make('linux', { customer: 'second-shop', settings: { ...SETTINGS, NEXT_PUBLIC_SITE_NAME: 'Second Shop', NEXT_PUBLIC_COUNTRY: 'GB' } });
+  const b = make('linux', { now: new Date('2026-01-01T00:00:00Z') });
   try {
-    assert.match(readFileSync(join(a.folder, 'READ ME FIRST.txt'), 'utf8'), /Luzon Fresh Mart: the website/);
-    assert.match(readFileSync(join(b.folder, 'READ ME FIRST.txt'), 'utf8'), /Second Shop: the website/);
-    assert.doesNotMatch(readFileSync(join(b.folder, 'READ ME FIRST.txt'), 'utf8'), /Luzon/);
-    assert.equal(b.name, 'website-second-shop-linux');
-    assert.equal(JSON.parse(readFileSync(join(b.folder, 'PACKAGE-INFO.json'), 'utf8')).publicSettings.NEXT_PUBLIC_COUNTRY, 'GB');
-    // The scripts and the example carry no company's name, address or key.
-    for (const f of ['start-website.js', 'start-website.sh', 'private-settings.example.env']) assert.doesNotMatch(readFileSync(join(a.folder, f), 'utf8'), /Luzon|smart ?avenue|@.*\.(com|example)/i, f);
+    const textsOf = (folder) => Object.fromEntries(['READ ME FIRST.txt', 'PACKAGE-INFO.json', 'start-website.js', 'start-website.sh', 'private-settings.example.env', 'prerequisites.json'].map((f) => [f, readFileSync(join(folder, f), 'utf8')]));
+    assert.deepEqual(textsOf(a.folder), textsOf(b.folder));
+    for (const [file, text] of Object.entries(textsOf(a.folder))) assert.doesNotMatch(text, /Luzon|smart ?avenue|Quezon|@.*\.(com|example)/i, file);
+    assert.match(readFileSync(join(a.folder, 'READ ME FIRST.txt'), 'utf8'), /^Smart Retail POS: the website\r\n/);
+    assert.match(readFileSync(join(a.folder, 'READ ME FIRST.txt'), 'utf8'), /folder "customer"/);
+    assert.equal(genericName('windows'), 'website-windows');
+    assert.throws(() => genericName('macos'), WebsiteError);
+    assert.equal(a.name, genericName('linux'));
+    assert.deepEqual(checkPackage(a.folder, { os: 'linux' }).problems, []);
   } finally { clean(a.root, b.root); }
+});
+
+test('a customer folder, a customer\'s name or a licence file in THE website is refused; in one customer\'s website the customer folder and the customer\'s licence are right', () => {
+  const p = make('linux');
+  try {
+    const at = (f) => join(p.folder, ...f.split('/'));
+    put(p.folder, { 'customer/brand.json': JSON.stringify({ name: 'Luzon Fresh Mart' }) });
+    assert.match(checkPackage(p.folder, { os: 'linux' }).problems.join('\n'), /customer\/ is in the package: THE website is the same for every customer/);
+    // The same folder is exactly what one customer's website carries.
+    assert.deepEqual(checkPackage(p.folder, { os: 'linux', kind: 'customer' }).problems, []);
+    rmSync(at('customer'), { recursive: true });
+    const info = JSON.parse(readFileSync(at('PACKAGE-INFO.json'), 'utf8'));
+    writeFileSync(at('PACKAGE-INFO.json'), JSON.stringify({ ...info, customer: 'luzon-fresh-mart', name: 'Luzon Fresh Mart', publicSettings: SETTINGS }));
+    assert.match(checkPackage(p.folder, { os: 'linux' }).problems.join('\n'), /PACKAGE-INFO\.json holds a customer's name or settings/);
+    writeFileSync(at('PACKAGE-INFO.json'), JSON.stringify(info));
+    // A licence file: refused in THE website, accepted only at licence/licence.ngos of one customer's website, and nowhere else.
+    put(p.folder, { 'licence/licence.ngos': 'a.b.c' });
+    assert.match(checkPackage(p.folder, { os: 'linux' }).problems.join('\n'), /licence\.ngos\s+licence file/);
+    assert.deepEqual(checkPackage(p.folder, { os: 'linux', kind: 'customer' }).problems, []);
+    const strict = spawnSync(process.execPath, [join(scripts, 'audit-package.mjs'), p.folder, '--node-app'], { encoding: 'utf8' });
+    assert.equal(strict.status, 1);
+    const customer = spawnSync(process.execPath, [join(scripts, 'audit-package.mjs'), p.folder, '--node-app', '--customer-package'], { encoding: 'utf8' });
+    assert.equal(customer.status, 0, customer.stdout + customer.stderr);
+    rmSync(at('licence/licence.ngos'));
+    put(p.folder, { 'app/licence.ngos': 'a.b.c', 'customer/licence/licence.ngos': 'x' });
+    assert.match(checkPackage(p.folder, { os: 'linux', kind: 'customer' }).problems.join('\n'), /app\/licence\.ngos\s+licence file/);
+    rmSync(at('app/licence.ngos'));
+    // Things planted in the customer folder are refused even in a customer's website.
+    for (const [rel, content, what] of [['customer/page.tsx', 'export {}', /source code/], ['customer/.env', 'A=1', /environment file/], ['customer/shop.db', 'x', /database/], ['customer/app.js.map', '{}', /source map/], ['customer/key.pem', 'x', /key or certificate/], ['customer/notes.txt', DB_URL, /database URL with a password/]]) {
+      put(p.folder, { [rel]: content });
+      assert.match(checkPackage(p.folder, { os: 'linux', kind: 'customer' }).problems.join('\n'), what, rel);
+      rmSync(at(rel));
+    }
+  } finally { clean(p.root); }
 });
 
 test('the zip holds the package under its own folder name, with the files that can be run marked so, and the audit passes it', async () => {
@@ -431,12 +470,12 @@ test('the zip holds the package under its own folder name, with the files that c
     const count = await zipPackage(p.folder, zip);
     const names = listZip(readFileSync(zip));
     assert.equal(names.length, count);
-    assert.ok(names.every((n) => n.startsWith('website-luzon-fresh-mart-linux/')), 'everything is under one folder');
-    for (const want of ['start-website.sh', 'node/bin/node', 'app/server.js', 'prerequisites.json', 'PACKAGE-INFO.json', 'READ ME FIRST.txt']) assert.ok(names.includes(`website-luzon-fresh-mart-linux/${want}`), want);
+    assert.ok(names.every((n) => n.startsWith('website-linux/')), 'everything is under one folder');
+    for (const want of ['start-website.sh', 'node/bin/node', 'app/server.js', 'prerequisites.json', 'PACKAGE-INFO.json', 'READ ME FIRST.txt', 'customer-rules.mjs']) assert.ok(names.includes(`website-linux/${want}`), want);
     assert.ok(!names.some((n) => /\.(tsx?|map)$|\/\.env|\.ngos$/.test(n)), 'no source, map, .env or licence in the zip');
     const a = spawnSync(process.execPath, [join(scripts, 'audit-package.mjs'), zip, '--node-app'], { encoding: 'utf8' });
     assert.equal(a.status, 0, a.stdout + a.stderr);
-    assert.match(a.stdout, /PASS\s+website-luzon-fresh-mart-linux\.zip/);
+    assert.match(a.stdout, /PASS\s+website-linux\.zip/);
   } finally { clean(p.root); }
 });
 
@@ -447,7 +486,7 @@ function launcherFolder(files = {}) {
   const root = tmp();
   put(root, {
     'start-website.js': LAUNCHER, 'PACKAGE-INFO.json': JSON.stringify({ name: 'Luzon Fresh Mart', version: '1.2.3' }),
-    'app/server.js': 'require("fs").writeFileSync(require("path").join(__dirname, "..", "seen.json"), JSON.stringify({ HOSTNAME: process.env.HOSTNAME, PORT: process.env.PORT, NODE_ENV: process.env.NODE_ENV, LICENCE_DIR: process.env.LICENCE_DIR, DATABASE_URL: process.env.DATABASE_URL, NEXT_PUBLIC_SITE_NAME: process.env.NEXT_PUBLIC_SITE_NAME, DEV: process.env.NGOS_DEV_UNLICENSED, ALREADY: process.env.ALREADY, CWD: process.cwd() }));',
+    'app/server.js': 'require("fs").writeFileSync(require("path").join(__dirname, "..", "seen.json"), JSON.stringify({ HOSTNAME: process.env.HOSTNAME, PORT: process.env.PORT, NODE_ENV: process.env.NODE_ENV, LICENCE_DIR: process.env.LICENCE_DIR, DATABASE_URL: process.env.DATABASE_URL, NEXT_PUBLIC_SITE_NAME: process.env.NEXT_PUBLIC_SITE_NAME, DEV: process.env.NGOS_DEV_UNLICENSED, ALREADY: process.env.ALREADY, CUSTOMER_DIR: process.env.NGOS_CUSTOMER_DIR, CWD: process.cwd() }));',
     ...files,
   });
   return root;
@@ -465,6 +504,7 @@ test('the start program: listens on this computer only, in production mode, on t
     const s = seen(root);
     assert.deepEqual([s.HOSTNAME, s.PORT, s.NODE_ENV], ['127.0.0.1', String(port), 'production']);
     assert.equal(s.LICENCE_DIR, join(root, 'licence'));
+    assert.equal(s.CUSTOMER_DIR, join(root, 'customer'), 'the customer\'s settings are read from the folder beside the program');
     assert.ok(existsSync(join(root, 'licence')), 'the folder for the licence is made');
     assert.equal(s.CWD, join(root, 'app'));
     assert.match(r.stdout, new RegExp(`Luzon Fresh Mart \\(version 1\\.2\\.3\\)`));
@@ -543,7 +583,7 @@ test('the start scripts: the Linux one checks the machine and hands over to the 
 
 test('the README is plain: it says what to do, for the right system, and that nothing needs installing first', () => {
   for (const os of ['windows', 'linux']) {
-    const text = readmeFor({ name: 'Luzon Fresh Mart', os, customer: 'luzon-fresh-mart', trial: false, version: '1.2.3', nodeVersion: 'v22.22.0' });
+    const text = readmeFor({ os, trial: false, version: '1.2.3', nodeVersion: 'v22.22.0' });
     assert.match(text, /Nothing has to be installed first/);
     assert.match(text, os === 'windows' ? /Double-click "Start Website"/ : /\.\/start-website\.sh --app/);
     assert.match(text, /no black terminal window|terminal can be closed at once/, 'it says there is no terminal to keep open');
@@ -572,6 +612,9 @@ test('the command refuses, before it builds anything, what it cannot make: no ar
     assert.equal(other.status, 1);
     assert.match(other.stderr, new RegExp(`is built on a ${hostOs === 'windows' ? 'Linux' : 'Windows'} computer`));
     assert.match(run([...base, '--settings', join(root, 'good.env')]).stderr, /short name/);
+    const generic = run(['--os', otherOs, '--version', '1.0.0']);
+    assert.equal(generic.status, 1, 'the website for another system is refused whether or not a customer is named');
+    assert.match(generic.stderr, new RegExp(`is built on a ${hostOs === 'windows' ? 'Linux' : 'Windows'} computer`));
     for (const id of ['../evil', 'a/b', 'A', '..']) { const r = run([...base, '--customer', id, '--settings', join(root, 'good.env')]); assert.equal(r.status, 1, id); assert.match(r.stderr, /short name/, id); }
     assert.match(run([...base, '--customer', 'luzon']).stderr, /Give the customer's public settings/);
     assert.match(run([...base, '--customer', 'luzon', '--settings', join(root, 'private.env')]).stderr, /DATABASE_URL is not a public setting/);

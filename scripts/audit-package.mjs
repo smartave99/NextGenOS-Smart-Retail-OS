@@ -5,6 +5,9 @@
  *
  *   node scripts/audit-package.mjs <folder-or-zip> [more...] [--obfuscated NextGenOS.Hub.Core.dll,...] [--names-from apps/business-hub/src]
  *
+ * With --customer-package (one customer's website, put together by the assemble step) the customer's own licence file is accepted, at licence/licence.ngos and nowhere else; everything
+ * else is still looked at: the customer's folder is checked like any other file, so a source file, an environment file, a database or a key planted in it fails.
+ *
  * With --node-app (the website is a Node.js server and needs the folder of its libraries) the node_modules folder itself is accepted, and everything inside it is checked like any other file,
  * with two differences that only apply to JavaScript: a library may name the header of a key file it reads (a key is a secret only when its text follows), and minified code such as
  * "s.password=r.password," is not a connection string.
@@ -76,10 +79,12 @@ export function auditFolder(folder, options = {}) {
       if (!e.isFile()) continue;
       files += 1;
       const ext = extname(e.name).toLowerCase();
-      if (FORBIDDEN_EXT.has(ext)) problems.push(`${rel}  ${describeExt(ext)}`);
+      // The one licence file a customer's own website may carry (options.customerPackage): the customer's, from the Licence Studio, in the folder the website reads it from.
+      const customerLicence = Boolean(options.customerPackage) && /(^|\/)licence\/licence\.ngos$/.test(rel);
+      if (FORBIDDEN_EXT.has(ext) && !customerLicence) problems.push(`${rel}  ${describeExt(ext)}`);
       const code = Boolean(options.nodeApp) && /\.(m?js|cjs)$/i.test(e.name);
       // A library's error class may be called SigningKeyNotFoundError.js: in JavaScript code inside node_modules the name alone says nothing (a key file would have a key extension, which is refused above).
-      const badName = FORBIDDEN_NAME.find(([re, what]) => re.test(e.name) && !(code && rel.includes('node_modules/') && what === 'private or signing key'));
+      const badName = customerLicence ? undefined : FORBIDDEN_NAME.find(([re, what]) => re.test(e.name) && !(code && rel.includes('node_modules/') && what === 'private or signing key'));
       if (badName) problems.push(`${rel}  ${badName[1]}`);
       if (statSync(full).size > 200 * 1024 * 1024) continue;
       if (!BINARY_EXT.has(ext)) {
@@ -193,8 +198,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = process.argv.slice(2);
   const value = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
   const nodeApp = args.includes('--node-app');
-  const targets = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--') && args[i - 1] !== '--node-app'));
-  if (!targets.length) { console.error('Usage: node scripts/audit-package.mjs <folder-or-zip>... [--obfuscated a.dll,b.dll] [--names-from dir,dir] [--node-app]'); process.exit(2); }
+  const customerPackage = args.includes('--customer-package');
+  const targets = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--') && !['--node-app', '--customer-package'].includes(args[i - 1])));
+  if (!targets.length) { console.error('Usage: node scripts/audit-package.mjs <folder-or-zip>... [--obfuscated a.dll,b.dll] [--names-from dir,dir] [--node-app] [--customer-package]'); process.exit(2); }
   const obfuscated = (value('--obfuscated') || '').split(',').filter(Boolean);
   const names = typeNamesFrom((value('--names-from') || '').split(',').filter(Boolean).map((p) => resolve(p)));
   let failed = false;
@@ -203,7 +209,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     let temp = null;
     if (!existsSync(folder)) { console.error(`${t}: not found`); failed = true; continue; }
     if (statSync(folder).isFile()) { temp = extract(folder); folder = temp; }
-    const { problems, files, programs } = auditFolder(folder, { obfuscated, names, nodeApp });
+    const { problems, files, programs } = auditFolder(folder, { obfuscated, names, nodeApp, customerPackage });
     if (temp) rmSync(temp, { recursive: true, force: true });
     if (problems.length) {
       failed = true;

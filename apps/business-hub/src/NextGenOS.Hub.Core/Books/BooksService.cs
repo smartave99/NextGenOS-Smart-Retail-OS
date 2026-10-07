@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Documents;
 using NextGenOS.Tax;
 using NewtonJson = Newtonsoft.Json.JsonConvert;
 
@@ -206,6 +207,7 @@ public sealed class BooksService(HubDb db, IClock clock)
             r => (Id: r.GetInt64(0), Doc: r.IsDBNull(1) ? (long?)null : r.GetInt64(1), Party: r.IsDBNull(2) ? (long?)null : r.GetInt64(2), Method: r.GetString(3), Amount: r.GetInt64(4), Kind: r.GetString(5),
                 At: DateTimeOffset.Parse(r.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal), Reference: r.IsDBNull(7) ? null : r.GetString(7)), t, ("$id", paymentId)).FirstOrDefault();
         if (p.Id == 0 || p.Amount == 0) return;
+        if (p.Method == DocumentService.AccountCredit) return;     // credit already on the customer's account moves no money: the account itself already nets it
         DocRow? doc = null;
         if (p.Doc is { } docId)
         {
@@ -236,10 +238,14 @@ public sealed class BooksService(HubDb db, IClock clock)
         return db.InTransaction((c, t) =>
         {
             var before = Convert.ToInt32(HubDb.Scalar(c, "SELECT COUNT(*) FROM journal_entries", t) ?? 0);
+            // Only what has no entry yet: a bill with no entry, or a bill whose payments are not all posted.
             foreach (var id in HubDb.Query(c,
-                         "SELECT id FROM documents WHERE status IN ('issued', 'void') AND issued_at IS NOT NULL AND type IN ('invoice', 'progress-bill', 'credit-note', 'purchase') ORDER BY issued_at, id", r => r.GetInt64(0), t))
+                         "SELECT d.id FROM documents d WHERE d.status IN ('issued', 'void') AND d.issued_at IS NOT NULL AND d.type IN ('invoice', 'progress-bill', 'credit-note', 'purchase') AND (" +
+                         "NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.tenant_id = $t AND e.site_id = $s AND e.source = 'bill' AND e.source_id = d.id) OR " +
+                         "EXISTS (SELECT 1 FROM payments p WHERE p.document_id = d.id AND p.method <> $a AND p.amount_minor <> 0 AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.tenant_id = $t AND e.site_id = $s AND e.source = 'payment' AND e.source_id = p.id))) " +
+                         "ORDER BY d.issued_at, d.id", r => r.GetInt64(0), t, ("$t", Tenant), ("$s", Site), ("$a", DocumentService.AccountCredit)))
                 Sync(c, t, id, null, historic: true);
-            foreach (var id in HubDb.Query(c, "SELECT id FROM payments WHERE document_id IS NULL ORDER BY id", r => r.GetInt64(0), t)) SyncPayment(c, t, id);
+            foreach (var id in HubDb.Query(c, "SELECT id FROM payments WHERE document_id IS NULL AND method <> $a ORDER BY id", r => r.GetInt64(0), t, ("$a", DocumentService.AccountCredit))) SyncPayment(c, t, id);
             PostOpeningBalances(c, t);
             return Convert.ToInt32(HubDb.Scalar(c, "SELECT COUNT(*) FROM journal_entries", t) ?? 0) - before;
         });
@@ -314,6 +320,10 @@ public sealed class BooksService(HubDb db, IClock clock)
 
     /// <summary>What the customer owes the shop now (negative when the shop owes the customer).</summary>
     public long CustomerBalance(long partyId) => CustomerLedger(partyId).LastOrDefault()?.BalanceMinor ?? 0;
+
+    /// <summary>The same, read inside a transaction that is changing the books (the credit-limit check of a bill being made).</summary>
+    public long CustomerBalance(SqliteConnection c, SqliteTransaction t, long partyId) => Convert.ToInt64(HubDb.Scalar(c,
+        "SELECT COALESCE(SUM(l.debit_minor - l.credit_minor), 0) FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE l.party_id = $p AND a.role IN ('receivable', 'customer-advances')", t, ("$p", partyId)) ?? 0L);
 
     /// <summary>What the shop owes the supplier now (negative when the supplier owes the shop).</summary>
     public long SupplierBalance(long partyId) => SupplierLedger(partyId).LastOrDefault()?.BalanceMinor ?? 0;

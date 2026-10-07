@@ -174,9 +174,8 @@ public class BooksTests
         var shopPath = f.App.Db.Path;
         f.App.Db.Rollback(HubDb.LatestVersion - 1);                    // the books step is undone: the bills and payments stay
         Assert.Empty(f.App.Db.Query("SELECT name FROM sqlite_master WHERE name = 'journal_entries'", r => r.GetString(0)));
-        var again = HubApp.Open(shopPath, f.Clock);                     // forward again
-        Assert.Empty(again.Books.TrialBalance());
-        Assert.True(again.Books.CatchUp() > 0);
+        var again = HubApp.Open(shopPath, f.Clock);                     // forward again: opening the shop posts what was not posted
+        Assert.Equal(0, again.Books.CatchUp());
         Assert.Equal(before, again.Books.TrialBalance().Select(r => (r.Code, r.Name, r.DebitMinor, r.CreditMinor)).ToList());
         Assert.Equal(balanceBefore, again.Books.CustomerBalance(buyer.Id));
     }
@@ -211,6 +210,109 @@ public class BooksTests
         Assert.Equal(-4_000, f.App.Books.CustomerBalance(owed.Id));      // the shop owes this customer 40.00
         Assert.Equal(900_000, f.App.Books.SupplierBalance(supplier.Id)); // and owes the supplier 9,000.00
         Assert.Equal(-150_000 + 4_000 + 900_000, Balance(f, "Opening balances"));   // the other side of all three
+        AssertBalanced(f);
+    }
+
+    // ---- money received on account, credit kept for a customer, and the credit limit read from the books ---------------------------------------
+
+    private static (HubFixture F, Party Buyer) Credit(long limit = 100_000_000)
+    {
+        var f = Shop("wholesale");
+        return (f, f.App.Parties.Create(new PartyInput { Kind = "customer", Name = "Sharma Store", CreditLimitMinor = limit }));
+    }
+
+    private static DocumentView CreditSale(HubFixture f, Party buyer, long priceMinor, long paidNow = 0) =>
+        f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, OnCredit = true, Lines = { Line("Rice", priceMinor) }, Payments = paidNow > 0 ? new() { new PaymentInput { AmountMinor = paidNow } } : new() });
+
+    [Fact]
+    public void Money_received_on_account_settles_the_oldest_bills_first_and_keeps_any_extra_as_credit()
+    {
+        var (f, buyer) = Credit();
+        using var _ = f;
+        var first = CreditSale(f, buyer, 10_000);     // 118.00
+        var second = CreditSale(f, buyer, 5_000);     // 59.00
+        Assert.Equal(11_800 + 5_900, f.App.Books.CustomerBalance(buyer.Id));
+        var receipt = f.App.Documents.ReceiveOnAccount(buyer.Id, 14_000, "cash");
+        Assert.Equal(new[] { (first.Document.Id, 11_800L), (second.Document.Id, 2_200L) }, receipt.Settled.Select(x => (x.DocumentId, x.AmountMinor)).ToArray());
+        Assert.Equal(0, receipt.KeptMinor);
+        Assert.Equal("paid", f.App.Documents.Get(first.Document.Id)!.Document.PaymentState);
+        Assert.Equal("partial", f.App.Documents.Get(second.Document.Id)!.Document.PaymentState);
+        Assert.Equal(17_700 - 14_000, f.App.Books.CustomerBalance(buyer.Id));
+        // paying more than is owed keeps the rest as credit for the customer
+        var more = f.App.Documents.ReceiveOnAccount(buyer.Id, 5_000, "card");
+        Assert.Equal(1_300, more.KeptMinor);      // 37.00 settles the rest of the second bill, 13.00 is kept
+        Assert.Equal(-1_300, f.App.Books.CustomerBalance(buyer.Id));
+        Assert.Equal("paid", f.App.Documents.Get(second.Document.Id)!.Document.PaymentState);
+        Assert.Equal("amount", Assert.Throws<HubException>(() => f.App.Documents.ReceiveOnAccount(buyer.Id, 0, "cash")).Code);
+        Assert.Equal("method", Assert.Throws<HubException>(() => f.App.Documents.ReceiveOnAccount(buyer.Id, 100, "account")).Code);
+        AssertBalanced(f);
+    }
+
+    [Fact]
+    public void Credit_on_the_account_pays_part_or_all_of_a_later_bill_without_moving_any_money()
+    {
+        var (f, buyer) = Credit();
+        using var _ = f;
+        f.App.Documents.ReceiveOnAccount(buyer.Id, 20_000, "cash");                       // nothing owed: all of it is kept as credit
+        Assert.Equal(-20_000, f.App.Books.CustomerBalance(buyer.Id));
+        var cashBefore = Balance(f, "Cash");
+        var bill = f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, Lines = { Line("Rice", 10_000) }, Payments = { new PaymentInput { Method = "account", AmountMinor = 11_800 } } });
+        Assert.Equal("paid", bill.Document.PaymentState);
+        Assert.Equal(cashBefore, Balance(f, "Cash"));                                      // no money moved
+        Assert.Equal(-20_000 + 11_800, f.App.Books.CustomerBalance(buyer.Id));            // 82.00 of credit left
+        // more than the credit is refused; so is credit for a customer who has none, and a payment of credit after the bill was made
+        Assert.Equal("account-credit", Assert.Throws<HubException>(() => f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, Lines = { Line("Rice", 100_000) }, Payments = { new PaymentInput { Method = "account", AmountMinor = 9_000 } } })).Code);
+        var stranger = f.App.Parties.Create(new PartyInput { Kind = "customer", Name = "Nobody" });
+        Assert.Equal("account-credit", Assert.Throws<HubException>(() => f.App.Documents.Checkout(new CheckoutRequest { PartyId = stranger.Id, Lines = { Line("Rice", 1_000) }, Payments = { new PaymentInput { Method = "account", AmountMinor = 100 } } })).Code);
+        var open = CreditSale(f, buyer, 100_000);
+        Assert.Equal("account-credit", Assert.Throws<HubException>(() => f.App.Documents.AddPayment(open.Document.Id, new PaymentInput { Method = "account", AmountMinor = 100 })).Code);
+        AssertBalanced(f);
+    }
+
+    [Fact]
+    public void A_return_kept_as_credit_can_pay_the_next_bill()
+    {
+        var (f, buyer) = Credit();
+        using var _ = f;
+        var sale = f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, Lines = { Line("Lamp", 10_000, 2000) }, Payments = { new PaymentInput { AmountMinor = 23_600 } } });
+        f.App.Documents.CreateCreditNote(sale.Document.Id, new[] { (sale.Lines[0].Id, 1000L) }, "wrong", "cash", null, refundPaid: false);   // decision 34: kept as credit
+        Assert.Equal(-11_800, f.App.Books.CustomerBalance(buyer.Id));
+        Assert.Equal(23_600, Balance(f, "Cash"));                                          // no money went back
+        var next = f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, Lines = { Line("Lamp", 10_000) }, Payments = { new PaymentInput { Method = "account", AmountMinor = 11_800 } } });
+        Assert.Equal("paid", next.Document.PaymentState);
+        Assert.Equal(0, f.App.Books.CustomerBalance(buyer.Id));
+        AssertBalanced(f);
+    }
+
+    [Fact]
+    public void A_cancelled_bill_that_was_partly_paid_from_the_account_gives_the_credit_back_and_refunds_only_the_money()
+    {
+        var (f, buyer) = Credit();
+        using var _ = f;
+        f.App.Documents.ReceiveOnAccount(buyer.Id, 5_000, "cash");
+        var bill = f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, Lines = { Line("Rice", 10_000) }, Payments = { new PaymentInput { Method = "account", AmountMinor = 5_000 }, new PaymentInput { Method = "cash", AmountMinor = 6_800 } } });
+        Assert.Equal(0, f.App.Books.CustomerBalance(buyer.Id));                            // 50.00 of credit and 68.00 in cash paid the 118.00 bill
+        f.App.Documents.Void(bill.Document.Id, "mistake", null);
+        Assert.Equal(-5_000, f.App.Books.CustomerBalance(buyer.Id));                       // the 50.00 of credit is back
+        Assert.Equal(5_000, Balance(f, "Cash"));                                           // only the advance is left in the till
+        AssertBalanced(f);
+    }
+
+    [Fact]
+    public void The_credit_limit_counts_what_the_books_say_so_a_balance_brought_across_counts_too()
+    {
+        var (f, buyer) = Credit(limit: 100_000);
+        using var _ = f;
+        using (var c = f.App.Db.Open()) HubDb.Exec(c, "INSERT INTO party_opening_balances(party_id, balance_minor, as_of) VALUES ($p, 99_900, '2026-04-01T00:00:00+00:00')".Replace("99_900", "99900"), null, ("$p", buyer.Id));
+        f.App.Books.CatchUp();
+        Assert.Equal(99_900, f.App.Books.CustomerBalance(buyer.Id));
+        var ex = Assert.Throws<HubException>(() => CreditSale(f, buyer, 10_000));          // 99.900 + 118.00 is more than the limit
+        Assert.Equal("over-limit", ex.Code);
+        // paying down what was owed makes room again
+        f.App.Documents.ReceiveOnAccount(buyer.Id, 50_000, "cash");
+        Assert.Equal(49_900, f.App.Books.CustomerBalance(buyer.Id));
+        CreditSale(f, buyer, 10_000);
+        Assert.Equal(49_900 + 11_800, f.App.Books.CustomerBalance(buyer.Id));
         AssertBalanced(f);
     }
 

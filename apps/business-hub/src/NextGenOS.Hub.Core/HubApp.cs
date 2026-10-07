@@ -101,6 +101,9 @@ public sealed class HubApp
     {
         var db = new HubDb(path);
         db.Migrate();
-        return new HubApp(db, clock ?? new SystemClock(), print, ai);
+        var app = new HubApp(db, clock ?? new SystemClock(), print, ai);
+        // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
+        app.Books.CatchUp();
+        return app;
     }
 }

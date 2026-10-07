@@ -16,6 +16,9 @@ namespace NextGenOS.Hub.Documents;
 /// </summary>
 public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books)
 {
+    /// <summary>The "way of paying" that uses credit a customer already has with the shop (an advance, or a return kept as credit). It moves no money and is not in the shop's list of ways of paying.</summary>
+    public const string AccountCredit = "account";
+
     private const string DocColumns =
         "id, type, number, status, direction, party_id, issued_at, created_at, due_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
         "subtotal_minor, tax_minor, total_minor, payable_minor, paid_minor, tips_minor, retention_minor, advance_minor, table_id, project_id, ref_document_id, user_id, notes, meta, " +
@@ -371,6 +374,14 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         var payable = header.PayableMinor;
         var tendered = options.Payments.Where(p => p.AmountMinor > 0).ToList();
         var paid = tendered.Sum(p => p.AmountMinor);
+        var accountPaid = tendered.Where(p => p.Method == AccountCredit).Sum(p => p.AmountMinor);
+        if (accountPaid > 0)
+        {
+            if (header.Direction != "out" || type is not (DocTypes.Invoice or DocTypes.ProgressBill) || header.PartyId is not { } creditParty)
+                throw new HubException("account-credit", "Credit on an account can only pay a bill made out to that customer.");
+            var credit = Math.Max(0, -books.CustomerBalance(c, t, creditParty));
+            if (accountPaid > credit) throw new HubException("account-credit", $"This customer's account has only {context.Money(credit)} of credit.");
+        }
         long change = 0;
         if (paid > payable)
         {
@@ -396,9 +407,12 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var party = header.PartyId is { } pid ? parties.Get(pid) : null;
             if (!context.Features.Credit || party is null || party.CreditLimitMinor <= 0)
                 throw new HubException("no-credit", "This customer has no credit. Take the full payment, or give the customer a credit limit first.");
-            var owed = Outstanding(c, t, party.Id);
-            if (owed + (payable - paid) > party.CreditLimitMinor)
-                throw new HubException("over-limit", $"{party.Name} would owe {context.Money(owed + payable - paid)}, above the credit limit of {context.Money(party.CreditLimitMinor)}.");
+            // What the customer owes is read from the customer's account in the books (so that opening balances, money paid in advance and returns kept as credit all count),
+            // and the new debt is the part of the bill not paid in money (credit the customer already had is not money and is taken off by the account itself).
+            var owed = books.CustomerBalance(c, t, party.Id);
+            var after = owed + (payable - (paid - accountPaid));
+            if (after > party.CreditLimitMinor)
+                throw new HubException("over-limit", $"{party.Name} would owe {context.Money(after)}, above the credit limit of {context.Money(party.CreditLimitMinor)}.");
             due = now.AddDays(party.TermsDays > 0 ? party.TermsDays : (int)context.Rule("creditDays", 30));
         }
 
@@ -471,12 +485,56 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", documentId)).SingleOrDefault() ?? throw new HubException("not-found", "That document was not found.");
             if (header.Status != DocStatus.Issued) throw new HubException("not-final", "Payments are taken on final documents only.");
             if (payment.AmountMinor <= 0) throw new HubException("amount", "The amount must be more than zero.");
+            if (payment.Method == AccountCredit) throw new HubException("account-credit", "Credit on an account is used when the bill is made. Take the payment in money, or put the credit on the next bill.");
             if (payment.AmountMinor > header.BalanceMinor) throw new HubException("too-much", $"Only {shop.Current.Money(header.BalanceMinor)} is still owed on this document.");
             InsertPayment(c, t, documentId, header.PartyId, header.ProjectId, payment, userId, "payment", clock.UtcNow);
             HubDb.Exec(c, "UPDATE documents SET paid_minor = paid_minor + $a WHERE id = $id", t, ("$a", payment.AmountMinor), ("$id", documentId));
             books.Sync(c, t, documentId, userId);
         });
         return Get(documentId)!;
+    }
+
+    /// <summary>What happened to money a customer paid on account: the bills it settled (oldest first) and what was left over and is now kept as credit.</summary>
+    public sealed record AccountReceipt(IReadOnlyList<(long DocumentId, string? Number, long AmountMinor)> Settled, long KeptMinor);
+
+    /// <summary>
+    /// Takes money from a customer who is paying what they owe (or paying in advance), without naming a bill: it settles the customer's unpaid bills, oldest first, and anything over is kept
+    /// on the customer's account as credit for a later bill. All in one step, and every payment is written in the books.
+    /// </summary>
+    public AccountReceipt ReceiveOnAccount(long partyId, long amountMinor, string method, string? reference = null, long? userId = null)
+    {
+        if (amountMinor <= 0) throw new HubException("amount", "The amount must be more than zero.");
+        if (method == AccountCredit || !shop.Current.PaymentMethods.Contains(method))
+            throw new HubException("method", $"\"{method}\" is not a way of paying here. Choose one of: {string.Join(", ", shop.Current.PaymentMethods)}.");
+        return db.InTransaction((c, t) =>
+        {
+            var party = parties.Get(partyId) ?? throw new HubException("party-not-found", "That customer was not found.");
+            var now = clock.UtcNow;
+            var left = amountMinor;
+            var settled = new List<(long, string?, long)>();
+            var open = HubDb.Query(c,
+                "SELECT id, number, payable_minor - paid_minor FROM documents WHERE party_id = $p AND direction = 'out' AND status = 'issued' AND type IN ('invoice', 'progress-bill') AND paid_minor < payable_minor " +
+                "ORDER BY COALESCE(issued_at, created_at), id", r => (Id: r.Int("id"), Number: r.TextOrNull("number"), Due: r.GetInt64(2)), t, ("$p", partyId));
+            foreach (var bill in open)
+            {
+                if (left <= 0) break;
+                var take = Math.Min(left, bill.Due);
+                InsertPayment(c, t, bill.Id, partyId, null, new PaymentInput { Method = method, AmountMinor = take, Reference = reference }, userId, "payment", now);
+                HubDb.Exec(c, "UPDATE documents SET paid_minor = paid_minor + $a WHERE id = $id", t, ("$a", take), ("$id", bill.Id));
+                books.Sync(c, t, bill.Id, userId);
+                settled.Add((bill.Id, bill.Number, take));
+                left -= take;
+            }
+            if (left > 0)
+            {
+                // nothing more is owed on a bill: the rest is the customer's credit, used on the next bill
+                var paymentId = HubDb.Insert(c, "INSERT INTO payments(document_id, party_id, method, amount_minor, reference, at, user_id, kind) VALUES (NULL, $p, $m, $a, $r, $at, $u, 'advance')", t,
+                    ("$p", partyId), ("$m", method), ("$a", left), ("$r", reference), ("$at", Iso.Text(now)), ("$u", userId));
+                books.SyncPayment(c, t, paymentId, userId);
+            }
+            audit.Log(c, t, userId, "receive", "party", partyId, $"{party.Name}: {shop.Current.Money(amountMinor)} by {method}");
+            return new AccountReceipt(settled, left);
+        });
     }
 
     /// <summary>Cancels a document. Stock comes back; money that was paid is refunded by the method given.</summary>
@@ -496,7 +554,12 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 if (sign != 0) MoveStock(c, t, documentId, lines, sign, "void", userId, clock.UtcNow);
                 if (header.PaidMinor > 0)
                 {
-                    InsertPayment(c, t, documentId, header.PartyId, header.ProjectId, new PaymentInput { Method = refundMethod, AmountMinor = header.PaidMinor, Reference = "void" }, userId, "refund", clock.UtcNow, negative: true);
+                    // Money paid is refunded in the way given; credit from the customer's account that paid part of the bill goes back to the account (nothing to hand over).
+                    var fromAccount = Math.Min(header.PaidMinor, Convert.ToInt64(HubDb.Scalar(c, "SELECT COALESCE(SUM(amount_minor), 0) FROM payments WHERE document_id = $id AND method = $m AND kind = 'payment'", t, ("$id", documentId), ("$m", AccountCredit)) ?? 0L));
+                    if (header.PaidMinor - fromAccount > 0)
+                        InsertPayment(c, t, documentId, header.PartyId, header.ProjectId, new PaymentInput { Method = refundMethod, AmountMinor = header.PaidMinor - fromAccount, Reference = "void" }, userId, "refund", clock.UtcNow, negative: true);
+                    if (fromAccount > 0)
+                        InsertPayment(c, t, documentId, header.PartyId, header.ProjectId, new PaymentInput { Method = AccountCredit, AmountMinor = fromAccount, Reference = "void" }, userId, "refund", clock.UtcNow, negative: true);
                     HubDb.Exec(c, "UPDATE documents SET paid_minor = 0 WHERE id = $id", t, ("$id", documentId));
                 }
             }
@@ -555,7 +618,9 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var noteDocLines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", noteId));
             var now = clock.UtcNow;
             var number = numbering.Next(c, t, DocTypes.CreditNote, now);
-            var refundable = refundPaid ? Math.Min(note.TotalMinor, invoice.PaidMinor) : 0;
+            // Money is given back only from what was paid in money; what was paid from the customer's account stays on the account.
+            var paidFromAccount = Convert.ToInt64(HubDb.Scalar(c, "SELECT COALESCE(SUM(amount_minor), 0) FROM payments WHERE document_id = $id AND method = $m AND kind = 'payment'", t, ("$id", invoiceId), ("$m", AccountCredit)) ?? 0L);
+            var refundable = refundPaid ? Math.Min(note.TotalMinor, Math.Max(0, invoice.PaidMinor - paidFromAccount)) : 0;
             HubDb.Exec(c, "UPDATE documents SET type = 'credit-note', number = $n, status = 'issued', issued_at = $at, paid_minor = $paid, registered = $reg, buyer_region = $br, seller_region = $sr WHERE id = $id", t,
                 ("$n", number), ("$at", Iso.Text(now)), ("$paid", refundable), ("$reg", invoice.Registered ? 1 : 0), ("$br", invoice.BuyerRegion), ("$sr", invoice.SellerRegion), ("$id", noteId));
             if (refundable > 0) InsertPayment(c, t, noteId, invoice.PartyId, null, new PaymentInput { Method = refundMethod, AmountMinor = refundable, Reference = "refund of " + invoice.Number }, userId, "refund", now, negative: true);
@@ -585,7 +650,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     private void InsertPayment(SqliteConnection c, SqliteTransaction t, long documentId, long? partyId, long? projectId, PaymentInput p, long? userId, string kind, DateTimeOffset at, bool negative = false)
     {
         var methods = shop.Current.PaymentMethods;
-        if (!methods.Contains(p.Method)) throw new HubException("method", $"\"{p.Method}\" is not a way of paying here. Choose one of: {string.Join(", ", methods)}.");
+        if (p.Method != AccountCredit && !methods.Contains(p.Method)) throw new HubException("method", $"\"{p.Method}\" is not a way of paying here. Choose one of: {string.Join(", ", methods)}.");
         HubDb.Exec(c, "INSERT INTO payments(document_id, party_id, project_id, method, amount_minor, reference, at, user_id, kind) VALUES ($d, $p, $pr, $m, $a, $r, $at, $u, $k)", t,
             ("$d", documentId), ("$p", partyId), ("$pr", projectId), ("$m", p.Method), ("$a", negative ? -p.AmountMinor : p.AmountMinor), ("$r", p.Reference), ("$at", Iso.Text(at)), ("$u", userId), ("$k", kind));
     }

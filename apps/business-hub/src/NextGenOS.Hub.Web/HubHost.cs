@@ -104,6 +104,7 @@ public static class HubHost
         // The look the owner chose on this PC; the licence's white-label level decides how much of it shows (BrandService).
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ProfileStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalThemeStore>();
+        services.AddSingleton<NextGenOS.Hub.Web.Branding.ShopLookStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ThemeService>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalBrandStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ProfiledBrand>();

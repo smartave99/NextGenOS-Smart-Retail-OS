@@ -8,6 +8,7 @@
 @inject NextGenOS.Hub.Web.Branding.LocalBrandStore Looks
 @inject NextGenOS.Hub.Web.Branding.LocalThemeStore LocalTheme
 @inject NextGenOS.Hub.Web.Branding.ThemeService Themes
+@inject NextGenOS.Hub.Web.Branding.ShopLookStore ShopLook
 
 <PageTitle>Settings</PageTitle>
 <h1>Settings</h1>
@@ -172,6 +173,25 @@ else if (tab == "look")
                 <button type="button" class="btn secondary" id="reset-look" @onclick="ResetLook">Go back to the standard look</button>
             </div>
         }
+    </section>
+    <section class="card" id="look-card">
+        <h2>The two looks</h2>
+        <p class="muted">The <strong>list look</strong> is for a PC or laptop. The <strong>counter look</strong> is for a touch screen at the counter. Choose one for the whole shop, or let each screen decide: a touch screen gets the counter look and any other screen gets the list look.</p>
+        <div class="look-choices" role="group" aria-label="The look of the shop">
+            @foreach (var (id, name, text) in LookChoices)
+            {
+                <button type="button" class="look-card" id="look-@id" aria-pressed="@(shopLook == id ? "true" : "false")" @onclick="() => ChooseShopLook(id)">
+                    <strong>@name</strong><span>@text</span>
+                </button>
+            }
+        </div>
+        <h3>On this computer only</h3>
+        <p class="muted">This computer can use its own look whatever the shop chose. It is kept in this browser.</p>
+        <div class="row">
+            <button type="button" class="btn secondary" id="here-shop" data-set-look="">Same as the shop</button>
+            <button type="button" class="btn secondary" id="here-list" data-set-look="list">List look</button>
+            <button type="button" class="btn secondary" id="here-counter" data-set-look="counter">Counter look</button>
+        </div>
     </section>
     <section class="card" id="layout-card">
         <h2>Screen and layout</h2>
@@ -506,6 +526,7 @@ else if (tab == "activity")
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
         layout = Themes.Current;
+        shopLook = ShopLook.Current;
         scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
@@ -571,6 +592,30 @@ else if (tab == "activity")
         // Without the licence's leave for style, only the choices about the screen are kept: a style chosen later (or a profile's) must not be overridden by a default saved here.
         if (!Themes.IdentityAllowed) { layout.Mode = layout.Surface = layout.Shape = layout.Font = layout.Depth = null; }
         LocalTheme.Save(layout, Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
+    private string shopLook = "standard";
+
+    private static readonly (string Id, string Name, string Text)[] LookChoices =
+    [
+        ("standard", "As it was", "The layout you set below, the same on every screen."),
+        ("auto", "Each screen decides", "A touch screen gets the counter look, any other screen gets the list look."),
+        (NextGenOS.Hub.Web.Branding.ShopLooks.List.Id, NextGenOS.Hub.Web.Branding.ShopLooks.List.Name, NextGenOS.Hub.Web.Branding.ShopLooks.List.Text),
+        (NextGenOS.Hub.Web.Branding.ShopLooks.Counter.Id, NextGenOS.Hub.Web.Branding.ShopLooks.Counter.Name, NextGenOS.Hub.Web.Branding.ShopLooks.Counter.Text),
+    ];
+
+    /// <summary>The owner picks the look of the whole shop. A look is a bundle of the layout settings below, so they are filled in and saved with it; "each screen decides" and "as it was" leave them alone (or put them back to standard).</summary>
+    private Task ChooseShopLook(string id) => Run(() =>
+    {
+        if (NextGenOS.Hub.Web.Branding.ShopLooks.Get(id) is { } preset)
+        {
+            layout.Density = preset.Density; layout.Nav = preset.Nav; layout.NavLabels = preset.NavLabels; layout.Cart = preset.Cart; layout.FontScale = preset.FontScale;
+            if (!Themes.IdentityAllowed) { layout.Mode = layout.Surface = layout.Shape = layout.Font = layout.Depth = null; }
+            LocalTheme.Save(layout, Me.Id);
+        }
+        else if (id == "standard") LocalTheme.Reset(Me.Id);
+        ShopLook.Save(id, Me.Id);
         Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
     });
 

@@ -51,6 +51,29 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+## One program for every customer (the customer folder)
+
+The website is **one finished program, the same for every customer**. Nothing of a customer is built into it. What belongs to one
+customer is a folder, read when the website starts (not when it is built):
+
+- **Where:** the folder named by the setting `NGOS_CUSTOMER_DIR`; else `./customer`, then `../customer`, next to where the
+  website runs. In a website package it is `customer/` beside `app/` and `node/`, and the start program points at it.
+- **What is in it** (everything optional; nothing is a secret): `brand.json` (name, tagline, colours, country, industry,
+  language, contact lines, web address, logo), `website-settings.env` (the `NEXT_PUBLIC_*` public settings the Setup Studio
+  writes; they win over `brand.json`), `setup.json` (name, country and kind of business, shared with the shop program),
+  `theme.json` (not used here yet) and `assets/` (the logo and a favicon).
+- **How it is checked:** `src/lib/customer/rules.mjs` holds the rules (the same file the package maker and the assemble step
+  use, and a copy of it travels in the package): a value that fails is left out and named once in the log, and the rest still
+  counts. The server puts the checked values into every page (`window.__NGOS_SETTINGS__`) and at `/api/settings`; the logo is
+  served at `/customer-assets/<file>`. Modules read them with `getSettings()` (`src/lib/customer/settings.ts`).
+- **With no folder** the website is neutral: no name, no country, no money symbol, the general kind of business ("Items").
+- **For a developer:** with no folder, the old `NEXT_PUBLIC_*` values in the computer's environment still work (see
+  `.env.example`), and `vitest.setup.ts` uses them to give the tests a shop in India that sells products. A production package
+  needs none of them.
+
+Making a customer's website from this program is *assembling*, not building: `scripts/assemble-website.mjs` (see
+`docs/CUSTOMER-BUILDS.md`).
+
 ## Live shop (the owner's live view)
 
 `/admin/live`, linked as **Live shop** in the admin menu, shows the shop's figures from the POS, live, from anywhere:
@@ -100,8 +123,9 @@ owner's Supabase sign-in.
      separate file of every release from 2.17.1, and also in each release's `SmartRetail-OwnerView.zip`) in the SQL
      Editor. Running it again is safe, and needed after an update (2.2.0 added the questions to the shop's AI, 2.17.0
      the weekly review, 2.18.0 the products for this website and the main PC).
-  2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the website's environment (see
-     `.env.example`), then deploy again. Never the secret key: the page refuses it.
+  2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to `website-settings.env` in the
+     website's customer folder (see "One program for every customer" below), then start the website again. Never the
+     secret key: the server drops it and the page says the live shop is not set up.
   3. In Supabase, *Authentication*, then *URL Configuration*: set the Site URL to `https://demomart99.com/admin/live`
      (and add it to the Redirect URLs), so the sign-up and new-password e-mails come back to Live shop.
   4. Open Live shop, create the owner's account and name the shop. Then, in Supabase, *Authentication*, then

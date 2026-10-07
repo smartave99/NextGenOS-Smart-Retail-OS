@@ -174,3 +174,11 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-07 14:45 (about; sent while assistants were working)
 
 > make sure software has longitudnal and well as lateral look because when people using software they like longitudnal and when using touch screen then latitudnal
+
+### 2026-10-07 14:55 (about; sent while an assistant was working; the same wish as the one above, repeated)
+
+> continue start from where stopped and make sure software has longitudnal and well as lateral look because when people using software they like longitudnal and when using touch screen then latitudnal
+
+### 2026-10-07 14:56 (about; the owner's answer to the question "What do you mean by the longitudinal look?", chosen from three readings)
+
+> A vertical, list-style look on a normal monitor

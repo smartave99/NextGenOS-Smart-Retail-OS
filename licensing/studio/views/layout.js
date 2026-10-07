@@ -41,9 +41,14 @@ function ago(ts, now) {
 function statusOf(lic, now) {
   if (lic.status === 'revoked') return { key: 'withdrawn', label: 'Withdrawn', cls: 'bad' };
   if (lic.status === 'suspended') return { key: 'hold', label: 'On hold', cls: 'warn' };
-  if (lic.exp && lic.exp < now) return { key: 'ended', label: 'Ended', cls: 'muted' };
+  if (lic.exp && lic.exp < now) {
+    // A paid licence that is set to carry on keeps working with a banner; a trial and a licence set to stop do not.
+    return lic.on_end === 'banner' && !lic.trial
+      ? { key: 'ended-working', label: 'Ended, still working', cls: 'warn' }
+      : { key: 'ended', label: lic.trial ? 'Trial ended' : 'Ended', cls: 'muted' };
+  }
   if (lic.nbf > now) return { key: 'later', label: 'Starts ' + fmtDate(lic.nbf), cls: 'info' };
-  if (lic.exp && lic.exp - now < 30 * 86400) return { key: 'soon', label: 'Ends soon', cls: 'warn' };
+  if (lic.exp && lic.exp - now < 30 * 86400) return { key: 'soon', label: lic.trial ? 'Trial ends soon' : 'Ends soon', cls: 'warn' };
   return { key: 'active', label: lic.trial ? 'Trial' : 'Active', cls: lic.trial ? 'info' : 'ok' };
 }
 const badge = (s) => html`<span class="badge ${s.cls}">${s.label}</span>`;
@@ -66,6 +71,7 @@ function page(title, body, ctx, active = '') {
       ${item('/brands', 'Brands', 'brands', 'brands.view')}
       ${item('/plans', 'Plans', 'plans', 'plans.manage')}
       ${item('/users', 'Team', 'users', 'users.manage')}
+      ${item('/service-accounts', 'Service accounts', 'service-accounts', 'users.manage')}
       ${item('/audit', 'History', 'audit', 'audit.view')}
       ${item('/settings', 'Settings', 'settings', 'settings.manage')}
       ${item('/help', 'Help', 'help')}

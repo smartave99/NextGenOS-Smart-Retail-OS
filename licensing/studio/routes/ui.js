@@ -16,7 +16,7 @@ const PRE_COOKIE = 'ngos_pre';
 const STATIC_DIR = path.join(__dirname, '..', 'public');
 const STATIC_TYPES = { '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
-function createUi({ studio, auth, db, config, clientIp, isSecure, clock, dataDir }) {
+function createUi({ studio, auth, accounts, db, config, clientIp, isSecure, clock, dataDir }) {
   const loginLimiter = new H.RateLimiter(10, 600, clock);
   const routes = [];
   const route = (method, pattern, handler, opts = {}) => {
@@ -64,6 +64,7 @@ function createUi({ studio, auth, db, config, clientIp, isSecure, clock, dataDir
       }
       const lic = studio.createLicence({
         customerId, planCode: f.planCode, term: f.term, startDate: f.startDate,
+        trialDays: f.term === 'trial' || f.term === 'trial30' ? num(f.trialDays) : undefined, onEnd: f.onEnd,
         devices: num(f.devices), stores: num(f.stores), users: num(f.users),
         bindMode: f.bindMode, domains: f.domains, brandId: f.brandId, resellerId: f.resellerId,
         whiteLevel: f.whiteLevel, offline: f.offline === 'on', notes: f.notes,
@@ -84,6 +85,7 @@ function createUi({ studio, auth, db, config, clientIp, isSecure, clock, dataDir
     const history = db.prepare('SELECT * FROM audit WHERE target LIKE ? ORDER BY ts DESC LIMIT 30').all(`${lic.lid}%`);
     return c.html(P.licenceView(c.ctx, {
       lic, customer, plan: studio.getPlan(lic.plan_code), brand, reseller, devices: studio.listActivations(lic.lid), history,
+      pcHistory: studio.history(lic.lid), moves: studio.moves(lic.lid),
       message: studio.customerMessage(lic), plans: studio.listPlans(),
     }));
   }, { perm: 'licences.view' });
@@ -99,13 +101,15 @@ function createUi({ studio, auth, db, config, clientIp, isSecure, clock, dataDir
   route('POST', '/licences/:lid/renew', (c) => { studio.updateLicence(c.params.lid, { extendTerm: c.form.extendTerm }, c.user, c.ip); return ok(c.res, back(c), 'The licence is renewed.'); }, { perm: 'licences.change' });
   route('POST', '/licences/:lid/change', (c) => {
     const f = c.form;
-    studio.updateLicence(c.params.lid, { planCode: f.planCode, devices: num(f.devices), stores: num(f.stores), users: num(f.users), whiteLevel: f.whiteLevel, notes: f.notes }, c.user, c.ip);
+    studio.updateLicence(c.params.lid, { planCode: f.planCode, devices: num(f.devices), stores: num(f.stores), users: num(f.users), whiteLevel: f.whiteLevel, onEnd: f.onEnd, notes: f.notes }, c.user, c.ip);
     return ok(c.res, back(c), 'Saved. Online PCs pick this up at their next check-in.');
   }, { perm: 'licences.change' });
+  route('POST', '/licences/:lid/extend', (c) => { studio.extendDays(c.params.lid, c.form.days, c.user, c.ip); return ok(c.res, back(c), 'The end date is moved. Online PCs pick this up at their next check-in.'); }, { perm: 'licences.change' });
+  route('POST', '/licences/:lid/convert', (c) => { studio.convertTrial(c.params.lid, { term: c.form.term }, c.user, c.ip); return ok(c.res, back(c), 'The trial is now a paid licence. Online PCs pick this up at their next check-in.'); }, { perm: 'licences.change' });
   route('POST', '/licences/:lid/suspend', (c) => { studio.setStatus(c.params.lid, 'suspended', c.form.reason, c.user, c.ip); return ok(c.res, back(c), 'The licence is on hold.'); }, { perm: 'licences.hold' });
   route('POST', '/licences/:lid/resume', (c) => { studio.setStatus(c.params.lid, 'active', '', c.user, c.ip); return ok(c.res, back(c), 'The hold is released.'); }, { perm: 'licences.hold' });
   route('POST', '/licences/:lid/revoke', (c) => { studio.setStatus(c.params.lid, 'revoked', c.form.reason, c.user, c.ip); return ok(c.res, back(c), 'The licence is withdrawn.'); }, { perm: 'licences.hold' });
-  route('POST', '/licences/:lid/free/:id', (c) => { studio.freeDevice(Number(c.params.id), c.user, c.ip); return ok(c.res, back(c), 'The PC is released. The customer can activate another one.'); }, { perm: 'devices.free' });
+  route('POST', '/licences/:lid/free/:id', (c) => { studio.freeDevice(Number(c.params.id), c.user, c.ip, c.form.reason, c.params.lid); return ok(c.res, back(c), 'The PC is released. The customer can activate another one.'); }, { perm: 'devices.free' });
 
   route('GET', '/customers', (c) => c.html(P.customers(c.ctx, { list: studio.listCustomers(c.url.searchParams.get('q') || ''), q: c.url.searchParams.get('q') || '' })), { perm: 'customers.view' });
   route('GET', '/customers/:id', (c) => {
@@ -166,6 +170,25 @@ function createUi({ studio, auth, db, config, clientIp, isSecure, clock, dataDir
     auth.setPassword(user.id, password, true);
     studio.audit(c.user, 'user.reset', user.email, '', c.ip);
     return c.html(P.users(c.ctx, { list: auth.listUsers(), temp: { email: user.email, password } }));
+  }, { perm: 'users.manage' });
+
+  // Sign-ins for tools such as the main Setup Studio (the staff API). Only an administrator makes or switches them off.
+  route('GET', '/service-accounts', (c) => c.html(P.serviceAccounts(c.ctx, { list: accounts.list() })), { perm: 'users.manage' });
+  route('POST', '/service-accounts', (c) => {
+    let made;
+    try {
+      made = accounts.create({ name: c.form.name, role: c.form.role, createdBy: c.user.email });
+    } catch (e) {
+      return fail(c.res, '/service-accounts', e.message);
+    }
+    studio.audit(c.user, 'service-account.create', made.name, `role ${made.role}`, c.ip);
+    return c.html(P.serviceAccounts(c.ctx, { list: accounts.list(), made }));
+  }, { perm: 'users.manage' });
+  route('POST', '/service-accounts/:id/off', (c) => {
+    let a;
+    try { a = accounts.revoke(Number(c.params.id)); } catch (e) { return fail(c.res, '/service-accounts', e.message); }
+    studio.audit(c.user, 'service-account.off', a.name, '', c.ip);
+    return ok(c.res, '/service-accounts', `${a.name} is switched off. Its token does not work any more.`);
   }, { perm: 'users.manage' });
 
   route('GET', '/audit', (c) => c.html(P.audit(c.ctx, { rows: db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 300').all() })), { perm: 'audit.view' });

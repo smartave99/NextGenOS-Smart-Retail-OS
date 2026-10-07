@@ -1,57 +1,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { open, now } = require('../lib/db');
-const keystore = require('../lib/keystore');
-const { Auth } = require('../lib/auth');
-const { createApp } = require('../src/app');
 const C = require('../lib/crypto');
 const { fp } = require('./helpers');
-
-/** Starts a real Studio on a random port with a fresh data folder, an administrator and a salesperson. */
-async function start() {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-http-'));
-  const db0 = open(dataDir);
-  keystore.createKey(db0, dataDir, now());
-  const auth0 = new Auth(db0);
-  auth0.createUser({ email: 'boss@example.com', name: 'Boss', role: 'admin', password: 'Correct-Horse-9' });
-  auth0.createUser({ email: 'sam@example.com', name: 'Sam', role: 'sales', password: 'Correct-Horse-9' });
-  auth0.createUser({ email: 'sue@example.com', name: 'Sue', role: 'support', password: 'Correct-Horse-9' });
-  db0.close();
-  const app = createApp({ dataDir });
-  await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${app.server.address().port}`;
-  return { app, base, dataDir, stop: () => new Promise((r) => app.server.close(r)) };
-}
-
-/** A tiny browser: keeps cookies, follows nothing, reads the CSRF token out of pages. */
-class Browser {
-  constructor(base) { this.base = base; this.jar = {}; }
-  async fetch(p, opts = {}) {
-    const headers = { ...(opts.headers || {}), cookie: Object.entries(this.jar).map(([k, v]) => `${k}=${v}`).join('; ') };
-    const res = await fetch(this.base + p, { redirect: 'manual', ...opts, headers });
-    for (const c of res.headers.getSetCookie()) {
-      const [pair] = c.split(';');
-      const i = pair.indexOf('=');
-      const value = pair.slice(i + 1);
-      if (/Max-Age=0/i.test(c)) delete this.jar[pair.slice(0, i)]; else this.jar[pair.slice(0, i)] = value;
-    }
-    return res;
-  }
-  async csrf(p) { const html = await (await this.fetch(p)).text(); const m = /name="_csrf" value="([^"]+)"/.exec(html); return m && m[1]; }
-  async post(p, form, csrfFrom = p) {
-    const token = await this.csrf(csrfFrom);
-    return this.fetch(p, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ _csrf: token, ...form }).toString() });
-  }
-  async login(email, password = 'Correct-Horse-9') {
-    const res = await this.post('/login', { email, password }, '/login');
-    assert.equal(res.status, 303, 'login should redirect');
-    return res;
-  }
-}
+const { start, Browser } = require('./browser');
 
 test('pages need a sign-in; the sign-in page is hardened', async () => {
   const s = await start();
@@ -123,9 +75,10 @@ test('sales can sell and look up, but cannot reach admin pages or withdraw a lic
     assert.equal(tooMany.status, 200);
     assert.match(await tooMany.text(), /allows up to 10 PCs/);
 
-    // Perpetual and full re-brand are not offered to sales.
+    // No end date is the normal paid licence and is offered to sales; a full re-brand is not.
     const page = await (await b.fetch('/licences/new')).text();
-    assert.ok(!page.includes('value="perpetual"'));
+    assert.ok(page.includes('value="perpetual"'));
+    assert.ok(page.includes('value="trial"'));
     assert.ok(!page.includes('Full re-brand'));
   } finally { await s.stop(); }
 });
@@ -155,8 +108,18 @@ test('administrator: whole path from sale to activation, PC release, hold, withd
     const view = await (await admin.fetch(`/licences/${lid}`)).text();
     assert.match(view, /COUNTER-1/);
     const actId = /\/free\/(\d+)/.exec(view)[1];
-    assert.equal((await admin.post(`/licences/${lid}/free/${actId}`, {}, `/licences/${lid}`)).status, 303);
+    // Freeing a PC needs a reason: without one nothing is freed and the page says why.
+    const noReason = await admin.post(`/licences/${lid}/free/${actId}`, {}, `/licences/${lid}`);
+    assert.equal(noReason.status, 303);
+    assert.match(decodeURIComponent(noReason.headers.get('location')), /say why/i);
+    assert.equal((await call('/api/v1/activate', { key: lic.licence_key, fp: fp('counter-2'), host: 'COUNTER-2' })).status, 409);
+    assert.equal((await admin.post(`/licences/${lid}/free/${actId}`, { reason: 'the old counter PC broke' }, `/licences/${lid}`)).status, 303);
     assert.equal((await call('/api/v1/activate', { key: lic.licence_key, fp: fp('counter-2'), host: 'COUNTER-2' })).status, 200);
+    // The licence page shows who freed what, and why.
+    const after = await (await admin.fetch(`/licences/${lid}`)).text();
+    assert.match(after, /Staff freed a PC: COUNTER-1/);
+    assert.match(after, /the old counter PC broke/);
+    assert.match(after, /boss@example\.com/);
 
     // Hold: check-in fails with "suspended", the list shows the licence.
     await admin.post(`/licences/${lid}/suspend`, { reason: 'unpaid' }, `/licences/${lid}`);

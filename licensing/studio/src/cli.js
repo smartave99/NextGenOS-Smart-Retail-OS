@@ -10,6 +10,7 @@ const { open, now } = require('../lib/db');
 const keystore = require('../lib/keystore');
 const { Studio, ApiError } = require('../lib/studio');
 const { Auth } = require('../lib/auth');
+const { ServiceAccounts } = require('../lib/service-accounts');
 const C = require('../lib/crypto');
 
 // Where the programs' source files are (the tests point this at a copy).
@@ -122,11 +123,46 @@ const commands = {
     const { db, studio } = openStudio();
     let customer = db.prepare('SELECT * FROM customers WHERE name = ?').get(flags.customer);
     if (!customer) customer = studio.createCustomer({ name: flags.customer, country: flags.country, email: flags.email }, actor, 'cli');
+    // A paid licence has no end date unless --term gives one (y1, y2, y3); --term trial (14 days, or --trial-days N) makes a trial that stops at its end.
     const lic = studio.createLicence({
-      customerId: customer.id, planCode: flags.plan || 'business', term: flags.term || 'y1', devices: flags.devices, stores: flags.stores, users: flags.users,
+      customerId: customer.id, planCode: flags.plan || 'business', term: flags.term === true ? undefined : flags.term,
+      trialDays: flags['trial-days'] === true ? undefined : flags['trial-days'], onEnd: flags['on-end'] === true ? undefined : flags['on-end'],
+      devices: flags.devices, stores: flags.stores, users: flags.users,
       bindMode: flags.bind || 'device', domains: flags.domains, offline: !!flags.offline, whiteLevel: flags.white || 'theme', startDate: flags.start, brandId: flags.brand,
     }, actor, 'cli');
-    console.log(JSON.stringify({ lid: lic.lid, key: lic.licence_key, exp: lic.exp }));
+    console.log(JSON.stringify({ lid: lic.lid, key: lic.licence_key, exp: lic.exp, trial: lic.trial, onEnd: lic.on_end }));
+    db.close();
+  },
+
+  async extend(flags, [lid]) {
+    const { db, studio } = openStudio();
+    const l = studio.extendDays(lid, flags.days, actor, 'cli');
+    console.log(JSON.stringify({ lid: l.lid, exp: l.exp, rev: l.rev }));
+    db.close();
+  },
+
+  async convert(flags, [lid]) {
+    const { db, studio } = openStudio();
+    const l = studio.convertTrial(lid, { term: flags.term === true ? undefined : flags.term }, actor, 'cli');
+    console.log(JSON.stringify({ lid: l.lid, exp: l.exp, trial: l.trial, onEnd: l.on_end, rev: l.rev }));
+    db.close();
+  },
+
+  // service-account create --name "Main Studio" --role sales | list | off <id>
+  async 'service-account'(flags, [sub, id]) {
+    const { db, studio } = openStudio();
+    const accounts = new ServiceAccounts(db);
+    if (sub === 'create') {
+      const made = accounts.create({ name: flags.name, role: flags.role || 'sales', createdBy: 'cli' });
+      studio.audit(actor, 'service-account.create', made.name, `role ${made.role}`, 'cli');
+      console.log(`Created "${made.name}" (role ${made.role}).\nToken (shown once, keep it safe): ${made.token}`);
+    } else if (sub === 'list') {
+      for (const a of accounts.list()) console.log(`${String(a.id).padEnd(4)} ${a.active ? 'on ' : 'off'}  ${a.role.padEnd(8)} ${a.name}  (${a.token_hint}...)`);
+    } else if (sub === 'off') {
+      const a = accounts.revoke(Number(id));
+      studio.audit(actor, 'service-account.off', a.name, '', 'cli');
+      console.log(`${a.name} is switched off.`);
+    } else throw new Error('Use: service-account create --name "Main Studio" --role sales|support|admin  |  list  |  off <id>');
     db.close();
   },
 
@@ -161,8 +197,9 @@ const commands = {
 
   async 'free-devices'(flags, [lid]) {
     const { db, studio } = openStudio();
+    if (!flags.reason || flags.reason === true) throw new Error('Say why: free-devices <licence id> --reason "The old computer broke"');
     let n = 0;
-    for (const a of studio.listActivations(lid)) if (a.active) { studio.freeDevice(a.id, actor, 'cli'); n += 1; }
+    for (const a of studio.listActivations(lid)) if (a.active) { studio.freeDevice(a.id, actor, 'cli', flags.reason, lid); n += 1; }
     console.log(`Released ${n} PC(s).`);
     db.close();
   },
@@ -242,7 +279,7 @@ async function main() {
   const { positional, flags } = parseArgs(process.argv.slice(2));
   const name = positional.shift();
   if (!name || !commands[name]) {
-    console.log('NextGenOS Licence Studio: command line\n\nCommands:\n  init                    create the signing key and the first administrator\n  add-user                --email --name --role sales|support|admin\n  reset-password <email>\n  create-licence          --customer "Name" --plan business --term y1 [--devices N] [--bind domain --domains a.com]\n  list | status\n  revoke|suspend|resume <licence id> [--reason "..."]\n  licence-file <licence id>   |   create-brand --name X [--primary #112233]\n  renew <licence id> [--term y1]   |   change <licence id> [--devices N --plan business]\n  free-devices <licence id>\n  offline-activate <request code>\n  sync-clients --url https://licence.example.com   build the public key into the apps\n  apply-public-keys --keys @keys.json --url https://licence.example.com   the same, on a machine without the Studio (release build)\n  export-public-keys\n  backup [file]\n');
+    console.log('NextGenOS Licence Studio: command line\n\nCommands:\n  init                    create the signing key and the first administrator\n  add-user                --email --name --role sales|support|admin\n  reset-password <email>\n  create-licence          --customer "Name" --plan business [--term y1|y2|y3|trial] [--trial-days 14] [--on-end banner|stop]\n                          [--devices N] [--bind domain --domains a.com]   (no --term: a paid licence with no end date; a trial always stops)\n  list | status\n  revoke|suspend|resume <licence id> [--reason "..."]\n  licence-file <licence id>   |   create-brand --name X [--primary #112233]\n  renew <licence id> [--term y1]   |   change <licence id> [--devices N --plan business]\n  extend <licence id> --days N     add days to the end date (or to today when it has ended)\n  convert <licence id> [--term y1] turn a trial into a paid licence (no end date unless --term)\n  free-devices <licence id> --reason "..."\n  service-account create --name "Main Studio" --role sales|support|admin   |   list   |   off <id>\n  offline-activate <request code>\n  sync-clients --url https://licence.example.com   build the public key into the apps\n  apply-public-keys --keys @keys.json --url https://licence.example.com   the same, on a machine without the Studio (release build)\n  export-public-keys\n  backup [file]\n');
     process.exit(name ? 1 : 0);
   }
   try {

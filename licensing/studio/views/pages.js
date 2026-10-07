@@ -14,7 +14,22 @@ const WHITE_LABELS = {
   theme: 'Customer can set shop name, logo, colours and receipts',
   full: 'Full re-brand (reseller): can also change the product name',
 };
+const TERM_HINTS = {
+  perpetual: 'The customer pays once and the program works for good.',
+  y1: 'A licence with an end date.', y2: 'A licence with an end date.', y3: 'A licence with an end date.',
+  trial: 'To try the product. It stops at its end date.',
+};
+const ON_END_LABELS = {
+  banner: 'The program keeps working and shows a banner',
+  stop: 'The program stops',
+};
 const moduleTags = (list) => list.map((m) => html`<span class="tag">${MODULE_LABELS[m] || m}</span>`);
+const eventText = (e) => {
+  if (e.kind === 'activated') return `A PC was activated${e.host ? ': ' + e.host : ''}`;
+  if (e.kind === 'client_deactivate') return `The customer moved the licence off a PC${e.host ? ': ' + e.host : ''}`;
+  if (e.kind === 'staff_free') return `Staff freed a PC${e.host ? ': ' + e.host : ''}`;
+  return e.kind;
+};
 
 function login(ctx, { email = '' } = {}) {
   const body = html`
@@ -117,9 +132,20 @@ function licenceNew(ctx, { plans, customers, brands, resellers, values = {}, err
             <strong>${p.name}</strong><small>${p.description}</small><div>${moduleTags(p.modules)}</div></label>`)}
         </div>
       </li>
-      <li><h3>For how long?</h3>
+      <li><h3>What kind of licence is it?</h3>
         <div class="choices" role="radiogroup" aria-label="Term">
-          ${Object.entries(TERMS).filter(([, t]) => !t.adminOnly || isAdmin).map(([k, t]) => html`<label class="choice"><input type="radio" name="term" value="${k}" ${v('term', 'y1') === k ? raw('checked') : ''}> <strong>${t.label}</strong>${t.trial ? html`<small>To try the product.</small>` : ''}</label>`)}
+          ${Object.entries(TERMS).filter(([, t]) => !t.legacy).map(([k, t]) => html`<label class="choice"><input type="radio" name="term" value="${k}" ${v('term', 'perpetual') === k ? raw('checked') : ''}> <strong>${t.label}</strong><small>${TERM_HINTS[k] || ''}</small></label>`)}
+        </div>
+        <div id="trial-box" class="hidden">
+          <label for="trialDays">How many days is the trial? <span class="hint">(14 unless this customer needs longer or shorter)</span></label>
+          <input id="trialDays" name="trialDays" type="number" min="1" max="365" value="${v('trialDays', '14')}">
+        </div>
+        <div id="onend-box">
+          <label for="onEnd">When the end date comes</label>
+          <select id="onEnd" name="onEnd">
+            ${Object.entries(ON_END_LABELS).map(([k, label]) => html`<option value="${k}" ${v('onEnd', 'banner') === k ? raw('selected') : ''}>${label}</option>`)}
+          </select>
+          <p class="hint" id="onend-hint">A trial always stops at its end date. A paid licence keeps working and shows a banner, unless you choose to stop it.</p>
         </div>
         <label for="startDate">Starts on <span class="hint">(leave empty to start today)</span></label>
         <input id="startDate" name="startDate" type="date" value="${v('startDate')}">
@@ -166,11 +192,12 @@ function licenceNew(ctx, { plans, customers, brands, resellers, values = {}, err
   return page('New licence', body, ctx2, 'licences');
 }
 
-function licenceView(ctx, { lic, customer, plan, brand, reseller, devices, history, message, plans }) {
+function licenceView(ctx, { lic, customer, plan, brand, reseller, devices, history, pcHistory = [], moves = { used: 0, allowed: 2, windowDays: 365 }, message, plans }) {
   const now = ctx.now;
   const st = statusOf(lic, now);
   const isAdmin = ctx.user.role === 'admin';
   const canChange = ctx.can('licences.change');
+  const endsText = lic.exp ? (lic.on_end === 'banner' && !lic.trial ? 'Keeps working and shows a banner' : 'The program stops') : 'Never (no end date)';
   const body = html`
   <div class="row between"><div>
       <p class="muted"><a href="/licences">Licences</a> › <a href="/customers/${customer.id}">${customer.name}</a></p>
@@ -197,13 +224,15 @@ function licenceView(ctx, { lic, customer, plan, brand, reseller, devices, histo
         <dt>PCs</dt><dd>${lic.limits.devices || 'any number'}</dd>
         <dt>Shops</dt><dd>${lic.limits.stores || 'any number'}</dd>
         <dt>People</dt><dd>${lic.limits.users || 'any number'}</dd>
+        <dt>Kind</dt><dd>${lic.trial ? 'Trial' : 'Paid'}</dd>
         <dt>Starts</dt><dd>${fmtDate(lic.nbf)}</dd>
         <dt>Ends</dt><dd>${lic.exp ? fmtDate(lic.exp) : 'no end date'}</dd>
+        <dt>At the end date</dt><dd>${endsText}</dd>
         <dt>Tied to</dt><dd>${lic.bind.mode === 'device' ? 'Windows PCs' : lic.bind.mode === 'domain' ? 'Website: ' + lic.bind.domains.join(', ') : 'Nothing (special)'}</dd>
         <dt>Look</dt><dd>${WHITE_LABELS[lic.white_level] || lic.white_level}</dd>
         <dt>Brand</dt><dd>${brand ? brand.name : 'NextGenOS'}</dd>
         <dt>Reseller</dt><dd>${reseller ? reseller.name : 'Direct'}</dd>
-        <dt>Internet</dt><dd>${lic.act.online ? 'Checks in every ' + lic.act.checkInDays + ' days' : 'Works offline'}</dd>
+        <dt>Internet</dt><dd>${lic.act.online ? `Checks in every ${lic.act.checkInDays} days; if it cannot, warnings for ${lic.act.graceDays} days, then it asks for a check-in or an offline code` : 'Works offline'}</dd>
         <dt>Revision</dt><dd>${lic.rev}</dd>
       </dl>
       ${lic.notes ? html`<p class="muted">Notes: ${lic.notes}</p>` : ''}
@@ -218,17 +247,23 @@ function licenceView(ctx, { lic, customer, plan, brand, reseller, devices, histo
     ${devices.length ? html`<div class="table-wrap"><table><thead><tr><th>PC</th><th>Program version</th><th>First activated</th><th>Last seen</th><th>Status</th><th></th></tr></thead><tbody>
       ${devices.map((d) => html`<tr><td>${d.host || 'unknown'}</td><td>${d.version || '-'}</td><td>${fmtDate(d.first_seen)}</td><td>${ago(d.last_checkin, now)}</td>
         <td>${d.active ? html`<span class="badge ok">In use</span>` : html`<span class="badge muted">Released</span>`}</td>
-        <td>${d.active && ctx.can('devices.free') ? html`<form method="post" action="/licences/${lic.lid}/free/${d.id}" data-confirm="Release this PC? It will need to be activated again.">${csrfField(ctx.csrf)}<button class="btn" type="submit">Free this PC</button></form>` : ''}</td></tr>`)}
+        <td>${d.active && ctx.can('devices.free') ? html`<form method="post" action="/licences/${lic.lid}/free/${d.id}" class="row" data-confirm="Release this PC? It will need to be activated again.">${csrfField(ctx.csrf)}<input name="reason" type="text" required maxlength="200" placeholder="Why? (for example: the old computer broke)" aria-label="Reason for freeing this PC"><button class="btn" type="submit">Free this PC</button></form>` : ''}</td></tr>`)}
     </tbody></table></div>` : html`<p class="muted">Not activated on any PC yet.</p>`}
-    <p class="hint">"Free this PC" is for a customer who changed or lost a computer: it makes room for another one.</p>
+    <p class="hint">"Free this PC" is for a customer who changed or lost a computer: it makes room for another one. Staff can do it as often as needed, but the reason is written down with your name.</p>
+    <p class="hint">The customer can also free an old PC from the program themselves, up to ${moves.allowed} times in any ${moves.windowDays} days. Used so far: <strong>${moves.used} of ${moves.allowed}</strong>. After that they must ask you.</p>
+  </section>
+  <section class="card"><h2>PC history</h2>
+    ${pcHistory.length ? html`<div class="table-wrap"><table><thead><tr><th>When</th><th>What</th><th>Who</th><th>Why</th></tr></thead><tbody>
+      ${pcHistory.map((e) => html`<tr><td>${fmtDateTime(e.ts)}</td><td>${eventText(e)}</td><td>${e.actor}</td><td>${e.reason}</td></tr>`)}
+    </tbody></table></div>` : html`<p class="muted">No PC has been activated, moved or freed yet.</p>`}
   </section>` : ''}
 
   ${canChange && lic.status !== 'revoked' ? html`<section class="card"><h2>Renew or change</h2>
     <div class="grid cols-2">
       <form method="post" action="/licences/${lic.lid}/renew">${csrfField(ctx.csrf)}
         <label for="extendTerm">Renew for</label>
-        <select id="extendTerm" name="extendTerm">${Object.entries(TERMS).filter(([k, t]) => !t.trial && (!t.adminOnly || isAdmin)).map(([k, t]) => html`<option value="${k}">${t.label}</option>`)}</select>
-        <p class="hint">If it has not ended yet, the time is added to the end date.</p>
+        <select id="extendTerm" name="extendTerm">${Object.entries(TERMS).filter(([k, t]) => !t.trial).map(([k, t]) => html`<option value="${k}">${t.label}</option>`)}</select>
+        <p class="hint">If it has not ended yet, the time is added to the end date.${lic.trial ? ' Renewing a trial makes it a paid licence.' : ''}</p>
         <button class="btn primary" type="submit">Renew</button></form>
       <form method="post" action="/licences/${lic.lid}/change">${csrfField(ctx.csrf)}
         <label for="planCode">Plan</label>
@@ -238,8 +273,24 @@ function licenceView(ctx, { lic, customer, plan, brand, reseller, devices, histo
         <div><label for="c-users">People</label><input id="c-users" name="users" type="number" min="0" value="${lic.limits.users}"></div></div>
         <label for="c-white">Look</label>
         <select id="c-white" name="whiteLevel">${['none', 'theme', ...(isAdmin ? ['full'] : [])].map((k) => html`<option value="${k}" ${lic.white_level === k ? raw('selected') : ''}>${WHITE_LABELS[k]}</option>`)}</select>
+        ${lic.trial ? '' : html`<label for="c-onend">When the end date comes</label>
+        <select id="c-onend" name="onEnd">${Object.entries(ON_END_LABELS).map(([k, label]) => html`<option value="${k}" ${lic.on_end === k ? raw('selected') : ''}>${label}</option>`)}</select>`}
         <label for="c-notes">Notes</label><textarea id="c-notes" name="notes" rows="3">${lic.notes}</textarea>
         <p><button class="btn" type="submit">Save changes</button></p></form>
+    </div>
+    <div class="grid cols-2">
+      ${lic.exp ? html`<form method="post" action="/licences/${lic.lid}/extend">${csrfField(ctx.csrf)}
+        <h3>${lic.trial ? 'Extend the trial' : 'Extend the end date'}</h3>
+        <label for="extend-days">Add this many days</label>
+        <input id="extend-days" name="days" type="number" min="1" max="3650" value="${lic.trial ? 7 : 30}" required>
+        <p class="hint">${lic.exp < now ? 'It has ended, so the days count from today.' : 'The days are added to the end date.'}</p>
+        <button class="btn" type="submit">Extend</button></form>` : ''}
+      ${lic.trial ? html`<form method="post" action="/licences/${lic.lid}/convert" data-confirm="Turn this trial into a paid licence?">${csrfField(ctx.csrf)}
+        <h3>Turn the trial into a paid licence</h3>
+        <label for="convert-term">The paid licence lasts</label>
+        <select id="convert-term" name="term">${Object.entries(TERMS).filter(([k, t]) => !t.trial).map(([k, t]) => html`<option value="${k}">${t.label}</option>`)}</select>
+        <p class="hint">The customer bought it. With no end date it works for good; with an end date it keeps working and shows a banner after it.</p>
+        <button class="btn primary" type="submit">Turn into paid licence</button></form>` : ''}
     </div>
     <p class="hint">Changes reach online PCs at their next check-in. For a PC without Internet, send the new licence file.</p>
   </section>` : ''}
@@ -275,6 +326,7 @@ function customerView(ctx, { customer, licences }) {
   <p class="muted"><a href="/customers">Customers</a> ›</p><h1>${customer.name}</h1>
   <div class="grid cols-2">
   <section class="card"><h2>Details</h2>
+    ${customer.external_id ? html`<p class="muted">Id in the main Setup Studio: <span class="mono">${customer.external_id}</span></p>` : ''}
     <form method="post" action="/customers/${customer.id}">${csrfField(ctx.csrf)}
       <label for="c-name">Business name</label><input id="c-name" name="name" type="text" value="${customer.name}" required>
       <label for="c-country">Country</label><input id="c-country" name="country" type="text" value="${customer.country}">
@@ -388,6 +440,35 @@ function users(ctx, { list, temp }) {
   return page('Team', body, ctx, 'users');
 }
 
+const ACCOUNT_ROLE_HELP = {
+  sales: 'Shows licences, makes licences within the plan limits, extends, turns trials into paid licences and frees PCs.',
+  support: 'Shows licences and frees PCs. Cannot make or change a licence.',
+  admin: 'Everything above, and can switch a licence off and on, and go beyond the plan limits. Use only when it is really needed.',
+};
+
+function serviceAccounts(ctx, { list, made }) {
+  const now = ctx.now;
+  const body = html`
+  <h1>Service accounts</h1>
+  <p class="lead">Sign-ins for tools, not people. The main Setup Studio uses one to show a client's licence and press its buttons. It never gets a signing key.</p>
+  ${made ? html`<div class="flash ok" role="status"><strong>${made.name}</strong> is ready. Copy its token now: <strong>it is shown only this once</strong> and cannot be shown again (only a scrambled copy is kept). If it is lost, switch the account off and make a new one.
+    <p><span class="keybox" id="the-token">${made.token}</span></p><p><button class="btn" type="button" data-copy="#the-token">Copy token</button></p>
+    <p class="muted">Put it in the main Studio's settings, together with this Studio's address. It is sent as <span class="mono">Authorization: Bearer ...</span> on every call.</p></div>` : ''}
+  <div class="card table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Token starts with</th><th>Last used</th><th>Made</th><th></th></tr></thead><tbody>
+    ${list.length ? list.map((a) => html`<tr><td>${a.name}${a.active ? '' : html` <span class="badge muted">Switched off</span>`}</td><td>${ROLE_LABELS[a.role] || a.role}</td><td class="mono">${a.token_hint}…</td>
+      <td>${a.last_used_at ? ago(a.last_used_at, now) : 'never'}</td><td>${fmtDate(a.created_at)}${a.created_by ? ' by ' + a.created_by : ''}</td>
+      <td>${a.active ? html`<form method="post" action="/service-accounts/${a.id}/off" data-confirm="Switch this account off? The tool that uses it will stop working until it gets a new token.">${csrfField(ctx.csrf)}<button class="btn danger" type="submit">Switch off</button></form>` : ''}</td></tr>`)
+      : html`<tr><td colspan="6" class="muted">No service account yet.</td></tr>`}
+  </tbody></table></div>
+  <form method="post" action="/service-accounts" class="card">${csrfField(ctx.csrf)}<h2>Make a service account</h2>
+    <div class="grid cols-2"><div><label for="sa-name">Name</label><input id="sa-name" name="name" type="text" maxlength="60" placeholder="Main Studio" required></div>
+    <div><label for="sa-role">Role</label><select id="sa-role" name="role">${Object.entries(ROLE_LABELS).map(([k, l]) => html`<option value="${k}" ${k === 'sales' ? raw('selected') : ''}>${l}</option>`)}</select></div></div>
+    <ul class="hint">${Object.entries(ACCOUNT_ROLE_HELP).map(([k, t]) => html`<li><strong>${ROLE_LABELS[k]}:</strong> ${t}</li>`)}</ul>
+    <p class="hint">Every call the tool makes is written on the History page with the staff member's name that the tool passes along.</p>
+    <p><button class="btn primary" type="submit">Make account and show its token</button></p></form>`;
+  return page('Service accounts', body, ctx, 'service-accounts');
+}
+
 function audit(ctx, { rows }) {
   const body = html`<h1>History</h1><p class="lead">Everything that was done, newest first.</p>
   <div class="card table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th>About</th><th>From</th></tr></thead><tbody>
@@ -409,9 +490,10 @@ function settings(ctx, { settings, keys, releaseKeys = [] }) {
     <h2>Rules for PCs</h2>
     <div class="grid cols-4">
       <div><label for="s-checkin">Check in every (days)</label><input id="s-checkin" name="check_in_days" type="number" min="1" max="60" value="${settings.check_in_days}"></div>
-      <div><label for="s-grace">Works without check-in for (days)</label><input id="s-grace" name="grace_days" type="number" min="1" max="90" value="${settings.grace_days}"></div>
+      <div><label for="s-grace">Warnings last (days)</label><input id="s-grace" name="grace_days" type="number" min="1" max="90" value="${settings.grace_days}"></div>
       <div><label for="s-offline">Offline code lasts (days)</label><input id="s-offline" name="offline_days" type="number" min="30" max="1095" value="${settings.offline_days}"></div>
     </div>
+    <p class="hint">A PC checks in about once a month (30 days). If it cannot, the owner sees warnings for 60 days; after that the program asks for a check-in or an offline code that you give by phone. These numbers are written into each new licence, so a change reaches a customer's PC at its next check-in.</p>
     <p><button class="btn primary" type="submit">Save settings</button></p></form>
 
   <section class="card"><h2>Signing keys</h2>
@@ -465,7 +547,9 @@ function help(ctx) {
   <section class="card"><h2>Common situations</h2>
     <dl class="facts">
       <dt>Renewal</dt><dd>Open the licence, choose <em>Renew for</em>, press Renew. Customers online get it by themselves.</dd>
-      <dt>New computer</dt><dd>Open the licence, press <em>Free this PC</em> next to the old one. The customer activates the new PC with the same key.</dd>
+      <dt>New computer</dt><dd>The customer can free the old PC from the program themselves, up to 2 times in any 12 months. After that, open the licence, write the reason and press <em>Free this PC</em> next to the old one. The customer activates the new PC with the same key.</dd>
+      <dt>Trial</dt><dd>Choose <em>Trial</em> when you make the licence (14 days unless you type another number). It stops at its end date. To give more time press <em>Extend</em>; when the customer buys, press <em>Turn into paid licence</em>.</dd>
+      <dt>Ended licence</dt><dd>A paid licence that has ended keeps working and shows a banner. A trial stops. You can always put a licence on hold or withdraw it.</dd>
       <dt>No Internet</dt><dd>Use <em>Offline activation</em>: the customer reads you a code, you send one back.</dd>
       <dt>More PCs</dt><dd>Open the licence, raise <em>PCs</em> (within the plan limit) and save. For more than the limit, ask an administrator.</dd>
       <dt>Customer did not pay</dt><dd>Ask an administrator to put the licence on hold. It can be released later.</dd>
@@ -473,7 +557,7 @@ function help(ctx) {
     </dl></section>
   <section class="card"><h2>Good to know</h2><ul>
     <li>Every change is written in <em>History</em>.</li>
-    <li>A customer's PC keeps working for a couple of weeks even if it cannot reach the Internet.</li>
+    <li>A customer's PC checks in about once a month. If it cannot reach the Internet it keeps working with warnings for 60 days, and then asks for a check-in or an offline code.</li>
     <li>Never send a customer the Studio's address or your own password.</li></ul></section>`;
   return page('Help', body, ctx, 'help');
 }
@@ -483,4 +567,4 @@ function message(ctx, title, text) {
   return page(title, body, ctx, '');
 }
 
-module.exports = { message, login, home, licenceList, licenceNew, licenceView, customers, customerView, offline, brands, brandEdit, plans, users, audit, settings, account, help, MODULE_LABELS, WHITE_LABELS };
+module.exports = { message, login, home, licenceList, licenceNew, licenceView, customers, customerView, offline, brands, brandEdit, plans, users, serviceAccounts, audit, settings, account, help, MODULE_LABELS, WHITE_LABELS };

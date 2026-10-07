@@ -58,8 +58,8 @@ test('activate: issues a signed licence and activation bound to the PC', () => {
   assert.equal(a.lid, lic.lid);
   assert.equal(a.fp.length, 5);
   assert.equal(a.fpMin, 3); // 60% of 5 parts
-  assert.equal(a.next, ctx.state.t + 7 * DAY);
-  assert.equal(a.until, ctx.state.t + 21 * DAY);
+  assert.equal(a.next, ctx.state.t + 30 * DAY); // about monthly (spec 13.2)
+  assert.equal(a.until, ctx.state.t + 90 * DAY); // and 60 days of warnings after that
   assert.deepEqual(crl.revoked, []);
   assert.equal(ctx.studio.listActivations(lic.lid).length, 1);
 });
@@ -73,7 +73,7 @@ test('activate: the same PC again does not use another seat; a 4th PC on a 3-PC 
 
   // Freeing a PC makes room.
   const first = ctx.studio.listActivations(lic.lid)[0];
-  ctx.studio.freeDevice(first.id, ADMIN, 'ip');
+  ctx.studio.freeDevice(first.id, ADMIN, 'ip', 'the old PC broke');
   assert.ok(ctx.studio.activate({ key: lic.licence_key, fp: fp('pc-d'), host: 'pc-d' }, 'ip').act);
 });
 
@@ -123,7 +123,7 @@ test('check-in: refreshes the activation, picks up changes, and sees revocation 
   const res = ctx.studio.checkin({ lid: lic.lid, act: first.act, fp: f, version: '2.19.0', usage: { stores: 1, devices: 2, users: 4 } }, 'ip');
   assert.equal(C.verifyToken(res.lic, ctx.trusted, 'lic').limits.devices, 5);
   assert.equal(C.verifyToken(res.lic, ctx.trusted, 'lic').rev, 2);
-  assert.equal(C.verifyToken(res.act, ctx.trusted, 'act').next, ctx.state.t + 7 * DAY);
+  assert.equal(C.verifyToken(res.act, ctx.trusted, 'act').next, ctx.state.t + 30 * DAY);
 
   ctx.studio.setStatus(lic.lid, 'revoked', '', ADMIN, 'ip');
   assert.throws(() => ctx.studio.checkin({ lid: lic.lid, act: res.act, fp: f }, 'ip'), (e) => e.code === 'revoked');
@@ -142,7 +142,7 @@ test('check-in: refuses a different PC, a freed PC and a token for another licen
   assert.throws(() => ctx.studio.checkin({ lid: a.lid, act: actB, fp: f }, 'ip'), (e) => e.code === 'bad_request');
   assert.throws(() => ctx.studio.checkin({ lid: a.lid, act: 'junk', fp: f }, 'ip'), (e) => e.code === 'bad_request');
 
-  ctx.studio.freeDevice(ctx.studio.listActivations(a.lid)[0].id, SALES, 'ip');
+  ctx.studio.freeDevice(ctx.studio.listActivations(a.lid)[0].id, SALES, 'ip', 'replaced');
   assert.throws(() => ctx.studio.checkin({ lid: a.lid, act, fp: f }, 'ip'), (e) => e.code === 'device_mismatch');
 });
 
@@ -169,24 +169,26 @@ test('offline activation: request code in, response code out, long validity', ()
   assert.throws(() => ctx.studio.offlineActivate('hello', ADMIN, 'ip'), (e) => e.code === 'bad_request');
 });
 
-test('terms: an activation never outlasts the licence; trial is flagged', () => {
+test('terms: an activation of a licence that stops never outlasts it; trial is flagged', () => {
   const ctx = makeStudio();
   const trial = newLicence(ctx, { term: 'trial30' });
   assert.equal(trial.trial, true);
+  assert.equal(trial.on_end, 'stop');
   ctx.state.t += 20 * DAY; // 10 days of the trial left
   const act = C.verifyToken(ctx.studio.activate({ key: trial.licence_key, fp: fp('t') }, 'ip').act, ctx.trusted, 'act');
-  assert.equal(act.next, ctx.state.t + 7 * DAY);
-  assert.equal(act.until, trial.exp); // 21 days would pass the end of the trial, so it stops at the end of the trial
+  assert.equal(act.next, trial.exp); // a month would pass the end of the trial, so the check-in is cut at the end of the trial
+  assert.equal(act.until, trial.exp);
 });
 
-test('roles: sales cannot exceed plan caps, issue perpetual licences or unbound licences', () => {
+test('roles: sales cannot exceed plan caps or issue unbound licences; no end date is now the normal paid licence', () => {
   const ctx = makeStudio();
   const customer = ctx.studio.createCustomer({ name: 'X' }, SALES, 'ip');
   const base = { customerId: customer.id, planCode: 'business', term: 'y1' };
   assert.throws(() => ctx.studio.createLicence({ ...base, devices: 11 }, SALES, 'ip'), (e) => e.code === 'forbidden');
-  assert.throws(() => ctx.studio.createLicence({ ...base, term: 'perpetual' }, SALES, 'ip'), (e) => e.code === 'forbidden');
   assert.throws(() => ctx.studio.createLicence({ ...base, bindMode: 'none' }, SALES, 'ip'), (e) => e.code === 'forbidden');
   assert.ok(ctx.studio.createLicence({ ...base, devices: 10 }, SALES, 'ip'));
+  // The owner's decision: one-time purchase, works for good. Sales issue it without asking an administrator.
+  assert.equal(ctx.studio.createLicence({ ...base, term: 'perpetual' }, SALES, 'ip').exp, null);
   assert.equal(ctx.studio.createLicence({ ...base, devices: 40, term: 'perpetual' }, ADMIN, 'ip').exp, null);
   // Sales cannot add modules the plan does not include.
   const l = ctx.studio.createLicence({ ...base, modules: ['pos', 'chain', 'api'] }, SALES, 'ip');

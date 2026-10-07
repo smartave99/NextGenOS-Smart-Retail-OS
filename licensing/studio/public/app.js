@@ -53,6 +53,19 @@
     };
     $all('input[name=bindMode]', form).forEach(function (r) { r.addEventListener('change', bind); });
     bind();
+
+    // Kind of licence: a trial has a length in days and always stops; a licence with no end date has nothing to choose at the end.
+    var kind = function () {
+      var term = ($('input[name=term]:checked', form) || {}).value;
+      var trial = term === 'trial';
+      $('#trial-box').classList.toggle('hidden', !trial);
+      $('#onend-box').classList.toggle('hidden', term === 'perpetual');
+      var onEnd = $('#onEnd');
+      if (trial) onEnd.value = 'stop';
+      onEnd.disabled = trial; // a trial always stops, and a disabled box is not sent: the Studio then uses "stop"
+    };
+    $all('input[name=term]', form).forEach(function (r) { r.addEventListener('change', kind); });
+    kind();
   }
 
   // Brand logo: read the picture into a hidden field, small pictures only.

@@ -10,6 +10,13 @@ const PRODUCT = 'smart-retail-os';
 const MODULES = ['pos', 'hub', 'ai', 'dashboard', 'storefront', 'owner-live', 'chain', 'api'];
 const FP_KINDS = ['bios', 'board', 'cpu', 'disk', 'os'];
 const WHITE_LEVELS = ['none', 'theme', 'full'];
+const ON_END = ['banner', 'stop'];
+// A customer may free their old PC themselves this often (spec section 8, "Moves"). Staff are not limited.
+const MOVE_LIMIT = 2;
+const MOVE_WINDOW_DAYS = 365;
+const TRIAL_DEFAULT_DAYS = 14;
+const TRIAL_MAX_DAYS = 365;
+const EXTEND_MAX_DAYS = 3650;
 
 class ApiError extends Error {
   constructor(status, code, message) {
@@ -28,6 +35,15 @@ const json = (value) => JSON.stringify(value);
 const parse = (value, fallback = null) => {
   try { return JSON.parse(value); } catch (_) { return fallback; }
 };
+/** A whole number from min to max; anything else is an error in plain words (never silently replaced). */
+const wholeNumber = (value, min, max, message) => {
+  const n = typeof value === 'number' ? value : (/^\s*\d{1,9}\s*$/.test(String(value)) ? Number(value) : NaN);
+  if (!Number.isInteger(n) || n < min || n > max) throw new ApiError(400, 'bad_request', message);
+  return n;
+};
+const dateOf = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
+/** Who did it, for the history: "Name (e-mail)" for a person, the text itself for a tool. */
+const actorLabel = (actor) => (actor ? (actor.name && actor.email && actor.name !== actor.email ? `${actor.name} (${actor.email})` : (actor.email || actor.name || '')) : '');
 
 const DEFAULT_PLANS = [
   { code: 'hub', name: 'Business Hub', description: 'Any kind of business in any country: shop, restaurant, library, builder, services. One site, its tax, its words.', modules: ['hub'], limits: { devices: 3, stores: 1, users: 10 }, caps: { devices: 10, stores: 1, users: 50 }, term_days: 365, sort: 0 },
@@ -42,17 +58,20 @@ const DEFAULT_SETTINGS = {
   support_email: 'smartave99@gmail.com',
   support_phone: '+91 6123115368',
   public_url: '',
-  check_in_days: '7',
-  grace_days: '14',
+  // About monthly, and 60 days of warnings after a missed check-in (spec section 13.2).
+  check_in_days: '30',
+  grace_days: '60',
   offline_days: '365',
 };
 
+// The "when does it end" choices. A paid licence has no end date unless staff choose one; a trial is 14 days unless staff choose another length.
 const TERMS = {
-  trial30: { days: 30, label: '30-day trial', trial: true },
+  perpetual: { days: null, label: 'No end date (one-time purchase)' },
   y1: { days: 365, label: '1 year' },
   y2: { days: 730, label: '2 years' },
   y3: { days: 1095, label: '3 years' },
-  perpetual: { days: null, label: 'No end date', adminOnly: true },
+  trial: { days: TRIAL_DEFAULT_DAYS, label: 'Trial', trial: true },
+  trial30: { days: 30, label: '30-day trial', trial: true, legacy: true }, // the older name, kept so old scripts keep working
 };
 
 class Studio {
@@ -70,6 +89,12 @@ class Studio {
   seedDefaults() {
     const insert = this.db.prepare('INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)');
     for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insert.run(k, v);
+    // Once: a Studio that still holds the old defaults (7 and 14 days) moves to monthly and 60 days. A value staff chose themselves stays.
+    if (!this.db.prepare("SELECT 1 FROM settings WHERE key = 'defaults_v2'").get()) {
+      this.db.prepare("UPDATE settings SET value = '30' WHERE key = 'check_in_days' AND value = '7'").run();
+      this.db.prepare("UPDATE settings SET value = '60' WHERE key = 'grace_days' AND value = '14'").run();
+      this.db.prepare("INSERT INTO settings(key, value) VALUES ('defaults_v2', '1')").run();
+    }
     const planInsert = this.db.prepare('INSERT OR IGNORE INTO plans(code, name, description, modules, limits, caps, term_days, sort) VALUES (?,?,?,?,?,?,?,?)');
     for (const p of DEFAULT_PLANS) planInsert.run(p.code, p.name, p.description, json(p.modules), json(p.limits), json(p.caps), p.term_days, p.sort);
   }
@@ -128,10 +153,36 @@ class Studio {
     if (!name) throw new ApiError(400, 'bad_request', 'Enter the customer\'s business name.');
     const email = text(input.email, 120);
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ApiError(400, 'bad_request', 'The e-mail address does not look right.');
-    const r = this.db.prepare('INSERT INTO customers(name, country, contact_name, email, phone, notes, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)')
-      .run(name, text(input.country, 60), text(input.contactName, 80), email, text(input.phone, 40), text(input.notes, 500), actor ? actor.id : null, this.now());
-    this.audit(actor, 'customer.create', name, '', ip);
+    const externalId = input.externalId === undefined || input.externalId === null || input.externalId === '' ? null : this.cleanExternalId(input.externalId);
+    if (externalId && this.getCustomerByExternalId(externalId)) throw new ApiError(409, 'conflict', 'A customer with that id already exists.');
+    const r = this.db.prepare('INSERT INTO customers(name, country, contact_name, email, phone, notes, external_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(name, text(input.country, 60), text(input.contactName, 80), email, text(input.phone, 40), text(input.notes, 500), externalId, actor ? actor.id : null, this.now());
+    this.audit(actor, 'customer.create', name, externalId ? `id ${externalId}` : '', ip);
     return this.getCustomer(Number(r.lastInsertRowid));
+  }
+
+  /** The id the main Setup Studio gave a client (its project id): letters, digits and . _ : - only. */
+  cleanExternalId(value) {
+    const id = text(value, 200);
+    if (!/^[A-Za-z0-9._:-]{1,80}$/.test(id)) throw new ApiError(400, 'bad_request', 'The customer id must be 1 to 80 letters, digits or the signs . _ : -');
+    return id;
+  }
+
+  getCustomerByExternalId(externalId) {
+    return this.db.prepare('SELECT * FROM customers WHERE external_id = ?').get(externalId) || null;
+  }
+
+  /** The customer for a client of the main Setup Studio: found by its id there, made when it is new, and renamed when the name changed. */
+  upsertExternalCustomer({ externalId, name, country }, actor, ip) {
+    const found = this.getCustomerByExternalId(externalId);
+    if (!found) return this.createCustomer({ name, country, externalId }, actor, ip);
+    const newName = text(name, 120) || found.name;
+    const newCountry = country === undefined || country === null || country === '' ? found.country : text(country, 60);
+    if (newName !== found.name || newCountry !== found.country) {
+      this.db.prepare('UPDATE customers SET name = ?, country = ? WHERE id = ?').run(newName, newCountry, found.id);
+      this.audit(actor, 'customer.update', newName, `id ${externalId}`, ip);
+    }
+    return this.getCustomer(found.id);
   }
 
   updateCustomer(id, input, actor, ip) {
@@ -251,20 +302,44 @@ class Studio {
     };
   }
 
-  resolveTerm(term, actor) {
-    const t = TERMS[term];
+  resolveTerm(term) {
+    const t = Object.prototype.hasOwnProperty.call(TERMS, term) ? TERMS[term] : null;
     if (!t) throw new ApiError(400, 'bad_request', 'Choose how long the licence lasts.');
-    if (t.adminOnly && (!actor || actor.role !== 'admin')) throw new ApiError(403, 'forbidden', 'Only an administrator can issue a licence with no end date.');
     return t;
   }
 
-  /** Creates a licence for an existing customer. Returns the stored licence. */
-  createLicence(input, actor, ip) {
+  /** What happens at the end date: "banner" or "stop". Left empty it is banner for a paid licence and stop for a trial. A trial always stops. */
+  resolveOnEnd(value, isTrial) {
+    const given = value === undefined || value === null || value === '' ? null : String(value);
+    if (given !== null && !ON_END.includes(given)) throw new ApiError(400, 'bad_request', 'Choose what happens when the licence ends: it keeps working and shows a banner, or it stops.');
+    if (isTrial && given === 'banner') throw new ApiError(400, 'bad_request', 'A trial always stops at its end date. To keep a customer going, turn the trial into a paid licence.');
+    return given || (isTrial ? 'stop' : 'banner');
+  }
+
+  /**
+   * Creates a licence. The customer is either an existing one (`customerId`) or, for a client of the main Setup Studio,
+   * `customer: {externalId, name, country}` (found by its id there, made when new). `hooks.inTransaction(lid, customer)` runs
+   * in the same transaction as the insert (the staff API stores its idempotency record there). Returns the stored licence.
+   */
+  createLicence(input, actor, ip, hooks = {}) {
     const plan = this.getPlan(text(input.planCode, 30));
     if (!plan || !plan.active) throw new ApiError(400, 'bad_request', 'Choose a plan.');
-    const customer = this.getCustomer(int(input.customerId, 0));
-    if (!customer) throw new ApiError(400, 'bad_request', 'Choose the customer.');
-    const term = this.resolveTerm(text(input.term, 20) || 'y1', actor);
+    let customer = null;
+    let external = null;
+    if (input.customer) {
+      external = { externalId: this.cleanExternalId(input.customer.externalId), name: text(input.customer.name, 120), country: text(input.customer.country, 60) };
+      if (!external.name) throw new ApiError(400, 'bad_request', 'Enter the customer\'s business name.');
+    } else {
+      customer = this.getCustomer(int(input.customerId, 0));
+      if (!customer) throw new ApiError(400, 'bad_request', 'Choose the customer.');
+    }
+    const termName = text(input.term, 20) || (input.trialDays !== undefined && input.trialDays !== null && input.trialDays !== '' ? 'trial' : 'perpetual');
+    const term = this.resolveTerm(termName);
+    const trialDays = term.trial
+      ? wholeNumber(input.trialDays === undefined || input.trialDays === null || input.trialDays === '' ? term.days : input.trialDays, 1, TRIAL_MAX_DAYS, `A trial lasts from 1 to ${TRIAL_MAX_DAYS} days.`)
+      : null;
+    if (!term.trial && input.trialDays !== undefined && input.trialDays !== null && input.trialDays !== '') throw new ApiError(400, 'bad_request', 'Trial days only go with a trial.');
+    const onEnd = this.resolveOnEnd(input.onEnd, !!term.trial);
 
     const isAdmin = actor && actor.role === 'admin';
     const limits = {
@@ -287,7 +362,14 @@ class Studio {
 
     const start = input.startDate && /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? Math.floor(Date.parse(input.startDate + 'T00:00:00Z') / 1000) : this.now();
     if (!Number.isFinite(start)) throw new ApiError(400, 'bad_request', 'The start date does not look right.');
-    const exp = term.days == null ? null : start + term.days * DAY;
+    let exp;
+    if (input.endsAt !== undefined) {
+      // An exact end given by a tool (the staff API): null is "no end date".
+      if (term.trial) throw new ApiError(400, 'bad_request', 'Give either the length of the trial or an end date, not both.');
+      exp = input.endsAt === null ? null : wholeNumber(input.endsAt, 0, 4_102_444_800, 'The end date does not look right.');
+    } else if (term.trial) exp = start + trialDays * DAY;
+    else exp = term.days == null ? null : start + term.days * DAY;
+    if (exp !== null && exp <= start) throw new ApiError(400, 'bad_request', 'The end date must be after the start date.');
 
     const whiteLevel = WHITE_LEVELS.includes(input.whiteLevel) ? input.whiteLevel : 'theme';
     if (whiteLevel === 'full' && !isAdmin) throw new ApiError(403, 'forbidden', 'Only an administrator can allow a full re-brand (a reseller licence).');
@@ -295,22 +377,25 @@ class Studio {
     const offline = input.offline === true || input.offline === 'on' || input.offline === '1';
     const actTerms = {
       online: !offline,
-      checkInDays: int(this.setting('check_in_days'), 7) || 7,
-      graceDays: int(this.setting('grace_days'), 14) || 14,
+      checkInDays: int(this.setting('check_in_days'), 30) || 30,
+      graceDays: int(this.setting('grace_days'), 60) || 60,
       offlineDays: int(this.setting('offline_days'), 365) || 365,
     };
 
-    const created = transaction(this.db, () => {
+    const made = transaction(this.db, () => {
+      const owner = customer || this.upsertExternalCustomer(external, actor, ip);
       const lid = C.generateLicenceId();
       const key = C.generateLicenceKey();
       const t = this.now();
-      this.db.prepare(`INSERT INTO licences(lid, licence_key, customer_id, reseller_id, plan_code, modules, limits, bind, brand_id, act, trial, white_level, nbf, exp, notes, created_by, created_at, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(lid, key, customer.id, resellerId, plan.code, json(modules), json(limits), json({ mode: bindMode, domains }), brandId, json(actTerms), term.trial ? 1 : 0, whiteLevel, start, exp, text(input.notes, 500), actor ? actor.id : null, t, t);
-      return lid;
+      this.db.prepare(`INSERT INTO licences(lid, licence_key, customer_id, reseller_id, plan_code, modules, limits, bind, brand_id, act, trial, white_level, on_end, nbf, exp, notes, created_by, created_at, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(lid, key, owner.id, resellerId, plan.code, json(modules), json(limits), json({ mode: bindMode, domains }), brandId, json(actTerms), term.trial ? 1 : 0, whiteLevel, onEnd, start, exp, text(input.notes, 500), actor ? actor.id : null, t, t);
+      if (hooks.inTransaction) hooks.inTransaction(lid, owner);
+      return { lid, name: owner.name };
     });
-    this.audit(actor, 'licence.create', `${created} (${customer.name})`, `${plan.code}, ${term.label}`, ip);
-    return this.getLicence(created);
+    const how = term.trial ? `trial of ${trialDays} days, stops at the end` : (exp === null ? 'no end date' : `ends ${dateOf(exp)}`) + `, ${onEnd === 'banner' ? 'keeps working with a banner after the end' : 'stops at the end'}`;
+    this.audit(actor, 'licence.create', `${made.lid} (${made.name})`, `${plan.code}, ${how}`, ip);
+    return this.getLicence(made.lid);
   }
 
   cap(value, planDefault, planCap, isAdmin, label) {
@@ -356,13 +441,21 @@ class Studio {
       modules = input.modules.filter((m) => MODULES.includes(m));
       changes.push('modules changed');
     }
+    let trial = lic.trial;
+    let onEnd = lic.on_end;
     if (input.extendTerm) {
-      const term = this.resolveTerm(text(input.extendTerm, 20), actor);
+      const term = this.resolveTerm(text(input.extendTerm, 20));
       if (term.days == null) { exp = null; changes.push('no end date'); } else {
         const base = exp && exp > this.now() ? exp : this.now(); // renewing before the end adds to the end date
         exp = base + term.days * DAY;
         changes.push(`renewed ${term.label}`);
       }
+      // Renewing a trial with a paid term makes it a paid licence, which keeps working with a banner.
+      if (trial && !term.trial) { trial = false; onEnd = 'banner'; changes.push('trial became paid'); }
+    }
+    if (input.onEnd !== undefined && input.onEnd !== '' && input.onEnd !== null) {
+      const wanted = this.resolveOnEnd(input.onEnd, trial);
+      if (wanted !== onEnd) { changes.push(`when it ends: ${onEnd} -> ${wanted}`); onEnd = wanted; }
     }
     let whiteLevel = lic.white_level;
     if (input.whiteLevel && WHITE_LEVELS.includes(input.whiteLevel) && input.whiteLevel !== lic.white_level) {
@@ -375,10 +468,39 @@ class Studio {
     }
     if (changes.length) {
       this.db.prepare('UPDATE licences SET white_level = ? WHERE lid = ?').run(whiteLevel, lid);
-      this.db.prepare('UPDATE licences SET plan_code=?, modules=?, limits=?, exp=?, trial = CASE WHEN ? THEN 0 ELSE trial END, rev = rev + 1, updated_at = ? WHERE lid = ?')
-        .run(planCode, json(modules), json(limits), exp, input.extendTerm && input.extendTerm !== 'trial30' ? 1 : 0, this.now(), lid);
+      this.db.prepare('UPDATE licences SET plan_code=?, modules=?, limits=?, exp=?, trial=?, on_end=?, rev = rev + 1, updated_at = ? WHERE lid = ?')
+        .run(planCode, json(modules), json(limits), exp, trial ? 1 : 0, onEnd, this.now(), lid);
       this.audit(actor, 'licence.update', lid, changes.join('; '), ip);
     }
+    return this.getLicence(lid);
+  }
+
+  /** Adds days to the end date, or to today when the licence has already ended (an ended trial runs again from today). */
+  extendDays(lid, days, actor, ip) {
+    const lic = this.getLicence(lid);
+    if (!lic) throw new ApiError(404, 'not_found', 'Licence not found.');
+    if (lic.status === 'revoked') throw new ApiError(409, 'conflict', 'A withdrawn licence cannot be changed. Issue a new licence.');
+    const n = wholeNumber(days, 1, EXTEND_MAX_DAYS, `Give a whole number of days from 1 to ${EXTEND_MAX_DAYS}.`);
+    if (lic.exp === null || lic.exp === undefined) throw new ApiError(409, 'conflict', 'This licence has no end date, so there is nothing to extend.');
+    const t = this.now();
+    const exp = (lic.exp > t ? lic.exp : t) + n * DAY;
+    this.db.prepare('UPDATE licences SET exp = ?, rev = rev + 1, updated_at = ? WHERE lid = ?').run(exp, t, lid);
+    this.audit(actor, 'licence.extend', lid, `${n} days, now ends ${dateOf(exp)}${lic.trial ? ' (trial)' : ''}`, ip);
+    return this.getLicence(lid);
+  }
+
+  /** Turns a trial into a paid licence: no end date (or the term staff choose), and it keeps working with a banner at its end. */
+  convertTrial(lid, opts, actor, ip) {
+    const lic = this.getLicence(lid);
+    if (!lic) throw new ApiError(404, 'not_found', 'Licence not found.');
+    if (lic.status === 'revoked') throw new ApiError(409, 'conflict', 'A withdrawn licence cannot be changed. Issue a new licence.');
+    if (!lic.trial) throw new ApiError(409, 'conflict', 'This licence is not a trial.');
+    const term = this.resolveTerm(text(opts && opts.term, 20) || 'perpetual');
+    if (term.trial) throw new ApiError(400, 'bad_request', 'Choose how long the paid licence lasts.');
+    const t = this.now();
+    const exp = term.days == null ? null : t + term.days * DAY;
+    this.db.prepare("UPDATE licences SET trial = 0, on_end = 'banner', exp = ?, rev = rev + 1, updated_at = ? WHERE lid = ?").run(exp, t, lid);
+    this.audit(actor, 'licence.convert', lid, `trial became paid, ${exp === null ? 'no end date' : 'ends ' + dateOf(exp)}`, ip);
     return this.getLicence(lid);
   }
 
@@ -404,8 +526,13 @@ class Studio {
       brand: brandRow ? { id: `B-${brandRow.id}`, ...brandRow.data } : null,
       reseller: reseller ? { id: `R-${reseller.id}`, name: reseller.name } : null,
       act: lic.act, trial: lic.trial, white: { level: lic.white_level || 'theme' },
+      // What happens after `exp` is written here, signed, and nowhere else (spec 10.1). Only a paid licence can be "banner".
+      onEnd: Studio.onEndOf(lic),
     }, this.signer);
   }
+
+  /** What the licence says about its end: "banner" only for a paid licence that is set to it. A trial always stops (spec 10.1 and 13.1). */
+  static onEndOf(lic) { return lic.on_end === 'banner' && !lic.trial ? 'banner' : 'stop'; }
 
   activationToken(lic, fpList, longOffline) {
     const t = this.now();
@@ -414,10 +541,11 @@ class Studio {
     if (!lic.act.online || longOffline) {
       next = until = t + (lic.act.offlineDays || 365) * DAY;
     } else {
-      next = t + (lic.act.checkInDays || 7) * DAY;
-      until = next + (lic.act.graceDays || 14) * DAY;
+      next = t + (lic.act.checkInDays || 30) * DAY;
+      until = next + (lic.act.graceDays || 60) * DAY;
     }
-    if (lic.exp) { next = Math.min(next, lic.exp); until = Math.min(until, lic.exp); }
+    // A licence that stops at its end date never has an activation that outlasts it; one that keeps working with a banner does not (spec 4.2).
+    if (lic.exp && Studio.onEndOf(lic) !== 'banner') { next = Math.min(next, lic.exp); until = Math.min(until, lic.exp); }
     return C.signToken({ typ: 'act', lid: lic.lid, rev: lic.rev, iat: t, fp: fpList, fpMin: Studio.fpMin(fpList.length), next, until }, this.signer);
   }
 
@@ -471,7 +599,8 @@ class Studio {
     if (lic.status === 'revoked') return new ApiError(403, 'revoked', 'This licence has been withdrawn. Please contact your supplier.');
     if (lic.status === 'suspended') return new ApiError(403, 'suspended', 'This licence is on hold. Please contact your supplier.');
     if (t < lic.nbf) return new ApiError(403, 'not_started', 'This licence has not started yet.');
-    if (lic.exp && t > lic.exp) return new ApiError(403, 'expired', 'This licence has ended. Please renew it.');
+    // A licence that keeps working with a banner after its end date is still activated and checked in (spec 13.3).
+    if (lic.exp && t > lic.exp && Studio.onEndOf(lic) !== 'banner') return new ApiError(403, 'expired', 'This licence has ended. Please renew it.');
     return null;
   }
 
@@ -498,6 +627,7 @@ class Studio {
           const r = this.db.prepare('INSERT INTO activations(lid, fp, host, version, first_seen, last_seen, last_checkin, ip) VALUES (?,?,?,?,?,?,?,?)')
             .run(lic.lid, json(fpList), hostName, text(version, 30), t, t, t, text(ip, 64));
           row = { id: Number(r.lastInsertRowid) };
+          this.recordEvent(lic.lid, 'activated', { activationId: row.id, host: hostName, actor: 'the customer' });
         } else {
           this.db.prepare('UPDATE activations SET fp=?, host=?, version=?, last_seen=?, last_checkin=?, ip=? WHERE id=?')
             .run(json(fpList), hostName || row.host, text(version, 30), t, t, text(ip, 64), row.id);
@@ -549,10 +679,36 @@ class Studio {
     const rows = this.db.prepare('SELECT * FROM activations WHERE lid = ? AND active = 1').all(lid);
     const row = rows.find((r) => this.matches(parse(r.fp, []), fpList));
     if (row) {
-      this.db.prepare('UPDATE activations SET active = 0 WHERE id = ?').run(row.id);
+      // The customer's own "free this PC" is allowed MOVE_LIMIT times in any rolling MOVE_WINDOW_DAYS days (spec section 8, "Moves").
+      const moves = this.moves(lid);
+      if (moves.used >= moves.allowed) {
+        this.audit(null, 'deactivate.refused', lid, 'move_limit_reached', ip);
+        throw new ApiError(409, 'move_limit_reached', `This licence has already been moved to a new PC ${moves.allowed} times in the last 12 months, which is all a customer can do alone. To move it again, please contact your supplier: they can free the old PC for you.`);
+      }
+      transaction(this.db, () => {
+        this.db.prepare('UPDATE activations SET active = 0 WHERE id = ?').run(row.id);
+        this.recordEvent(lid, 'client_deactivate', { activationId: row.id, host: row.host, actor: 'the customer' });
+      });
       this.audit(null, 'deactivate', lid, row.host, ip);
     }
     return { ok: true };
+  }
+
+  /** How many times the customer moved this licence in the last 365 days (spec section 8, "Moves"). Staff frees do not count. */
+  moves(lid) {
+    const since = this.now() - MOVE_WINDOW_DAYS * DAY;
+    const used = this.db.prepare("SELECT COUNT(*) AS n FROM licence_events WHERE lid = ? AND kind = 'client_deactivate' AND ts > ?").get(lid, since).n;
+    return { used, allowed: MOVE_LIMIT, windowDays: MOVE_WINDOW_DAYS };
+  }
+
+  recordEvent(lid, kind, { activationId = null, host = '', actor = '', reason = '' } = {}) {
+    this.db.prepare('INSERT INTO licence_events(lid, ts, kind, activation_id, host, actor, reason) VALUES (?,?,?,?,?,?,?)')
+      .run(lid, this.now(), kind, activationId, text(host, 80), text(actor, 200), text(reason, 200));
+  }
+
+  /** What happened to a licence's PCs, newest first: activations, moves by the customer, PCs freed by staff (who and why). */
+  history(lid, limit = 100) {
+    return this.db.prepare('SELECT * FROM licence_events WHERE lid = ? ORDER BY ts DESC, id DESC LIMIT ?').all(lid, limit);
   }
 
   listActivations(lid) {
@@ -560,12 +716,34 @@ class Studio {
       .map((a) => ({ ...a, fp: parse(a.fp, []), usage: parse(a.usage, {}) }));
   }
 
-  freeDevice(activationId, actor, ip) {
-    const a = this.db.prepare('SELECT * FROM activations WHERE id = ?').get(activationId);
-    if (!a) throw new ApiError(404, 'not_found', 'That PC was not found.');
-    this.db.prepare('UPDATE activations SET active = 0 WHERE id = ?').run(activationId);
-    this.audit(actor, 'device.free', a.lid, a.host, ip);
+  getActivation(id) {
+    return this.db.prepare('SELECT * FROM activations WHERE id = ?').get(id) || null;
+  }
+
+  /** Staff frees a PC's seat. Not limited, but a reason is needed and it is written down with who did it. Returns the licence id. */
+  freeDevice(activationId, actor, ip, reason, expectLid) {
+    const a = this.getActivation(activationId);
+    if (!a || (expectLid && a.lid !== expectLid)) throw new ApiError(404, 'not_found', 'That PC was not found.');
+    const why = text(reason, 200);
+    if (!why) throw new ApiError(400, 'bad_request', 'Please say why you are freeing this PC (for example: the old computer broke).');
+    if (!a.active) return a.lid; // already free: nothing to do
+    transaction(this.db, () => {
+      this.db.prepare('UPDATE activations SET active = 0 WHERE id = ?').run(activationId);
+      this.recordEvent(a.lid, 'staff_free', { activationId, host: a.host, actor: actorLabel(actor), reason: why });
+    });
+    this.audit(actor, 'device.free', a.lid, `${a.host}: ${why}`, ip);
     return a.lid;
+  }
+
+  // ---------- repeated calls from tools ----------
+
+  /** The licence an earlier "make a licence" call with this key made, if any: { body_hash, lid }. */
+  findIdempotent(accountId, key) {
+    return this.db.prepare('SELECT body_hash, lid FROM idempotency WHERE account_id = ? AND idem_key = ?').get(accountId, key) || null;
+  }
+
+  saveIdempotent(accountId, key, bodyHash, lid) {
+    this.db.prepare('INSERT INTO idempotency(account_id, idem_key, body_hash, lid, created_at) VALUES (?,?,?,?,?)').run(accountId, key, bodyHash, lid, this.now());
   }
 
   // ---------- offline activation ----------
@@ -606,7 +784,7 @@ class Studio {
       `Thank you for choosing ${company}. Your licence is ready.`,
       '',
       `Licence key:  ${lic.licence_key}`,
-      `Valid until:  ${until}`,
+      lic.trial ? `Trial until:  ${until} (the program stops on that day, unless you buy the full licence before)` : `Valid until:  ${until}`,
     ];
     if (lic.bind.mode === 'device') lines.push(`PCs allowed:  ${lic.limits.devices || 'any number of'}`);
     if (lic.bind.mode === 'domain') lines.push(`Website:      ${lic.bind.domains.join(', ')}`);
@@ -628,4 +806,4 @@ class Studio {
   }
 }
 
-module.exports = { Studio, ApiError, MODULES, TERMS, FP_KINDS, WHITE_LEVELS, DAY, PRODUCT };
+module.exports = { Studio, ApiError, MODULES, TERMS, FP_KINDS, WHITE_LEVELS, ON_END, DAY, PRODUCT, MOVE_LIMIT, MOVE_WINDOW_DAYS, TRIAL_DEFAULT_DAYS, TRIAL_MAX_DAYS, EXTEND_MAX_DAYS, actorLabel };

@@ -28,9 +28,11 @@ function readBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let tooBig = false;
     req.on('data', (c) => {
+      if (tooBig) return; // keep reading and throw it away, so that the answer can still be sent (the connection is closed after it)
       size += c.length;
-      if (size > maxBytes) { reject(new ApiError(413, 'too_large', 'The request is too large.')); req.destroy(); return; }
+      if (size > maxBytes) { tooBig = true; chunks.length = 0; reject(new ApiError(413, 'too_large', 'The request is too large.')); return; }
       chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));

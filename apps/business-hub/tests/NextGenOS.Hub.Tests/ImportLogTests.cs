@@ -37,7 +37,7 @@ public class ImportLogTests
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
         f.App.Parties.Create(new NextGenOS.Hub.Catalog.PartyInput { Kind = "customer", Name = "Asha" });
-        var before = Tables(f.App).Except(ImportTables).ToArray();
+        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines" }).ToArray();
 
         f.App.Db.Rollback(5);
 
@@ -49,7 +49,7 @@ public class ImportLogTests
 
         var again = HubApp.Open(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), ImportTables.ToHashSet());
-        Assert.Equal(new long[] { 1, 2, 3, 4, 5, 6 }, again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
+        Assert.Equal(Enumerable.Range(1, NextGenOS.Hub.Data.HubDb.LatestVersion).Select(v => (long)v).ToArray(), again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
         Assert.Equal("Rice", again.Db.Scalar("SELECT name FROM items"));
     }
 

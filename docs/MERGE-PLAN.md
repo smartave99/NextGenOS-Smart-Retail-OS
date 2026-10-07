@@ -40,7 +40,7 @@ The old POS's screens (`apps/pos-desktop/Documentation/UI_SCREEN_INVENTORY.csv`)
 | Products: categories, units, bulk change, variants, serial numbers, combo packs, labels, import and export (61) | Partly: items and barcodes. **Corrected after reading the code (study 02): the Hub has no variant, batch or serial-number tables** | Variants, batches and serial numbers, bulk price and product change, combo packs, barcode label printing, Excel import and export, product images |
 | Customers: ledger, outstanding, receipts, loyalty, coupons, offers, gifts (39) | Partly: customers, credit and terms, balances | **Loyalty, coupons, gifts, offers, customer receipts and statements** |
 | Suppliers (8) | Partly | Supplier ledger and outstanding |
-| Accounting books: general ledger, day book, vouchers, bank, contra, income and expense, balance sheet, trial balance, profit and loss (41) | **Not found** | The accounting books, as a module |
+| Accounting books: general ledger, day book, vouchers, bank, contra, income and expense, balance sheet, trial balance, profit and loss (41) | **Core built 7 October 2026 (decision 32): double-entry journal, customer and supplier accounts, trial balance; no screens yet** | The screens and reports; vouchers; stock value and cost of goods sold; year close |
 | India tax and compliance: GSTR-1, GSTR-3B, HSN, e-way bill, TCS, GST registers (21) | Partly: tax rates through the country pack | **GST returns and registers, e-way bill, TCS**, as the India country module |
 | Staff and salespeople: employees, attendance, salary, commission (13) | **Not found** | A staff and salesperson module |
 | Restaurant and kitchen: tables, kitchen section, orders, tokens (3) | Have | Token flows, if different |

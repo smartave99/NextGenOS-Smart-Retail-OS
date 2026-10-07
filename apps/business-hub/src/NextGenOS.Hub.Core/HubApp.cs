@@ -2,6 +2,7 @@ using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
+using NextGenOS.Hub.Books;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
@@ -33,11 +34,12 @@ public sealed class HubApp
         Numbering = new Numbering(Shop);
         Parties = new PartyService(db, Shop, clock);
         Catalog = new CatalogService(db, Shop, clock);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit);
+        Books = new BooksService(db, clock);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books);
         Users = new UserService(db, clock, Audit);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
-        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit);
+        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit, Books);
         Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
         Purchasing = new PurchaseService(Documents, Catalog, Parties);
         Reports = new ReportService(db, Shop, clock, Catalog);
@@ -62,6 +64,7 @@ public sealed class HubApp
     public Numbering Numbering { get; }
     public PartyService Parties { get; }
     public CatalogService Catalog { get; }
+    public BooksService Books { get; }
     public DocumentService Documents { get; }
     public UserService Users { get; }
     public RestaurantService Restaurant { get; }
@@ -88,6 +91,7 @@ public sealed class HubApp
         var settings = Shop.Settings;
         if (string.IsNullOrEmpty(settings.Country) || !settings.SetupDone) return;
         Documents.DiscardStaleDrafts();
+        Books.CatchUp();
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
         Retention.Prune(null);
     }

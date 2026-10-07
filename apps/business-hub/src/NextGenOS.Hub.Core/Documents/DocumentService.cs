@@ -14,7 +14,7 @@ namespace NextGenOS.Hub.Documents;
 /// Invoices, quotes, orders, credit notes, purchases and progress bills. One place does the money: it builds the lines, asks the tax engine for the
 /// amounts (so every country is right to the last cent), keeps the answer with the document, takes payments, moves stock and numbers the document.
 /// </summary>
-public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit)
+public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books)
 {
     private const string DocColumns =
         "id, type, number, status, direction, party_id, issued_at, created_at, due_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
@@ -411,6 +411,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 
         if (type == DocTypes.Invoice && header.Direction == "out") MoveStock(c, t, header.Id, lines, -1, "sale", options.UserId, now);
         if (type == DocTypes.Purchase) MoveStock(c, t, header.Id, lines, +1, "purchase", options.UserId, now);
+        books.Sync(c, t, documentId, options.UserId);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
         return documentId;
     }
@@ -473,6 +474,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             if (payment.AmountMinor > header.BalanceMinor) throw new HubException("too-much", $"Only {shop.Current.Money(header.BalanceMinor)} is still owed on this document.");
             InsertPayment(c, t, documentId, header.PartyId, header.ProjectId, payment, userId, "payment", clock.UtcNow);
             HubDb.Exec(c, "UPDATE documents SET paid_minor = paid_minor + $a WHERE id = $id", t, ("$a", payment.AmountMinor), ("$id", documentId));
+            books.Sync(c, t, documentId, userId);
         });
         return Get(documentId)!;
     }
@@ -499,6 +501,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 }
             }
             HubDb.Exec(c, "UPDATE documents SET status = 'void', notes = COALESCE(notes || char(10), '') || $why WHERE id = $id", t, ("$why", "Void: " + reason.Trim()), ("$id", documentId));
+            books.Sync(c, t, documentId, userId);
             audit.Log(c, t, userId, "void", "document", documentId, reason.Trim());
         });
         return Get(documentId)!;
@@ -559,6 +562,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             // What the customer paid is kept honest on the invoice: the refund lowers what counts as paid there.
             HubDb.Exec(c, "UPDATE documents SET paid_minor = MAX(0, paid_minor - $r) WHERE id = $id", t, ("$r", refundable), ("$id", invoiceId));
             MoveStock(c, t, noteId, noteDocLines, +1, "return", userId, now);
+            books.Sync(c, t, noteId, userId);
             audit.Log(c, t, userId, "credit-note", "document", noteId, number + " for " + invoice.Number + ": " + reason.Trim());
             return noteId;
         });

@@ -1,0 +1,98 @@
+@page "/account/{Id:long}"
+@attribute [Authorize(Policy = Perm.Parties)]
+@inherits HubPage
+
+<PageTitle>@(party?.Name ?? "Account")</PageTitle>
+@if (party is null)
+{
+    <h1>Not found</h1>
+    <Notice Error="@Error" />
+    <a class="btn primary" href="people">Back to the list</a>
+}
+else
+{
+    <p><a href="people">← People</a></p>
+    <h1>@party.Name</h1>
+    <p class="sub">The account: what @(supplier ? "the shop owes this supplier" : "this customer owes the shop"), line by line.</p>
+    <Notice Error="@Error" Info="@Info" />
+
+    <div class="row wrap">
+        <div class="card stat"><span class="label">@(supplier ? (balance >= 0 ? "We owe" : "They owe us") : (balance > 0 ? "Owes" : balance < 0 ? "Has credit" : "Owes"))</span><span class="value" id="balance">@Money(Math.Abs(balance))</span></div>
+        @if (!supplier && Me.Can(Perm.Sell) && Shop.PaymentMethods.Count > 0)
+        {
+            <div class="card grow">
+                <h2>Receive money</h2>
+                <p class="muted small">The oldest unpaid bills are settled first. If the customer pays more than is owed, the rest is kept as credit for the next bill.</p>
+                <div class="inline-form">
+                    <div><label for="r-amount">Amount</label><input id="r-amount" inputmode="decimal" @bind="amountText" placeholder="@(balance > 0 ? Shop.Text(balance) : "")" /></div>
+                    <div><label for="r-method">Paid by</label><select id="r-method" @bind="method">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div>
+                    <div><label for="r-ref">Reference (optional)</label><input id="r-ref" @bind="reference" maxlength="60" /></div>
+                    <button type="button" class="btn primary" id="receive" @onclick="Receive">Receive</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="card tbl-wrap">
+        @if (rows.Count == 0)
+        {
+            <div class="empty">Nothing on this account yet.</div>
+        }
+        else
+        {
+            <table class="tbl" id="statement">
+                <thead><tr><th>Date</th><th>What</th><th class="num">@(supplier ? "We were billed" : "Billed")</th><th class="num">@(supplier ? "We paid" : "Paid or credited")</th><th class="num">@(supplier ? "We owe" : "Owes")</th></tr></thead>
+                <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td>@Day(r.At)</td>
+                        <td>@r.Memo</td>
+                        <td class="num">@(Billed(r) > 0 ? Money(Billed(r)) : "")</td>
+                        <td class="num">@(Paid(r) > 0 ? Money(Paid(r)) : "")</td>
+                        <td class="num">@Money(r.BalanceMinor)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private Party? party;
+    private IReadOnlyList<NextGenOS.Hub.Books.BooksService.LedgerRow> rows = Array.Empty<NextGenOS.Hub.Books.BooksService.LedgerRow>();
+    private long balance;
+    private bool supplier;
+    private string amountText = "", method = "cash", reference = "";
+
+    protected override Task LoadAsync()
+    {
+        party = App.Parties.Get(Id);
+        if (party is null) return Task.CompletedTask;
+        supplier = party.Kind == "supplier";
+        rows = supplier ? App.Books.SupplierLedger(Id) : App.Books.CustomerLedger(Id);
+        balance = rows.LastOrDefault()?.BalanceMinor ?? 0;
+        method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods.FirstOrDefault() ?? "cash";
+        return Task.CompletedTask;
+    }
+
+    // a customer's account runs by debit (they owe more); a supplier's by credit (we owe more)
+    private long Billed(NextGenOS.Hub.Books.BooksService.LedgerRow r) => supplier ? r.CreditMinor : r.DebitMinor;
+    private long Paid(NextGenOS.Hub.Books.BooksService.LedgerRow r) => supplier ? r.DebitMinor : r.CreditMinor;
+
+    private Task Receive() => Run(async () =>
+    {
+        long amount = balance;
+        if (amountText.Trim().Length > 0 && (!TryMoney(Shop, amountText, out amount) || amount <= 0)) throw new HubException("amount", "Please type the amount as a number, like 250 or 99.50.");
+        if (amount <= 0) throw new HubException("amount", "Please type the amount received.");
+        var receipt = App.Documents.ReceiveOnAccount(Id, amount, method, string.IsNullOrWhiteSpace(reference) ? null : reference.Trim(), Me.Id);
+        var text = receipt.Settled.Count == 0 ? "" : "settled " + string.Join(", ", receipt.Settled.Select(s => s.Number ?? "a bill"));
+        var kept = receipt.KeptMinor > 0 ? $"{Money(receipt.KeptMinor)} kept as credit for the next bill" : "";
+        Info = $"Received {Money(amount)}" + (text.Length > 0 || kept.Length > 0 ? ": " + string.Join("; ", new[] { text, kept }.Where(x => x.Length > 0)) : "") + ".";
+        amountText = reference = "";
+        await Reload();
+    });
+}

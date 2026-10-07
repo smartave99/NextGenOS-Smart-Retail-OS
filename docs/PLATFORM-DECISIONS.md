@@ -255,7 +255,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked (7 October 2026):** A customer brings goods back: always cash back, always credit on the account, or the cashier chooses?
 - **Answer (the owner chose):** "Cashier chooses: cash back or credit on the account (Recommended)".
 - **Rule:** Every return asks **cash back now, or keep it as credit on the customer's account** for a later bill. Both are written in the customer's account and in the books. A return on an unpaid credit sale **lowers what the customer owes** (today a Hub credit note does not). Credit on the account needs a named customer.
-- **Today:** Not built. The Hub's credit note exists but does not touch what a customer owes.
+- **Today:** **Built (7 October 2026).** On the bill screen *Take something back* asks whether the money goes back now (by the way chosen) or stays as credit on the customer's account (needs a customer on the bill). The credit lowers what the customer owes in the books and is used at the till with *Use credit on account* (a way of paying that moves no money, only for the customer who has the credit). Tested by `BooksTests` and `e2e/accounts.e2e.mjs`. **Not done:** a credit note on an old bill still lowers the bill's `paid` figure by the refund (the books are right, the bill's own balance line is not changed), the customer's account is not printed, there is no limit on how long credit lasts.
 
 ### 35. An estimate shows the tax, so the bill matches
 

@@ -129,6 +129,10 @@
                 {
                     <button type="button" class="btn secondary" @onclick="() => Complete(true)">Put on account</button>
                 }
+                @if (AccountCredit > 0 && Remaining > 0)
+                {
+                    <button type="button" class="btn secondary" id="use-credit" @onclick="UseCredit">Use credit on account (@Money(AccountCredit))</button>
+                }
             </div>
             @foreach (var (p, i) in payments.Select((p, i) => (p, i)))
             {
@@ -167,9 +171,14 @@
     private Task OpenDrawer() => Run(async () => { await App.Printing.OpenDrawerAsync(null, Me.Id); });
 
     private long Paid => payments.Sum(p => p.AmountMinor);
+
+    /// <summary>What the customer has with the shop already (an advance, or a return kept as credit), not yet counted in the payments below.</summary>
+    private long AccountCredit => customer is null ? 0 : Math.Max(0, -App.Books.CustomerBalance(customer.Id) - payments.Where(p => p.Method == DocumentService.AccountCredit).Sum(p => p.AmountMinor));
+
+    private void UseCredit() => Run(() => payments.Add(new PaymentInput { Method = DocumentService.AccountCredit, AmountMinor = Math.Min(AccountCredit, Remaining) }));
     private long Remaining => Math.Max(0, (cart?.Document.PayableMinor ?? 0) - Paid);
 
-    private static string Label(string m) => char.ToUpperInvariant(m[0]) + m[1..];
+    private static string Label(string m) => m == DocumentService.AccountCredit ? "Credit on account" : char.ToUpperInvariant(m[0]) + m[1..];
 
     protected override Task LoadAsync()
     {
@@ -326,6 +335,7 @@
         {
             customer = p;
             customerQuery = "";
+            payments.RemoveAll(x => x.Method == DocumentService.AccountCredit);
             if (cart is not null) cart = App.Documents.SetParty(cart.Document.Id, p.Id);
             Search();
         });
@@ -336,6 +346,7 @@
         Run(() =>
         {
             customer = null;
+            payments.RemoveAll(x => x.Method == DocumentService.AccountCredit);
             if (cart is not null) cart = App.Documents.SetParty(cart.Document.Id, null);
             Search();
         });
@@ -365,7 +376,7 @@
         {
             if (cart is null) return;
             if (!onAccount && tender.Trim().Length > 0) AddPayment();
-            if (!onAccount && payments.Count == 0 && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });
+            if (!onAccount && payments.All(p => p.Method == DocumentService.AccountCredit) && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });   // nothing typed (or only the customer's credit): the rest is taken in the way chosen
             var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount });
             finished = true;
             Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");

@@ -42,7 +42,7 @@
     }
     @foreach (var p in View.Payments.Where(p => p.Kind == "payment"))
     {
-        <div class="r"><span>@(char.ToUpperInvariant(p.Method[0]) + p.Method[1..])</span><span>@Shop.Money(p.AmountMinor)</span></div>
+        <div class="r"><span>@(p.Method == DocumentService.AccountCredit ? "Credit on account" : char.ToUpperInvariant(p.Method[0]) + p.Method[1..])</span><span>@Shop.Money(p.AmountMinor)</span></div>
     }
     @if (View.Document.Meta.TryGetValue("changeGiven", out var change) && long.TryParse(change, out var given) && given > 0)
     {

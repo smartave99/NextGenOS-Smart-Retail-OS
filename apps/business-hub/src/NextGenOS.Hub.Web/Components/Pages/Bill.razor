@@ -18,7 +18,7 @@ else
         <h1>@Kind() @(d.Number ?? "")</h1>
         <p class="sub">
             @(d.IssuedAt is { } at ? When(at) : "Not finished") ·
-            @if (view.Party is { } p) { <span>@p.Name</span> }
+            @if (view.Party is { } p) { <a href="account/@p.Id">@p.Name</a> }
             @if (d.Status == DocStatus.Void) { <span class="chip bad">Void</span> }
             else if (d.Status == DocStatus.Issued) { <span class="chip @(d.PaymentState == "paid" ? "ok" : "warn")">@(d.PaymentState == "paid" ? "Paid" : d.PaymentState == "partial" ? "Part paid" : "Unpaid")</span> }
         </p>
@@ -58,7 +58,8 @@ else
                 </table>
                 <div class="inline-form">
                     <div><label for="r-why">Why</label><input id="r-why" @bind="reason" maxlength="120" /></div>
-                    <div><label for="r-how">Money goes back by</label><select id="r-how" @bind="refundMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div>
+                    <div><label for="r-kind">The money</label><select id="r-kind" @bind="keepAsCredit"><option value="@false">goes back now</option>@if (view.Party is not null) { <option value="@true">stays as credit on the customer's account</option> }</select></div>
+                    @if (!keepAsCredit) { <div><label for="r-how">Money goes back by</label><select id="r-how" @bind="refundMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div> }
                     <button type="button" class="btn primary" id="save-return" @onclick="SaveReturn">Give back</button>
                 </div>
             </div>
@@ -156,6 +157,8 @@ else
         Info = $"Printed on {receiptPrinter.Name}.";
     });
 
+    private bool keepAsCredit;
+
     private const string PayPanel = "pay", ReturnPanel = "return", VoidPanel = "void";
 
     private void Toggle(string name) => panel = panel == name ? null : name;
@@ -187,7 +190,8 @@ else
             if (milli > 0) credit.Add((l.Id, milli));
         }
         if (credit.Count == 0) throw new HubException("nothing", "Type how many of each are coming back.");
-        var note = App.Documents.CreateCreditNote(Id, credit, string.IsNullOrWhiteSpace(reason) ? "Returned" : reason.Trim(), refundMethod, Me.Id);
+        if (keepAsCredit && view.Party is null) throw new HubException("no-party", "Credit on an account needs a customer on the bill.");
+        var note = App.Documents.CreateCreditNote(Id, credit, string.IsNullOrWhiteSpace(reason) ? "Returned" : reason.Trim(), refundMethod, Me.Id, refundPaid: !keepAsCredit);
         Nav.NavigateTo("/documents/" + note.Document.Id);
     });
 

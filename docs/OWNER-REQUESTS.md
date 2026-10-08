@@ -208,3 +208,7 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-08 (about; sent with the file `NextGenOS_Developer_Engineering_Blueprint.pdf` attached, which is saved as `docs/NextGenOS_Developer_Engineering_Blueprint.pdf`; the working copy is `docs/ENGINEERING-BLUEPRINT.md`)
 
 > continue start from where stopped and read and save the attach file and execute it as and when best
+
+### 2026-10-08 (about; sent while the assistant was working on the blueprint tickets)
+
+> I hit my usage limit while you were working, but it has reset now. Please continue from where you left off.

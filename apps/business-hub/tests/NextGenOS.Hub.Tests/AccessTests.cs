@@ -137,6 +137,10 @@ public class AccessTests : IDisposable
         yield return new("Appointments.SetStatus", new[] { Perm.Appointments }, a => a.Appointments.SetStatus(0, "arrived"));
         yield return new("Appointments.Invoice", new[] { Perm.Appointments }, a => a.Appointments.Invoice(0, null, Array.Empty<PaymentInput>()));
 
+        yield return new("Network.Configure", new[] { Perm.Network }, a => a.Network.Configure(null, false, 5290));
+        yield return new("Network.Pairing.NewCode", new[] { Perm.Network }, a => a.Network.Pairing.NewCode(null));
+        yield return new("Network.Pairing.Remove", new[] { Perm.Network }, a => a.Network.Pairing.Remove(0, null));
+
         yield return new("Ai.Flags.Set", new[] { Perm.Ai }, a => a.Ai.Flags.Set("nope", false, null));
         yield return new("Ai.Providers.Save", new[] { Perm.Ai }, a => a.Ai.Providers.Save(null!, null));
         yield return new("Ai.Providers.SetEnabled", new[] { Perm.Ai }, a => a.Ai.Providers.SetEnabled("x", true, null));

@@ -1,5 +1,6 @@
 using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Catalog;
+using NextGenOS.Hub.Counters;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
 using NextGenOS.Hub.Backups;
@@ -27,7 +28,7 @@ namespace NextGenOS.Hub;
 /// </summary>
 public sealed class HubApp
 {
-    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, bool trusted)
+    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, bool trusted, NetworkOptions? network)
     {
         Db = db;
         Clock = clock;
@@ -63,6 +64,8 @@ public sealed class HubApp
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Access);
         // The shop's own copies, made every night to a second place the owner chose (Settings, Backups), and putting one back.
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
+        // A store with one main PC and many counter PCs on the shop's own network: switched off unless the owner chose it (and the Hub was started again since). Nothing leaves the shop.
+        Network = new StoreNetwork(db, clock, Audit, Access, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", network);
     }
 
     public HubDb Db { get; }
@@ -95,6 +98,7 @@ public sealed class HubApp
     public OntologyService Ontology { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
+    public StoreNetwork Network { get; }
 
     /// <summary>
     /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day
@@ -117,22 +121,22 @@ public sealed class HubApp
     /// Opens (and, if needed, creates or brings up to date) the shop database at a path. An update of a shop that has data first makes a checked copy, in <paramref name="backupFolder"/>
     /// (next to the file when null); if the copy cannot be made this throws and the shop's data is untouched (<see cref="HubDb.Migrate()"/>).
     /// </summary>
-    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null) =>
-        Open(path, clock, print, ai, backupFolder, trusted: false);
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null, NetworkOptions? network = null) =>
+        Open(path, clock, print, ai, backupFolder, trusted: false, network);
 
     /// <summary>
     /// A shop in which a command with nobody named is allowed: for the tests and for filling the sample company, where the program acts on its own. Not reachable from the program
     /// (internal): the shop that people use is opened with <see cref="Open(string, IClock?, NextGenOS.Devices.Printing.PrintService?, AiOptions?, string?)"/>, where a command with
     /// nobody named is refused (see <see cref="Security.Access"/>).
     /// </summary>
-    internal static HubApp OpenTrusted(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null) =>
-        Open(path, clock, print, ai, backupFolder, trusted: true);
+    internal static HubApp OpenTrusted(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null, NetworkOptions? network = null) =>
+        Open(path, clock, print, ai, backupFolder, trusted: true, network);
 
-    private static HubApp Open(string path, IClock? clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, string? backupFolder, bool trusted)
+    private static HubApp Open(string path, IClock? clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, string? backupFolder, bool trusted, NetworkOptions? network)
     {
         var db = new HubDb(path, backupFolder);
         db.Migrate();
-        var app = new HubApp(db, clock ?? new SystemClock(), print, ai, trusted);
+        var app = new HubApp(db, clock ?? new SystemClock(), print, ai, trusted, network);
         // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
         app.Books.CatchUp();
         return app;

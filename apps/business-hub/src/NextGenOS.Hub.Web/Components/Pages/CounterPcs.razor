@@ -1,0 +1,217 @@
+@page "/settings/network"
+@attribute [Authorize(Policy = Perm.Network)]
+@inherits HubPage
+@using NextGenOS.Hub.Counters
+
+<PageTitle>Store network</PageTitle>
+<h1>Store network</h1>
+<p class="sub">Connect the other PCs of the shop to this one. <a href="settings">Back to settings</a></p>
+<Notice Error="@Error" Info="@Info" />
+
+<section class="card" id="net-about">
+    <h2>One main PC, many counter PCs</h2>
+    <p>This PC is the shop's <strong>main PC</strong>: it keeps all the shop's information. Other PCs, called <strong>counter PCs</strong>, open the shop's screens from this one over the shop's own network (the cable or the Wi-Fi of the shop). Nothing goes to the internet, and nothing is kept on a counter PC.</p>
+    <p class="muted small">A counter PC cannot work when this PC is switched off or off the network: there is nothing else for it to show. Keep this PC on while the shop is open. A spare copy of the main PC is not built yet.</p>
+</section>
+
+<section class="card" id="net-switch">
+    <h2>Let counter PCs connect</h2>
+    @if (status.Running && status.Accepting)
+    {
+        <div class="notice ok" id="net-state">Counter PCs can connect now.</div>
+    }
+    else if (!status.Chosen && !status.Running)
+    {
+        <p class="muted" id="net-state">Off. Counter PCs cannot connect. The Hub answers on this PC only.</p>
+    }
+    else if (!status.Chosen && status.Running)
+    {
+        <div class="notice warn" id="net-state">Switched off. Every counter PC is refused now. The Hub's network door closes completely the next time the Hub starts.</div>
+    }
+
+    @if (status.RestartNeeded && status.Problem is null)
+    {
+        <div class="notice warn" id="net-restart">
+            Saved. It takes effect when the Hub starts again, which a program cannot do by itself while it runs. @RestartWords()
+        </div>
+    }
+    @if (status.Problem is { } problem)
+    {
+        <div class="notice warn" id="net-problem">@problem</div>
+    }
+
+    <div class="stack">
+        <label class="check"><input type="checkbox" id="net-on" @bind="wantOn" /> <strong>Let counter PCs connect</strong> <span class="muted small">to this PC, over the shop's own network</span></label>
+        <details>
+            <summary class="muted small">Advanced: the port</summary>
+            <label for="net-port">Port (leave it as it is unless your network needs another)</label>
+            <input id="net-port" inputmode="numeric" @bind="portText" maxlength="5" />
+        </details>
+    </div>
+    <div class="row"><button type="button" class="btn primary" id="net-save" @onclick="Save">Save</button></div>
+    <p class="muted small">Switching it off takes effect at once and sends every counter PC away. Switching it on takes effect when the Hub starts again. The first time, this PC makes the shop's own certificate, kept on this PC only; nothing is bought or fetched from outside.</p>
+</section>
+
+@if (status.Running && status.Accepting)
+{
+    <section class="card" id="net-add">
+        <h2>Add a counter PC</h2>
+        @if (use.Limit is { } limit)
+        {
+            <p id="net-use">PCs in use: <strong>@use.InUse</strong> of <strong>@limit</strong> (this main PC and its counter PCs together, as your licence allows).</p>
+            @if (use.Full) { <div class="notice warn" id="net-full">All the PCs your licence allows are in use. Remove a counter PC you no longer use, or ask your supplier for a licence with more PCs.</div> }
+        }
+        else
+        {
+            <p class="muted" id="net-use">Your licence puts no limit on the number of PCs.</p>
+        }
+
+        <ol>
+            <li>Press <strong>Make a pairing code</strong> below. It works once and runs out after 10 minutes.</li>
+            <li>On the counter PC, open the browser and go to one of these addresses (the name is the easiest to remember):
+                <ul>@foreach (var url in status.Urls) { <li><code>@url/pair</code></li> }</ul>
+            </li>
+            <li>The first time, the browser warns that the connection is not private, until that PC trusts this shop's certificate. The page it shows explains it. These check letters must be the same there as here:
+                <div class="notice" id="net-letters"><code>@StoreCertificates.Spaced(status.AuthorityFingerprint ?? "")</code></div>
+            </li>
+            <li>Type the code and a name for that PC.</li>
+        </ol>
+        <div class="row">
+            <button type="button" class="btn primary" id="net-code-make" disabled="@use.Full" @onclick="MakeCode">Make a pairing code</button>
+            <a class="btn ghost" id="net-cert" href="pair/ca.crt" download>Download the shop's certificate</a>
+        </div>
+        @if (newCode is not null)
+        {
+            <div class="notice ok" id="net-code-box" role="status">
+                <div>Pairing code, shown only now:</div>
+                <strong id="net-code" style="font-size:2rem;letter-spacing:.12em">@newCode.Code</strong>
+                <div class="small">Works once. Runs out at @When(newCode.ExpiresAt).</div>
+            </div>
+        }
+
+        <details>
+            <summary class="muted small">A counter PC cannot connect?</summary>
+            <ul class="muted small">
+                <li>Both PCs must be on the same network of the shop (the same router), and this PC must be on.</li>
+                <li>This PC's firewall may block the port (@status.RunningPort). In Windows: Windows Security, Firewall and network protection, Advanced settings, Inbound Rules, New Rule: choose Port, TCP, @status.RunningPort, Allow the connection, for Private and Domain networks. The Hub's setup does not open it for you yet.</li>
+                <li>If this PC's address changes (some routers hand out new ones), use its name instead, or restart the Hub so that its certificate follows the new address.</li>
+            </ul>
+        </details>
+    </section>
+
+    <section class="card" id="net-counters">
+        <h2>Counter PCs</h2>
+        @if (counters.Count == 0) { <div class="empty">No counter PC is paired yet.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl">
+                <thead><tr><th>Name</th><th>Paired</th><th>Last seen</th><th>Address</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var c in counters)
+                {
+                    var id = c.Id;
+                    <tr id="@("net-pc-" + id)">
+                        <td><strong>@c.Name</strong></td>
+                        <td class="nowrap">@When(c.PairedAt)</td>
+                        <td class="nowrap">@(c.LastSeenAt is { } seen ? When(seen) : "never")</td>
+                        <td>@c.LastAddress</td>
+                        <td class="right nowrap">
+                            @if (confirmRemove == id)
+                            {
+                                <span class="muted small">Remove it? It is sent away at once.</span>
+                                <button type="button" class="btn ghost small" id="@("net-yes-" + id)" @onclick="() => Remove(id)">Yes, remove</button>
+                                <button type="button" class="btn ghost small" @onclick="() => confirmRemove = null">No</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn ghost small" id="@("net-remove-" + id)" @onclick="() => confirmRemove = id">Remove</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+
+        <div class="row"><button type="button" class="btn ghost small" @onclick="Reload">Refresh the list</button></div>
+        @if (removed.Count > 0)
+        {
+            <details>
+                <summary class="muted small">Removed counter PCs (@removed.Count)</summary>
+                <ul class="muted small">@foreach (var c in removed) { <li>@c.Name: paired @When(c.PairedAt), removed @(c.RemovedAt is { } r ? When(r) : "")</li> }</ul>
+            </details>
+        }
+    </section>
+}
+
+<section class="card" id="net-stays">
+    <h2>What stays in the shop</h2>
+    <ul>
+        <li>The shop's information stays on this PC. A counter PC only shows it and sends what the person at it types.</li>
+        <li>Nothing is sent to the internet because of this. No outside service is used for the certificate or the connection.</li>
+        <li>A computer that has not been paired is refused, and so is a counter PC you removed, at once. People still sign in with their own user name and password on a counter PC, and see only what their role allows.</li>
+        <li>Every pairing, removal and refusal is written to <a href="settings?tab=activity">What people did</a>.</li>
+    </ul>
+</section>
+
+@code {
+    private StoreNetworkStatus status = default!;
+    private PcUse use = new(0, null);
+    private IReadOnlyList<CounterPc> counters = Array.Empty<CounterPc>();
+    private IReadOnlyList<CounterPc> removed = Array.Empty<CounterPc>();
+    private NewPairingCode? newCode;
+    private bool wantOn;
+    private string portText = NetworkSettings.DefaultPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private long? confirmRemove;
+    private bool formShown;
+
+    protected override Task LoadAsync()
+    {
+        status = App.Network.Status();
+        use = App.Network.Pairing.Use();
+        counters = App.Network.Pairing.List();
+        removed = App.Network.Pairing.Removed();
+        if (!formShown)
+        {
+            wantOn = status.Chosen;
+            portText = status.ChosenPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            formShown = true;
+        }
+
+        if (newCode is not null && newCode.ExpiresAt <= App.Clock.UtcNow) newCode = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task Save()
+    {
+        await Run(() =>
+        {
+            if (!int.TryParse(portText.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var port))
+                throw new HubException("bad-port", "The port must be a number between 1024 and 65535.");
+            App.Network.Configure(Me.Id, wantOn, port);
+            if (!wantOn) newCode = null;
+        }, wantOn ? "Saved." : "Saved. Counter PCs are refused from now on.");
+        formShown = false;
+        await Reload();
+    }
+
+    private async Task MakeCode()
+    {
+        await Run(() => newCode = App.Network.Pairing.NewCode(Me.Id));
+        await Reload();
+    }
+
+    private async Task Remove(long id)
+    {
+        confirmRemove = null;
+        await Run(() => App.Network.Pairing.Remove(id, Me.Id), "Removed. That counter PC is refused from now on.");
+        await Reload();
+    }
+
+    /// <summary>Plain words about restarting. There is no restart button yet: the Hub cannot safely restart itself, because on Windows the service does not start again by itself after a plain stop.</summary>
+    private static string RestartWords() => OperatingSystem.IsWindows()
+        ? "Restart this PC (Start, Power, Restart). A restart button inside the Hub is not built yet."
+        : "Restart this computer, or ask the person who set it up to restart the Hub's service (nextgenos-hub). A restart button inside the Hub is not built yet.";
+}

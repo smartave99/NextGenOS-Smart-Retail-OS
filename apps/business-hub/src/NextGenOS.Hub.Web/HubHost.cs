@@ -8,6 +8,7 @@ using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Web.Auth;
 using NextGenOS.Hub.Web.Components;
+using NextGenOS.Hub.Web.Counters;
 using NextGenOS.Licensing.AspNetCore;
 
 namespace NextGenOS.Hub.Web;
@@ -60,11 +61,17 @@ public static class HubHost
         // Hub:BackupFolder is where the copy made before an update goes (a second disk is best); without it the copy is made next to the shop's file.
         var backupFolder = builder.Configuration["Hub:BackupFolder"];
         var shopFile = Path.Combine(folder, "shop.db");
+        // Counter PCs on the shop's own network: off unless the owner chose it. Off, nothing is added and the Hub listens on this PC only, as it always did.
+        var network = StoreNetworkHost.Add(builder, folder);
         services.AddSingleton(sp =>
         {
             // A copy the owner chose to put back (Settings, Backups, or the first screen of a PC with no shop) is put in place now, before the shop is opened: the running shop cannot swap its own file.
             var restored = NextGenOS.Hub.Backups.PendingRestore.ApplyIfPending(folder, shopFile);
-            var app = HubApp.Open(shopFile, ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>())), backupFolder: backupFolder);
+            // The licence's number of PCs limits the counter PCs (the main PC counts as one); like the modules it is handed over as a function.
+            var licence = sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>();
+            var app = HubApp.Open(shopFile, ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(licence)), backupFolder: backupFolder,
+                network: new NextGenOS.Hub.Counters.NetworkOptions(network, LicenceEntitlements.DeviceLimit(licence)));
+            StoreNetworkHost.Connect(app, sp.GetRequiredService<ConnectionTracker>());
             if (restored is not null) app.Audit.Log(null, restored.Done ? "restore" : "restore-failed", "backup", null, restored.Message);
             return app;
         });
@@ -134,7 +141,10 @@ public static class HubHost
 
     public static void UseHub(WebApplication app)
     {
-        // First of all: nothing is served, not even a static file, without a usable licence.
+        // Before even the licence page: a computer on the shop's network that was not paired with this shop gets one plain refusal and nothing else (it must not see the licence
+        // page, or be able to type a licence key). Requests from this PC itself pass straight through, untouched.
+        app.UseStoreNetworkGate();
+        // Then: nothing is served, not even a static file, without a usable licence.
         app.UseLicenceGate();
         app.Use(SecurityHeaders);
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
@@ -145,6 +155,7 @@ public static class HubHost
         app.UseAntiforgery();
         app.MapStaticAssets().AllowAnonymous();
 
+        StoreNetworkEndpoints.Map(app);
         app.MapGet("/health", () => Results.Text("ok")).AllowAnonymous();
         app.MapGet("/tokens.css", (HttpContext http) =>
         {
@@ -180,6 +191,13 @@ public static class HubHost
     /// <summary>Headers on every answer: nothing from another site runs, the page cannot be framed, and nothing is guessed about file types.</summary>
     private static Task SecurityHeaders(HttpContext context, RequestDelegate next)
     {
+        ApplySecurityHeaders(context);
+        return next(context);
+    }
+
+    /// <summary>The headers above, set on one answer (also used by the pages that are answered before this step, for computers that are not paired).</summary>
+    internal static void ApplySecurityHeaders(HttpContext context)
+    {
         var h = context.Response.Headers;
         h["X-Content-Type-Options"] = "nosniff";
         h["X-Frame-Options"] = "DENY";
@@ -187,7 +205,6 @@ public static class HubHost
         h["Cross-Origin-Opener-Policy"] = "same-origin";
         h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(), payment=()";
         h.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
-        return next(context);
     }
 
     /// <summary>

@@ -216,6 +216,10 @@ public class EndpointAndTextGuardTests
     [InlineData("card 4111-1111-1111-1111", true)]
     [InlineData("5500005555555559", true)]
     [InlineData("340000000000009", true)]
+    [InlineData("4111 1111 1111 1111 51", true)]          // other digits after it in the same run
+    [InlineData("51 4111 1111 1111 1111", true)]          // ... or before it
+    [InlineData("ref 77 4111-1111-1111-1111 order 5", true)]
+    [InlineData("4111 1111 1111 1112 51", false)]         // not a valid card number with or without the extra digits
     [InlineData("4111 1111 1111 1112", false)]
     [InlineData("Order 1234567890123456 shipped", false)]
     [InlineData("Call +91 98765 43210 today", false)]

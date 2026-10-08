@@ -80,6 +80,12 @@ public static class HubHost
         var protection = services.AddDataProtection().SetApplicationName("NextGenOS.Hub").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(folder, "keys")));
         if (OperatingSystem.IsWindows()) protection.ProtectKeysWithDpapi(protectToLocalMachine: true);
 
+        // The Help button: the program remembers its last warnings and errors (in memory only) so that a support file can say what went wrong lately.
+        var trouble = new NextGenOS.Hub.Web.Diagnostics.TroubleLog();
+        services.AddSingleton(trouble);
+        builder.Logging.AddProvider(trouble);
+        services.AddSingleton<NextGenOS.Hub.Web.Diagnostics.SupportFileBuilder>();
+
         services.AddHttpContextAccessor();
         services.AddAntiforgery(o => { o.HeaderName = CsrfHeader; o.Cookie.Name = "hub.csrf"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.HttpOnly = true; });
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>

@@ -21,6 +21,7 @@ using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Restaurant;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
+using NextGenOS.Hub.Diagnostics;
 
 namespace NextGenOS.Hub;
 
@@ -47,7 +48,7 @@ public sealed class HubApp
         Events = new EventStore(db, clock, Audit, Ai.Flags, Retention, Access);
         // The outbox: a sale, a return, a payment, a purchase and a stock change leave a message in the very transaction that makes them (only while the event history is on); the upkeep delivers them.
         Outbox = new OutboxService(db, clock, Ai.Flags, Events, Audit, Access);
-        Books = new BooksService(db, clock);
+        Books = new BooksService(db, clock, Access);
         Catalog = new CatalogService(db, Shop, clock, Access, Books, Outbox);
         Loyalty = new LoyaltyService(db, Shop, clock);
         Offers = new OffersService(db, Shop, clock, Audit, Access);
@@ -63,8 +64,8 @@ public sealed class HubApp
         Insights = new InsightService(db, clock, Audit, Ai.Flags, Outbox, Supply, Access);
         // Requests for a closed list of things, each approved by a person before it is done (today: a draft order to a supplier). Off until the owner switches on suggested actions.
         Actions = new ActionService(db, clock, Audit, Ai.Flags, Outbox, Insights, new ActionRegistry([new CreatePurchaseOrderAction(db, Parties, Catalog, Purchasing, Shop)]), Access);
-        Reports = new ReportService(db, Shop, clock, Catalog);
-        TaxRegisters = new TaxRegisterService(db, Shop);
+        Reports = new ReportService(db, Shop, clock, Catalog, Access);
+        TaxRegisters = new TaxRegisterService(db, Shop, Access);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
@@ -75,6 +76,8 @@ public sealed class HubApp
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
         // A store with one main PC and many counter PCs on the shop's own network: switched off unless the owner chose it (and the Hub was started again since). Nothing leaves the shop.
         Network = new StoreNetwork(db, clock, Audit, Access, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", network);
+        // The Help button's support file: facts about how the shop is set up and how it is doing, never what it sold or to whom.
+        Support = new SupportService(this);
     }
 
     public HubDb Db { get; }
@@ -112,6 +115,7 @@ public sealed class HubApp
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public StoreNetwork Network { get; }
+    public SupportService Support { get; }
 
     /// <summary>
     /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day

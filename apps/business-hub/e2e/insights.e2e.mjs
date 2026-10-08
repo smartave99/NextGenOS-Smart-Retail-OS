@@ -117,6 +117,19 @@ try {
   for (const word of ['supply.set', 'insight.run', 'insight.dismiss', 'insight.settings', 'action.propose', 'action.approve', 'action.done']) assert.ok(activity.includes(word), 'the activity list shows ' + word);
   step('every change by a person is in the activity list');
 
+  // What was sent to an AI service: a request through a fixed reason, with no service connected and a customer's name added, is refused and the screen says that nothing was sent and what was left out.
+  const egress = await page.request.post(hub.url + '/__e2e/seed-egress');
+  assert.strictEqual(egress.status(), 200);
+  assert.strictEqual((await egress.json()).ok, false);
+  await page.goto(hub.url + '/settings');
+  await page.getByRole('tab', { name: 'AI helpers' }).click();
+  await page.getByRole('heading', { name: 'AI helpers', level: 1 }).waitFor();
+  await page.locator('#ai-sent').waitFor();
+  const sentRow = (await page.locator('#ai-sent-table tbody tr').first().innerText()).replace(/\s+/g, ' ');
+  for (const part of ['low_stock_explain', 'nothing', 'customer_name', 'Not allowed']) assert.ok(sentRow.includes(part), 'the row says ' + part + ': ' + sentRow);
+  assert.ok(!sentRow.includes('Maria') && !sentRow.includes('Basmati'), 'the row holds no value that was supplied');
+  step('the AI page says what was asked, that nothing was sent, what was left out, and never shows what the pieces said');
+
   await page.context().close();
   assert.deepStrictEqual(problems, [], 'the browser saw problems');
   console.log('\nRunning low: all steps passed.');

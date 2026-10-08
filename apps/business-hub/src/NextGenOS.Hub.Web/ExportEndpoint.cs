@@ -1,13 +1,19 @@
+using System.Security.Claims;
 using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Shop;
 
 namespace NextGenOS.Hub.Web;
 
-/// <summary>Reports as files for a spreadsheet: /export/{report}.csv?from=2026-10-01&amp;to=2026-10-31. Only for people allowed to see reports.</summary>
+/// <summary>
+/// Reports as files for a spreadsheet: /export/{report}.csv?from=2026-10-01&amp;to=2026-10-31. Only for people allowed to see reports. The route checks the role, and the reading itself is
+/// done as the person signed in, so the Hub's own check (blueprint SEC-004) stands behind it.
+/// </summary>
 public static class ExportEndpoint
 {
-    public static IResult Handle(string report, string? from, string? to, HubApp app)
+    public static IResult Handle(string report, string? from, string? to, HubApp app, HttpContext http)
     {
+        long? who = long.TryParse(http.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+        using var scope = app.Access.As(who);
         var shop = app.Shop.Current;
         var today = shop.Time.LocalDate(app.Clock.UtcNow);
         var start = DateOnly.TryParse(from, out var f) ? f : today.AddDays(-29);

@@ -76,6 +76,7 @@
         if (Can(Perm.Reports) && Shop.Settings.TaxRegistered && Shop.Country.Tax.Model != "none") yield return new Link("registers", Shop.Country.Tax.Name + " registers", "receipt");
         if (f.CounterSale && Can(Perm.Discount)) yield return new Link("offers", "Offers", "tag");
         if (Can(Perm.Settings)) yield return new Link("settings", "Settings", "gear");
+        if (Can(Perm.Settings)) yield return new Link("help", "Help", "help");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

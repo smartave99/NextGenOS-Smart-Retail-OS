@@ -1,5 +1,6 @@
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
 using NextGenOS.Tax;
 using NewtonJson = Newtonsoft.Json.JsonConvert;
@@ -54,13 +55,14 @@ public sealed record SupplySummary(IReadOnlyList<SummaryBlockResult> Blocks, int
 /// credit notes and of purchases, the lists a country's tax return is made from (the pack says which bills go in which list: <c>tax.returns</c>), and a summary by the code of what was sold. Cancelled
 /// bills are left out; so is every bill of a shop that is not registered for the tax (no tax was charged on it). The buyer's number is the one that was on the bill when it was made.
 /// </summary>
-public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop)
+public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop, Access access)
 {
     private sealed record Raw(long Id, string Type, string Number, DateTimeOffset At, string? PartyName, string? PartyTaxId, string? BuyerRegion, string? SellerRegion, bool Registered,
         long SubtotalMinor, long TotalMinor, string? Result);
 
     private IReadOnlyList<Raw> Read(string types, string direction, DateOnly from, DateOnly to)
     {
+        access.Require(Perm.Reports);   // blueprint SEC-004 (reads): the registers hold customers' tax numbers and every bill, so the Hub itself asks who is reading
         var time = shop.Current.Time;
         return db.Query(
             "SELECT d.id, d.type, d.number, d.issued_at, p.name AS party_name, d.party_tax_id, d.buyer_region, d.seller_region, d.registered, d.subtotal_minor, d.total_minor, d.result " +
@@ -103,6 +105,7 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop)
     /// </summary>
     public IReadOnlyList<ReturnListResult> ReturnLists(DateOnly from, DateOnly to)
     {
+        access.Require(Perm.Reports);
         var rules = shop.Current.Country.Tax.Returns;
         if (!HasReturnLists) return Array.Empty<ReturnListResult>();
         var decimals = shop.Current.Decimals;
@@ -143,6 +146,7 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop)
     /// </summary>
     public SupplySummary SupplySummary(DateOnly from, DateOnly to)
     {
+        access.Require(Perm.Reports);
         var context = shop.Current;
         var rules = context.Country.Tax.Summary;
         if (!HasSupplySummary) return new SupplySummary(Array.Empty<SummaryBlockResult>(), 0);
@@ -197,6 +201,7 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop)
     /// </summary>
     public CodeSummary CodesSold(DateOnly from, DateOnly to)
     {
+        access.Require(Perm.Reports);
         var context = shop.Current;
         if (context.Country.Tax.ItemCode is null) return new CodeSummary(Array.Empty<CodeSummaryRow>(), 0);
         var decimals = context.Decimals;

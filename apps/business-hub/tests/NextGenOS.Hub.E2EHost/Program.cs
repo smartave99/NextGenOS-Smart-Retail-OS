@@ -90,6 +90,18 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
         Seed("Toor dal", 60_000, 2_000, 4, 1);
         return Results.Ok(new { supplier = supplier.Id });
     }).AllowAnonymous().DisableAntiforgery();
+
+    // One request through a fixed reason for sending something to an AI service, with no service connected: it is refused, and the screen shows that nothing was sent.
+    app.MapPost("/__e2e/seed-egress", async (NextGenOS.Hub.HubApp hub) =>
+    {
+        using var asTheProgram = hub.Access.AsSystem();
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.PredictiveInventory, true, null);
+        var answer = await hub.Ai.Gateway.GenerateAsync(new NextGenOS.Hub.Ai.EgressRequest("low_stock_explain", new Dictionary<string, string>
+        {
+            ["item"] = "Basmati rice", ["on_hand"] = "16000", ["sold"] = "84000", ["days_looked_at"] = "28", ["delivery_days"] = "5", ["customer_name"] = "Maria Santos",
+        }), null, CancellationToken.None);
+        return Results.Ok(new { ok = answer.Ok, refusal = answer.Refusal });
+    }).AllowAnonymous().DisableAntiforgery();
 }
 
 app.Run();

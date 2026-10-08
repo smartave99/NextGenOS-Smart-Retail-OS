@@ -208,6 +208,33 @@
     }
 </section>
 
+<section class="card" id="ai-sent">
+    <h2>What was sent</h2>
+    <p class="muted small">Every time the program asked an AI service for something through one of its fixed reasons, this says which pieces of information went (their names and kinds, never what they said), where, and under which of your permissions. What was left out is listed too.</p>
+    @if (egress.Count == 0) { <div class="empty" id="ai-sent-none">Nothing has been sent.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl" id="ai-sent-table">
+            <thead><tr><th>When</th><th>Reason</th><th>Service</th><th>Pieces sent</th><th>Left out</th><th>Your permission of</th><th>Result</th></tr></thead>
+            <tbody>
+            @foreach (var e in egress)
+            {
+                <tr>
+                    <td>@When(e.At)</td><td>@e.Purpose</td>
+                    <td>@(e.ProviderId is null ? "–" : e.ProviderId + " (" + PlaceWord(e.Location) + ")")</td>
+                    <td>@(e.Fields.Count == 0 ? "nothing" : string.Join(", ", e.Fields.Select(x => x.Name)))</td>
+                    <td>@(e.Dropped.Count == 0 ? "" : string.Join(", ", e.Dropped))</td>
+                    <td>@(e.ConsentVersion is null ? (e.Location is "local" or "local-optimized" ? "not needed: stayed on this computer" : "–") : When(DateTimeOffset.Parse(e.ConsentVersion, CultureInfo.InvariantCulture)))</td>
+                    <td>@OutcomeLabel(e.Outcome)@(e.Detail is null ? "" : ": " + e.Detail)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</section>
+
 @code {
     private sealed class LimitForm { public string Requests = "", TokensMonth = "", Spend = "", PriceIn = "", PriceOut = ""; }
     private sealed class ServiceForm { public string Name = "", Where = ProviderLocation.Local, Address = "", Model = "", Key = ""; public bool Generate = true, Embed; }
@@ -220,6 +247,7 @@
     private IReadOnlyList<ModelRecord> models = Array.Empty<ModelRecord>();
     private IReadOnlyList<ProviderUsage> summary = Array.Empty<ProviderUsage>();
     private IReadOnlyList<UsageRow> recent = Array.Empty<UsageRow>();
+    private IReadOnlyList<EgressRow> egress = Array.Empty<EgressRow>();
     private readonly Dictionary<string, IReadOnlyList<ConsentRecord>> consents = new();
     private readonly Dictionary<string, bool> hasKey = new();
     private readonly Dictionary<string, string> keyText = new();
@@ -238,6 +266,7 @@
         var now = App.Clock.UtcNow.UtcDateTime;
         summary = ai.Usage.Summary(new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero));
         recent = ai.Usage.Recent(20);
+        egress = ai.Egress.Recent(20);
         consents.Clear();
         hasKey.Clear();
         foreach (var p in providers)
@@ -255,6 +284,8 @@
         // Looking at the computer can take a moment the first time (it asks the graphics driver), so it is done off the screen's own thread.
         caps = await Task.Run(() => ai.Hardware.Capabilities());
     }
+
+    private static string PlaceWord(string? location) => location switch { "local" or "local-optimized" => "this computer", "lan" => "your network", "cli" => "your own tool", "api" => "online", _ => location ?? "" };
 
     private async Task Recheck() => await Run(async () => { caps = await Task.Run(() => App.Ai.Hardware.Refresh()); });
 

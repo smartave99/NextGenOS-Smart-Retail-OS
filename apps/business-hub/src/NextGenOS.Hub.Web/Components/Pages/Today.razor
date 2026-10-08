@@ -123,8 +123,9 @@
         if (f.Tables) floor = App.Restaurant.Floor();
         if (f.Kitchen) tickets = App.Restaurant.Tickets().Count(t => t.Status != "served");
         if (f.Lending) { overdue = App.Library.Overdue().Count; openLoans = App.Library.OpenLoans().Count; }
-        if (f.Projects) { var active = App.Projects.List("active"); projects = active.Count; owed = App.Reports.Outstanding().Sum(a => a.TotalMinor); }
-        else if (f.Credit) owed = App.Reports.Outstanding().Sum(a => a.TotalMinor);
+        // What customers owe is for the people who see the reports (the Hub itself refuses the others).
+        if (f.Projects) { var active = App.Projects.List("active"); projects = active.Count; if (Me.Can(Perm.Reports)) owed = App.Reports.Outstanding().Sum(a => a.TotalMinor); }
+        else if (f.Credit && Me.Can(Perm.Reports)) owed = App.Reports.Outstanding().Sum(a => a.TotalMinor);
         if (f.Appointments) bookings = App.Appointments.Day(Today).Count(a => a.Appointment.Status is "booked" or "arrived");
         if (Shop.Industry.Features.StockTracking != "never" && Me.Can(Perm.Stock)) lowStock = App.Catalog.StockList(lowOnly: true);
         return Task.CompletedTask;

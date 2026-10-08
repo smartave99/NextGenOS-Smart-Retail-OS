@@ -61,6 +61,8 @@ country-packs/
     "classes": { "standard": "GST18", "reduced": "GST5", "zero": "GST0", "exempt": "GSTEX" },   // section 4, "tax classes"
     "regions": { "label": "State", "list": [ { "code": "27", "name": "Maharashtra" } ] },
     "businessId": { "label": "GSTIN", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$" },
+    "itemCode": { "label": "HSN or SAC code", "help": "..." },       // optional: a code a line may carry for what it sells (section 4a)
+    "extraTax": { "label": "Cess", "help": "..." },                    // optional: a further tax set per item, on top of the main one (section 4a)
     "customerDiscounts": [ ],            // section 6
     "rounding": { "total": "nearest", "increment": "1", "defaultOn": false }   // section 7
   },
@@ -91,6 +93,15 @@ is one the shop sets itself (for example a combined sales tax that depends on th
 **Tax classes.** Shop staff should not have to know rate codes. A pack names four everyday classes and the rate code each one means:
 `standard` (the main rate), `reduced` (the usual lower rate, if the country has one), `zero` and `exempt`. Products carry a class or a code; demo data and
 product import use classes. Each class names a code that exists in `rates`; `standard` is required.
+
+### 4a. Item code and extra tax (optional)
+
+Some countries ask for two more things on an item and its bill lines. A pack says so by naming them; a pack that does not name them shows no field and no word about them.
+
+* `itemCode` – a code the line carries for the goods or service sold (India: HSN or SAC). The programs show an input named `label` on the item, keep a copy on every bill line when the bill is made,
+  and print it under the line's description. It is a record only: the engine does not read it.
+* `extraTax` – a further tax set per item as a percent of the price before tax (India: cess). The programs show an input named `label` on the item, keep the percent on the bill line, and pass it to the engine
+  as the line's `cessPercent` (section 5, step 6). The engine names its amounts `cess` in every country; the programs show them under `label`.
 
 ## 5. Models
 

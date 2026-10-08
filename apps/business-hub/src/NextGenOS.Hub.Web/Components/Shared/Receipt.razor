@@ -19,6 +19,7 @@
     {
         var r = View.ResultFor(line);
         <div>@line.Description</div>
+        @if (line.ItemCode is { Length: > 0 } lineCode && Shop.Country.Tax.ItemCode is { } codeRule) { <div class="muted small">@codeRule.Label: @lineCode</div> }
         @if (line.IsFree)
         {
             <div class="r"><span>@Qty(line.QtyMilli) free</span><span>@Shop.Money(0)</span></div>
@@ -43,7 +44,7 @@
             if (Shop.Minor(c.Amount) == 0) continue;
             <div class="r"><span>@c.Name</span><span>@Shop.Money(Shop.Minor(c.Amount))</span></div>
         }
-        @if (!string.IsNullOrEmpty(t.Cess) && Shop.Minor(t.Cess) != 0) { <div class="r"><span>Cess</span><span>@Shop.Money(Shop.Minor(t.Cess))</span></div> }
+        @if (!string.IsNullOrEmpty(t.Cess) && Shop.Minor(t.Cess) != 0) { <div class="r"><span>@(Shop.Country.Tax.ExtraTax?.Label ?? "Extra tax")</span><span>@Shop.Money(Shop.Minor(t.Cess))</span></div> }
         @foreach (var a in result.Adjustments ?? new List<AdjustmentResult>())
         {
             <div class="r"><span>@a.Label</span><span>@Shop.Money(Shop.Minor(a.Amount))</span></div>

@@ -391,7 +391,7 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
         }
     }
 
-    private sealed record LineRow(long Id, long? ItemId, string Description, long Qty, string? Unit, long Price, string TaxCode, string? Station, long? FreeFor, long DiscountPct, long DiscountAmount);
+    private sealed record LineRow(long Id, long? ItemId, string Description, long Qty, string? Unit, long Price, string TaxCode, string? Station, long? FreeFor, long DiscountPct, long DiscountAmount, string? ItemCode, long ExtraTaxPct);
 
     /// <summary>
     /// Brings everything that offers add to an open sale up to date after its lines changed: the free goods, the bill offer, the codes on it. It does nothing for a document that is not a sale
@@ -425,9 +425,9 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
     private void SyncFreeLines(SqliteConnection c, SqliteTransaction t, long documentId, DateOnly today)
     {
         var rows = HubDb.Query(c,
-            "SELECT id, item_id, description, qty_milli, unit, unit_price_minor, tax_code, station, free_for_line_id, discount_pct_milli, discount_amount_minor FROM document_lines WHERE document_id = $d ORDER BY line_no",
+            "SELECT id, item_id, description, qty_milli, unit, unit_price_minor, tax_code, station, free_for_line_id, discount_pct_milli, discount_amount_minor, item_code, extra_tax_pct_milli FROM document_lines WHERE document_id = $d ORDER BY line_no",
             r => new LineRow(r.Int("id"), r.IntOrNull("item_id"), r.Text("description"), r.Int("qty_milli"), r.TextOrNull("unit"), r.Int("unit_price_minor"), r.Text("tax_code"), r.TextOrNull("station"),
-                r.IntOrNull("free_for_line_id"), r.Int("discount_pct_milli"), r.Int("discount_amount_minor")), t, ("$d", documentId));
+                r.IntOrNull("free_for_line_id"), r.Int("discount_pct_milli"), r.Int("discount_amount_minor"), r.TextOrNull("item_code"), r.Int("extra_tax_pct_milli")), t, ("$d", documentId));
         var bought = rows.Where(r => r.FreeFor is null).ToList();
         var free = rows.Where(r => r.FreeFor is not null).ToList();
         foreach (var orphan in free.Where(f => bought.All(b => b.Id != f.FreeFor)))
@@ -448,9 +448,10 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
             {
                 var lineNo = Convert.ToInt32(HubDb.Scalar(c, "SELECT COALESCE(MAX(line_no), 0) + 1 FROM document_lines WHERE document_id = $d", t, ("$d", documentId)) ?? 1);
                 HubDb.Exec(c,
-                    "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, tax_code, station, discount_source, free_for_line_id) " +
-                    "VALUES ($d, $n, $item, $desc, $q, $unit, $price, 100000, 0, $tax, $station, 'offer', $for)", t,
-                    ("$d", documentId), ("$n", lineNo), ("$item", line.ItemId), ("$desc", line.Description), ("$q", want), ("$unit", line.Unit), ("$price", line.Price), ("$tax", line.TaxCode), ("$station", line.Station), ("$for", line.Id));
+                    "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, tax_code, station, discount_source, free_for_line_id, item_code, extra_tax_pct_milli) " +
+                    "VALUES ($d, $n, $item, $desc, $q, $unit, $price, 100000, 0, $tax, $station, 'offer', $for, $icode, $extra)", t,
+                    ("$d", documentId), ("$n", lineNo), ("$item", line.ItemId), ("$desc", line.Description), ("$q", want), ("$unit", line.Unit), ("$price", line.Price), ("$tax", line.TaxCode), ("$station", line.Station), ("$for", line.Id),
+                    ("$icode", line.ItemCode), ("$extra", line.ExtraTaxPct));
             }
             else if (have.Qty != want || have.Price != line.Price || have.TaxCode != line.TaxCode)
                 HubDb.Exec(c, "UPDATE document_lines SET qty_milli = $q, unit_price_minor = $p, tax_code = $tax WHERE id = $id", t, ("$q", want), ("$p", line.Price), ("$tax", line.TaxCode), ("$id", have.Id));

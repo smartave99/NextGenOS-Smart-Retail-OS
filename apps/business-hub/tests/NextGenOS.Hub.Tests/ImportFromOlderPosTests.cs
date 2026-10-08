@@ -46,7 +46,7 @@ public class ImportFromOlderPosTests
         Assert.Equal("Pcs", rice.Unit);
         Assert.Equal("Grocery", rice.Category);                         // the category comes through the sub-category, which holds the category's NAME (padded)
         Assert.Equal("Rice and sugar", rice.Attrs["subCategory"]);
-        Assert.Equal("1006", rice.Attrs["hsn"]);
+        Assert.Equal("1006", rice.Attrs[NextGenOS.Hub.Catalog.ItemAttrs.Code]);
         Assert.Equal("150.00", rice.Attrs["mrp"]);
         Assert.True(Item(plan, "lot:11").Active);
 

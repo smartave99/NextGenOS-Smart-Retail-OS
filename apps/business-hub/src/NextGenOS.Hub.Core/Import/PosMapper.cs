@@ -113,7 +113,7 @@ public static class PosMapper
 
                 var attrs = new Dictionary<string, string>();
                 if (subById.TryGetValue(p.SubCategoryId ?? -1, out var sub) && T(sub.Name).Length > 0) attrs["subCategory"] = T(sub.Name);
-                if (T(p.HsnCode).Length > 0) attrs["hsn"] = T(p.HsnCode);
+                if (T(p.HsnCode).Length > 0) attrs[ItemAttrs.Code] = T(p.HsnCode);
                 var mrp = lot is not null && lot.Mrp > 0 ? lot.Mrp : p.Mrp;
                 if (mrp > 0 && TryScale(mrp, decimals, out var mrpMinor)) attrs["mrp"] = shop.Text(mrpMinor);
                 if (lot is not null) { if (T(lot.Size).Length > 0) attrs["size"] = T(lot.Size); if (T(lot.Colour).Length > 0) attrs["colour"] = T(lot.Colour); if (T(lot.Batch).Length > 0) attrs["batch"] = T(lot.Batch); }
@@ -128,7 +128,15 @@ public static class PosMapper
                 if (itemName.Length > 160) { notes.Add(FindingLevels.Look, "name-long", "{n} item name(s) were longer than the Hub allows and were cut short.", itemName); itemName = itemName[..160]; }
 
                 var taxClass = TaxClassFor(p, shop, notes, T(p.Name));
-                if (p.Cess > 0) notes.Add(FindingLevels.Look, "cess", "{n} item(s) carry an extra tax (cess) in the older program. The Hub does not keep it yet, so it was not moved.", name);
+                if (p.Cess > 0)
+                {
+                    if (shop.Country.Tax.ExtraTax is { } extra && p.Cess <= 100)
+                    {
+                        attrs[ItemAttrs.ExtraTax] = p.Cess.ToString("0.###", CultureInfo.InvariantCulture);
+                        notes.Add(FindingLevels.Info, "cess", "{n} item(s) carry an extra tax (" + extra.Label + ") in the older program. It was kept as the item's own extra tax.", name);
+                    }
+                    else notes.Add(FindingLevels.Look, "cess", "{n} item(s) carry an extra tax in the older program that this shop's country does not use (or that is above 100 percent), so it was not moved.", name);
+                }
                 CheckTaxMode(p, shop, notes, name);
                 if (lot is not null && ((lot.SPrice > 0 && lot.SPrice != p.SellingPrice) || (lot.WPrice > 0 && p.ReorderPoint > 0 && lot.WPrice != p.ReorderPoint)))
                     notes.Add(FindingLevels.Info, "price-differs", "{n} item(s) have a different price in the stock row than on the product. The stock row's price (the one the till used) was moved.", name);

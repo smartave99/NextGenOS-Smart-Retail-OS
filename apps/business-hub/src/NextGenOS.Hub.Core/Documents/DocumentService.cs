@@ -24,7 +24,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         "subtotal_minor, tax_minor, total_minor, payable_minor, paid_minor, tips_minor, retention_minor, advance_minor, table_id, project_id, ref_document_id, user_id, notes, meta, " +
         "bill_discount_minor, bill_discount_pct_milli, loyalty_points_used_cent, loyalty_discount_minor, offer_discount_minor";
 
-    private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id, discount_source, free_for_line_id";
+    private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id, discount_source, free_for_line_id, item_code, extra_tax_pct_milli";
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -41,7 +41,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     private static DocLine MapLine(SqliteDataReader r) => new(
         r.Int("id"), (int)r.Int("line_no"), r.IntOrNull("item_id"), r.Text("description"), r.Int("qty_milli"), r.TextOrNull("unit"), r.Int("unit_price_minor"),
         r.Int("discount_pct_milli"), r.Text("tax_code"), r.TextOrNull("customer_discount"), r.Flag("fired"), r.TextOrNull("note"), r.TextOrNull("station"), r.IntOrNull("boq_id"),
-        r.Int("discount_amount_minor"), r.IntOrNull("ref_line_id"), r.TextOrNull("discount_source"), r.IntOrNull("free_for_line_id"));
+        r.Int("discount_amount_minor"), r.IntOrNull("ref_line_id"), r.TextOrNull("discount_source"), r.IntOrNull("free_for_line_id"), r.TextOrNull("item_code"), r.Int("extra_tax_pct_milli"));
 
     public Document? GetHeader(long id) => db.QueryOne($"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, ("$id", id));
 
@@ -142,6 +142,11 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         if (item is not null && discountPct == 0 && input.DiscountAmountMinor == 0 && input.RefLineId is null && !input.NoAutoDiscount
             && HubDb.Query(c, "SELECT type, direction FROM documents WHERE id = $id", r => (Type: r.Text("type"), Direction: r.Text("direction")), t, ("$id", documentId)).FirstOrDefault() is { Direction: "out", Type: DocTypes.Invoice or DocTypes.Order or DocTypes.Quote })
             (discountPct, discountSource) = offers.AutoLineDiscount(c, t, item.Id, party?.Id);
+        // What the country's tax asks for besides the rate: a code for what is sold and an extra tax. A country whose pack names neither gets neither (nothing is kept, nothing is passed on).
+        var itemCode = context.Country.Tax.ItemCode is null ? null : Blank(input.ItemCode ?? item?.Attrs.GetValueOrDefault(ItemAttrs.Code));
+        var extraTaxPct = context.Country.Tax.ExtraTax is null ? 0 : input.ExtraTaxPctMilli ?? PercentMilli(item?.Attrs.GetValueOrDefault(ItemAttrs.ExtraTax));
+        if (itemCode is { Length: > 40 }) throw new HubException("item-code", "That code is too long.");
+        if (extraTaxPct is < 0 or > 100_000) throw new HubException("extra-tax", "A tax percent must be between 0 and 100.");
         string taxCode;
         try { taxCode = context.TaxCode(input.TaxCode ?? item?.TaxCode ?? "standard"); }
         catch (ArgumentException ex) { throw new HubException("tax", ex.Message); }
@@ -149,10 +154,10 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             throw new HubException("customer-discount", $"\"{input.CustomerDiscount}\" is not a discount of {context.Country.Name}.");
         var lineNo = Convert.ToInt32(HubDb.Scalar(c, "SELECT COALESCE(MAX(line_no), 0) + 1 FROM document_lines WHERE document_id = $id", t, ("$id", documentId)) ?? 1);
         HubDb.Exec(c,
-            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id, discount_source) " +
-            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq, $source)", t,
+            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id, discount_source, item_code, extra_tax_pct_milli) " +
+            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq, $source, $icode, $extra)", t,
             ("$d", documentId), ("$n", lineNo), ("$item", item?.Id), ("$desc", description), ("$q", input.QtyMilli), ("$unit", input.Unit ?? item?.Unit), ("$price", price),
-            ("$disc", discountPct), ("$damt", input.DiscountAmountMinor), ("$source", discountSource), ("$refline", input.RefLineId), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
+            ("$disc", discountPct), ("$damt", input.DiscountAmountMinor), ("$source", discountSource), ("$icode", itemCode), ("$extra", extraTaxPct), ("$refline", input.RefLineId), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
     }
 
     public DocumentView UpdateLine(long documentId, long lineId, long? qtyMilli = null, long? discountPctMilli = null, string? note = null, string? customerDiscount = null, bool clearCustomerDiscount = false, long? discountAmountMinor = null)
@@ -373,6 +378,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             DiscountPercent = shares[i] == 0 && l.DiscountAmountMinor == 0 && l.DiscountPctMilli > 0 ? MoneyText.Minor(l.DiscountPctMilli, 3) : null,
             DiscountAmount = shares[i] > 0 ? MoneyText.Minor(LineDiscountOf(l) + shares[i], d) : l.DiscountAmountMinor > 0 ? MoneyText.Minor(LineDiscountOf(l), d) : null,
             CustomerDiscount = l.CustomerDiscount,
+            CessPercent = l.ExtraTaxPctMilli > 0 ? MoneyText.Minor(l.ExtraTaxPctMilli, 3) : null,
         }).ToList();
         // A regional country (Canada, the US) needs a region to tax by: the shop's own when the buyer's is not known.
         if (context.Country.Tax.Model == "regional" && string.IsNullOrEmpty(taxContext.SellerRegion) && string.IsNullOrEmpty(taxContext.BuyerRegion))
@@ -575,7 +581,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 Lines = lines.Where(l => !l.IsFree).Select(l => new LineInput
                 {
                     ItemId = l.ItemId, Description = l.Description, QtyMilli = l.QtyMilli, Unit = l.Unit, UnitPriceMinor = l.UnitPriceMinor, DiscountPctMilli = l.DiscountPctMilli,
-                    DiscountAmountMinor = l.DiscountAmountMinor, TaxCode = l.TaxCode, CustomerDiscount = l.CustomerDiscount, Note = l.Note, NoAutoDiscount = true,
+                    DiscountAmountMinor = l.DiscountAmountMinor, TaxCode = l.TaxCode, CustomerDiscount = l.CustomerDiscount, Note = l.Note, NoAutoDiscount = true, ItemCode = l.ItemCode, ExtraTaxPctMilli = l.ExtraTaxPctMilli,
                 }).ToList(),
             });
         });
@@ -763,7 +769,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 noteLines.Add(new LineInput
                 {
                     ItemId = line.ItemId, Description = line.Description, QtyMilli = qty, Unit = line.Unit, UnitPriceMinor = line.UnitPriceMinor, DiscountPctMilli = byAmount ? 0 : line.DiscountPctMilli,
-                    DiscountAmountMinor = creditDiscount, RefLineId = line.Id, TaxCode = line.TaxCode, CustomerDiscount = line.CustomerDiscount,
+                    DiscountAmountMinor = creditDiscount, RefLineId = line.Id, TaxCode = line.TaxCode, CustomerDiscount = line.CustomerDiscount, ItemCode = line.ItemCode, ExtraTaxPctMilli = line.ExtraTaxPctMilli,
                 });
             }
             if (noteLines.Count == 0) throw new HubException("empty", "Choose what is being returned.");
@@ -852,4 +858,12 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     }
 
     private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    /// <summary>"12" or "2.5" or "2,5" as thousandths of a percent; anything else (or nothing) is none.</summary>
+    private static long PercentMilli(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+        try { return ShopContext.QtyMilli(text.Trim().Replace(',', '.').TrimEnd('%').Trim()); }
+        catch (FormatException) { return 0; }
+    }
 }

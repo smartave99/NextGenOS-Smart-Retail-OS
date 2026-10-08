@@ -60,6 +60,10 @@ namespace NextGenOS.Tax
         [JsonProperty("classes")] public Dictionary<string, string> Classes { get; set; }
         [JsonProperty("regions")] public RegionList Regions { get; set; }
         [JsonProperty("businessId")] public BusinessIdRule BusinessId { get; set; }
+        /// <summary>The code a line may carry for the goods or service sold, under the country's own name for it. Null: the country has none.</summary>
+        [JsonProperty("itemCode")] public NamedTaxField ItemCode { get; set; }
+        /// <summary>A further tax some items carry on top of the main one, as a percent set on the item, under the country's own name for it. Null: the country has none.</summary>
+        [JsonProperty("extraTax")] public NamedTaxField ExtraTax { get; set; }
         [JsonProperty("customerDiscounts")] public List<CustomerDiscount> CustomerDiscounts { get; set; }
         [JsonProperty("rounding")] public RoundingRule Rounding { get; set; }
     }
@@ -94,6 +98,13 @@ namespace NextGenOS.Tax
         [JsonProperty("name")] public string Name { get; set; }
         [JsonProperty("percent")] public string Percent { get; set; }
         [JsonProperty("editable")] public bool Editable { get; set; }
+    }
+
+    /// <summary>A field the country's tax asks for on an item or a line: the words for it, and a line of help.</summary>
+    public sealed class NamedTaxField
+    {
+        [JsonProperty("label")] public string Label { get; set; }
+        [JsonProperty("help")] public string Help { get; set; }
     }
 
     public sealed class BusinessIdRule

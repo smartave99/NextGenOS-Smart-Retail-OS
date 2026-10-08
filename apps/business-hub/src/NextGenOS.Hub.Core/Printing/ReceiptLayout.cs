@@ -40,6 +40,7 @@ public static class ReceiptLayout
             var line = view.Lines[i];
             var result = view.Result?.Lines.ElementAtOrDefault(i);
             doc.Text(line.Description);
+            if (line.ItemCode is { Length: > 0 } code && shop.Country.Tax.ItemCode is { } codeRule) doc.Text($"  {codeRule.Label}: {code}");
             var qty = ShopContext.Qty(line.QtyMilli).TrimEnd('0').TrimEnd('.');
             if (line.IsFree) doc.Split($"  {qty} free", shop.Money(0));
             else
@@ -58,7 +59,7 @@ public static class ReceiptLayout
             doc.Split(shop.Settings.PricesIncludeTax ? "Before tax" : "Subtotal", shop.Money(shop.Minor(t.Taxable)));
             foreach (var c in t.Components ?? new List<NextGenOS.Tax.Component>())
                 if (shop.Minor(c.Amount) != 0) doc.Split(c.Name, shop.Money(shop.Minor(c.Amount)));
-            if (!string.IsNullOrEmpty(t.Cess) && shop.Minor(t.Cess) != 0) doc.Split("Cess", shop.Money(shop.Minor(t.Cess)));
+            if (!string.IsNullOrEmpty(t.Cess) && shop.Minor(t.Cess) != 0) doc.Split(shop.Country.Tax.ExtraTax?.Label ?? "Extra tax", shop.Money(shop.Minor(t.Cess)));
             foreach (var a in r.Adjustments ?? new List<NextGenOS.Tax.AdjustmentResult>()) doc.Split(a.Label, shop.Money(shop.Minor(a.Amount)));
             if (shop.Minor(t.RoundOff) != 0) doc.Split("Rounding", shop.Money(shop.Minor(t.RoundOff)));
             doc.Split("TOTAL", shop.Money(view.Document.PayableMinor), true);

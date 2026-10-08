@@ -38,7 +38,7 @@ public sealed record Document(
 
 public sealed record DocLine(
     long Id, int LineNo, long? ItemId, string Description, long QtyMilli, string? Unit, long UnitPriceMinor, long DiscountPctMilli, string TaxCode,
-    string? CustomerDiscount, bool Fired, string? Note, string? Station, long? BoqId, long DiscountAmountMinor = 0, long? RefLineId = null, string? DiscountSource = null, long? FreeForLineId = null)
+    string? CustomerDiscount, bool Fired, string? Note, string? Station, long? BoqId, long DiscountAmountMinor = 0, long? RefLineId = null, string? DiscountSource = null, long? FreeForLineId = null, string? ItemCode = null, long ExtraTaxPctMilli = 0)
 {
     /// <summary>True for goods given free with another line ("buy so many, get so many free").</summary>
     public bool IsFree => FreeForLineId is not null;
@@ -59,6 +59,10 @@ public sealed class LineInput
     public long? RefLineId { get; set; }
     /// <summary>Keep the discount exactly as given (none included): do not look for the customer's standing discount or an item offer. For copying a line that already has its final discount.</summary>
     public bool NoAutoDiscount { get; set; }
+    /// <summary>The code of the goods or service, copied onto the line (null: the item's own, when the country's pack has such a code).</summary>
+    public string? ItemCode { get; set; }
+    /// <summary>A further tax on top of the main one, in thousandths of a percent (null: the item's own, when the country's pack has one).</summary>
+    public long? ExtraTaxPctMilli { get; set; }
     public string? TaxCode { get; set; }
     public string? CustomerDiscount { get; set; }
     public string? Note { get; set; }

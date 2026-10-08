@@ -170,6 +170,25 @@
                             }
                         </div>
                     }
+                    @if (!lending && (Shop.Country.Tax.ItemCode is not null || Shop.Country.Tax.ExtraTax is not null))
+                    {
+                        <div class="field-row">
+                            @if (Shop.Country.Tax.ItemCode is { } codeRule)
+                            {
+                                <div>
+                                    <label for="f-code">@codeRule.Label (optional)</label>
+                                    <input id="f-code" maxlength="40" autocomplete="off" title="@codeRule.Help" @bind="itemCode" />
+                                </div>
+                            }
+                            @if (Shop.Country.Tax.ExtraTax is { } extraRule)
+                            {
+                                <div>
+                                    <label for="f-extra">@extraRule.Label (percent, optional)</label>
+                                    <input id="f-extra" inputmode="decimal" title="@extraRule.Help" @bind="extraTax" />
+                                </div>
+                            }
+                        </div>
+                    }
                     @if (Kind(form.Kind)?.HasDuration == true)
                     {
                         <label for="f-dur">Takes (minutes)</label>
@@ -348,6 +367,7 @@
         price = tradePrice = cost = reorder = "";
         author = isbn = "";
         loyaltyMode = loyaltyValue = "";
+        itemCode = extraTax = "";
         copies = 1;
         duration = first?.HasDuration == true ? 30 : null;
         track = first?.TracksStock == true && Shop.Industry.Features.StockTracking == "always";
@@ -361,6 +381,8 @@
         form = new ItemInput { Kind = i.Kind, Sku = i.Sku, Barcode = i.Barcode, Name = i.Name, Category = i.Category, Unit = i.Unit, TaxClass = i.TaxCode, Station = i.Station ?? Stations().First(), Attrs = new Dictionary<string, string>(i.Attrs) };
         loyaltyMode = i.Attrs.GetValueOrDefault(NextGenOS.Hub.Loyalty.LoyaltyService.ModeKey) ?? "";
         loyaltyValue = i.Attrs.GetValueOrDefault(NextGenOS.Hub.Loyalty.LoyaltyService.ValueKey) ?? "";
+        itemCode = i.Attrs.GetValueOrDefault(ItemAttrs.Code) ?? "";
+        extraTax = i.Attrs.GetValueOrDefault(ItemAttrs.ExtraTax) ?? "";
         price = Shop.Text(i.PriceMinor);
         tradePrice = i.TradePriceMinor is { } t ? Shop.Text(t) : "";
         cost = Shop.Text(i.CostMinor);
@@ -372,6 +394,7 @@
     }
 
     private string loyaltyMode = "", loyaltyValue = "";
+    private string itemCode = "", extraTax = "";
 
     private string TaxLabelFor(string code) => code;
 
@@ -416,6 +439,21 @@
                         }
                     }
                     else { form.Attrs.Remove(NextGenOS.Hub.Loyalty.LoyaltyService.ModeKey); form.Attrs.Remove(NextGenOS.Hub.Loyalty.LoyaltyService.ValueKey); }
+                }
+                if (Shop.Country.Tax.ItemCode is not null)
+                {
+                    if (itemCode.Trim().Length > 0) form.Attrs[ItemAttrs.Code] = itemCode.Trim(); else form.Attrs.Remove(ItemAttrs.Code);
+                }
+                if (Shop.Country.Tax.ExtraTax is { } extraRule)
+                {
+                    long extraMilli = 0;
+                    if (extraTax.Trim().Length > 0)
+                    {
+                        try { extraMilli = ShopContext.QtyMilli(extraTax.Trim().Replace(',', '.').TrimEnd('%').Trim()); }
+                        catch (FormatException) { throw new HubException("extra-tax", $"Please type the {extraRule.Label.ToLowerInvariant()} as a percent, like 12 or 2.5, or leave it empty."); }
+                        if (extraMilli is < 0 or > 100_000) throw new HubException("extra-tax", $"The {extraRule.Label.ToLowerInvariant()} must be between 0 and 100 percent.");
+                    }
+                    if (extraMilli > 0) form.Attrs[ItemAttrs.ExtraTax] = extraTax.Trim().Replace(',', '.').TrimEnd('%').Trim(); else form.Attrs.Remove(ItemAttrs.ExtraTax);
                 }
                 if (string.IsNullOrWhiteSpace(form.Barcode)) form.Barcode = null;
                 if (editing is null) App.Catalog.Create(form); else App.Catalog.Update(editing.Id, form);

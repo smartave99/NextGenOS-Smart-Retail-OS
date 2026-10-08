@@ -90,6 +90,11 @@ export function validatePack(pack, fileName) {
   }
   if (t.businessId && !t.businessId.label) bad('businessId needs a label');
   if (t.businessId?.pattern) { try { new RegExp(t.businessId.pattern); } catch { bad('businessId "pattern" is not a valid pattern'); } }
+  for (const part of ['itemCode', 'extraTax']) {
+    if (t[part] === undefined) continue;
+    if (!isObj(t[part]) || typeof t[part].label !== 'string' || !t[part].label.trim()) bad(`${part} needs a label (the words the programs show for it)`);
+    else if (t[part].help !== undefined && typeof t[part].help !== 'string') bad(`${part} "help" must be text`);
+  }
   const inv = pack.invoice;
   if (!isObj(inv) || !inv.title || !Array.isArray(inv.requiredFields)) bad('"invoice" needs a title and requiredFields');
   if (!Array.isArray(pack.notes)) bad('"notes" must be a list');

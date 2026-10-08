@@ -4,6 +4,11 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Business events never get lost (the outbox)
+- **What happens in the shop is left as a message in the same step that makes it.** A sale, a payment or refund, a return, a void, a purchase and a change of stock each leave one message (figures and numbers only: never a name, a note, a card detail or what was typed with a payment), written in the very transaction of the sale, so the sale and its message exist together or not at all. Only while the *business events* switch (Settings, AI) is on and the licence has it; with it off nothing is written and the till is unchanged.
+- **A helper delivers the messages to the event history, once each.** Every ten minutes and when the shop opens, also after the program was stopped half-way; two helpers at the same moment, or a message sent twice, still make one event. A message that cannot be delivered is tried again later and later (at most an hour apart), set aside after eight tries, and shown on the *Business events* page with a *Try again* button. Nothing waits on it: the till never does.
+- Database step 16 (two new tables, with their way back). Not yet: a second helper that reads these messages (the low-stock rule), a screen to deliver a period again (the code is there).
+
 ### When a licence ends (decision 15)
 - **A paid licence that has ended keeps working and says so; a trial stops.** What happens at the end date is written inside the signed licence (never a setting on the PC): the Licence Studio signs "keep working with a banner" for a paid licence and "stop" for a trial. The Hub shows a banner across every screen: for a trial, when it ends; for a paid licence that has ended, that it ended and the shop keeps working; for a PC that could not check in, how many days it still works. Staff can still switch any licence off at any time.
 - Not yet: the same banner in the older Windows programs, and "read-only, export your data" for a stopped trial.

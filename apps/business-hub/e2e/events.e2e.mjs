@@ -1,5 +1,5 @@
 // The business event history screen (Version 2, phase 2): off until switched on; what is kept, looked through, explained and corrected by a person; how long things are kept.
-// Events are put in through the event store by a test-only door of the test program (nothing in the shop writes events yet).
+// Camera events are put in through the event store by a test-only door of the test program (no camera service exists yet); the shop's own sales leave messages in the outbox, which the last steps show.
 import assert from 'node:assert';
 import { build, startHub, launch, newPage, setUp, signIn, shots, go } from './lib.mjs';
 
@@ -123,11 +123,44 @@ try {
   await page.locator('.notice.ok', { hasText: 'Nothing is past its time.' }).waitFor();
   step('"forget what is past its time" does nothing when nothing is due');
 
+  // The messages that sales leave for the history (the outbox): what waits, what could not be written, and writing them down.
+  assert.strictEqual(await page.locator('#ev-q-waiting').innerText(), '0');
+  assert.strictEqual(await page.locator('#ev-q-failed').innerText(), '0');
+  assert.strictEqual(await page.locator('#ev-q-retry').count(), 0, 'no button to try again when nothing failed');
+  const queued = await page.request.post(hub.url + '/__e2e/seed-outbox');
+  assert.strictEqual(queued.status(), 200);
+  assert.deepStrictEqual(await queued.json(), { waiting: 2, failed: 1 });
+  await page.reload();
+  await page.locator('#ev-queue').waitFor();
+  assert.strictEqual(await page.locator('#ev-q-waiting').innerText(), '2');
+  assert.strictEqual(await page.locator('#ev-q-failed').innerText(), '1');
+  assert.match(await page.locator('#ev-queue').innerText(), /The business event history was busy/);
+  await shot(page, '2-queue');
+  step('a sale leaves messages that wait to be written into the history, and one that could not be written is shown with its reason');
+
+  await page.locator('#ev-q-run').click();
+  await page.locator('.notice.ok', { hasText: '2 message(s) written down.' }).waitFor();
+  assert.strictEqual(await page.locator('#ev-q-waiting').innerText(), '0');
+  assert.strictEqual(await page.locator('#ev-q-done').innerText(), '2');
+  step('the waiting messages are written down when asked, once each');
+
+  await page.locator('#ev-q-retry').click();
+  await page.locator('.notice.ok', { hasText: '1 message(s) put back to be tried again; 1 written down now.' }).waitFor();
+  assert.strictEqual(await page.locator('#ev-q-failed').innerText(), '0');
+  assert.strictEqual(await page.locator('#ev-q-done').innerText(), '3');
+  assert.strictEqual(await page.locator('#ev-q-retry').count(), 0);
+  await page.locator('#f-what').selectOption('events');
+  await page.locator('#f-type').fill('sale.issued');
+  await page.locator('#f-go').click();
+  await rows(page, '#ev-table', 1);
+  assert.match(await page.locator('#ev-table').innerText(), /Sale: issued/);
+  step('what failed is tried again when the owner asks, and the sale is now in the history');
+
   await go(page, 'Settings');
   await page.getByRole('tab', { name: 'Activity' }).click();
   await page.getByRole('heading', { name: 'What people did' }).waitFor();
   const activity = await page.locator('main').innerText();
-  for (const word of ['events.status', 'events.supersede', 'events.retention']) assert.ok(activity.includes(word), 'the activity list shows ' + word);
+  for (const word of ['events.status', 'events.supersede', 'events.retention', 'outbox.retry']) assert.ok(activity.includes(word), 'the activity list shows ' + word);
   step('every change by a person is in the activity list');
 
   await page.context().close();

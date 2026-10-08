@@ -38,11 +38,18 @@ public sealed class HubApp
         Shop = new ShopContextProvider(SettingsStore);
         Numbering = new Numbering(Shop);
         Parties = new PartyService(db, Shop, clock, Access);
+        // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
+        Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", Access, ai);
+        // The business event history (observations, events, evidence pointers) and its forgetting. Writing waits for the owner's switch.
+        Retention = new RetentionService(db, clock, Audit, Access);
+        Events = new EventStore(db, clock, Audit, Ai.Flags, Retention, Access);
+        // The outbox: a sale, a return, a payment, a purchase and a stock change leave a message in the very transaction that makes them (only while the event history is on); the upkeep delivers them.
+        Outbox = new OutboxService(db, clock, Ai.Flags, Events, Audit, Access);
         Books = new BooksService(db, clock);
-        Catalog = new CatalogService(db, Shop, clock, Access, Books);
+        Catalog = new CatalogService(db, Shop, clock, Access, Books, Outbox);
         Loyalty = new LoyaltyService(db, Shop, clock);
         Offers = new OffersService(db, Shop, clock, Audit, Access);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Access);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Outbox, Access);
         Users = new UserService(db, clock, Audit, Access);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit, Access);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit, Access);
@@ -53,11 +60,6 @@ public sealed class HubApp
         TaxRegisters = new TaxRegisterService(db, Shop);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
-        // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
-        Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", Access, ai);
-        // The business event history (observations, events, evidence pointers) and its forgetting. Writing waits for the owner's switch; nothing in the shop's own screens writes to it yet.
-        Retention = new RetentionService(db, clock, Audit, Access);
-        Events = new EventStore(db, clock, Audit, Ai.Flags, Retention, Access);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
@@ -79,6 +81,7 @@ public sealed class HubApp
     public PartyService Parties { get; }
     public CatalogService Catalog { get; }
     public BooksService Books { get; }
+    public OutboxService Outbox { get; }
     public LoyaltyService Loyalty { get; }
     public OffersService Offers { get; }
     public DocumentService Documents { get; }
@@ -112,6 +115,7 @@ public sealed class HubApp
         using var asTheProgram = Access.AsSystem();
         Documents.DiscardStaleDrafts();
         Books.CatchUp();
+        Outbox.Dispatch();   // messages left by sales and stock changes since the last time are handed to the event history (nothing happens while it is switched off)
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
         Retention.Prune(null);
         Backups.RunIfDue();   // the night's copy, when it is due (a failed try is written down and shown to the owner; it never stops the till)
@@ -139,6 +143,8 @@ public sealed class HubApp
         var app = new HubApp(db, clock ?? new SystemClock(), print, ai, trusted, network);
         // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
         app.Books.CatchUp();
+        // What a stopped program left in the outbox is delivered now (once: the event history keeps one event for one message).
+        using (app.Access.AsSystem()) app.Outbox.Dispatch();
         return app;
     }
 }

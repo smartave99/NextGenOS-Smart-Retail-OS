@@ -25,7 +25,7 @@ builder.Services.AddSingleton(new ProductLicence(() => licensed
     : new LicenceState { Status = LicenceStatus.Missing }));
 var app = builder.Build();
 HubHost.UseHub(app);
-// Only for the browser test of the event history screen (--E2E:Seed=true): this test program is not shipped. There is nothing yet that records business events by itself, so the
+// Only for the browser test of the event history screen (--E2E:Seed=true): this test program is not shipped. Sales and stock changes now leave messages for the history by themselves (the outbox), but cameras do not exist yet, so the
 // test records a few the way a camera service later will: through the event store.
 if (builder.Configuration.GetValue("E2E:Seed", false))
 {
@@ -42,6 +42,24 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
         var wrong = hub.Events.Append(new NextGenOS.Hub.Events.EventInput("shelf.restocked", "system", "hub", "INTERNAL", now.AddMinutes(-2), ZoneRef: "zone:aisle-3"));
         hub.Events.Supersede(wrong.Id, new NextGenOS.Hub.Events.EventInput("shelf.checked", "person", "staff", "INTERNAL", now.AddMinutes(-1), ZoneRef: "zone:aisle-3", Explanation: "Someone only looked at it"), null, "it was only looked at");
         return Results.Ok(new { events = hub.Events.Counts().Confirmed });
+    }).AllowAnonymous().DisableAntiforgery();
+
+    // A sale made now (with the history on it leaves its messages in the outbox, as in the shop), and one message that failed for good, as if the history had been busy eight times.
+    app.MapPost("/__e2e/seed-outbox", (NextGenOS.Hub.HubApp hub) =>
+    {
+        using var asTheProgram = hub.Access.AsSystem();
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.EventEngine, true, null);
+        var item = hub.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "service", Name = "Haircut", PriceMinor = 40_000, TaxClass = "zero" });
+        hub.Documents.Checkout(new NextGenOS.Hub.Documents.CheckoutRequest
+        {
+            Lines = { new NextGenOS.Hub.Documents.LineInput { ItemId = item.Id, QtyMilli = 1_000 } },
+            Payments = { new NextGenOS.Hub.Documents.PaymentInput { Method = "cash", AmountMinor = 40_000 } },
+        });
+        var now = NextGenOS.Hub.Iso.Text(DateTimeOffset.UtcNow);
+        hub.Db.InTransaction((c, t) => NextGenOS.Hub.Data.HubDb.Exec(c,
+            "INSERT INTO outbox(id, event_type, aggregate_type, aggregate_id, occurred_at, created_at, data_class, payload, status, attempts, next_attempt_at, last_error) " +
+            "VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM outbox), 'payment.recorded', 'payment', 999, $now, $now, 'FINANCIAL', '{}', 'failed', 8, $now, 'The business event history was busy.')", t, ("$now", now)));
+        return Results.Ok(new { waiting = hub.Outbox.Stats().Waiting, failed = hub.Outbox.Stats().Failed });
     }).AllowAnonymous().DisableAntiforgery();
 }
 

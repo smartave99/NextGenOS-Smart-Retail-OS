@@ -8,7 +8,7 @@ using NextGenOS.Hub.Shop;
 namespace NextGenOS.Hub.Catalog;
 
 /// <summary>Items (products, menu items, titles, services, materials) and their stock.</summary>
-public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock, Access access, BooksService books)
+public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock, Access access, BooksService books, NextGenOS.Hub.Events.OutboxService outbox)
 {
     private const string Columns = "id, kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, active";
 
@@ -136,6 +136,9 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
             }
             var move = StockCost.Insert(c, t, itemId, deltaMilli, reason, null, note, clock.UtcNow, userId, value);
             books.SyncStockMove(c, t, move, userId);
+            outbox.Add(c, t, "stock.adjusted", "item", itemId,
+                new Dictionary<string, object?> { ["itemId"] = itemId, ["deltaMilli"] = deltaMilli, ["reason"] = reason, ["valueMinor"] = value, ["moveId"] = move },
+                NextGenOS.Hub.Ai.DataClass.Internal, userId);
         });
     }
 

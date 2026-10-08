@@ -33,6 +33,32 @@ else if (!App.Events.Recording)
     }
 </section>
 
+<section class="card" id="ev-queue">
+    <h2>Waiting to be written down</h2>
+    <p class="muted small">Every sale, return, payment, purchase and stock change leaves a short message when it happens. The program writes the messages into the history a moment later, so the till never waits for it. If the program stops in between, the messages are still here and are written when it starts again.</p>
+    @if (queue.Paused)
+    {
+        <div class="notice warn" id="ev-queue-paused">@queue.Waiting message(s) are waiting because the business event history is switched off. They are written when it is switched on again.</div>
+    }
+    <div class="grid">
+        <div class="card stat"><span class="label">Waiting</span><span class="value" id="ev-q-waiting">@queue.Waiting</span><span class="note">@(queue.OldestWaitingAge is { } age ? "the oldest for " + Wait(age) : "nothing is waiting")</span></div>
+        <div class="card stat"><span class="label">Written down</span><span class="value" id="ev-q-done">@queue.Delivered</span></div>
+        <div class="card stat"><span class="label">Could not be written</span><span class="value" id="ev-q-failed">@queue.Failed</span><span class="note">@(queue.Failed > 0 ? "tried several times; nothing was lost" : "none")</span></div>
+    </div>
+    @if (queue.Waiting > 0 && !queue.Paused)
+    {
+        <div class="row"><button type="button" class="btn secondary" id="ev-q-run" @onclick="WriteNow">Write the waiting ones down now</button></div>
+    }
+    @if (queue.Failed > 0)
+    {
+        <div class="row"><button type="button" class="btn secondary" id="ev-q-retry" @onclick="RetryFailed">Try the failed ones again</button></div>
+        @foreach (var bad in failedMessages)
+        {
+            <p class="muted small">@bad.EventType (number @bad.Id): @bad.LastError</p>
+        }
+    }
+</section>
+
 <section class="card" id="ev-list">
     <h2>Look through the history</h2>
     <div class="field-row">
@@ -182,8 +208,32 @@ else if (!App.Events.Recording)
     private EventExplanation? why;
     private long? beforeId;
 
+    private OutboxStats queue = new(0, 0, 0, null, null, false);
+    private IReadOnlyList<OutboxMessage> failedMessages = Array.Empty<OutboxMessage>();
+
+    private static string Wait(TimeSpan age) => age.TotalMinutes < 1 ? "less than a minute" : age.TotalHours < 1 ? (int)age.TotalMinutes + " minute(s)" : age.TotalDays < 1 ? (int)age.TotalHours + " hour(s)" : (int)age.TotalDays + " day(s)";
+
+    private async Task RetryFailed()
+    {
+        await Run(() =>
+        {
+            var again = App.Outbox.RetryFailed(Me.Id);
+            var written = App.Outbox.Dispatch();
+            Info = again == 0 ? "Nothing had failed." : again + " message(s) put back to be tried again; " + written + " written down now.";
+        });
+        await Reload();
+    }
+
+    private async Task WriteNow()
+    {
+        await Run(() => Info = App.Outbox.Dispatch() + " message(s) written down.");
+        await Reload();
+    }
+
     protected override Task LoadAsync()
     {
+        queue = App.Outbox.Stats();
+        failedMessages = queue.Failed > 0 ? App.Outbox.List("failed", 5) : Array.Empty<OutboxMessage>();
         counts = App.Events.Counts();
         rules = App.Retention.Rules();
         foreach (var rule in rules) days[(rule.Subject, rule.DataClass)] = rule.IsDefault ? "" : rule.Days.ToString(CultureInfo.InvariantCulture);

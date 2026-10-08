@@ -97,7 +97,10 @@ namespace NextGenOS.Licensing
             }
 
             if (input.Now < lic.NotBefore) { state.Status = LicenceStatus.NotYetValid; return state; }
-            if (lic.Expires.HasValue && input.Now > lic.Expires.Value) { state.Status = LicenceStatus.Expired; return state; }
+            // Past its end date a trial (or a licence that does not say "banner") stops; a paid licence that says "banner" goes on and is shown as ended (spec 4.1a). A revoked one was refused above.
+            var ended = lic.Expires.HasValue && input.Now > lic.Expires.Value;
+            if (ended && !lic.KeepsWorkingAfterEnd) { state.Status = LicenceStatus.Expired; return state; }
+            var running = ended ? LicenceStatus.Ended : LicenceStatus.Valid;
 
             if (input.RequiredModule != null && !lic.Modules.Contains(input.RequiredModule))
             {
@@ -108,17 +111,17 @@ namespace NextGenOS.Licensing
             switch (lic.Bind.Mode)
             {
                 case "none":
-                    state.Status = LicenceStatus.Valid;
+                    state.Status = running;
                     return state;
 
                 case "domain":
-                    state.Status = HostMatches(input.Host, lic.Bind.Domains) ? LicenceStatus.Valid : LicenceStatus.DomainMismatch;
+                    state.Status = HostMatches(input.Host, lic.Bind.Domains) ? running : LicenceStatus.DomainMismatch;
                     return state;
 
                 case "device":
                     if (act == null) { state.Status = LicenceStatus.NotActivated; return state; }
                     if (!DeviceFingerprint.Matches(act.Fingerprint, act.FingerprintMin, input.Fingerprint)) { state.Status = LicenceStatus.DeviceMismatch; return state; }
-                    if (input.Now <= act.NextCheckIn) { state.Status = LicenceStatus.Valid; return state; }
+                    if (input.Now <= act.NextCheckIn) { state.Status = running; return state; }
                     if (input.Now <= act.Until)
                     {
                         state.Status = LicenceStatus.Grace;

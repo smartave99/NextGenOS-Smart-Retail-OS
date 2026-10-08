@@ -275,7 +275,7 @@ public class StockCostTests
         Assert.Equal(7_000, Convert.ToInt64(f.App.Db.Scalar("SELECT SUM(qty_milli) FROM stock_moves")));                                          // so does the stock
 
         var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);               // forward again works
-        Assert.Equal(15L, Convert.ToInt64(again.Db.Scalar("SELECT MAX(version) FROM schema_version")));
+        Assert.Equal((long)HubDb.LatestVersion, Convert.ToInt64(again.Db.Scalar("SELECT MAX(version) FROM schema_version")));
         Assert.Equal(7_000, Convert.ToInt64(again.Db.Scalar("SELECT SUM(qty_milli) FROM stock_moves")));
     }
 

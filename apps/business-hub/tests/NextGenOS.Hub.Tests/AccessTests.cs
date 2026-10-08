@@ -160,6 +160,8 @@ public class AccessTests : IDisposable
         yield return new("Retention.Set", new[] { Perm.Ai }, a => a.Retention.Set("event", "PUBLIC", 30, null));
         yield return new("Retention.Prune", new[] { Perm.Ai }, a => a.Retention.Prune(null));
         yield return new("Events.SetStatus", new[] { Perm.Ai }, a => a.Events.SetStatus(0, "verified", null));
+        yield return new("Outbox.RetryFailed", new[] { Perm.Ai }, a => a.Outbox.RetryFailed(null));
+        yield return new("Outbox.Replay", new[] { Perm.Ai }, a => a.Outbox.Replay(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, null));
     }
 
     private static bool Refusal(Exception? e) => e is HubException { Code: "forbidden" or "not-signed-in" };

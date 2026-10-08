@@ -15,7 +15,7 @@ namespace NextGenOS.Hub.Documents;
 /// Invoices, quotes, orders, credit notes, purchases and progress bills. One place does the money: it builds the lines, asks the tax engine for the
 /// amounts (so every country is right to the last cent), keeps the answer with the document, takes payments, moves stock and numbers the document.
 /// </summary>
-public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, Access access)
+public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Events.OutboxService outbox, Access access)
 {
     /// <summary>The "way of paying" that uses credit a customer already has with the shop (an advance, or a return kept as credit). It moves no money and is not in the shop's list of ways of paying.</summary>
     public const string AccountCredit = "account";
@@ -599,7 +599,29 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         loyalty.OnIssued(c, t, documentId, options.UserId);
         offers.OnIssued(c, t, documentId, options.UserId);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
+        if (type is DocTypes.Invoice or DocTypes.ProgressBill) Announce(c, t, "sale.issued", documentId, options.UserId, requestKey);
+        else if (type == DocTypes.Purchase) Announce(c, t, "purchase.received", documentId, options.UserId, null);
         return documentId;
+    }
+
+    /// <summary>
+    /// Leaves a message in the outbox, inside the transaction of the thing that happened (blueprint EVT-009): which document, its kind and number, its figures and the items and quantities on it.
+    /// Identifiers and figures only: no name, no note, no card detail. Does nothing (and reads nothing) while the business event history is off.
+    /// </summary>
+    private void Announce(SqliteConnection c, SqliteTransaction t, string eventType, long documentId, long? userId, string? correlation)
+    {
+        if (!outbox.Recording) return;
+        var d = HubDb.Query(c, "SELECT type, number, total_minor, payable_minor, paid_minor, tax_minor, party_id, ref_document_id FROM documents WHERE id = $id",
+            r => (Type: r.GetString(0), Number: r.IsDBNull(1) ? null : r.GetString(1), Total: r.GetInt64(2), Payable: r.GetInt64(3), Paid: r.GetInt64(4), Tax: r.GetInt64(5), Party: r.IsDBNull(6) ? (long?)null : r.GetInt64(6), Ref: r.IsDBNull(7) ? (long?)null : r.GetInt64(7)),
+            t, ("$id", documentId)).Single();
+        var lines = HubDb.Query(c, "SELECT item_id, qty_milli, unit_price_minor FROM document_lines WHERE document_id = $id ORDER BY line_no LIMIT 60",
+            r => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?> { ["itemId"] = r.IsDBNull(0) ? null : r.GetInt64(0), ["qtyMilli"] = r.GetInt64(1), ["unitPriceMinor"] = r.GetInt64(2) }, t, ("$id", documentId));
+        var payload = new Dictionary<string, object?>
+        {
+            ["documentId"] = documentId, ["number"] = d.Number, ["kind"] = d.Type, ["totalMinor"] = d.Total, ["payableMinor"] = d.Payable, ["paidMinor"] = d.Paid, ["taxMinor"] = d.Tax,
+            ["partyId"] = d.Party, ["refDocumentId"] = d.Ref, ["lines"] = lines,
+        };
+        outbox.Add(c, t, eventType, d.Type.Replace('-', '_'), documentId, payload, NextGenOS.Hub.Ai.DataClass.Financial, userId, correlation);
     }
 
     // ---- estimates (quotes for a shop sale) ---------------------------------------------------------------------------------------------
@@ -776,6 +798,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 var paymentId = HubDb.Insert(c, "INSERT INTO payments(document_id, party_id, method, amount_minor, reference, at, user_id, kind) VALUES (NULL, $p, $m, $a, $r, $at, $u, 'advance')", t,
                     ("$p", partyId), ("$m", method), ("$a", left), ("$r", reference), ("$at", Iso.Text(now)), ("$u", userId));
                 books.SyncPayment(c, t, paymentId, userId);
+                AnnouncePayment(c, t, paymentId, null, method, left, "advance", userId);
             }
             audit.Log(c, t, userId, "receive", "party", partyId, $"{party.Name}: {shop.Current.Money(amountMinor)} by {method}");
             return new AccountReceipt(settled, left);
@@ -813,6 +836,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             books.Sync(c, t, documentId, userId);
             if (header.Status == DocStatus.Issued) { loyalty.OnVoid(c, t, documentId, userId); offers.OnVoid(c, t, documentId, userId); }
             audit.Log(c, t, userId, "void", "document", documentId, reason.Trim());
+            if (header.Status == DocStatus.Issued && header.Type is DocTypes.Invoice or DocTypes.ProgressBill) Announce(c, t, "sale.voided", documentId, userId, null);
+            else if (header.Status == DocStatus.Issued && header.Type == DocTypes.Purchase) Announce(c, t, "purchase.voided", documentId, userId, null);
         });
         return Get(documentId)!;
     }
@@ -880,6 +905,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             books.Sync(c, t, noteId, userId);
             loyalty.OnCreditNote(c, t, noteId, invoiceId, userId);
             audit.Log(c, t, userId, "credit-note", "document", noteId, number + " for " + invoice.Number + ": " + reason.Trim());
+            Announce(c, t, "sale.returned", noteId, userId, null);
             return noteId;
         });
         return Get(id)!;
@@ -902,8 +928,18 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     {
         var methods = shop.Current.PaymentMethods;
         if (p.Method != AccountCredit && !methods.Contains(p.Method)) throw new HubException("method", $"\"{p.Method}\" is not a way of paying here. Choose one of: {string.Join(", ", methods)}.");
-        HubDb.Exec(c, "INSERT INTO payments(document_id, party_id, project_id, method, amount_minor, reference, at, user_id, kind) VALUES ($d, $p, $pr, $m, $a, $r, $at, $u, $k)", t,
+        var paymentId = HubDb.Insert(c, "INSERT INTO payments(document_id, party_id, project_id, method, amount_minor, reference, at, user_id, kind) VALUES ($d, $p, $pr, $m, $a, $r, $at, $u, $k)", t,
             ("$d", documentId), ("$p", partyId), ("$pr", projectId), ("$m", p.Method), ("$a", negative ? -p.AmountMinor : p.AmountMinor), ("$r", p.Reference), ("$at", Iso.Text(at)), ("$u", userId), ("$k", kind));
+        AnnouncePayment(c, t, paymentId, documentId, p.Method, negative ? -p.AmountMinor : p.AmountMinor, kind, userId);
+    }
+
+    /// <summary>The message for a payment or a refund: which payment, on which document, by which way of paying, how much. (The reference the person typed is not in it.)</summary>
+    private void AnnouncePayment(SqliteConnection c, SqliteTransaction t, long paymentId, long? documentId, string method, long amountMinor, string kind, long? userId)
+    {
+        if (!outbox.Recording) return;
+        outbox.Add(c, t, "payment.recorded", "payment", paymentId,
+            new Dictionary<string, object?> { ["paymentId"] = paymentId, ["documentId"] = documentId, ["method"] = method, ["amountMinor"] = amountMinor, ["kind"] = kind },
+            NextGenOS.Hub.Ai.DataClass.Financial, userId);
     }
 
     private static void ReduceCash(List<PaymentInput> payments, long change)

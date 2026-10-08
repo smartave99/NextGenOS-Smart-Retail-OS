@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 
 export type LicenceStatus =
     | "Valid" | "Grace" | "NotActivated" | "NeedsCheckIn" | "Expired" | "NotYetValid" | "Revoked"
-    | "DeviceMismatch" | "DomainMismatch" | "ClockTampered" | "Invalid" | "Missing" | "ModuleNotLicensed";
+    | "DeviceMismatch" | "DomainMismatch" | "ClockTampered" | "Invalid" | "Missing" | "ModuleNotLicensed" | "Ended";
 
 export interface TrustedKey { kid: string; publicKey: string }
 
@@ -25,8 +25,14 @@ export interface LicenceClaims {
     bind: { mode: "device" | "domain" | "none"; domains: string[] };
     brand: BrandProfile | null; reseller: { id: string; name: string } | null;
     act: { online: boolean; checkInDays: number; graceDays: number; offlineDays: number };
-    trial: boolean; white?: { level: "none" | "theme" | "full" };
+    trial: boolean;
+    /** What happens when the licence has ended (spec 4.1a): "stop" or "banner". Absent means "stop". A trial always stops. */
+    end?: "stop" | "banner";
+    white?: { level: "none" | "theme" | "full" };
 }
+
+/** True when the program goes on working after the end date, with a banner: the licence says "banner" and it is not a trial. */
+export const keepsWorkingAfterEnd = (lic: LicenceClaims) => !lic.trial && lic.end === "banner";
 
 export interface ActivationClaims {
     typ: "act"; lid: string; iat: number; fp: string[]; fpMin: number; next: number; until: number;
@@ -160,18 +166,21 @@ function evaluateCore(input: EvaluationInput): LicenceState {
     const floor = Math.max(input.lastSeen ?? 0, lic.iat, act ? act.iat : 0, crl ? crl.iat : 0);
     if (input.now < floor - CLOCK_SLACK) return { ...state, status: "ClockTampered" };
     if (input.now < lic.nbf) return { ...state, status: "NotYetValid" };
-    if (lic.exp != null && input.now > lic.exp) return { ...state, status: "Expired" };
+    // Past its end date a trial (or a licence that does not say "banner") stops; a paid licence that says "banner" goes on and is shown as ended (spec 4.1a). A revoked one was refused above.
+    const ended = lic.exp != null && input.now > lic.exp;
+    if (ended && !keepsWorkingAfterEnd(lic)) return { ...state, status: "Expired" };
+    const running: LicenceStatus = ended ? "Ended" : "Valid";
     if (input.requiredModule && !lic.modules.includes(input.requiredModule)) return { ...state, status: "ModuleNotLicensed" };
 
     switch (lic.bind.mode) {
         case "none":
-            return { ...state, status: "Valid" };
+            return { ...state, status: running };
         case "domain":
-            return { ...state, status: hostMatches(input.host, lic.bind.domains) ? "Valid" : "DomainMismatch" };
+            return { ...state, status: hostMatches(input.host, lic.bind.domains) ? running : "DomainMismatch" };
         case "device": {
             if (!act) return { ...state, status: "NotActivated" };
             if (!fingerprintMatches(act.fp, act.fpMin, input.fingerprint)) return { ...state, status: "DeviceMismatch" };
-            if (input.now <= act.next) return { ...state, status: "Valid" };
+            if (input.now <= act.next) return { ...state, status: running };
             if (input.now <= act.until) return { ...state, status: "Grace", graceDaysLeft: Math.max(0, Math.floor((act.until - input.now + 86399) / 86400)) };
             return { ...state, status: "NeedsCheckIn" };
         }
@@ -180,7 +189,7 @@ function evaluateCore(input: EvaluationInput): LicenceState {
     }
 }
 
-export const isUsable = (s: LicenceState) => s.status === "Valid" || s.status === "Grace";
+export const isUsable = (s: LicenceState) => s.status === "Valid" || s.status === "Grace" || s.status === "Ended";
 
 /** A short sentence for the person using the site, with no technical words. */
 export function describe(s: LicenceState): string {
@@ -190,6 +199,7 @@ export function describe(s: LicenceState): string {
         case "NotActivated": return "This site needs to be activated with a licence key.";
         case "NeedsCheckIn": return "The site has not been able to confirm its licence for too long.";
         case "Expired": return "The licence has ended. Please renew it with your supplier.";
+        case "Ended": return "The licence ended on " + (s.licence?.exp ? new Date(s.licence.exp * 1000).toISOString().slice(0, 10) : "an earlier date") + ". The site keeps working. Please renew it with your supplier.";
         case "NotYetValid": return "The licence has not started yet.";
         case "Revoked": return "This licence has been withdrawn. Please contact your supplier.";
         case "DeviceMismatch": return "This licence belongs to a different server.";

@@ -32,7 +32,7 @@ Install a program that runs AI models on your PC and speaks the common web proto
 
 ## 4. Business events (Settings, AI helpers, Business events)
 
-1. Switch on **Business event history** under the AI helpers. The screen has nothing in it: nothing records events yet.
+1. Switch on **Business event history** under the AI helpers. The screen starts empty. From then on every sale, payment, return, purchase and stock change leaves a message that the program writes into the history within ten minutes (the *Waiting to be written down* box on the same screen shows them, and *Write the waiting ones down now* does it at once); cameras and sensors record nothing yet.
 2. In **How long things are kept**, check that biometric data says **not kept** and that card and payment details have no row.
 3. Press **Forget what is past its time now**: "Nothing is past its time."
 

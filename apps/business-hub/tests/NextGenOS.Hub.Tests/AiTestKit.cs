@@ -59,8 +59,11 @@ public sealed class AiFixture : IDisposable
     {
         Entitled = new Entitled(licensed);
         Secrets = new MemorySecretStore();
-        Shop = new HubFixture(ai: new AiOptions(Entitled, Secrets, Factory, new FixedProbe()));
+        _options = new AiOptions(Entitled, Secrets, Factory, new FixedProbe());
+        Shop = new HubFixture(ai: _options);
     }
+
+    private readonly AiOptions _options;
 
     public Entitled Entitled { get; }
     public MemorySecretStore Secrets { get; }
@@ -68,6 +71,9 @@ public sealed class AiFixture : IDisposable
     public HubFixture Shop { get; }
     public HubApp App => Shop.App;
     public AiFoundation Ai => App.Ai;
+
+    /// <summary>The same shop file opened again with the same licence, safe and services, as after the program was stopped and started.</summary>
+    public HubApp Reopen() => HubApp.OpenTrusted(App.Db.Path, Shop.Clock, null, _options);
 
     /// <summary>Connects a stand-in service, switched on, at an address that fits its place.</summary>
     public FakeService Connect(string id, string location, bool on = true, string[]? tasks = null, ProviderLimits? limits = null, long? priceIn = null, long? priceOut = null)

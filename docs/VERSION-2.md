@@ -46,7 +46,7 @@ physical world + digital systems
 |---|---|---|
 | 0 | Repository understanding | **Done**: `docs/V2-ARCHITECTURE-ASSESSMENT.md` |
 | 1 | AI foundation: hardware detection, provider interfaces and registry, model configuration, secure key storage, feature flags, privacy routing policy, consent, the AI settings tab | **Built and tested in a cloud session** (what is in it, and what is not: `docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 6). Not yet tried on a real Windows PC. |
-| 2 | Event foundation: universal event schema, event store, provenance, event APIs and viewer | **Built and tested in a cloud session** (`docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 7). Nothing in the shop writes events yet: sources are connected from Phase 3 on. |
+| 2 | Event foundation: universal event schema, event store, provenance, event APIs and viewer | **Built and tested in a cloud session** (`docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 7). Since 8 October 2026 the shop's own sales, payments, returns, voids, purchases and stock changes reach the history through a durable outbox (blueprint EVT-009, database step 16); cameras and sensors are connected from Phase 3 on. |
 | 3 | Ontology foundation: entities, relationships, mapping of the existing POS objects, APIs | **Built and tested in a cloud session** (`docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 8). The first sources of events are not connected yet. |
 | 4 | Business intelligence: projections, current state, rules engine, analytics | Not started |
 | 5 | Embeddings and local knowledge: local embedding provider, vector abstraction (pgvector, Qdrant behind an interface), document ingestion, RAG with source references | Not started |

@@ -291,6 +291,10 @@ describe("WeeklyReview staying up to date", () => {
         const missing = fakeDb({ error: { message: "gone", code: "PGRST205" }, status: 404 });
         show(missing.db);
         await screen.findByRole("heading", { name: "The weekly review needs the updated script" });
+        // The screen stops looking on its own once it knows there are no reports, but only when React has run the effect that
+        // clears the timer. Whether that has happened by now depends on timing (a slower machine loses the race, and the timer
+        // then fires three times before it is cleared), so let React finish before the clock moves.
+        await act(async () => {});
         await act(async () => {
             vi.advanceTimersByTime(15 * 60_000);
         });

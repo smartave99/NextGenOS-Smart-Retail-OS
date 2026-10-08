@@ -23,7 +23,25 @@ suite("licence evaluator against the Studio's signed vectors", () => {
 
     it("covers every status the .NET library knows", () => {
         const seen = new Set(vectors.cases.map((c: { expect: string }) => c.expect));
-        for (const s of ["Valid", "Grace", "NotActivated", "NeedsCheckIn", "Expired", "NotYetValid", "Revoked", "DeviceMismatch", "DomainMismatch", "ClockTampered", "Invalid", "Missing", "ModuleNotLicensed"]) expect(seen.has(s)).toBe(true);
+        for (const s of ["Valid", "Grace", "NotActivated", "NeedsCheckIn", "Expired", "NotYetValid", "Revoked", "DeviceMismatch", "DomainMismatch", "ClockTampered", "Invalid", "Missing", "ModuleNotLicensed", "Ended"]) expect(seen.has(s)).toBe(true);
+    });
+
+    it("a paid licence past its end date keeps working and says so; a trial stops; a revoked one stops", () => {
+        const run = (name: string) => {
+            const c = vectors.cases.find((x: { name: string }) => x.name === name);
+            return evaluate({ licenceToken: c.lic, activationToken: c.act, revocationListToken: c.crl, fingerprint: list(c.fp), host: c.host, requiredModule: c.module, now: c.now, lastSeen: c.lastSeen ?? 0, trustedKeys: keys });
+        };
+        const ended = run("ended_paid_keeps_working");
+        expect(ended.status).toBe("Ended");
+        expect(isUsable(ended)).toBe(true);
+        expect(words(ended)).toContain("ended on");
+        expect(words(ended)).toContain("keeps working");
+        expect(run("ended_trial_stops_even_if_it_says_banner").status).toBe("Expired");
+        expect(isUsable(run("ended_trial_stops_even_if_it_says_banner"))).toBe(false);
+        expect(run("expired").status).toBe("Expired");
+        expect(run("not_ended_paid_is_valid").status).toBe("Valid");
+        expect(run("ended_paid_that_is_revoked").status).toBe("Revoked");
+        expect(run("end_claim_changed_after_signing").status).toBe("Invalid");
     });
 
     it("refuses everything when no key is trusted", () => {

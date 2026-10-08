@@ -53,7 +53,21 @@ A **public key** is written as `b64u` of the 65-byte uncompressed point (`0x04 |
 | `reseller` | `{id, name}` or `null` |
 | `act` | `{online: bool, checkInDays, graceDays, offlineDays}` |
 | `trial` | `true` for an evaluation licence |
+| `end` | What happens when `exp` has passed: `"stop"` or `"banner"` (see 4.1a). Absent means `"stop"`, so licences made before this claim existed behave as they always did |
 | `white` | `{level}`: how much of the look the customer may change on their own PC (see 5.1) |
+
+#### 4.1a What happens when a licence ends (`end`)
+
+The choice is written **inside the signed licence**, never in a local setting (`CLAUDE.md` section 3: nothing on the customer's PC can make an ended licence keep working, or stop one that should work).
+
+| `end` | At `exp` |
+|---|---|
+| `"stop"` | The licence is `Expired` and the program does not run. Every trial (`trial = true`) is `"stop"` whatever `end` says, so a trial can never be made to keep working by a claim. |
+| `"banner"` | The licence is `Ended`: the program **keeps working** and shows a banner that it ended. This is what a paid licence does (one-time fee, or a plan that was not renewed). The owner's data is never locked away. |
+
+Staff can still stop a licence at any time (revoke or suspend it): that always works, whatever `end` says, because a revoked licence is read before the end date is.
+
+An activation of a `"banner"` licence is **not capped by `exp`** (the Studio keeps answering check-ins for it), so a device-bound PC goes on checking in after the end date; section 9's cap by `exp` is for `"stop"` licences only.
 
 ### 4.2 `act`, the activation certificate (this licence on this PC)
 
@@ -195,7 +209,7 @@ For a PC with no internet:
 2. The sales or support person pastes it into the Studio's **Offline activation** page, which answers with a **response code**: `NGOSRES1.` + `b64u({lic, act})`.
 3. The customer pastes the response code into the app (or loads a `.ngosact` file).
 
-Licences with `act.online = false` get an activation whose `next` and `until` are `offlineDays` away (default 365), always capped by `exp`.
+Licences with `act.online = false` get an activation whose `next` and `until` are `offlineDays` away (default 365), capped by `exp` for a `"stop"` licence (not for a `"banner"` one, 4.1a).
 
 ## 10. What a client decides
 
@@ -207,7 +221,8 @@ Given a licence token, an optional activation token, an optional CRL and the clo
 | `Grace` | as `Valid` but `next < now <= until` | yes, with a warning that shows the days left |
 | `NotActivated` | licence good, no (matching) activation | no, show the activation screen |
 | `NeedsCheckIn` | `now > until` | no, ask to connect to the Internet or use offline activation |
-| `Expired` | `now > exp` | no |
+| `Expired` | `now > exp` and the licence is a trial or its `end` is not `"banner"` | no |
+| `Ended` | `now > exp`, `end = "banner"`, not a trial, and every other check passes as for `Valid` | yes, with a banner that says the licence ended (the program keeps working) |
 | `NotYetValid` | `now < nbf` | no |
 | `Revoked` | `lid` is in the CRL | no |
 | `DeviceMismatch` | fewer than `fpMin` parts match | no |
@@ -216,6 +231,8 @@ Given a licence token, an optional activation token, an optional CRL and the clo
 | `Missing` | no licence at all | no |
 | `ModuleNotLicensed` | the licence does not list the module the app needs | no |
 | `DomainMismatch` | a domain-bound licence is used on another web site address | no |
+
+The checks run in the order of the table's reasons: a revoked licence is `Revoked` whatever its end date; a `now > exp` licence that may not go on is `Expired`; one that may is checked like any other (module, fingerprint, check-in) and, if it would have been `Valid`, is `Ended` instead. A `Grace` licence whose end date has passed stays `Grace` (the `Ended` fact is shown by the client too: `exp` is in the licence).
 
 The app **fails closed**: any unexpected error is `Invalid`.
 

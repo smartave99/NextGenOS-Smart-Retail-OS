@@ -58,11 +58,34 @@ public sealed class SupportFileBuilder(HubApp app, ProductLicence licence, Brand
     /// <summary>A name or number from the signed licence (not private, and support needs it as it is) when it is short and plain; anything else is not shown.</summary>
     private static string Plain(string? value) => value is { Length: > 0 and <= 40 } v && v.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_') ? v : "(not shown)";
 
+    /// <summary>
+    /// The licence state in plain words. Written out one by one on purpose: the shipped program has the names of its enums hidden, so printing the value itself would show a meaningless
+    /// letter (the browser test of the hidden build found this). Anything this list does not know is said to be unknown, never guessed.
+    /// </summary>
+    internal static string StateWords(NextGenOS.Licensing.LicenceStatus status) => status switch
+    {
+        NextGenOS.Licensing.LicenceStatus.Valid => "Valid",
+        NextGenOS.Licensing.LicenceStatus.Grace => "Valid, but this PC must check in soon",
+        NextGenOS.Licensing.LicenceStatus.NotActivated => "Not activated",
+        NextGenOS.Licensing.LicenceStatus.NeedsCheckIn => "This PC must check in",
+        NextGenOS.Licensing.LicenceStatus.Expired => "Expired",
+        NextGenOS.Licensing.LicenceStatus.NotYetValid => "Not valid yet",
+        NextGenOS.Licensing.LicenceStatus.Revoked => "Switched off by the supplier",
+        NextGenOS.Licensing.LicenceStatus.DeviceMismatch => "Made for another PC",
+        NextGenOS.Licensing.LicenceStatus.DomainMismatch => "Made for another address",
+        NextGenOS.Licensing.LicenceStatus.ClockTampered => "The PC's clock looks wrong",
+        NextGenOS.Licensing.LicenceStatus.Invalid => "Not a valid licence",
+        NextGenOS.Licensing.LicenceStatus.Missing => "No licence",
+        NextGenOS.Licensing.LicenceStatus.ModuleNotLicensed => "A part is not in the licence",
+        NextGenOS.Licensing.LicenceStatus.Ended => "Ended (keeps working, with a banner)",
+        _ => "Unknown",
+    };
+
     private SupportSection Licence()
     {
         var state = licence.State;
         var claims = state.Licence;
-        var lines = new List<string> { "State: " + state.Status + (state.Banner is { } banner ? " (" + SupportRedaction.Clean(banner, null, 200) + ")" : "") + "." };
+        var lines = new List<string> { "State: " + StateWords(state.Status) + (state.Banner is { } banner ? " (" + SupportRedaction.Clean(banner, null, 200) + ")" : "") + "." };
         if (claims is not null)
         {
             lines.Add("Licence number: " + Plain(claims.LicenceId) + ", kind: " + (claims.Trial ? "trial" : "paid") + ", edition: " + Plain(claims.Edition) + ".");

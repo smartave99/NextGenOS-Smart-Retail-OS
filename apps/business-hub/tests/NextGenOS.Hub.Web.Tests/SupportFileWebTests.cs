@@ -65,4 +65,16 @@ public class SupportFileWebTests
         Assert.Equal("help@acme.example or +1 555 0100", branded.Services.GetRequiredService<SupportFileBuilder>().SendTo);
         Assert.NotEqual(product, branded.Services.GetRequiredService<SupportFileBuilder>().SendTo);
     }
+
+    [Fact]
+    public void Every_licence_state_has_words_of_its_own_because_the_shipped_programs_enum_names_are_hidden()
+    {
+        // The hidden build prints an enum as a meaningless letter; this list is written out by hand, and a state added later must be added to it.
+        var all = Enum.GetValues<NextGenOS.Licensing.LicenceStatus>();
+        Assert.NotEmpty(all);
+        var words = all.Select(NextGenOS.Hub.Web.Diagnostics.SupportFileBuilder.StateWords).ToList();
+        Assert.DoesNotContain("Unknown", words);
+        Assert.Equal(words.Count, words.Distinct().Count());   // no two states read alike
+        Assert.Equal("Valid", NextGenOS.Hub.Web.Diagnostics.SupportFileBuilder.StateWords(NextGenOS.Licensing.LicenceStatus.Valid));
+    }
 }

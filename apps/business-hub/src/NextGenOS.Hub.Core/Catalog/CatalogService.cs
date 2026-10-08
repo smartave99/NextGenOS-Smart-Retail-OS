@@ -1,12 +1,13 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
 
 namespace NextGenOS.Hub.Catalog;
 
 /// <summary>Items (products, menu items, titles, services, materials) and their stock.</summary>
-public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock)
+public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock, Access access)
 {
     private const string Columns = "id, kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, active";
 
@@ -20,6 +21,7 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Item Create(ItemInput input)
     {
+        access.Require(Perm.Catalog);
         var id = db.InTransaction((c, t) => Create(c, t, input));
         return Get(id)!;
     }
@@ -58,6 +60,7 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Item Update(long id, ItemInput input)
     {
+        access.Require(Perm.Catalog);
         var (taxCode, track) = Validate(input);
         try
         {
@@ -101,8 +104,11 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
     public IReadOnlyList<string> Categories(string? kind = null) =>
         db.Query("SELECT DISTINCT category FROM items WHERE active = 1 AND category IS NOT NULL AND ($kind IS NULL OR kind = $kind) ORDER BY category COLLATE NOCASE", r => r.Text("category"), ("$kind", kind));
 
-    public void SetActive(long id, bool active) =>
+    public void SetActive(long id, bool active)
+    {
+        access.Require(Perm.Catalog);
         db.InTransaction((c, t) => HubDb.Exec(c, "UPDATE items SET active = $a WHERE id = $id", t, ("$a", active ? 1 : 0), ("$id", id)));
+    }
 
     // ---- stock ---------------------------------------------------------------------------------------------------------------------
 
@@ -111,6 +117,7 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Changes the stock of an item: a count, damage, a delivery. The reason is kept with who did it.</summary>
     public void Adjust(long itemId, long deltaMilli, string reason, string? note = null, long? userId = null)
     {
+        access.Require(Perm.Stock);
         var item = Get(itemId) ?? throw new HubException("not-found", "That item was not found.");
         if (!item.TrackStock) throw new HubException("not-tracked", $"Stock is not tracked for {item.Name}.");
         if (deltaMilli == 0) return;

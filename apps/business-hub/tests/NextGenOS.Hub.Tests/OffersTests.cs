@@ -581,7 +581,7 @@ public class OffersTests
         Assert.DoesNotContain("offer_discount_minor", f.App.Db.Query("SELECT name FROM pragma_table_info('documents')", r => r.GetString(0)));
         Assert.DoesNotContain("free_for_line_id", f.App.Db.Query("SELECT name FROM pragma_table_info('document_lines')", r => r.GetString(0)));
         Assert.Equal(1L, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents WHERE status = 'issued'")));
-        var again = HubApp.Open(path, f.Clock);
+        var again = HubApp.OpenTrusted(path, f.Clock);
         Assert.Contains("offer_discount_minor", again.Db.Query("SELECT name FROM pragma_table_info('documents')", r => r.GetString(0)));
         Assert.Equal(sale.Document.PayableMinor, again.Documents.Get(sale.Document.Id)!.Document.PayableMinor);
     }

@@ -26,11 +26,11 @@ public class UpkeepTests
         var path = TempDb();
         try
         {
-            var then = HubApp.Open(path, new FixedClock(Now.AddDays(-3)));
+            var then = HubApp.OpenTrusted(path, new FixedClock(Now.AddDays(-3)));
             then.Shop.Save(new ShopSettings { Name = "Not yet", Country = "PH", Industry = "retail", SetupDone = false });
             var forgotten = then.Documents.CreateDraft(new DraftOptions());
 
-            var app = HubApp.Open(path, new FixedClock(Now));
+            var app = HubApp.OpenTrusted(path, new FixedClock(Now));
             app.Upkeep();
             Assert.NotNull(app.Documents.Get(forgotten.Document.Id));   // set-up is not finished: nothing is tidied
 
@@ -49,7 +49,7 @@ public class UpkeepTests
         var path = TempDb();
         try
         {
-            var app = HubApp.Open(path, new FixedClock(Now));
+            var app = HubApp.OpenTrusted(path, new FixedClock(Now));
             app.Upkeep();   // nothing chosen yet: it must not throw "not set up"
             Assert.False(app.Shop.Settings.SetupDone);
         }
@@ -64,7 +64,7 @@ public class UpkeepTests
         var path = TempDb();
         try
         {
-            var web = HubApp.Open(path, new FixedClock(Now));
+            var web = HubApp.OpenTrusted(path, new FixedClock(Now));
             web.Shop.Save(new ShopSettings { Name = "Luzon Fresh Mart", Country = "PH", Industry = "retail", SetupDone = false });
             using var stop = new CancellationTokenSource();
             var upkeepErrors = new List<Exception>();

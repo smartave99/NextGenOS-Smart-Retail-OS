@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Events;
 
@@ -10,7 +11,7 @@ namespace NextGenOS.Hub.Events;
 /// history can always be read as it was. Writing needs the switch "Business event history" (and the licence's "ai" part); reading and forgetting never do, so what was kept can still be
 /// looked at, and expired records still go, after the switch is turned off.
 /// </summary>
-public sealed class EventStore(HubDb db, IClock clock, AuditService audit, FeatureFlagService flags, RetentionService retention)
+public sealed class EventStore(HubDb db, IClock clock, AuditService audit, FeatureFlagService flags, RetentionService retention, Access access)
 {
     private const string Tenant = FeatureFlagService.Tenant;
     private const string Site = FeatureFlagService.Site;
@@ -82,6 +83,7 @@ public sealed class EventStore(HubDb db, IClock clock, AuditService audit, Featu
     /// </summary>
     public EventRecord Supersede(long oldId, EventInput replacement, long? userId, string? reason = null)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         var old = Get(oldId) ?? throw new HubException("no-event", "That event does not exist.");
         if (!EventStatus.CanMove(old.Status, EventStatus.Superseded))
@@ -101,6 +103,7 @@ public sealed class EventStore(HubDb db, IClock clock, AuditService audit, Featu
     /// <summary>A person (or a rule) confirms a proposed event, or says an event was wrong. The change is written down with who and why.</summary>
     public EventRecord SetStatus(long id, string status, long? userId, string? reason = null)
     {
+        access.Require(Perm.Ai);
         if (!flags.Licensed) throw new HubException("not-licensed", "The business event history is not part of this shop's licence.");
         var current = Get(id) ?? throw new HubException("no-event", "That event does not exist.");
         if (!EventStatus.IsKnown(status) || status == EventStatus.Superseded) throw new HubException("bad-status", "Choose confirmed or rejected.");

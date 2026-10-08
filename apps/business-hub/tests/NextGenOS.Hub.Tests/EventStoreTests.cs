@@ -518,7 +518,7 @@ public class EventMigrationTests
         Assert.Equal("Rice", f.App.Db.Scalar("SELECT name FROM items"));
         Assert.True(File.Exists(f.App.Db.LastBackup));
 
-        var again = HubApp.Open(f.App.Db.Path, f.Clock);
+        var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), EventTables.ToHashSet());
     }
 
@@ -528,7 +528,7 @@ public class EventMigrationTests
         using var f = new HubFixture();
         f.App.Db.Rollback(1);
         Assert.Empty(Tables(f.App).Intersect(EventTables.Concat(AiTables)));
-        var again = HubApp.Open(f.App.Db.Path, f.Clock);
+        var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), EventTables.Concat(AiTables).ToHashSet());
         Assert.Contains($"before-update-1-to-{HubDb.LatestVersion}", again.Db.LastBackup);
     }

@@ -14,7 +14,7 @@ public class UpdateSafetyWebTests
         // An older shop (first structure only) is already in the data folder, and the folder for copies cannot be made.
         Directory.CreateDirectory(f.Folder);
         var path = Path.Combine(f.Folder, "shop.db");
-        HubApp.Open(path).Db.Rollback(1);
+        HubApp.OpenTrusted(path).Db.Rollback(1);
         var blocker = Path.Combine(f.Folder, "blocker");
         File.WriteAllText(blocker, "not a folder");
         f.BackupFolder = Path.Combine(blocker, "copies");

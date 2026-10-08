@@ -282,7 +282,7 @@ public class DiscountTests
         Assert.Equal(new long[] { 1, 2, 3, 4 }, f.App.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
         Assert.NotEqual(0L, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents")));
         // opening it again brings the step back; the bill is still there (its discount was kept only in the step's columns, so it is the plain bill again)
-        var again = HubApp.Open(f.App.Db.Path, f.Clock);
+        var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         Assert.Contains("bill_discount_minor", again.Db.Query("SELECT name FROM pragma_table_info('documents')", r => r.GetString(0)));
         Assert.True(before > 0);
     }

@@ -301,6 +301,7 @@ else
             profile.ApplyTo(settings);
             App.Shop.Save(settings);
             var owner = App.Users.Create(ownerUser.Trim(), ownerName.Trim(), Roles.Owner, ownerPass);
+            using var asTheOwner = App.Access.As(owner.Id);   // the rest of the set-up is the new owner's doing
             if (demo)
             {
                 DemoCompany.Fill(App.Db.Path, new DemoOptions { Industry = industry, Country = country, Region = region, Name = name.Trim() });

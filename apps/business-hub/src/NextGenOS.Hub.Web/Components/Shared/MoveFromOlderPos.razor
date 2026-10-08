@@ -1,4 +1,4 @@
-@* Settings, "Move from the older POS": for the owner only. Two separate steps. "Check" reads the older program's database and shows a report; it saves nothing.
+@* Settings, "Move from the older POS": for the owner only (the Hub checks it again itself). Two separate steps. "Check" reads the older program's database and shows a report; it saves nothing.
    "Move it" saves, all or nothing, after a copy of the Business Hub's data has been made. The password is typed here each time, used for the check, and dropped: it is never saved or shown. *@
 @inherits HubPage
 @implements IDisposable
@@ -142,7 +142,7 @@
     private ImportResult? done;
     private IReadOnlyList<ImportRun> runs = Array.Empty<ImportRun>();
 
-    /// <summary>The owner only. Checked here and again in each action, because a service does not check who is asking.</summary>
+    /// <summary>The owner only. Checked here to show or hide the screen, and again by the Hub itself when the import is asked for.</summary>
     private bool Allowed => Me is not null && Me.Can(Perm.Settings);
 
     protected override Task LoadAsync()

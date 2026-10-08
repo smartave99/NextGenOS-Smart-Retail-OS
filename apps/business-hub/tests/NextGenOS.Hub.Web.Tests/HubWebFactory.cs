@@ -35,7 +35,19 @@ public sealed class HubWebFactory : WebApplicationFactory<Program>
         });
     }
 
-    public HubApp Hub => Services.GetRequiredService<HubApp>();
+    /// <summary>
+    /// The shop the web program uses, for the test to read and set up. What the test does with it is done as the program itself (the Hub's own lock would refuse a command that names nobody);
+    /// the requests the test sends through the web server are NOT: they run as whoever is signed in, with the Hub's lock on.
+    /// </summary>
+    public HubApp Hub
+    {
+        get
+        {
+            var app = Services.GetRequiredService<HubApp>();
+            app.Access.EnterSystemForTests();
+            return app;
+        }
+    }
 
     protected override void Dispose(bool disposing)
     {

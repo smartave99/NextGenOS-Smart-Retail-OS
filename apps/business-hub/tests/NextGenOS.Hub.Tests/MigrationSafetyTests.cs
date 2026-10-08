@@ -152,7 +152,7 @@ public class MigrationSafetyTests : IDisposable
         Assert.True(report.Healthy, string.Join("; ", report.Problems));
         Assert.Equal(HubDb.LatestVersion, report.Version);
 
-        var again = HubApp.Open(restored, f.Clock);
+        var again = HubApp.OpenTrusted(restored, f.Clock);
         long Sum(HubApp a, string sql) => Convert.ToInt64(a.Db.Scalar(sql) ?? 0L);
         foreach (var sql in new[]
         {

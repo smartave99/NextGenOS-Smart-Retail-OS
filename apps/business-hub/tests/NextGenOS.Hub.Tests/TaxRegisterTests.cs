@@ -363,7 +363,7 @@ public class TaxRegisterTests
         var path = f.App.Db.Path;
         f.App.Db.Rollback(10);
         Assert.DoesNotContain("party_tax_id", f.App.Db.Query("SELECT name FROM pragma_table_info('documents')", r => r.GetString(0)));
-        var again = HubApp.Open(path, f.Clock);                                   // forward again: a bill made before the step gets the number its customer has now
+        var again = HubApp.OpenTrusted(path, f.Clock);                                   // forward again: a bill made before the step gets the number its customer has now
         Assert.Equal("27AAPFU0939F1ZV", again.Documents.Get(bill.Document.Id)!.Document.PartyTaxId);
     }
 }

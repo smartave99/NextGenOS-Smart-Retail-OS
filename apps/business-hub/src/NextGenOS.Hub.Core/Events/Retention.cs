@@ -1,5 +1,6 @@
 using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Events;
 
@@ -11,7 +12,7 @@ public sealed record RetentionRule(string Subject, string DataClass, int Days, b
 /// writes a rule for it: keeping it is an opt-in. Card and payment details are never kept and no rule can change that. The forgetting does not depend on any switch: records past
 /// their day are removed even when the event history is switched off.
 /// </summary>
-public sealed class RetentionService(HubDb db, IClock clock, AuditService audit)
+public sealed class RetentionService(HubDb db, IClock clock, AuditService audit, Access access)
 {
     private const string Tenant = FeatureFlagService.Tenant;
     private const string Site = FeatureFlagService.Site;
@@ -61,6 +62,7 @@ public sealed class RetentionService(HubDb db, IClock clock, AuditService audit)
     /// <summary>The owner decides how many days. For biometric data this is also the permission to keep any at all.</summary>
     public void Set(string subject, string dataClass, int days, long? userId)
     {
+        access.Require(Perm.Ai);
         if (!RetentionSubject.IsKnown(subject)) throw new HubException("bad-subject", "That kind of record does not exist.");
         if (!DataClass.IsKnown(dataClass)) throw new HubException("bad-class", "That kind of data does not exist.");
         if (dataClass == DataClass.PaymentSensitive) throw new HubException("never-stored", "Card and payment details are never kept, so there is nothing to set.");
@@ -77,6 +79,7 @@ public sealed class RetentionService(HubDb db, IClock clock, AuditService audit)
     /// <summary>Goes back to the default for this kind of record.</summary>
     public void UseDefault(string subject, string dataClass, long? userId)
     {
+        access.Require(Perm.Ai);
         db.InTransaction((c, t) =>
         {
             var removed = HubDb.Exec(c, "DELETE FROM retention_policies WHERE tenant_id = $t AND site_id = $s AND subject = $x AND data_class = $c", t,
@@ -91,6 +94,7 @@ public sealed class RetentionService(HubDb db, IClock clock, AuditService audit)
     /// </summary>
     public PruneResult Prune(long? userId)
     {
+        access.Require(Perm.Ai);
         var now = Iso.Text(clock.UtcNow);
         var references = new List<string>();
         long observations = 0, events = 0, evidence = 0;

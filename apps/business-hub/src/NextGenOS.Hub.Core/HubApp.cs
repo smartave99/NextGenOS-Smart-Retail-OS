@@ -26,42 +26,45 @@ namespace NextGenOS.Hub;
 /// </summary>
 public sealed class HubApp
 {
-    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai)
+    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, bool trusted)
     {
         Db = db;
         Clock = clock;
-        SettingsStore = new SettingsStore(db);
-        Shop = new ShopContextProvider(SettingsStore);
         Audit = new AuditService(db, clock);
+        Access = new Access(db, Audit, trusted);
+        SettingsStore = new SettingsStore(db, Access);
+        Shop = new ShopContextProvider(SettingsStore);
         Numbering = new Numbering(Shop);
-        Parties = new PartyService(db, Shop, clock);
-        Catalog = new CatalogService(db, Shop, clock);
+        Parties = new PartyService(db, Shop, clock, Access);
+        Catalog = new CatalogService(db, Shop, clock, Access);
         Books = new BooksService(db, clock);
         Loyalty = new LoyaltyService(db, Shop, clock);
-        Offers = new OffersService(db, Shop, clock, Audit);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers);
-        Users = new UserService(db, clock, Audit);
+        Offers = new OffersService(db, Shop, clock, Audit, Access);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Access);
+        Users = new UserService(db, clock, Audit, Access);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
         Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit, Books);
         Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
-        Purchasing = new PurchaseService(Documents, Catalog, Parties);
+        Purchasing = new PurchaseService(Documents, Catalog, Parties, Access);
         Reports = new ReportService(db, Shop, clock, Catalog);
         TaxRegisters = new TaxRegisterService(db, Shop);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
         // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
-        Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", ai);
+        Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", Access, ai);
         // The business event history (observations, events, evidence pointers) and its forgetting. Writing waits for the owner's switch; nothing in the shop's own screens writes to it yet.
-        Retention = new RetentionService(db, clock, Audit);
-        Events = new EventStore(db, clock, Audit, Ai.Flags, Retention);
+        Retention = new RetentionService(db, clock, Audit, Access);
+        Events = new EventStore(db, clock, Audit, Ai.Flags, Retention, Access);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
-        Ontology = new OntologyService(db, clock, Audit, Ai.Flags);
+        Ontology = new OntologyService(db, clock, Audit, Ai.Flags, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
-        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers);
+        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Access);
     }
 
     public HubDb Db { get; }
+    /// <summary>The lock in front of every command that changes money, stock, people or settings: see <see cref="Security.Access"/>.</summary>
+    public Access Access { get; }
     public IClock Clock { get; }
     public SettingsStore SettingsStore { get; }
     public ShopContextProvider Shop { get; }
@@ -98,6 +101,7 @@ public sealed class HubApp
     {
         var settings = Shop.Settings;
         if (string.IsNullOrEmpty(settings.Country) || !settings.SetupDone) return;
+        using var asTheProgram = Access.AsSystem();
         Documents.DiscardStaleDrafts();
         Books.CatchUp();
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
@@ -108,11 +112,22 @@ public sealed class HubApp
     /// Opens (and, if needed, creates or brings up to date) the shop database at a path. An update of a shop that has data first makes a checked copy, in <paramref name="backupFolder"/>
     /// (next to the file when null); if the copy cannot be made this throws and the shop's data is untouched (<see cref="HubDb.Migrate()"/>).
     /// </summary>
-    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null)
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null) =>
+        Open(path, clock, print, ai, backupFolder, trusted: false);
+
+    /// <summary>
+    /// A shop in which a command with nobody named is allowed: for the tests and for filling the sample company, where the program acts on its own. Not reachable from the program
+    /// (internal): the shop that people use is opened with <see cref="Open(string, IClock?, NextGenOS.Devices.Printing.PrintService?, AiOptions?, string?)"/>, where a command with
+    /// nobody named is refused (see <see cref="Security.Access"/>).
+    /// </summary>
+    internal static HubApp OpenTrusted(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null) =>
+        Open(path, clock, print, ai, backupFolder, trusted: true);
+
+    private static HubApp Open(string path, IClock? clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, string? backupFolder, bool trusted)
     {
         var db = new HubDb(path, backupFolder);
         db.Migrate();
-        var app = new HubApp(db, clock ?? new SystemClock(), print, ai);
+        var app = new HubApp(db, clock ?? new SystemClock(), print, ai, trusted);
         // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
         app.Books.CatchUp();
         return app;

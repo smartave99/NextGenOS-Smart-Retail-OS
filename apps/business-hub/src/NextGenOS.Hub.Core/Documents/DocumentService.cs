@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
 using NextGenOS.Tax;
 using NewtonJson = Newtonsoft.Json.JsonConvert;
@@ -14,7 +15,7 @@ namespace NextGenOS.Hub.Documents;
 /// Invoices, quotes, orders, credit notes, purchases and progress bills. One place does the money: it builds the lines, asks the tax engine for the
 /// amounts (so every country is right to the last cent), keeps the answer with the document, takes payments, moves stock and numbers the document.
 /// </summary>
-public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers)
+public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, Access access)
 {
     /// <summary>The "way of paying" that uses credit a customer already has with the shop (an advance, or a return kept as credit). It moves no money and is not in the shop's list of ways of paying.</summary>
     public const string AccountCredit = "account";
@@ -27,6 +28,41 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id, discount_source, free_for_line_id, item_code, extra_tax_pct_milli";
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    // ---- who may do what (SEC-004): every command that changes a bill asks first, here, whatever screen or caller it came from ----------------------------------
+
+    /// <summary>The people who work on bills of any kind: at a till, a table, a loan desk, a booking, a project or a buying desk.</summary>
+    private static readonly string[] DocumentWork = { Perm.Sell, Perm.Orders, Perm.Loans, Perm.Appointments, Perm.Projects, Perm.Purchases };
+
+    /// <summary>Giving a discount: owners and managers always; a cashier only when the owner has set a limit above nothing (and then <see cref="EnforceDiscountLimit"/> holds them to it).</summary>
+    private void RequireToGiveDiscount()
+    {
+        access.RequireAny(DocumentWork);
+        if (!access.Can(Perm.Discount) && shop.Settings.CashierDiscountPctMilli <= 0)
+            throw new HubException("forbidden", "You are not allowed to give a discount. Ask the owner or a manager.");
+    }
+
+    /// <summary>
+    /// A person without the discount permission may not take off more than the owner's limit, counting every discount on the bill that they typed in. What was agreed beforehand does not
+    /// count against them: points, offers, coupons, the customer's own rate and free goods. Called inside the transaction that gave the discount, so a refusal leaves the bill as it was.
+    /// </summary>
+    private void EnforceDiscountLimit(SqliteConnection c, SqliteTransaction t, long documentId)
+    {
+        if (access.Can(Perm.Discount)) return;
+        var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", documentId)).Single();
+        var resultText = HubDb.Scalar(c, "SELECT result FROM documents WHERE id = $id", t, ("$id", documentId)) as string;
+        if (resultText is null) return;
+        var result = NewtonJson.DeserializeObject<TaxResult>(resultText);
+        if (result is null) return;
+        var lines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", documentId));
+        var context = shop.Current;
+        var automatic = lines.Where(l => l.IsFree || l.DiscountSource is not null).Sum(LineDiscountOf);
+        var gross = context.Minor(result.Totals.Gross) - lines.Where(l => l.IsFree).Sum(l => Gross(l.QtyMilli, l.UnitPriceMinor));
+        var off = context.Minor(result.Totals.Discount) - header.LoyaltyDiscountMinor - header.OfferDiscountMinor - automatic;
+        var limit = shop.Settings.CashierDiscountPctMilli;
+        if (gross > 0 && (decimal)off * 100_000m > (decimal)limit * gross)
+            throw new HubException("discount-limit", $"A cashier may take off up to {ShopContext.Qty(limit).TrimEnd('0').TrimEnd('.')}% of a bill. Ask a manager for more.");
+    }
 
     // ---- reading ---------------------------------------------------------------------------------------------------------------
 
@@ -84,7 +120,14 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Starts an open document (an order, a quote, a bill being built). Lines and adjustments may be given at once.</summary>
     public DocumentView CreateDraft(DraftOptions options)
     {
-        var id = db.InTransaction((c, t) => CreateDraft(c, t, options));
+        if (options.Lines.Any(l => l.DiscountPctMilli > 0 || l.DiscountAmountMinor > 0) || options.BillDiscountMinor > 0 || options.BillDiscountPctMilli > 0) RequireToGiveDiscount();
+        else access.RequireAny(DocumentWork);
+        var id = db.InTransaction((c, t) =>
+        {
+            var made = CreateDraft(c, t, options);
+            if (options.Lines.Any(l => l.DiscountPctMilli > 0 || l.DiscountAmountMinor > 0) || options.BillDiscountMinor > 0 || options.BillDiscountPctMilli > 0) EnforceDiscountLimit(c, t, made);
+            return made;
+        });
         return Get(id)!;
     }
 
@@ -113,12 +156,15 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 
     public DocumentView AddLine(long documentId, LineInput input)
     {
+        if (input.DiscountPctMilli > 0 || input.DiscountAmountMinor > 0) RequireToGiveDiscount();
+        else access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
             var partyId = HubDb.Scalar(c, "SELECT party_id FROM documents WHERE id = $id", t, ("$id", documentId)) as long?;
             AddLine(c, t, documentId, input, partyId is { } p ? parties.Get(p) : null);
             Recalculate(c, t, documentId);
+            if (input.DiscountPctMilli > 0 || input.DiscountAmountMinor > 0) EnforceDiscountLimit(c, t, documentId);
         });
         return Get(documentId)!;
     }
@@ -162,6 +208,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 
     public DocumentView UpdateLine(long documentId, long lineId, long? qtyMilli = null, long? discountPctMilli = null, string? note = null, string? customerDiscount = null, bool clearCustomerDiscount = false, long? discountAmountMinor = null)
     {
+        var givesDiscount = discountPctMilli is > 0 || discountAmountMinor is > 0;
+        if (givesDiscount) RequireToGiveDiscount(); else access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -181,12 +229,14 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var now = HubDb.Query(c, "SELECT qty_milli, unit_price_minor, discount_amount_minor FROM document_lines WHERE id = $id AND document_id = $doc", r => (Qty: r.Int("qty_milli"), Price: r.Int("unit_price_minor"), Amount: r.Int("discount_amount_minor")), t, ("$id", lineId), ("$doc", documentId)).FirstOrDefault();
             if (now.Amount > Gross(now.Qty, now.Price)) throw new HubException("discount", "A discount cannot be more than the line comes to.");
             Recalculate(c, t, documentId);
+            if (givesDiscount) EnforceDiscountLimit(c, t, documentId);
         });
         return Get(documentId)!;
     }
 
     public DocumentView RemoveLine(long documentId, long lineId)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -201,6 +251,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 
     public DocumentView SetAdjustments(long documentId, IEnumerable<TaxAdjustmentInput> adjustments)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -216,6 +267,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// </summary>
     public DocumentView SetBillDiscount(long documentId, long amountMinor, long pctMilli)
     {
+        if (amountMinor > 0 || pctMilli > 0) RequireToGiveDiscount(); else access.RequireAny(DocumentWork);
         CheckBillDiscount(amountMinor, pctMilli);
         db.InTransaction((c, t) =>
         {
@@ -225,6 +277,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var loyaltyValue = Convert.ToInt64(HubDb.Scalar(c, "SELECT loyalty_discount_minor FROM documents WHERE id = $id", t, ("$id", documentId)) ?? 0L);
             if (amountMinor + loyaltyValue > lines.Sum(NetOf)) throw new HubException("discount", "The discount is more than the bill comes to.");
             Recalculate(c, t, documentId);
+            if (amountMinor > 0 || pctMilli > 0) EnforceDiscountLimit(c, t, documentId);
         });
         return Get(documentId)!;
     }
@@ -235,6 +288,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// </summary>
     public DocumentView SetLoyaltyPoints(long documentId, long pointsCent)
     {
+        access.RequireAny(DocumentWork);
         if (pointsCent < 0) throw new HubException("loyalty", "Points cannot be less than nothing.");
         db.InTransaction((c, t) =>
         {
@@ -277,6 +331,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 
     public DocumentView SetParty(long documentId, long? partyId)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -303,6 +358,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Puts a coupon or gift voucher (by its code) on a sale that is being made. It is used up only when the bill is made.</summary>
     public DocumentView ApplyCode(long documentId, string code)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -315,6 +371,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Takes a coupon or gift voucher off a sale that is being made (it stays good for another bill).</summary>
     public DocumentView RemoveCode(long documentId, long voucherId)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -327,6 +384,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>The cashier chooses not to use the offer that fits the bill (or to use it after all).</summary>
     public DocumentView SetOfferDeclined(long documentId, bool declined)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
@@ -447,6 +505,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Makes an open document final: numbers it, takes the payments, moves the stock. After this its amounts never change.</summary>
     public DocumentView Issue(long documentId, IssueOptions? options = null)
     {
+        access.RequireAny(DocumentWork);
         options ??= new IssueOptions();
         var id = db.InTransaction((c, t) => Issue(c, t, documentId, options));
         return Get(id)!;
@@ -551,6 +610,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// </summary>
     public DocumentView SaveAsEstimate(long draftId, long? userId = null)
     {
+        access.RequireAny(DocumentWork);
         var id = db.InTransaction((c, t) =>
         {
             var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", draftId)).SingleOrDefault() ?? throw new HubException("not-found", "That sale was not found.");
@@ -569,6 +629,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// </summary>
     public DocumentView BillFromEstimate(long quoteId, long? userId = null)
     {
+        access.RequireAny(DocumentWork);
         var id = db.InTransaction((c, t) =>
         {
             var quote = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", quoteId)).SingleOrDefault() ?? throw new HubException("not-found", "That quote was not found.");
@@ -593,6 +654,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Builds and finishes a counter sale in one step: the lines, the adjustments (service charge ...) and the payments.</summary>
     public DocumentView Checkout(CheckoutRequest request)
     {
+        var typedDiscount = request.Lines.Any(l => l.DiscountPctMilli > 0 || l.DiscountAmountMinor > 0) || request.BillDiscountMinor > 0 || request.BillDiscountPctMilli > 0;
+        if (typedDiscount) RequireToGiveDiscount(); else access.RequireAny(DocumentWork);
         var key = CleanRequestKey(request.RequestKey);
         var id = db.InTransaction((c, t) =>
         {
@@ -602,6 +665,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 Type = request.Type, PartyId = request.PartyId, UserId = request.UserId, Notes = request.Notes, Lines = request.Lines, Adjustments = request.Adjustments,
                 BillDiscountMinor = request.BillDiscountMinor, BillDiscountPctMilli = request.BillDiscountPctMilli,
             });
+            if (typedDiscount) EnforceDiscountLimit(c, t, draftId);
             return Issue(c, t, draftId, new IssueOptions { Payments = request.Payments, UserId = request.UserId, OnCredit = request.OnCredit, RequestKey = key });
         });
         return Get(id)!;
@@ -624,6 +688,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Throws away a sale that was started and never finished. Only an open invoice or quote with nothing sent to a kitchen can go; anything else is voided or cancelled by its own screen.</summary>
     public void Discard(long documentId)
     {
+        access.RequireAny(DocumentWork);
         db.InTransaction((c, t) =>
         {
             var row = HubDb.Query(c, "SELECT type, status, number FROM documents WHERE id = $id", r => (Type: r.Text("type"), Status: r.Text("status"), Number: r.TextOrNull("number")), t, ("$id", documentId)).FirstOrDefault();
@@ -658,6 +723,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Takes a payment on an issued document (a customer settling an invoice). Returns the document with the payment added.</summary>
     public DocumentView AddPayment(long documentId, PaymentInput payment, long? userId = null)
     {
+        access.RequireAny(Perm.Sell, Perm.Projects, Perm.Purchases);
         db.InTransaction((c, t) =>
         {
             var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", documentId)).SingleOrDefault() ?? throw new HubException("not-found", "That document was not found.");
@@ -681,6 +747,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// </summary>
     public AccountReceipt ReceiveOnAccount(long partyId, long amountMinor, string method, string? reference = null, long? userId = null)
     {
+        access.Require(Perm.Sell);
         if (amountMinor <= 0) throw new HubException("amount", "The amount must be more than zero.");
         if (method == AccountCredit || !shop.Current.PaymentMethods.Contains(method))
             throw new HubException("method", $"\"{method}\" is not a way of paying here. Choose one of: {string.Join(", ", shop.Current.PaymentMethods)}.");
@@ -718,6 +785,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Cancels a document. Stock comes back; money that was paid is refunded by the method given.</summary>
     public DocumentView Void(long documentId, string reason, long? userId, string refundMethod = "cash")
     {
+        access.Require(Perm.Void);
         if (string.IsNullOrWhiteSpace(reason)) throw new HubException("reason", "Please say why.");
         db.InTransaction((c, t) =>
         {
@@ -752,6 +820,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>A credit note for some or all of an issued invoice: the lines go back, stock returns, and the money is refunded or kept as a balance.</summary>
     public DocumentView CreateCreditNote(long invoiceId, IReadOnlyList<(long LineId, long QtyMilli)> credits, string reason, string refundMethod, long? userId, bool refundPaid = true)
     {
+        access.Require(Perm.Sell);
         if (string.IsNullOrWhiteSpace(reason)) throw new HubException("reason", "Please say why.");
         var id = db.InTransaction((c, t) =>
         {

@@ -10,7 +10,7 @@ public class ShopLookTests : IDisposable
     private readonly string path = Path.Combine(Path.GetTempPath(), "hub-shoplook-" + Guid.NewGuid().ToString("N") + ".db");
     private readonly HubApp app;
 
-    public ShopLookTests() => app = HubApp.Open(path);
+    public ShopLookTests() => app = HubApp.OpenTrusted(path);
 
     public void Dispose()
     {

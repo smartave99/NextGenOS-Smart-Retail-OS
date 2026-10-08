@@ -156,7 +156,7 @@ public class TaxInputsTests
         Assert.DoesNotContain("item_code", f.App.Db.Query("SELECT name FROM pragma_table_info('document_lines')", r => r.GetString(0)));
         Assert.DoesNotContain("extra_tax_pct_milli", f.App.Db.Query("SELECT name FROM pragma_table_info('document_lines')", r => r.GetString(0)));
         Assert.Equal(done.Document.PayableMinor, Convert.ToInt64(f.App.Db.Scalar("SELECT payable_minor FROM documents WHERE id = $id", ("$id", done.Document.Id))));
-        var again = HubApp.Open(path, f.Clock);
+        var again = HubApp.OpenTrusted(path, f.Clock);
         Assert.Contains("item_code", again.Db.Query("SELECT name FROM pragma_table_info('document_lines')", r => r.GetString(0)));
     }
 }

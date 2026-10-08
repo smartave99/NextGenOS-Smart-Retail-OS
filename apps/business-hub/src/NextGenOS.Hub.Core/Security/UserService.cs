@@ -9,7 +9,7 @@ public sealed record User(long Id, string Username, string DisplayName, string R
 internal sealed record LoginRow(User User, string Hash, int Failed, DateTimeOffset? Locked);
 
 /// <summary>People who sign in. Passwords are never stored: only a salted, deliberately slow hash (PBKDF2-SHA256). Repeated wrong passwords lock the account for a while.</summary>
-public sealed class UserService(HubDb db, IClock clock, AuditService audit)
+public sealed class UserService(HubDb db, IClock clock, AuditService audit, Access access)
 {
     private const int Iterations = 600_000;
     private const int MaxFailures = 5;
@@ -21,6 +21,7 @@ public sealed class UserService(HubDb db, IClock clock, AuditService audit)
 
     public User Create(string username, string displayName, string role, string password, long? byUser = null)
     {
+        access.Require(Perm.Users);
         if (string.IsNullOrWhiteSpace(username) || username.Trim().Length < 3) throw new HubException("username", "A user name needs at least 3 characters.");
         if (username.Any(char.IsWhiteSpace)) throw new HubException("username", "A user name cannot contain spaces.");
         if (string.IsNullOrWhiteSpace(displayName)) throw new HubException("name-missing", "Please give a name.");
@@ -72,6 +73,7 @@ public sealed class UserService(HubDb db, IClock clock, AuditService audit)
 
     public void ChangePassword(long userId, string newPassword, long? byUser)
     {
+        if (access.CurrentUserId != userId) access.Require(Perm.Users);   // your own password, or the owner's word for someone else's
         var user = Get(userId) ?? throw new HubException("not-found", "That user was not found.");
         CheckPassword(user.Username, newPassword);
         db.InTransaction((c, t) => HubDb.Exec(c, "UPDATE users SET password_hash = $h, failed_logins = 0, locked_until = NULL WHERE id = $id", t, ("$h", Hash(newPassword)), ("$id", userId)));
@@ -80,6 +82,7 @@ public sealed class UserService(HubDb db, IClock clock, AuditService audit)
 
     public void SetActive(long userId, bool active, long? byUser)
     {
+        access.Require(Perm.Users);
         var user = Get(userId) ?? throw new HubException("not-found", "That user was not found.");
         if (!active && user.Role == Roles.Owner && db.Query("SELECT id FROM users WHERE role = 'owner' AND active = 1 AND id <> $id", r => r.Int("id"), ("$id", userId)).Count == 0)
             throw new HubException("last-owner", "The last owner cannot be switched off.");
@@ -89,6 +92,7 @@ public sealed class UserService(HubDb db, IClock clock, AuditService audit)
 
     public void SetRole(long userId, string role, long? byUser)
     {
+        access.Require(Perm.Users);
         if (!Roles.All.Contains(role)) throw new HubException("role", "That is not a role.");
         var user = Get(userId) ?? throw new HubException("not-found", "That user was not found.");
         if (user.Role == Roles.Owner && role != Roles.Owner && db.Query("SELECT id FROM users WHERE role = 'owner' AND active = 1 AND id <> $id", r => r.Int("id"), ("$id", userId)).Count == 0)

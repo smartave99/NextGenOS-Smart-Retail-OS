@@ -1,11 +1,12 @@
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
 
 namespace NextGenOS.Hub.Catalog;
 
 /// <summary>Customers, guests, members, clients, suppliers and staff: everybody the shop deals with, in one list with a kind.</summary>
-public sealed class PartyService(HubDb db, ShopContextProvider shop, IClock clock)
+public sealed class PartyService(HubDb db, ShopContextProvider shop, IClock clock, Access access)
 {
     private const string Columns = "id, kind, code, name, phone, email, address, tax_id, region, member_type, price_level, credit_limit_minor, terms_days, card_barcode, notes, active";
 
@@ -16,6 +17,7 @@ public sealed class PartyService(HubDb db, ShopContextProvider shop, IClock cloc
 
     public Party Create(PartyInput input)
     {
+        access.Require(Perm.Parties);
         var id = db.InTransaction((c, t) => Create(c, t, input));
         return Get(id)!;
     }
@@ -42,6 +44,7 @@ public sealed class PartyService(HubDb db, ShopContextProvider shop, IClock cloc
 
     public Party Update(long id, PartyInput input)
     {
+        access.Require(Perm.Parties);
         Validate(input);
         try
         {
@@ -75,8 +78,11 @@ public sealed class PartyService(HubDb db, ShopContextProvider shop, IClock cloc
             ("$kind", kind), ("$all", includeInactive ? 1 : 0), ("$t", (text ?? "").Trim()), ("$like", like), ("$limit", limit));
     }
 
-    public void SetActive(long id, bool active) =>
+    public void SetActive(long id, bool active)
+    {
+        access.Require(Perm.Parties);
         db.InTransaction((c, t) => HubDb.Exec(c, "UPDATE parties SET active = $a WHERE id = $id", t, ("$a", active ? 1 : 0), ("$id", id)));
+    }
 
     private void Validate(PartyInput input)
     {

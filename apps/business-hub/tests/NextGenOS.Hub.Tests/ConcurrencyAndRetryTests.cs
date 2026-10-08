@@ -188,7 +188,7 @@ public class ConcurrencyAndRetryTests
         Assert.Equal(0, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'request_key'")));
         Assert.Equal(made.Document.Number, f.App.Db.Scalar("SELECT number FROM documents WHERE status = 'issued'"));   // the bill is still there
 
-        var again = HubApp.Open(path, f.Clock);
+        var again = HubApp.OpenTrusted(path, f.Clock);
         Assert.Equal(1, Convert.ToInt64(again.Db.Scalar("SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'request_key'")));
         Assert.Equal(1, Convert.ToInt64(again.Db.Scalar("SELECT COUNT(*) FROM documents WHERE status = 'issued'")));
     }

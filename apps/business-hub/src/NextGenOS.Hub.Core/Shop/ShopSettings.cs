@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Shop;
 
@@ -51,7 +52,7 @@ public sealed class ShopSettings
 }
 
 /// <summary>Settings kept in the database as key/value rows.</summary>
-public sealed class SettingsStore(HubDb db)
+public sealed class SettingsStore(HubDb db, Access access)
 {
     private const string Key = "shop";
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = false, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -64,12 +65,16 @@ public sealed class SettingsStore(HubDb db)
 
     public void Save(ShopSettings settings)
     {
+        access.Require(Perm.Settings);
         var text = JsonSerializer.Serialize(settings, Json);
         db.InTransaction((c, t) => HubDb.Exec(c, "INSERT INTO settings(key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", t, ("$k", Key), ("$v", text)));
     }
 
     public string? GetText(string key) => db.Scalar("SELECT value FROM settings WHERE key = $k", ("$k", key)) as string;
 
-    public void SetText(string key, string value) =>
+    public void SetText(string key, string value)
+    {
+        access.Require(Perm.Settings);
         db.InTransaction((c, t) => HubDb.Exec(c, "INSERT INTO settings(key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", t, ("$k", key), ("$v", value)));
+    }
 }

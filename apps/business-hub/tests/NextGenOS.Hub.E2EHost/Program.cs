@@ -31,6 +31,7 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
 {
     app.MapPost("/__e2e/seed-events", (NextGenOS.Hub.HubApp hub) =>
     {
+        using var asTheProgram = hub.Access.AsSystem();   // the test host acts as the program itself (it is not shipped)
         hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.EventEngine, true, null);
         var now = DateTimeOffset.UtcNow;
         var a = hub.Events.Observe(new NextGenOS.Hub.Events.ObservationInput("object.detected", "model", "cam-1", "INTERNAL", now.AddMinutes(-4), 0.81, "detector", "2.1", "zone:aisle-3", "track:cam1:17", "hand", "{\"box\":[0.1,0.2,0.3,0.4]}"));

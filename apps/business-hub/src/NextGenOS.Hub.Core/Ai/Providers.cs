@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Ai;
 
@@ -23,7 +24,7 @@ public sealed record ConsentRecord(string ProviderId, string DataClass, string F
 /// The AI services the owner connected, what each may receive, and where its key is kept. A new service is switched off and may receive nothing. Every change is written
 /// to the audit log (never with a key in it), and changing where a service is clears what it was allowed to receive, because the permission was for the old place.
 /// </summary>
-public sealed partial class ProviderService(HubDb db, IClock clock, AuditService audit, ISecretStore secrets, IProviderFactory factory)
+public sealed partial class ProviderService(HubDb db, IClock clock, AuditService audit, ISecretStore secrets, IProviderFactory factory, Access access)
 {
     private const string Tenant = FeatureFlagService.Tenant;
     private const string Site = FeatureFlagService.Site;
@@ -42,6 +43,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
 
     public ProviderRecord Save(ProviderInput input, long? userId)
     {
+        access.Require(Perm.Ai);
         var id = (input.Id ?? "").Trim();
         if (!Slug().IsMatch(id)) throw new HubException("bad-id", "Give the service a short name of small letters, numbers and dashes, for example 'ollama-shop'.");
         var name = (input.Name ?? "").Trim();
@@ -99,6 +101,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
 
     public void SetEnabled(string id, bool enabled, long? userId)
     {
+        access.Require(Perm.Ai);
         var provider = Get(id);
         if (enabled && EndpointClassifier.Mismatch(provider.Location, provider.BaseUrl) is { } mismatch) throw new HubException("bad-address", mismatch);
         if (enabled && !factory.Adapters.Contains(provider.Adapter)) throw new HubException("bad-adapter", "This program cannot talk to that kind of service yet.");
@@ -112,6 +115,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
 
     public void Delete(string id, long? userId)
     {
+        access.Require(Perm.Ai);
         var provider = Get(id);
         db.InTransaction((c, t) =>
         {
@@ -135,6 +139,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
     /// <summary>Keeps the key in the secret store and its name in the database. The key is never written to the database, the audit log or any message.</summary>
     public void SetSecret(string id, string secret, long? userId)
     {
+        access.Require(Perm.Ai);
         var provider = Get(id);
         if (string.IsNullOrWhiteSpace(secret)) throw new HubException("no-key", "Type the key.");
         var key = secret.Trim();
@@ -151,6 +156,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
 
     public void ClearSecret(string id, long? userId)
     {
+        access.Require(Perm.Ai);
         var provider = Get(id);
         if (provider.SecretName is not null) TryDeleteSecret(provider.SecretName);
         db.InTransaction((c, t) =>
@@ -177,6 +183,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
     /// <summary>The owner lets one service receive one kind of data (for every feature, or only for the named ones).</summary>
     public void Grant(string providerId, string dataClass, IEnumerable<string>? features, long? userId)
     {
+        access.Require(Perm.Ai);
         var provider = Get(providerId);
         if (!DataClass.IsKnown(dataClass)) throw new HubException("bad-class", "That kind of data does not exist.");
         if (Routing.NeverLeavesTheComputer(dataClass) && !ProviderLocation.StaysOnThisComputer(provider.Location))
@@ -196,6 +203,7 @@ public sealed partial class ProviderService(HubDb db, IClock clock, AuditService
 
     public void Revoke(string providerId, string dataClass, long? userId)
     {
+        access.Require(Perm.Ai);
         Get(providerId);
         db.InTransaction((c, t) =>
         {

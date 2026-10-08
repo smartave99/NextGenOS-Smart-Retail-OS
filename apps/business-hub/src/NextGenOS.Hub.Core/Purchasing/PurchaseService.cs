@@ -1,6 +1,7 @@
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
 
 namespace NextGenOS.Hub.Purchasing;
@@ -14,10 +15,11 @@ public sealed class PurchaseLine
 }
 
 /// <summary>Buying from suppliers: a purchase order, receiving the goods into stock, and paying the supplier.</summary>
-public sealed class PurchaseService(DocumentService documents, CatalogService catalog, PartyService parties)
+public sealed class PurchaseService(DocumentService documents, CatalogService catalog, PartyService parties, Access access)
 {
     public DocumentView CreateOrder(long supplierId, IEnumerable<PurchaseLine> lines, string? notes = null, long? userId = null)
     {
+        access.Require(Perm.Purchases);
         var supplier = parties.Get(supplierId) ?? throw new HubException("party-not-found", "That supplier was not found.");
         if (supplier.Kind != "supplier") throw new HubException("not-supplier", $"{supplier.Name} is not a supplier.");
         var list = lines.ToList();
@@ -32,6 +34,7 @@ public sealed class PurchaseService(DocumentService documents, CatalogService ca
     /// <summary>The goods arrived: the order becomes final, stock goes up, and the cost price of each item is updated.</summary>
     public DocumentView Receive(long orderId, long? userId = null)
     {
+        access.Require(Perm.Purchases);
         var order = documents.Get(orderId) ?? throw new HubException("not-found", "That order was not found.");
         if (order.Document.Type != DocTypes.Purchase) throw new HubException("not-purchase", "That is not a purchase order.");
         var view = documents.Issue(orderId, new IssueOptions { UserId = userId });
@@ -39,6 +42,7 @@ public sealed class PurchaseService(DocumentService documents, CatalogService ca
         {
             var item = catalog.Get(line.ItemId!.Value);
             if (item is null || line.UnitPriceMinor <= 0) continue;
+            using var costUpdate = access.AsSystem();   // the new cost is part of the receive the person was allowed to do, not a catalogue edit of theirs
             catalog.Update(item.Id, new ItemInput
             {
                 Kind = item.Kind, Sku = item.Sku, Barcode = item.Barcode, Name = item.Name, Category = item.Category, Unit = item.Unit, PriceMinor = item.PriceMinor, TradePriceMinor = item.TradePriceMinor,
@@ -50,8 +54,11 @@ public sealed class PurchaseService(DocumentService documents, CatalogService ca
     }
 
     /// <summary>A payment to the supplier for a received order.</summary>
-    public DocumentView Pay(long orderId, long amountMinor, string method, string? reference = null, long? userId = null) =>
-        documents.AddPayment(orderId, new PaymentInput { Method = method, AmountMinor = amountMinor, Reference = reference }, userId);
+    public DocumentView Pay(long orderId, long amountMinor, string method, string? reference = null, long? userId = null)
+    {
+        access.Require(Perm.Purchases);
+        return documents.AddPayment(orderId, new PaymentInput { Method = method, AmountMinor = amountMinor, Reference = reference }, userId);
+    }
 
     /// <summary>What is owed to suppliers: received orders not yet fully paid.</summary>
     public IReadOnlyList<Document> Payable() =>

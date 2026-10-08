@@ -1,4 +1,5 @@
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Ai;
 
@@ -26,7 +27,7 @@ public sealed class DelegateEntitlements(Func<string, bool> has) : IEntitlements
 /// The switches for the major capabilities. Every one starts off, so that nothing new happens on a shop until its owner turns it on, and the owner can turn it off again.
 /// A switch only counts when the licence has the "ai" module as well: <see cref="IsEnabled"/> is the one answer the program uses.
 /// </summary>
-public sealed class FeatureFlagService(HubDb db, IClock clock, AuditService audit, IEntitlements entitlements)
+public sealed class FeatureFlagService(HubDb db, IClock clock, AuditService audit, IEntitlements entitlements, Access access)
 {
     public const string Tenant = "local";
     public const string Site = "main";
@@ -46,6 +47,7 @@ public sealed class FeatureFlagService(HubDb db, IClock clock, AuditService audi
 
     public void Set(string key, bool enabled, long? userId)
     {
+        access.Require(Perm.Ai);
         if (!FlagKey.All.Contains(key)) throw new HubException("unknown-flag", "That switch does not exist.");
         if (enabled && !entitlements.Has(LicenceModule)) throw new HubException("not-licensed", "The AI features are not part of this shop's licence.");
         var before = Chosen(key);

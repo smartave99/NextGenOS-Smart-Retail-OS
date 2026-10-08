@@ -490,7 +490,12 @@
         // A sale left open by closing the page is thrown away, so it does not clutter the day.
         if (cart is not null && !finished)
         {
-            try { App.Documents.Discard(cart.Document.Id); } catch (Exception) { /* the daily clean-up will take it */ }
+            try
+            {
+                using var asMe = App.Access.As(Me.Id);
+                App.Documents.Discard(cart.Document.Id);
+            }
+            catch (Exception) { /* the daily clean-up will take it */ }
         }
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Ai;
 
@@ -16,7 +17,7 @@ public sealed record ModelInput(
 /// The list of models and where each stands. Models are replaceable: nothing in the program names one. A newer model is not used because it is newer. It is added as a candidate, tested,
 /// run beside the active one, and only then made the active one, and the one before it is kept so that it can be put back. A model whose licence does not allow use in a business is refused.
 /// </summary>
-public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit)
+public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit, Access access)
 {
     private const string Tenant = FeatureFlagService.Tenant;
     private const string Site = FeatureFlagService.Site;
@@ -34,6 +35,7 @@ public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit)
 
     public ModelRecord Add(ModelInput input, long? userId)
     {
+        access.Require(Perm.Ai);
         var modelId = (input.ModelId ?? "").Trim();
         if (modelId.Length is < 1 or > 200) throw new HubException("bad-model", "Give the model's name.");
         if (!AiTask.IsKnown(input.Task)) throw new HubException("bad-task", "Say what the model is used for.");
@@ -68,6 +70,7 @@ public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit)
     /// <summary>Moves a model along: candidate, testing, shadow (run beside the active one), active, retired. Making one active retires the one that was active (it is kept, to put back).</summary>
     public ModelRecord Move(long id, string to, long? userId, string? reason = null)
     {
+        access.Require(Perm.Ai);
         var model = Get(id);
         if (!ModelStatus.IsKnown(to)) throw new HubException("bad-status", "That is not a stage a model can be in.");
         if (!ModelStatus.CanMove(model.Status, to))
@@ -89,6 +92,7 @@ public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit)
     /// <summary>Takes a model out of use and puts back the one that was in use before it (the most recently retired one for the same work and service). Returns the model now in use, or null.</summary>
     public ModelRecord? RollBack(long id, long? userId, string? reason = null)
     {
+        access.Require(Perm.Ai);
         var model = Get(id);
         if (model.Status != ModelStatus.Active) throw new HubException("not-active", "Only the model in use can be rolled back.");
         var now = Iso.Text(clock.UtcNow);
@@ -111,6 +115,7 @@ public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit)
 
     public void SetInstalled(long id, bool installed, long? userId)
     {
+        access.Require(Perm.Ai);
         var model = Get(id);
         db.InTransaction((c, t) =>
         {
@@ -122,6 +127,7 @@ public sealed class ModelRegistry(HubDb db, IClock clock, AuditService audit)
 
     public void Remove(long id, long? userId)
     {
+        access.Require(Perm.Ai);
         var model = Get(id);
         if (model.Status == ModelStatus.Active) throw new HubException("in-use", "That model is in use. Roll it back or retire it first.");
         db.InTransaction((c, t) =>

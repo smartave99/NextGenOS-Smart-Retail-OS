@@ -22,6 +22,7 @@
   <ItemGroup>
     <!-- The tests reach the update steps directly, to prove that a step that fails leaves the shop as it was. -->
     <InternalsVisibleTo Include="NextGenOS.Hub.Tests" />
+    <InternalsVisibleTo Include="NextGenOS.Hub.Web.Tests" />
   </ItemGroup>
 
   <ItemGroup>

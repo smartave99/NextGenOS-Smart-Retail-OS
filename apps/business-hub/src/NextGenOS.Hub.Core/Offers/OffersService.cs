@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Shop;
 
@@ -87,7 +88,7 @@ public sealed record DocumentOffers(IReadOnlyList<AppliedOffer> Applied, Applied
 ///   - the discount of all offers and codes together never goes above what the bill comes to.
 /// A cashier needs no discount right for these: the shop made them.
 /// </summary>
-public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit)
+public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, Access access)
 {
     private const string CodeLetters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // no 0, O, 1 or I: a code read out over the phone or typed from a screen has fewer mistakes
     private const int CodeLength = 8;
@@ -175,6 +176,7 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>Adds a rule, or changes the one named by the id. Refused, in plain words, when it does not make sense.</summary>
     public Offer SaveOffer(OfferInput input, long? userId = null)
     {
+        access.Require(Perm.Discount);
         if (!OfferKinds.All.Contains(input.Kind)) throw new HubException("offer-kind", "That kind of offer does not exist.");
         if (input.ValidFrom is { } f && input.ValidTo is { } to && to < f) throw new HubException("offer-dates", "The last day cannot be before the first day.");
         var name = string.IsNullOrWhiteSpace(input.Name) ? null : input.Name.Trim();
@@ -236,18 +238,26 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
         });
     }
 
-    public void SetOfferEnabled(long id, bool enabled, long? userId = null) => db.InTransaction((c, t) =>
+    public void SetOfferEnabled(long id, bool enabled, long? userId = null)
     {
-        if (HubDb.Exec(c, "UPDATE offers SET enabled = $e WHERE id = $id", t, ("$e", enabled ? 1 : 0), ("$id", id)) == 0) throw new HubException("not-found", "That offer was not found.");
-        audit.Log(c, t, userId, enabled ? "offer-on" : "offer-off", "offer", id, null);
-    });
+        access.Require(Perm.Discount);
+        db.InTransaction((c, t) =>
+        {
+            if (HubDb.Exec(c, "UPDATE offers SET enabled = $e WHERE id = $id", t, ("$e", enabled ? 1 : 0), ("$id", id)) == 0) throw new HubException("not-found", "That offer was not found.");
+            audit.Log(c, t, userId, enabled ? "offer-on" : "offer-off", "offer", id, null);
+        });
+    }
 
     /// <summary>Takes a rule away. Bills already made keep what it gave them.</summary>
-    public void DeleteOffer(long id, long? userId = null) => db.InTransaction((c, t) =>
+    public void DeleteOffer(long id, long? userId = null)
     {
-        HubDb.Exec(c, "DELETE FROM offers WHERE id = $id", t, ("$id", id));
-        audit.Log(c, t, userId, "offer-delete", "offer", id, null);
-    });
+        access.Require(Perm.Discount);
+        db.InTransaction((c, t) =>
+        {
+            HubDb.Exec(c, "DELETE FROM offers WHERE id = $id", t, ("$id", id));
+            audit.Log(c, t, userId, "offer-delete", "offer", id, null);
+        });
+    }
 
     // ---- a customer's standing discount ------------------------------------------------------------------------------------------------------
 
@@ -260,6 +270,7 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>Sets the percent a customer is always given off an item (0 takes it away). It can be switched off without losing the percent.</summary>
     public void SetPartyDiscount(long partyId, long pctMilli, bool enabled, long? userId = null)
     {
+        access.Require(Perm.Discount);
         if (pctMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
         db.InTransaction((c, t) => SetPartyDiscount(c, t, partyId, pctMilli, enabled, userId));
     }
@@ -304,6 +315,7 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
     /// </summary>
     public IReadOnlyList<Voucher> GenerateCoupons(IReadOnlyList<long> partyIds, long amountMinor, DateOnly? from, DateOnly? to, bool enabled = true, long? userId = null)
     {
+        access.Require(Perm.Discount);
         if (amountMinor <= 0) throw new HubException("coupon-amount", "Please enter the amount of the coupon.");
         if (partyIds.Count == 0) throw new HubException("coupon-customers", "Choose at least one customer.");
         if (from is { } f && to is { } e && e < f) throw new HubException("coupon-dates", "The last day cannot be before the first day.");
@@ -342,14 +354,18 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
     }
 
     /// <summary>Switches a coupon or voucher off (or back on). One that was used cannot be changed.</summary>
-    public void SetVoucherEnabled(long id, bool enabled, long? userId = null) => db.InTransaction((c, t) =>
+    public void SetVoucherEnabled(long id, bool enabled, long? userId = null)
     {
-        var row = HubDb.Query(c, "SELECT used_at FROM vouchers WHERE id = $id", r => r.TextOrNull("used_at"), t, ("$id", id));
-        if (row.Count == 0) throw new HubException("not-found", "That code was not found.");
-        if (row[0] is not null) throw new HubException("voucher-used", "That code was already used and cannot be changed.");
-        HubDb.Exec(c, "UPDATE vouchers SET enabled = $e WHERE id = $id", t, ("$e", enabled ? 1 : 0), ("$id", id));
-        audit.Log(c, t, userId, enabled ? "voucher-on" : "voucher-off", "voucher", id, null);
-    });
+        access.Require(Perm.Discount);
+        db.InTransaction((c, t) =>
+        {
+            var row = HubDb.Query(c, "SELECT used_at FROM vouchers WHERE id = $id", r => r.TextOrNull("used_at"), t, ("$id", id));
+            if (row.Count == 0) throw new HubException("not-found", "That code was not found.");
+            if (row[0] is not null) throw new HubException("voucher-used", "That code was already used and cannot be changed.");
+            HubDb.Exec(c, "UPDATE vouchers SET enabled = $e WHERE id = $id", t, ("$e", enabled ? 1 : 0), ("$id", id));
+            audit.Log(c, t, userId, enabled ? "voucher-on" : "voucher-off", "voucher", id, null);
+        });
+    }
 
     // ---- on a bill that is being made --------------------------------------------------------------------------------------------------------
 

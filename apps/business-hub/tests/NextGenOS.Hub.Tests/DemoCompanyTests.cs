@@ -19,7 +19,7 @@ public class DemoCompanyTests
     {
         var path = Path.Combine(Path.GetTempPath(), "hub-demo-" + Guid.NewGuid().ToString("N") + ".db");
         var summary = DemoCompany.Fill(path, new DemoOptions { Industry = industry, Country = country, Days = days }, Now);
-        return (HubApp.Open(path, new FixedClock(Now)), summary, path);
+        return (HubApp.OpenTrusted(path, new FixedClock(Now)), summary, path);
     }
 
     private static void Cleanup(string path)
@@ -37,11 +37,11 @@ public class DemoCompanyTests
         var path = Path.Combine(Path.GetTempPath(), "hub-demo-" + Guid.NewGuid().ToString("N") + ".db");
         try
         {
-            var first = HubApp.Open(path, new FixedClock(Now));
+            var first = HubApp.OpenTrusted(path, new FixedClock(Now));
             first.Shop.Save(new ShopSettings { Name = "Own ways", Country = "PH", Industry = industry, PaymentMethods = new List<string> { "gcash", "card" } });
             var summary = DemoCompany.Fill(path, new DemoOptions { Industry = industry, Country = "PH", Days = 7 }, Now);
             Assert.True(summary.Documents > 0);
-            var app = HubApp.Open(path, new FixedClock(Now));
+            var app = HubApp.OpenTrusted(path, new FixedClock(Now));
             Assert.Equal(new[] { "gcash", "card" }, app.Shop.Settings.PaymentMethods);
         }
         finally { Cleanup(path); }

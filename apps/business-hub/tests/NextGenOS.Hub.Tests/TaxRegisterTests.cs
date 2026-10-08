@@ -265,6 +265,95 @@ public class TaxRegisterTests
         Assert.Empty(uk.App.TaxRegisters.CodesSold(Today, Today).Rows);
     }
 
+    // ---- the summary of supplies (T1 to T14) -------------------------------------------------------------------------------------------
+
+    private static SummaryBlockResult Block(SupplySummary summary, string id) => summary.Blocks.Single(b => b.Id == id);
+
+    [Fact]
+    public void T1_to_T7_every_line_goes_in_the_block_of_its_own_rate_buyer_and_place_even_inside_one_bill()
+    {
+        using var f = Shop();
+        var near = Buyer(f, "Asha");
+        var farUnregistered = Buyer(f, "Gujarat walk-in", null, "24");
+        var farRegistered = Buyer(f, "Gujarat Ltd", "24BBBBB1111B1Z1", "24");
+        Sell(f, near.Id, Line("Shirt", 100_000));                                                    // T1: inside the state
+        Sell(f, farUnregistered.Id, Line("Shirt", 100_000));                                         // T2: between states, no number
+        Sell(f, farRegistered.Id, Line("Shirt", 100_000));                                           // T3: between states, with a number
+        Sell(f, near.Id, Line("Bread", 50_000, "GST0"));                                              // T4: taxed at nil
+        Sell(f, near.Id, Line("Shirt", 100_000), Line("Bread", 20_000, "GST0"));                      // T6: one bill, two kinds of line: the older program put all 1,200.00 in the taxed block
+        Sell(f, farRegistered.Id, Line("Bread", 30_000, "GST0"));                                     // T7: nil between states: the state does not matter for a nil line
+        Sell(f, near.Id, Line("Flour", 10_000, "GSTEX"));                                             //     an exempt line
+        var summary = f.App.TaxRegisters.SupplySummary(Today, Today);
+
+        var inside = Block(summary, "out-inside");
+        Assert.Equal(2, inside.Lines);
+        Assert.Equal(200_000, inside.ValueMinor);                                                    // T1 and the taxed line of T6
+        Assert.Equal(new[] { ("CGST", 18_000L), ("SGST", 18_000L) }, inside.Parts.ToArray());
+        var unregistered = Block(summary, "out-between-unreg");
+        Assert.Equal(100_000, unregistered.ValueMinor);
+        Assert.Equal(new[] { ("IGST", 18_000L) }, unregistered.Parts.ToArray());
+        Assert.Equal(100_000, Block(summary, "out-between-reg").ValueMinor);
+        var zero = Block(summary, "out-zero");
+        Assert.Equal(3, zero.Lines);
+        Assert.Equal(50_000 + 20_000 + 30_000, zero.ValueMinor);                                     // T4, the nil line of T6 and T7
+        Assert.Empty(zero.Parts);
+        Assert.Equal(10_000, Block(summary, "out-exempt").ValueMinor);
+        Assert.Equal(0, summary.UnplacedLines);
+        Assert.True(summary.Blocks.Where(b => b.Side == "inward").All(b => b.Lines == 0));
+    }
+
+    [Fact]
+    public void T8_to_T13_purchases_go_in_the_inward_blocks_by_supplier_number_and_rate_and_a_nil_purchase_from_an_unregistered_supplier_is_not_lost()
+    {
+        using var f = Shop();
+        var registered = f.App.Parties.Create(new PartyInput { Kind = "supplier", Name = "Mill Co", TaxId = "27AAPFU0939F1ZV", Region = "27" });
+        var unregistered = f.App.Parties.Create(new PartyInput { Kind = "supplier", Name = "Farm", Region = "29" });
+        var taxed = f.App.Catalog.Create(new ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 5_000, TaxClass = "GST5", TrackStock = false });
+        var nil = f.App.Catalog.Create(new ItemInput { Kind = "stock", Name = "Fresh milk", PriceMinor = 5_000, TaxClass = "GST0", TrackStock = false });
+        void Buy(long supplier, long item, long cost) => f.App.Purchasing.Receive(f.App.Purchasing.CreateOrder(supplier, new[] { new PurchaseLine { ItemId = item, QtyMilli = 10_000, CostMinor = cost } }).Document.Id);
+        Buy(registered.Id, taxed.Id, 50_000);        // T8: from a supplier with a number
+        Buy(unregistered.Id, taxed.Id, 40_000);      // T10: from a supplier without one (between states: IGST)
+        Buy(registered.Id, nil.Id, 4_000);           // T11: nil from a supplier with a number
+        Buy(unregistered.Id, nil.Id, 2_500);         // T12: nil from a supplier without a number: the older program had no block for it
+        var summary = f.App.TaxRegisters.SupplySummary(Today, Today);
+        Assert.Equal(500_000, Block(summary, "in-reg").ValueMinor);
+        Assert.Equal(new[] { ("CGST", 12_500L), ("SGST", 12_500L) }, Block(summary, "in-reg").Parts.ToArray());
+        Assert.Equal(400_000, Block(summary, "in-unreg").ValueMinor);
+        Assert.Equal(new[] { ("IGST", 20_000L) }, Block(summary, "in-unreg").Parts.ToArray());
+        Assert.Equal(40_000 + 25_000, Block(summary, "in-zero").ValueMinor);
+        Assert.Equal(0, summary.UnplacedLines);
+        Assert.All(summary.Blocks.Where(b => b.Side == "outward"), b => Assert.Equal(0, b.Lines));
+    }
+
+    [Fact]
+    public void T14_goods_given_back_are_taken_off_the_same_block_a_cancelled_bill_is_not_counted_and_a_period_holds_only_its_own_days()
+    {
+        using var f = Shop();
+        var near = Buyer(f, "Asha");
+        var bill = Sell(f, near.Id, Line("Shirt", 100_000, "GST18", null, 3_000));                    // 3 shirts
+        var cancelled = Sell(f, near.Id, Line("Shirt", 100_000));
+        f.App.Documents.Void(cancelled.Document.Id, "mistake", null);
+        f.App.Documents.CreateCreditNote(bill.Document.Id, new[] { (bill.Lines[0].Id, 1_000L) }, "size", "cash", null);   // one comes back
+        var inside = Block(f.App.TaxRegisters.SupplySummary(Today, Today), "out-inside");
+        Assert.Equal(200_000, inside.ValueMinor);                                                    // 3,000.00 less 1,000.00 (the older program did not net returns)
+        Assert.Equal(new[] { ("CGST", 18_000L), ("SGST", 18_000L) }, inside.Parts.ToArray());
+        Assert.Equal(0, Block(f.App.TaxRegisters.SupplySummary(Today.AddDays(1), Today.AddDays(5)), "out-inside").Lines);
+    }
+
+    [Fact]
+    public void A_shop_that_is_not_registered_and_a_country_without_blocks_have_no_summary()
+    {
+        using (var unregistered = Shop(registered: false))
+        {
+            Sell(unregistered, null, Line("Shirt", 10_000));
+            Assert.False(unregistered.App.TaxRegisters.HasSupplySummary);
+            Assert.Empty(unregistered.App.TaxRegisters.SupplySummary(Today, Today).Blocks);
+        }
+        using var uk = new HubFixture("GB", "retail");
+        Assert.Null(uk.App.Shop.Current.Country.Tax.Summary);
+        Assert.Empty(uk.App.TaxRegisters.SupplySummary(Today, Today).Blocks);
+    }
+
     [Fact]
     public void The_step_that_keeps_the_buyers_number_can_be_undone_and_done_again()
     {

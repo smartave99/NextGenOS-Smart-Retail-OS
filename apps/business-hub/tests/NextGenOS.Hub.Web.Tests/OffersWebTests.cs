@@ -85,6 +85,7 @@ public class OffersWebTests
             Assert.Equal(HttpStatusCode.OK, (await Get(http, "/registers", cookie)).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/register-sales.csv", cookie)).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/codes.csv", cookie)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/summary.csv", cookie)).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/list-b2b.csv", cookie)).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await Get(http, "/export/list-nothing.csv", cookie)).StatusCode);
         }

@@ -65,6 +65,13 @@ public static class ExportEndpoint
                     }));
                 break;
             }
+            case "summary":
+            {
+                var sum = app.TaxRegisters.SupplySummary(start, end);
+                text = Csv.Build(new[] { "Side", "Block", "Lines", "Before tax", "Tax parts", "Extra tax", "Tax" },
+                    sum.Blocks.Select(b => (IReadOnlyList<object?>)new object?[] { b.Side, b.Label, b.Lines, M(b.ValueMinor), string.Join("; ", b.Parts.Select(p => p.Name + " " + M(p.AmountMinor))), M(b.ExtraTaxMinor), M(b.TaxMinor) }));
+                break;
+            }
             case "codes":
             {
                 var codes = app.TaxRegisters.CodesSold(start, end);

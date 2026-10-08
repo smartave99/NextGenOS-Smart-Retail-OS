@@ -66,6 +66,8 @@ namespace NextGenOS.Tax
         [JsonProperty("extraTax")] public NamedTaxField ExtraTax { get; set; }
         /// <summary>The lists this country's tax returns are made from (which bills go in which list). Null: the country has none.</summary>
         [JsonProperty("returns")] public ReturnRules Returns { get; set; }
+        /// <summary>The blocks of the summary of supplies a country's periodic return asks for (what was sold and bought, line by line). Null: the country has none.</summary>
+        [JsonProperty("summary")] public SummaryRules Summary { get; set; }
         [JsonProperty("customerDiscounts")] public List<CustomerDiscount> CustomerDiscounts { get; set; }
         [JsonProperty("rounding")] public RoundingRule Rounding { get; set; }
     }
@@ -107,6 +109,31 @@ namespace NextGenOS.Tax
     {
         [JsonProperty("title")] public string Title { get; set; }
         [JsonProperty("lists")] public List<ReturnList> Lists { get; set; }
+    }
+
+    /// <summary>The blocks of a summary of supplies: each line of a bill, credit note or purchase goes in the first block of its side whose rule it meets.</summary>
+    public sealed class SummaryRules
+    {
+        [JsonProperty("title")] public string Title { get; set; }
+        [JsonProperty("blocks")] public List<SummaryBlock> Blocks { get; set; }
+    }
+
+    public sealed class SummaryBlock
+    {
+        [JsonProperty("id")] public string Id { get; set; }
+        [JsonProperty("label")] public string Label { get; set; }
+        /// <summary>"outward" (sales; credit notes are taken off) or "inward" (purchases).</summary>
+        [JsonProperty("side")] public string Side { get; set; }
+        [JsonProperty("when")] public SummaryWhen When { get; set; }
+    }
+
+    /// <summary>What a line must meet to go in a block. Everything named must be true; what is not named does not matter.</summary>
+    public sealed class SummaryWhen
+    {
+        /// <summary>"taxed" (the line has a rate above nothing), "zero" (taxable at nothing) or "exempt" (outside the tax).</summary>
+        [JsonProperty("rate")] public string Rate { get; set; }
+        [JsonProperty("partyHasTaxId")] public bool? PartyHasTaxId { get; set; }
+        [JsonProperty("betweenRegions")] public bool? BetweenRegions { get; set; }
     }
 
     public sealed class ReturnList

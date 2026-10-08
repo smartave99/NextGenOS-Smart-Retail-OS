@@ -40,6 +40,15 @@ public sealed record CodeSummaryRow(string Code, string TaxCode, string TaxLabel
 
 public sealed record CodeSummary(IReadOnlyList<CodeSummaryRow> Rows, int LinesWithoutCode);
 
+/// <summary>One block of the summary of supplies: the value before tax and each tax part of every line that falls in it (credit notes taken off).</summary>
+public sealed record SummaryBlockResult(string Id, string Label, string Side, int Lines, long ValueMinor, IReadOnlyList<(string Name, long AmountMinor)> Parts, long ExtraTaxMinor)
+{
+    public long TaxMinor => Parts.Sum(p => p.AmountMinor) + ExtraTaxMinor;
+}
+
+/// <summary>The blocks of the country's summary for the period, and how many lines fell in none of them.</summary>
+public sealed record SupplySummary(IReadOnlyList<SummaryBlockResult> Blocks, int UnplacedLines);
+
 /// <summary>
 /// The registers a shop's accountant asks for, read from what was stored when each bill was made (nothing is worked out again, so a register always agrees with the bills): a register of bills, of
 /// credit notes and of purchases, the lists a country's tax return is made from (the pack says which bills go in which list: <c>tax.returns</c>), and a summary by the code of what was sold. Cancelled
@@ -113,6 +122,72 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop)
         if (when.BetweenRegions is { } between && between != row.BetweenRegions) return false;
         if (!string.IsNullOrEmpty(when.TotalOver) && !(row.TotalMinor > (long)MoneyText.Parse(when.TotalOver, decimals))) return false;
         return true;
+    }
+
+    /// <summary>True when the pack names summary blocks and the shop charges the tax.</summary>
+    public bool HasSupplySummary => shop.Current.Settings.TaxRegistered && shop.Current.Country.Tax.Summary is { Blocks.Count: > 0 };
+
+    /// <summary>"taxed", "zero" or "exempt": what a line's rate is, from the pack.</summary>
+    private static string RateKind(TaxRate? rate)
+    {
+        if (rate is null) return "taxed";
+        if (rate.Exempt) return "exempt";
+        if (rate.Zero) return "zero";
+        if (rate.Taxable) return "taxed";
+        return decimal.TryParse(rate.Percent, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var percent) && percent > 0 ? "taxed" : "zero";
+    }
+
+    /// <summary>
+    /// The country's summary of supplies for the days chosen, worked line by line (the older program classed a whole bill by its header, so a bill with one taxed and one nil line was all taxed): each line of a
+    /// bill, credit note (taken off) or purchase goes in the first block of its side whose rule it meets, in the order the pack gives. A line that meets no rule is counted, not hidden. Empty when the pack names no blocks.
+    /// </summary>
+    public SupplySummary SupplySummary(DateOnly from, DateOnly to)
+    {
+        var context = shop.Current;
+        var rules = context.Country.Tax.Summary;
+        if (!HasSupplySummary) return new SupplySummary(Array.Empty<SummaryBlockResult>(), 0);
+        var decimals = context.Decimals;
+        var time = context.Time;
+        var totals = rules!.Blocks.ToDictionary(b => b.Id, _ => (Lines: 0, Value: 0L, Parts: new Dictionary<string, long>(), Extra: 0L));
+        var unplaced = 0;
+        var documents = db.Query(
+            "SELECT id, type, direction, party_tax_id, buyer_region, seller_region, result FROM documents WHERE status = 'issued' AND registered = 1 AND " +
+            "((direction = 'out' AND type IN ('invoice','progress-bill','credit-note')) OR (direction = 'in' AND type = 'purchase')) AND issued_at >= $f AND issued_at < $t ORDER BY issued_at, id",
+            r => (Id: r.Int("id"), Type: r.Text("type"), Direction: r.Text("direction"), TaxId: r.TextOrNull("party_tax_id"), Buyer: r.TextOrNull("buyer_region"), Seller: r.TextOrNull("seller_region"), Result: r.TextOrNull("result")),
+            ("$f", Iso.Text(time.StartOfDay(from))), ("$t", Iso.Text(time.StartOfNextDay(to))));
+        foreach (var d in documents)
+        {
+            if (d.Result is null) continue;
+            var result = NewtonJson.DeserializeObject<TaxResult>(d.Result);
+            if (result is null) continue;
+            var side = d.Direction == "out" ? "outward" : "inward";
+            var sign = d.Type == DocTypes.CreditNote ? -1 : 1;
+            var hasId = !string.IsNullOrWhiteSpace(d.TaxId);
+            var between = !string.IsNullOrEmpty(d.Buyer) && d.Buyer != d.Seller;
+            var codes = db.Query("SELECT tax_code FROM document_lines WHERE document_id = $id ORDER BY line_no", r => r.Text("tax_code"), ("$id", d.Id));
+            for (var i = 0; i < codes.Count && i < result.Lines.Count; i++)
+            {
+                var line = result.Lines[i];
+                var kind = RateKind(context.Country.Tax.Rates.FirstOrDefault(r => r.Code == codes[i]));
+                var block = rules.Blocks.FirstOrDefault(b => b.Side == side && (b.When?.Rate is null || b.When.Rate == kind)
+                    && (b.When?.PartyHasTaxId is not { } wantId || wantId == hasId) && (b.When?.BetweenRegions is not { } wantBetween || wantBetween == between));
+                if (block is null) { unplaced++; continue; }
+                var parts = (line.Components ?? new List<Component>()).Select(c => (c.Name, Amount: Minor(c.Amount, decimals))).ToList();
+                var extra = Minor(line.Cess, decimals);
+                var value = Minor(line.LineTotal, decimals) - parts.Sum(p => p.Amount) - extra;
+                var t = totals[block.Id];
+                t.Lines++;
+                t.Value += sign * value;
+                t.Extra += sign * extra;
+                foreach (var (name, amount) in parts) t.Parts[name] = t.Parts.GetValueOrDefault(name) + sign * amount;
+                totals[block.Id] = t;
+            }
+        }
+        return new SupplySummary(rules.Blocks.Select(b =>
+        {
+            var t = totals[b.Id];
+            return new SummaryBlockResult(b.Id, b.Label, b.Side, t.Lines, t.Value, t.Parts.Where(p => p.Value != 0).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => (p.Key, p.Value)).ToList(), t.Extra);
+        }).ToList(), unplaced);
     }
 
     /// <summary>

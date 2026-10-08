@@ -254,6 +254,20 @@
       "label": "Cess",
       "help": "A further tax a few goods carry on top of GST, as a percent of the price before tax. Leave empty for most items."
     },
+    "summary": {
+      "title": "GST summary of sales and purchases",
+      "blocks": [
+        { "id": "out-inside", "label": "Taxable sales inside the state", "side": "outward", "when": { "rate": "taxed", "betweenRegions": false } },
+        { "id": "out-between-reg", "label": "Taxable sales between states to buyers with a GSTIN", "side": "outward", "when": { "rate": "taxed", "betweenRegions": true, "partyHasTaxId": true } },
+        { "id": "out-between-unreg", "label": "Taxable sales between states to buyers without a GSTIN", "side": "outward", "when": { "rate": "taxed", "betweenRegions": true, "partyHasTaxId": false } },
+        { "id": "out-zero", "label": "Sales taxed at nil", "side": "outward", "when": { "rate": "zero" } },
+        { "id": "out-exempt", "label": "Exempt sales", "side": "outward", "when": { "rate": "exempt" } },
+        { "id": "in-reg", "label": "Taxable purchases from suppliers with a GSTIN", "side": "inward", "when": { "rate": "taxed", "partyHasTaxId": true } },
+        { "id": "in-unreg", "label": "Taxable purchases from suppliers without a GSTIN", "side": "inward", "when": { "rate": "taxed", "partyHasTaxId": false } },
+        { "id": "in-zero", "label": "Purchases taxed at nil", "side": "inward", "when": { "rate": "zero" } },
+        { "id": "in-exempt", "label": "Exempt purchases", "side": "inward", "when": { "rate": "exempt" } }
+      ]
+    },
     "returns": {
       "title": "GST returns, lists of bills",
       "lists": [

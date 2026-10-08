@@ -32,13 +32,45 @@
     {
         <button type="button" role="tab" class="@(tab == "list-" + l.Id ? "on" : "")" aria-selected="@(tab == "list-" + l.Id)" @onclick='() => Open("list-" + l.Id)'>@ShortName(l) <span class="chip">@l.Rows.Count</span></button>
     }
+    @if (App.TaxRegisters.HasSupplySummary)
+    {
+        <button type="button" role="tab" class="@(tab == "summary" ? "on" : "")" aria-selected="@(tab == "summary")" @onclick='() => Open("summary")'>Summary</button>
+    }
     @if (Shop.Country.Tax.ItemCode is { } codeRule)
     {
         <button type="button" role="tab" class="@(tab == "codes" ? "on" : "")" aria-selected="@(tab == "codes")" @onclick='() => Open("codes")'>@codeRule.Label</button>
     }
 </div>
 
-@if (tab == "codes")
+@if (tab == "summary")
+{
+    <section class="card" id="register-summary">
+        <div class="head"><h2>@Shop.Country.Tax.Summary!.Title</h2><a class="btn ghost small" href="export/summary.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        <p class="muted small">Worked line by line from what was stored. Credit notes are taken off. Cancelled bills are left out.</p>
+        @if (summary.UnplacedLines > 0)
+        {
+            <div class="notice error" id="summary-unplaced">@summary.UnplacedLines @(summary.UnplacedLines == 1 ? "line fits" : "lines fit") none of the blocks below, so @(summary.UnplacedLines == 1 ? "it is" : "they are") not counted. Ask your accountant which block @(summary.UnplacedLines == 1 ? "it belongs" : "they belong") in.</div>
+        }
+        @foreach (var side in new[] { "outward", "inward" })
+        {
+            var blocks = summary.Blocks.Where(b => b.Side == side).ToList();
+            if (blocks.Count == 0) { continue; }
+            <h3>@(side == "outward" ? "Sales" : "Purchases")</h3>
+            <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>Block</th><th class="num">Lines</th><th class="num">Before tax</th><th>Tax parts</th><th class="num">Tax</th></tr></thead>
+                <tbody>
+                @foreach (var b in blocks)
+                {
+                    <tr data-block="@b.Id"><td>@b.Label</td><td class="num">@b.Lines</td><td class="num">@Money(b.ValueMinor)</td><td>@PartsText(b.Parts, b.ExtraTaxMinor)</td><td class="num">@Money(b.TaxMinor)</td></tr>
+                }
+                </tbody>
+                <tfoot><tr><th>Together</th><th class="num">@blocks.Sum(b => b.Lines)</th><th class="num">@Money(blocks.Sum(b => b.ValueMinor))</th><th></th><th class="num">@Money(blocks.Sum(b => b.TaxMinor))</th></tr></tfoot>
+            </table>
+            </div>
+        }
+    </section>
+}
+else if (tab == "codes")
 {
     <section class="card" id="register-codes">
         <div class="head"><h2>What was sold, by @(Shop.Country.Tax.ItemCode?.Label ?? "code") and rate</h2><a class="btn ghost small" href="export/codes.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
@@ -104,6 +136,7 @@ else
     private IReadOnlyList<RegisterRow> rows = Array.Empty<RegisterRow>();
     private IReadOnlyList<ReturnListResult> lists = Array.Empty<ReturnListResult>();
     private CodeSummary codes = new(Array.Empty<CodeSummaryRow>(), 0);
+    private SupplySummary summary = new(Array.Empty<SummaryBlockResult>(), 0);
 
     private string Heading => tab switch
     {
@@ -159,7 +192,9 @@ else
         var r = App.TaxRegisters;
         lists = r.HasReturnLists ? r.ReturnLists(from, to) : Array.Empty<ReturnListResult>();
         if (tab.StartsWith("list-", StringComparison.Ordinal) && lists.All(l => "list-" + l.Id != tab)) tab = "sales";
-        if (tab == "codes") codes = r.CodesSold(from, to);
+        if (tab == "summary" && !r.HasSupplySummary) tab = "sales";
+        if (tab == "summary") summary = r.SupplySummary(from, to);
+        else if (tab == "codes") codes = r.CodesSold(from, to);
         else rows = tab switch
         {
             "sales" or "credits" or "purchases" => r.Register(tab, from, to),

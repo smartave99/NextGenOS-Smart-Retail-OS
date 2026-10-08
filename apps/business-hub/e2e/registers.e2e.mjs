@@ -61,6 +61,15 @@ try {
   assert.match(await page.locator('#register-table').innerText(), /Nothing in these days/);
   step('the bill is in the B2B list and not in the list for buyers without a number');
 
+  await page.getByRole('tab', { name: 'Summary' }).click();
+  await page.locator('#register-summary').waitFor();
+  const inside = await page.locator('tr[data-block="out-inside"]').innerText();
+  assert.match(inside, /Taxable sales inside the state/);
+  assert.match(inside, /₹100\.00/);
+  assert.match(inside, /CGST ₹9\.00, SGST ₹9\.00/);
+  assert.strictEqual(await page.locator('#summary-unplaced').count(), 0);
+  step('the summary of sales and purchases puts the bill in its block, line by line');
+
   await page.getByRole('tab', { name: 'HSN or SAC code' }).click();
   await page.locator('#register-codes').waitFor();
   assert.match(await page.locator('#register-codes').innerText(), /2202/);
@@ -70,6 +79,7 @@ try {
   const csv = await page.request.get(hub.url + '/export/register-sales.csv');
   assert.strictEqual(csv.status(), 200);
   assert.match(await csv.text(), /27AAPFU0939F1ZV/);
+  assert.match(await (await page.request.get(hub.url + '/export/summary.csv')).text(), /Taxable sales inside the state/);
   const codesCsv = await page.request.get(hub.url + '/export/codes.csv');
   assert.match(await codesCsv.text(), /2202/);
   step('the registers download as files for a spreadsheet');
@@ -85,7 +95,7 @@ try {
   await ph.locator('#register-table').waitFor();
   const tabs = await ph.locator('#register-tabs').innerText();
   assert.match(tabs, /Sales/);
-  assert.doesNotMatch(tabs, /B2B|HSN/);
+  assert.doesNotMatch(tabs, /B2B|HSN|Summary/);
   step('in the Philippines there are the registers and no GST lists');
 
   assert.deepStrictEqual(problems, [], 'the browser saw problems');

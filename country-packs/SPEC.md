@@ -64,6 +64,7 @@ country-packs/
     "itemCode": { "label": "HSN or SAC code", "help": "..." },       // optional: a code a line may carry for what it sells (section 4a)
     "extraTax": { "label": "Cess", "help": "..." },                    // optional: a further tax set per item, on top of the main one (section 4a)
     "returns": { "title": "GST returns", "lists": [ ] },               // optional: the lists the country's tax returns are made from (section 4b)
+    "summary": { "title": "Summary of supplies", "blocks": [ ] },       // optional: the blocks of the periodic return's summary of sales and purchases (section 4c)
     "customerDiscounts": [ ],            // section 6
     "rounding": { "total": "nearest", "increment": "1", "defaultOn": false }   // section 7
   },
@@ -115,6 +116,16 @@ put in the **first** list of its kind whose `when` it meets (so the order matter
 
 Everything named must be true. The programs list, for each list and a period, the bills in it with the buyer's name, tax number and place, the amount before tax, each tax part, the total and the date; nothing in program code names a list. Bills of a shop that is
 not registered for the tax (no tax charged) and cancelled bills are in no list. The pack's `review` says whether an adviser has checked the limits.
+
+### 4c. Summary of supplies (optional)
+
+A country whose periodic return asks for totals of what was sold and bought, grouped, says how in `summary.blocks`: an ordered list, each with an `id`, a `label` (the country's words), a `side` (`outward`: sales, credit notes taken off; `inward`: purchases) and `when`. The programs work **line by line**: each line
+of every issued bill, credit note and purchase of the period goes in the first block of its side whose `when` it meets, and each block shows the value before tax, each tax part and the extra tax, summed. `when` may name:
+
+* `rate` – `taxed` (the line's rate is above nothing), `zero` (taxable at nothing) or `exempt` (outside the tax).
+* `partyHasTaxId`, `betweenRegions` – as in section 4b, for the bill the line is on.
+
+Everything named must be true. A line that meets no block is in none (it is counted, so that it can be looked at). Bills of a shop that is not registered for the tax and cancelled bills are left out.
 
 ## 5. Models
 

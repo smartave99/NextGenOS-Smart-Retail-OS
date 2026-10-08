@@ -559,7 +559,7 @@ jobs:
           mkdir -p dist
           cp "${RUNNER_TEMP}/website-out/website-${OS}.zip" dist/
       - name: Also put one customer's settings beside it (only when a customer was named; nothing is built again)
-        if: ${{ inputs.website_customer != '' }}
+        if: inputs.website_customer != ''
         shell: bash
         env:
           OS: ${{ matrix.os }}

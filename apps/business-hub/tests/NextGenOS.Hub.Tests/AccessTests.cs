@@ -160,6 +160,7 @@ public class AccessTests : IDisposable
         yield return new("Retention.Set", new[] { Perm.Ai }, a => a.Retention.Set("event", "PUBLIC", 30, null));
         yield return new("Retention.Prune", new[] { Perm.Ai }, a => a.Retention.Prune(null));
         yield return new("Events.SetStatus", new[] { Perm.Ai }, a => a.Events.SetStatus(0, "verified", null));
+        yield return new("Support.Sections", new[] { Perm.Settings }, a => a.Support.Sections());
         yield return new("Ontology.Check", new[] { Perm.Ai }, a => a.Ontology.Check());
         yield return new("Supply.Set", new[] { Perm.Purchases }, a => a.Supply.Set(itemId, supplierId, 5, 2, 1_000, 0, null));
         yield return new("Supply.Clear", new[] { Perm.Purchases }, a => a.Supply.Clear(itemId, null));

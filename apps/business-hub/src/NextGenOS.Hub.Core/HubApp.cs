@@ -21,6 +21,7 @@ using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Restaurant;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
+using NextGenOS.Hub.Diagnostics;
 
 namespace NextGenOS.Hub;
 
@@ -75,6 +76,8 @@ public sealed class HubApp
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
         // A store with one main PC and many counter PCs on the shop's own network: switched off unless the owner chose it (and the Hub was started again since). Nothing leaves the shop.
         Network = new StoreNetwork(db, clock, Audit, Access, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", network);
+        // The Help button's support file: facts about how the shop is set up and how it is doing, never what it sold or to whom.
+        Support = new SupportService(this);
     }
 
     public HubDb Db { get; }
@@ -112,6 +115,7 @@ public sealed class HubApp
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public StoreNetwork Network { get; }
+    public SupportService Support { get; }
 
     /// <summary>
     /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day

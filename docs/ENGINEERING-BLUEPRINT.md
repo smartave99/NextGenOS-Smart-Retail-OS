@@ -40,7 +40,7 @@ Status words: **built** (code and tests in the repository), **part** (some of it
 | **KIT-017** P1 | One tested base kit per release; two customers from one release | The website part is built (`assembleWebsite`); Android and the encrypted kit are not | **Part** (`OPEN-WORK.md` item 1c) |
 | **WEB-018** P2 | Opt-in product snapshots to the website with freshness | Not built; the website has its own catalogue | **Not built** |
 | **QA-019** P0 | Real hardware and Windows certification matrix | The gate runs here on Linux; the Windows runner in the release workflow | **Owner** (real PCs, printers, scanners) |
-| **GT-020** P1 | Privacy-safe pilot measures | Not built | **Owner** with a pilot shop |
+| **GT-020** P1 | Privacy-safe pilot measures | Not built | **Part, 8 October 2026.** The owner's Help button (decision 18) is built: *Help* in the owner's menu makes a support file that is shown in full and saved by the owner (nothing is sent by the program): the program and its version, the licence state, the shop's data check, the copies, the counter PCs, the AI helpers and waiting lines, counts from the activity record and the last problems noticed, with folders, addresses, numbers, passwords, keys and the names the shop keeps taken out. `Diagnostics/`, `Help.razor`, `SupportFileTests` 19, `SupportFileWebTests` 3, `e2e/help.e2e.mjs`. *Not built:* a pilot's baseline and after measures (time to ring up a sale, stock-outs, returns, voids) as a report the owner can read and share, the client's page in the Studio that receives the file, and anything that is sent without the owner's act (by design: none). The measures need a pilot shop (owner). |
 
 ## 3. The order of work ("as and when best")
 

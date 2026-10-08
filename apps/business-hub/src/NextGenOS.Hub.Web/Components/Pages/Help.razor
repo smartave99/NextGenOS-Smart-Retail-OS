@@ -1,0 +1,37 @@
+@page "/help"
+@attribute [Authorize(Policy = Perm.Settings)]
+@inherits HubPage
+@inject NextGenOS.Hub.Web.Diagnostics.SupportFileBuilder Builder
+
+<PageTitle>Help</PageTitle>
+<h1>Help</h1>
+<p class="sub">If something is wrong, say what in your own words and make a support file. <strong>Nothing is sent from here.</strong> You read the file, and you send it yourself to the person who looks after your system@(Builder.SendTo is { } to ? " (" + to + ")" : "").</p>
+<Notice Error="@Error" Info="@Info" />
+
+<section class="card" id="help-form">
+    <label for="help-message">What went wrong? (optional)</label>
+    <textarea id="help-message" rows="4" maxlength="1000" placeholder="For example: the till froze when I pressed Pay on the second bill." @bind="message" @bind:event="oninput"></textarea>
+    <p class="muted small">Please do not type customers' names, telephone numbers or card numbers here; if you do, the program takes the obvious ones out before it makes the file.</p>
+    <div class="row"><button type="button" class="btn primary" id="help-make" @onclick="Make">Make the support file</button></div>
+</section>
+
+@if (text is not null)
+{
+    <section class="card" id="help-file">
+        <h2>The support file</h2>
+        <p class="muted small">This is everything that is in it. It has no sales, no customers, no staff names, no amounts, no passwords and no keys.</p>
+        <textarea id="support-text" class="mono" rows="24" readonly aria-label="The support file">@text</textarea>
+        <div class="row">
+            <a class="btn primary" id="help-save" download="@FileName" href="data:text/plain;charset=utf-8,@Uri.EscapeDataString(text)">Save it as a file</a>
+        </div>
+    </section>
+}
+
+@code {
+    private string message = "";
+    private string? text;
+
+    private string FileName => "support-file-" + App.Clock.UtcNow.UtcDateTime.ToString("yyyy-MM-dd") + ".txt";
+
+    private Task Make() => Run(() => { text = Builder.Build(message); });
+}

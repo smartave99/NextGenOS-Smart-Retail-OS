@@ -20,6 +20,25 @@
     <button type="button" class="btn primary" id="new-order" @onclick="NewOrder">New order</button>
 </div>
 
+@if (actionsOn && waiting.Count > 0)
+{
+    <section class="card" id="approvals">
+        <h2>Waiting for approval</h2>
+        <p class="muted small">Things that have been asked for and are not done until a person who may buy says yes. Nothing is bought or paid by approving: it makes a draft order that you receive and pay for as usual.</p>
+        @foreach (var a in waiting)
+        {
+            <div class="approval-row" id="approval-@a.Id">
+                <p>@a.Summary</p>
+                <p class="muted small">Asked for by @(a.ProposedByName ?? "the program") on @When(a.ProposedAt). It runs out on @When(a.ExpiresAt).</p>
+                <div class="row">
+                    <button type="button" class="btn primary small" id="approve-@a.Id" @onclick="() => ApproveAction(a)">Approve and draft the order</button>
+                    <button type="button" class="btn ghost small" id="decline-@a.Id" @onclick="() => DeclineAction(a)">Decline</button>
+                </div>
+            </div>
+        }
+    </section>
+}
+
 @if (insightsOn)
 {
     <section class="card" id="low-stock">
@@ -47,6 +66,7 @@
                     <p class="muted small">Worked out on @Day(f.Detail.AsOf) from @(f.Detail.SaleDocuments.Count == 0 ? "the stock records" : "bills " + string.Join(", ", f.Detail.SaleDocuments.Take(5)) + (f.Detail.SaleDocuments.Count > 5 ? " and others" : "")).</p></details>
                 <div class="row">
                     @if (f.Status == "order") { <button type="button" class="btn primary small" id="low-order-@f.Id" @onclick="() => StartOrder(f)">Start an order for @Qty(f.Detail.ProposedMilli) @f.Detail.Unit</button> }
+                    @if (f.Status == "order" && actionsOn) { <button type="button" class="btn secondary small" id="low-ask-@f.Id" @onclick="() => AskFor(f)">Ask for approval</button> }
                     <button type="button" class="btn ghost small" id="low-dismiss-@f.Id" @onclick="() => SetAside(f)">Set aside</button>
                 </div>
             </div>
@@ -187,7 +207,8 @@
     }
 
     // ---- running low (stock forecasts) ----------------------------------------------------------------------------------------------------
-    private bool insightsOn, termsSheet;
+    private bool insightsOn, actionsOn, termsSheet;
+    private IReadOnlyList<NextGenOS.Hub.Actions.ActionView> waiting = Array.Empty<NextGenOS.Hub.Actions.ActionView>();
     private RunSummary? lowRun;
     private IReadOnlyList<StoredFinding> findings = Array.Empty<StoredFinding>();
     private IReadOnlyList<Item> stocked = Array.Empty<Item>();
@@ -197,11 +218,35 @@
 
     private void ReadInsights()
     {
+        actionsOn = App.Actions.On;
+        waiting = actionsOn ? App.Actions.List([NextGenOS.Hub.Actions.ActionStatus.AwaitingApproval]) : [];
         insightsOn = App.Insights.On;
         if (!insightsOn) return;
         lowRun = App.Insights.Latest();
         findings = App.Insights.Open();
     }
+
+    /// <summary>Asks for the order a warning proposes, to be approved by someone who may buy. Asking twice for the same warning is the same request.</summary>
+    private Task AskFor(StoredFinding f) => Run(() =>
+    {
+        var cost = App.Catalog.Get(f.ItemId)?.CostMinor ?? 0;
+        var input = System.Text.Json.JsonSerializer.Serialize(new NextGenOS.Hub.Actions.CreatePurchaseOrderInput(f.Detail.SupplierId, [new NextGenOS.Hub.Actions.OrderLineInput(f.ItemId, f.Detail.ProposedMilli, cost)]));
+        App.Actions.Propose("CreatePurchaseOrder", 1, input, "finding", f.Id, "finding:" + f.Id, Me.Id);
+        ReadInsights();
+    }, "Asked for. It waits for approval above.");
+
+    private Task ApproveAction(NextGenOS.Hub.Actions.ActionView a) => Run(() =>
+    {
+        App.Actions.Approve(a.Id, null, Me.Id);
+        Read();
+        ReadInsights();
+    }, "Approved. The order is drafted: you will find it under “To receive”.");
+
+    private Task DeclineAction(NextGenOS.Hub.Actions.ActionView a) => Run(() =>
+    {
+        App.Actions.Decline(a.Id, null, Me.Id);
+        ReadInsights();
+    }, "Declined. Nothing was done.");
 
     private Task CheckNow() => Run(() =>
     {

@@ -299,7 +299,7 @@ public class LowStockInsightTests
         }
 
         var sales = Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents WHERE number IS NOT NULL"));
-        f.App.Db.Rollback(HubDb.LatestVersion - 1);
+        f.App.Db.Rollback(16);   // the step before this one (later steps are undone with it)
         Assert.Empty(f.App.Db.Query("SELECT name FROM sqlite_master WHERE name IN ('supply_terms', 'insight_settings', 'insight_runs', 'insight_findings')", r => r.GetString(0)));
         Assert.Equal(sales, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents WHERE number IS NOT NULL")));
         var again = f.Reopen();

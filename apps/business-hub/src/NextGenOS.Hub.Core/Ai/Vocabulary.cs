@@ -126,14 +126,15 @@ public static class FlagKey
     public const string EventEngine = "event_engine";
     public const string PredictiveInventory = "predictive_inventory";
     public const string AdvancedRules = "advanced_rules";
+    public const string SuggestedActions = "suggested_actions";
 
-    public static readonly IReadOnlyList<string> All = new[] { AiAssistant, CameraAnalytics, LocalEmbeddings, RemoteAi, BusinessOntology, EventEngine, PredictiveInventory, AdvancedRules };
+    public static readonly IReadOnlyList<string> All = new[] { AiAssistant, CameraAnalytics, LocalEmbeddings, RemoteAi, BusinessOntology, EventEngine, PredictiveInventory, AdvancedRules, SuggestedActions };
 
     public static string Label(string key) => key switch
     {
         AiAssistant => "Business assistant", CameraAnalytics => "Camera analytics", LocalEmbeddings => "Local search by meaning (embeddings)",
         RemoteAi => "Use online AI services", BusinessOntology => "Business map (things and how they relate)", EventEngine => "Business event history",
-        PredictiveInventory => "Stock forecasts", AdvancedRules => "Advanced automatic rules", _ => key,
+        PredictiveInventory => "Stock forecasts", AdvancedRules => "Advanced automatic rules", SuggestedActions => "Suggested actions (with approval)", _ => key,
     };
 
     public static string Describe(string key) => key switch
@@ -146,6 +147,7 @@ public static class FlagKey
         EventEngine => "Keeps a history of what happened in the business, with the reason the system believes it.",
         PredictiveInventory => "Warns which goods will run out before a new delivery could arrive, from your own sales and the delivery times you type in (Buying, Delivery times). Plain arithmetic on this computer; no AI service is used.",
         AdvancedRules => "Automatic rules such as 'if a shelf is nearly empty and the back room is full, create a task'.",
+        SuggestedActions => "Lets the program prepare something for a person to approve, such as a draft order to a supplier from a 'running low' warning. Nothing is done until someone who may do it approves, and every step is written down.",
         _ => "",
     };
 }

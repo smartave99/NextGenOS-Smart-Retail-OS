@@ -54,3 +54,9 @@ Anything that is wrong, unclear or in words you would not use, with a screenshot
 3. Press **Check now**. A thing that sells fast and has little on the shelf is listed with the reasons; open *Why might this be wrong?*; press **Start an order** to fill in the order form (you still place it yourself) or **Set aside** to keep the warning quiet.
 4. Nothing is judged without a delivery time, and a thing that has been in stock for less than a week is not judged.
 
+## Try suggested actions
+1. Switch on **Suggested actions** under Settings, AI helpers (and Stock forecasts, as above).
+2. On a *Running low* warning press **Ask for approval**. A card **Waiting for approval** appears, saying in words what would be done.
+3. As a manager or the owner press **Approve and draft the order**. A draft order appears under *To receive*; the warning is marked as acted on. Press **Decline** instead and nothing is done.
+4. A request that nobody approves runs out after 48 hours. The rules are in `docs/SUGGESTED-ACTIONS.md`.
+

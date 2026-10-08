@@ -62,25 +62,33 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
         return Results.Ok(new { waiting = hub.Outbox.Stats().Waiting, failed = hub.Outbox.Stats().Failed });
     }).AllowAnonymous().DisableAntiforgery();
 
-    // Stock forecasts, switched on, with a shop that has sold 3 kg of rice a day for four weeks (bills made now, their stock moves dated back) and a supplier who takes 5 days.
+    // Stock forecasts and suggested actions, switched on, with a shop that has sold rice (3 kg a day) and dal (2 kg a day) for four weeks (bills made now, their stock moves dated back) and a supplier
+    // who takes 5 (and 4) days.
     app.MapPost("/__e2e/seed-stock", (NextGenOS.Hub.HubApp hub) =>
     {
         using var asTheProgram = hub.Access.AsSystem();
         hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.PredictiveInventory, true, null);
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.SuggestedActions, true, null);
         var supplier = hub.Parties.Create(new NextGenOS.Hub.Catalog.PartyInput { Kind = "supplier", Name = "National Foods" });
-        var rice = hub.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Basmati rice", Unit = "kg", PriceMinor = 20_000, CostMinor = 10_000, TaxClass = "zero", TrackStock = true });
-        hub.Purchasing.Receive(hub.Purchasing.CreateOrder(supplier.Id, [new NextGenOS.Hub.Purchasing.PurchaseLine { ItemId = rice.Id, QtyMilli = 100_000, CostMinor = 10_000 }]).Document.Id);
-        for (var day = 1; day <= 28; day++)
-            hub.Documents.Checkout(new NextGenOS.Hub.Documents.CheckoutRequest
-            {
-                Lines = { new NextGenOS.Hub.Documents.LineInput { ItemId = rice.Id, QtyMilli = 3_000 } },
-                Payments = { new NextGenOS.Hub.Documents.PaymentInput { Method = "cash", AmountMinor = 100_000_000 } },
-            });
-        // The purchase 29 days ago, the first sale 28 days ago (less an hour), the last one a day ago: moves 1 to 29.
-        hub.Db.InTransaction((c, t) => NextGenOS.Hub.Data.HubDb.Exec(c,
-            "UPDATE stock_moves SET at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', printf('-%d days', 30 - id), '+1 hours') WHERE item_id = $i", t, ("$i", rice.Id)));
-        hub.Supply.Set(rice.Id, supplier.Id, 5, 2, 1_000, 0, null);
-        return Results.Ok(new { item = rice.Id, supplier = supplier.Id });
+        void Seed(string name, long bought, long perDay, int lead, int safety)
+        {
+            var item = hub.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = name, Unit = "kg", PriceMinor = 20_000, CostMinor = 10_000, TaxClass = "zero", TrackStock = true });
+            hub.Purchasing.Receive(hub.Purchasing.CreateOrder(supplier.Id, [new NextGenOS.Hub.Purchasing.PurchaseLine { ItemId = item.Id, QtyMilli = bought, CostMinor = 10_000 }]).Document.Id);
+            for (var day = 1; day <= 28; day++)
+                hub.Documents.Checkout(new NextGenOS.Hub.Documents.CheckoutRequest
+                {
+                    Lines = { new NextGenOS.Hub.Documents.LineInput { ItemId = item.Id, QtyMilli = perDay } },
+                    Payments = { new NextGenOS.Hub.Documents.PaymentInput { Method = "cash", AmountMinor = 100_000_000 } },
+                });
+            // The purchase 29 days ago, the first sale 28 days ago (less an hour), the last one a day ago.
+            hub.Db.InTransaction((c, t) => NextGenOS.Hub.Data.HubDb.Exec(c,
+                "UPDATE stock_moves SET at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', printf('-%d days', 29 - (id - (SELECT MIN(m.id) FROM stock_moves m WHERE m.item_id = $i))), '+1 hours') WHERE item_id = $i", t, ("$i", item.Id)));
+            hub.Supply.Set(item.Id, supplier.Id, lead, safety, 1_000, 0, null);
+        }
+
+        Seed("Basmati rice", 100_000, 3_000, 5, 2);
+        Seed("Toor dal", 60_000, 2_000, 4, 1);
+        return Results.Ok(new { supplier = supplier.Id });
     }).AllowAnonymous().DisableAntiforgery();
 }
 

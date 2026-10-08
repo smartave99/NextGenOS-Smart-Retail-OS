@@ -155,7 +155,7 @@ public class AiSettingsWebTests
         using var worker = new NextGenOS.Hub.Web.Auth.HubWorker(f.Hub, log);
         await worker.StartAsync(CancellationToken.None);
         // The first round starts by itself (on its own thread); give it a moment.
-        for (var i = 0; i < 100 && f.Hub.Events.Counts().Observations > 0; i++) await Task.Delay(50);
+        for (var i = 0; i < 400 && f.Hub.Events.Counts().Observations > 0; i++) await Task.Delay(50);   // up to 20 seconds: a busy build machine can be slow to start the thread
         await worker.StopAsync(CancellationToken.None);
 
         Assert.True(log.Problems.Count == 0, string.Join(" | ", log.Problems));

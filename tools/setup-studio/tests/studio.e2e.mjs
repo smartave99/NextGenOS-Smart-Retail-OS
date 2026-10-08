@@ -69,7 +69,7 @@ try {
   assert.ok(!page.url().includes('k='), 'the secret is not left in the address bar');
   step('the first person makes the administrator account; a mistyped password is explained, and the secret leaves the address bar');
   await page.getByRole('heading', { name: 'Customers', exact: true }).waitFor();
-  assert.ok(await page.getByText('No customers yet').isVisible());
+  assert.ok(await page.getByRole('heading', { name: 'No customers yet' }).isVisible());
   await shot(page, '02-empty');
 
   // ---- the team ---------------------------------------------------------------------------------------------------------------------------

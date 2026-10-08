@@ -199,3 +199,28 @@ test('the part speaks plain words: no technical name in anything it says to a pe
   assert.ok(said.length > 20, `its words were found (${said.length})`);
   for (const line of said) assert.doesNotMatch(line, /\b(token|workflow|dispatch|runner|pipeline|commit|branch|json|api|stack|exception|null|undefined)\b/i, line);
 });
+
+test('the Installer step names the programs that came with the Studio and lists the website packages made on this PC with their fingerprints', async () => {
+  const { render: renderInstaller } = await import('../ui/js/views/output.js');
+  const sha = 'cd'.repeat(32);
+  const at = new Date().toISOString();
+  answers = {
+    'GET /api/customers/luzon-fresh-mart/outputs': { body: {
+      release: { n: 1, approvedAt: at }, source: 'built-in', trial: false,
+      programs: { ok: true, folder: '/somewhere/kit', version: '1.4.0', trial: false, signing: { windows: 'not signed', android: 'unknown' }, problems: [], files: [{ name: 'a.exe', role: 'hub-windows-setup', bytes: 4000 }] },
+      items: [{ id: 'shop-pc', title: 'The program for the shop computer (Windows)', status: 'ready', note: 'Version 1.4.0.', files: ['a.exe'] }, { id: 'website', title: 'The website', status: 'ready', note: 'The website package made for this customer on this PC (Linux), with the customer\'s settings inside; no licence file is inside yet.', files: ['website-luzon-fresh-mart-linux.zip'] }],
+      builds: [
+        { kind: 'website-local', release: 1, os: 'linux', bytes: 84_932_765, sha256: 'ee'.repeat(32), licenceIncluded: false, trial: false, at, by: { name: 'Rita Reviewer' } },
+        { kind: 'website-local', release: 1, os: 'linux', bytes: 84_932_765, sha256: sha, licenceIncluded: true, trial: false, at, by: { name: 'Rita Reviewer' } },
+        { kind: 'website-local', release: 0, os: 'windows', bytes: 1, sha256: 'ff'.repeat(32), licenceIncluded: true, trial: false, at, by: { name: 'Old' } },
+      ],
+    } },
+  };
+  const page = await renderInstaller({ id: 'luzon-fresh-mart', customer: { name: 'Luzon Fresh Mart', releases: [{ n: 1, approvedAt: at }] }, can: { build: true, settings: false } });
+  assert.match(text(byId(page, 'programs-ok')), /Version 1\.4\.0: 1 files checked.*These are the programs that came with the Studio\./);
+  const rows = page.findAll((e) => e.attrs['data-website-package']);
+  assert.equal(rows.length, 1, 'only the newest of each system, only for this approval');
+  assert.match(text(rows[0]), /Rita Reviewer.*Linux.*85 MB.*Inside.*cdcdcdcdcdcdcdcd/);
+  assert.notEqual(rows[0].find((e) => e.attrs.title === sha), null, 'the whole fingerprint is there to read');
+  assert.doesNotMatch(text(page), /\bnull\b|\bundefined\b|\[object|NaN/);
+});

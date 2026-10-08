@@ -63,9 +63,9 @@ export async function render(ctx) {
   const sites = [...(data.builds ?? [])].reverse().filter((b) => b.kind === 'website-local' && b.release === release.n && !seenSystem.has(b.os) && seenSystem.add(b.os));
   if (sites.length) {
     box.append(h('div', { class: 'card', id: 'website-packages' }, h('h2', {}, 'Website packages made on this PC'),
-      h('div', { class: 'panel mt-s' }, h('table', { class: 'tbl', id: 'website-packages-table' }, h('thead', {}, h('tr', {}, ['Made', 'By', 'For', 'Size', 'Licence', 'Fingerprint'].map((t) => h('th', {}, t)))),
+      h('div', { class: 'panel mt-s' }, h('div', { style: { 'overflow-x': 'auto' } }, h('table', { class: 'tbl', id: 'website-packages-table' }, h('thead', {}, h('tr', {}, ['Made', 'By', 'For', 'Size', 'Licence', 'Fingerprint'].map((t) => h('th', {}, t)))),
         h('tbody', {}, sites.map((b) => h('tr', { 'data-website-package': b.os }, h('td', { class: 'muted', title: when(b.at), style: { 'white-space': 'nowrap' } }, ago(b.at)), h('td', {}, b.by?.name ?? ''), h('td', {}, (b.os === 'windows' ? 'Windows' : 'Linux') + (b.trial ? ' (trial)' : '')), h('td', {}, SIZE(b.bytes)),
-          h('td', {}, b.licenceIncluded ? 'Inside' : 'Not yet'), h('td', { class: 'tiny muted', title: b.sha256, style: { 'font-family': 'var(--ngos-mono)' } }, b.sha256.slice(0, 16))))))),
+          h('td', {}, b.licenceIncluded ? 'Inside' : 'Not yet'), h('td', { class: 'tiny muted', title: b.sha256, style: { 'font-family': 'var(--ngos-mono)' } }, b.sha256.slice(0, 16)))))))),
       h('p', { class: 'small muted mt-s' }, `They are made in the step "Website and app" and go into the pack as they are. To make one again (a new licence file, new details), do it there, then make the pack again.`)));
   }
 

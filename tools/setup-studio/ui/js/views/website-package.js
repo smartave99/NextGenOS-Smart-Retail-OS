@@ -88,7 +88,7 @@ export async function render(ctx) {
     const rows = status.made.filter((m) => !m.replaced);
     if (!rows.length) return null;
     return h('div', { class: 'mt' }, h('h3', {}, 'Made on this PC'),
-      h('div', { class: 'panel mt-s' }, h('table', { class: 'tbl', id: 'local-made' }, h('thead', {}, h('tr', {}, ['Made', 'By', 'For', 'Release', 'Size', 'Fingerprint', 'Licence', ''].map((t) => h('th', {}, t)))),
+      h('div', { class: 'panel mt-s' }, h('div', { style: { 'overflow-x': 'auto' } }, h('table', { class: 'tbl', id: 'local-made' }, h('thead', {}, h('tr', {}, ['Made', 'By', 'For', 'Release', 'Size', 'Fingerprint', 'Licence', ''].map((t) => h('th', {}, t)))),
         h('tbody', {}, rows.map((m) => h('tr', { 'data-made': m.os, 'data-release': m.release },
           h('td', { class: 'muted', title: when(m.at), style: { 'white-space': 'nowrap' } }, ago(m.at)), h('td', {}, m.by), h('td', {}, m.label + (m.trial ? ' (trial)' : '')),
           h('td', {}, m.forThisRelease ? String(m.release) : `${m.release} (an older approval)`), h('td', {}, SIZE(m.bytes)),
@@ -96,7 +96,7 @@ export async function render(ctx) {
           h('td', {}, m.licenceIncluded ? 'Inside' : 'Not yet'),
           h('td', { class: 'right' }, m.there && ctx.can.build ? h('button', { class: 'btn small', type: 'button', 'data-download-website': m.os, onclick: async () => {
             try { const res = await api('GET', `${base}/${m.release}/${m.os}/website.zip`, undefined, { raw: true }); download(await res.blob(), m.name); } catch (x) { toast(x.message, 'bad'); }
-          } }, icon('download', 's'), 'Download') : h('span', { class: 'small muted' }, m.there ? '' : 'No longer there'))))))),
+          } }, icon('download', 's'), 'Download') : h('span', { class: 'small muted' }, m.there ? '' : 'No longer there')))))))),
       h('p', { class: 'small muted mt-s' }, 'Give the website to the customer (or put it online) from here, or let it go into the customer\'s pack in the Installer step. The licence file and the customer\'s folder are inside it.'));
   }
 

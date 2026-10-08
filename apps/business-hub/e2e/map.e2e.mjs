@@ -35,6 +35,7 @@ try {
   // switch it on, from the AI helpers screen
   await page.goto(hub.url + '/settings/ai');
   await page.locator('#flag-business_ontology').check();
+  await page.locator('.notice.ok', { hasText: 'Switched on.' }).waitFor();      // the Hub has kept the choice (a reload before that could cut it off on a slow machine)
   await page.reload();
   await page.locator('#flag-business_ontology').waitFor();
   assert.strictEqual(await page.locator('#flag-business_ontology').isChecked(), true);

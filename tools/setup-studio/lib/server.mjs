@@ -565,6 +565,8 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     }
   });
   await new Promise((r, j) => { server.once('error', j); server.listen(port, '127.0.0.1', r); });
-  const url = `http://127.0.0.1:${server.address().port}/?k=${token}`;
+  // The kit that came with the Studio can be large: it is read once now, in the background, so that the first page does not wait for it. (A kit that cannot be read is said on the page.)
+  if (builtInPresent()) readBaseKit(kitFolder, { quick: true }).catch(() => {});
+  const url =`http://127.0.0.1:${server.address().port}/?k=${token}`;
   return { server, url, token, state, close: () => new Promise((r) => { state.builds?.close(); server.close(() => r()); server.closeAllConnections?.(); }) };
 }

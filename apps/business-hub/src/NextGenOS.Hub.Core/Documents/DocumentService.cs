@@ -876,7 +876,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             if (refundable > 0) InsertPayment(c, t, noteId, invoice.PartyId, null, new PaymentInput { Method = refundMethod, AmountMinor = refundable, Reference = "refund of " + invoice.Number }, userId, "refund", now, negative: true);
             // What the customer paid is kept honest on the invoice: the refund lowers what counts as paid there.
             HubDb.Exec(c, "UPDATE documents SET paid_minor = MAX(0, paid_minor - $r) WHERE id = $id", t, ("$r", refundable), ("$id", invoiceId));
-            MoveStock(c, t, noteId, noteDocLines, +1, "return", userId, now);
+            MoveStock(c, t, noteId, noteDocLines, +1, "return", userId, now, invoiceId);
             books.Sync(c, t, noteId, userId);
             loyalty.OnCreditNote(c, t, noteId, invoiceId, userId);
             audit.Log(c, t, userId, "credit-note", "document", noteId, number + " for " + invoice.Number + ": " + reason.Trim());
@@ -918,9 +918,15 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         payments.RemoveAll(p => p.AmountMinor <= 0);
     }
 
-    private void MoveStock(SqliteConnection c, SqliteTransaction t, long documentId, IReadOnlyList<DocLine> lines, int direction, string reason, long? userId, DateTimeOffset at)
+    /// <summary>
+    /// Moves the stock of the tracked items on a document, each move with its value (decision 36, average cost): a sale takes its quantity off at the average cost of that moment; a purchase brings
+    /// it in at what the lines cost without tax; goods a customer brings back (<paramref name="originId"/> is the bill they were sold on) return at the cost they left at; and undoing a document
+    /// undoes the value its own moves had.
+    /// </summary>
+    private void MoveStock(SqliteConnection c, SqliteTransaction t, long documentId, IReadOnlyList<DocLine> lines, int direction, string reason, long? userId, DateTimeOffset at, long? originId = null)
     {
         var context = shop.Current;
+        var bought = reason == "purchase" ? CostOfPurchasedLines(c, t, documentId, lines) : null;
         foreach (var group in lines.Where(l => l.ItemId is not null).GroupBy(l => l.ItemId!.Value))
         {
             var tracked = Convert.ToInt64(HubDb.Scalar(c, "SELECT track_stock FROM items WHERE id = $i", t, ("$i", group.Key)) ?? 0L) != 0;
@@ -935,9 +941,45 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                     throw new HubException("stock", $"Only {ShopContext.Qty(onHand)} of {name} left.");
                 }
             }
-            HubDb.Exec(c, "INSERT INTO stock_moves(item_id, qty_milli, reason, document_id, at, user_id) VALUES ($i, $q, $r, $d, $at, $u)", t,
-                ("$i", group.Key), ("$q", qty), ("$r", reason), ("$d", documentId), ("$at", Iso.Text(at)), ("$u", userId));
+            var value = reason switch
+            {
+                "sale" => -StockCost.TakeOut(c, t, group.Key, -qty),
+                "purchase" => bought![group.Key],
+                "return" when originId is { } invoice => StockCost.Returned(c, t, invoice, documentId, group.Key, qty),
+                "void" => Undone(c, t, documentId, group.Key, qty),
+                _ => 0L,
+            };
+            StockCost.Insert(c, t, group.Key, qty, reason, documentId, null, at, userId, value);
         }
+    }
+
+    /// <summary>What each stocked item on a purchase cost: the amounts of its lines without tax, after discounts, as the tax engine worked them out (what the books count as the goods bought).</summary>
+    private static Dictionary<long, long> CostOfPurchasedLines(SqliteConnection c, SqliteTransaction t, long documentId, IReadOnlyList<DocLine> lines)
+    {
+        var cost = new Dictionary<long, long>();
+        var resultText = HubDb.Scalar(c, "SELECT result FROM documents WHERE id = $id", t, ("$id", documentId)) as string;
+        var result = resultText is null ? null : NewtonJson.DeserializeObject<TaxResult>(resultText);
+        var decimals = Convert.ToInt32(HubDb.Scalar(c, "SELECT currency_decimals FROM documents WHERE id = $id", t, ("$id", documentId)) ?? 2L, CultureInfo.InvariantCulture);
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].ItemId is not { } item) continue;
+            var amount = result is not null && result.Lines.Count == lines.Count ? (long)MoneyText.Parse(result.Lines[i].Taxable, decimals) : StockCost.Worth(lines[i].QtyMilli, lines[i].UnitPriceMinor);
+            cost[item] = cost.GetValueOrDefault(item) + amount;
+        }
+        return cost;
+    }
+
+    /// <summary>
+    /// The value of undoing a document's stock: the moves it made are turned round with the value they had (so a cancelled sale puts the goods back at the cost they left at, and a cancelled
+    /// purchase takes them off at the cost they came in at). A document made before values were kept has none to turn round, so the goods are valued at the average.
+    /// </summary>
+    private static long Undone(SqliteConnection c, SqliteTransaction t, long documentId, long itemId, long qty)
+    {
+        var sale = StockCost.Made(c, t, documentId, itemId, "sale");
+        if (sale.Known) return sale.Value;
+        var purchase = StockCost.Made(c, t, documentId, itemId, "purchase");
+        if (purchase.Known) return -purchase.Value;
+        return qty > 0 ? StockCost.BringIn(c, t, itemId, qty) : -StockCost.TakeOut(c, t, itemId, -qty);
     }
 
     private static void RequireOpen(SqliteConnection c, SqliteTransaction t, long documentId)

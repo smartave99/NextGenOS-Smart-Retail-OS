@@ -140,7 +140,8 @@
                         <div class="field-row">
                             <div>
                                 <label for="f-cost">Cost price</label>
-                                <input id="f-cost" inputmode="decimal" @bind="cost" />
+                                <input id="f-cost" inputmode="decimal" @bind="cost" aria-describedby="f-cost-help" />
+                                <span class="muted small" id="f-cost-help">The last price paid. The books use the average of what was paid for the stock on the shelf.</span>
                             </div>
                             <div>
                                 <label for="f-reorder">Tell me when below</label>

@@ -149,9 +149,9 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
             r => new TopCustomer(r.Int("party_id"), r.Text("name"), (int)r.Int("n"), r.Int("total")), ("$f", Iso.Text(time.StartOfDay(from))), ("$t", Iso.Text(time.StartOfNextDay(to))), ("$n", limit));
     }
 
-    /// <summary>What the stock on the shelves is worth at cost.</summary>
+    /// <summary>What the stock on the shelves is worth at cost: the value its moves have (decision 36, average cost), the same figure as "Stock on the shelves" in the books. Stock whose value is not known (moved before values were kept, with no cost price) shows nothing.</summary>
     public IReadOnlyList<StockValue> StockValues() =>
-        catalog.StockList().Where(s => s.OnHandMilli > 0).Select(s => new StockValue(s.ItemId, s.Name, s.OnHandMilli, s.CostMinor, (2 * s.OnHandMilli * s.CostMinor + 1000) / 2000)).ToList();
+        catalog.StockList().Where(s => s.OnHandMilli > 0).Select(s => new StockValue(s.ItemId, s.Name, s.OnHandMilli, s.CostMinor, s.ValueMinor)).ToList();
 
     /// <summary>Purchases received in the period and what is still unpaid to suppliers.</summary>
     public (long ReceivedMinor, long UnpaidMinor) Purchases(DateOnly from, DateOnly to)

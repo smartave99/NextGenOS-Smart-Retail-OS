@@ -16,7 +16,7 @@ namespace NextGenOS.Hub.Import;
 /// is done before the import so that the import needs no connection to the old system at all.
 /// This class does not check who is asking: the screen does (the owner only), as for every service in the Hub.
 /// </summary>
-public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, CatalogService catalog, PartyService parties, NextGenOS.Hub.Offers.OffersService offers, Access access)
+public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, CatalogService catalog, PartyService parties, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Books.BooksService books, Access access)
 {
     private const string Tenant = "local";
     private const string Site = "main";
@@ -88,8 +88,9 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
             if (!item.Active) HubDb.Exec(c, "UPDATE items SET active = 0 WHERE id = $id", t, ("$id", id));
             if (item.MovesStock)
             {
-                HubDb.Exec(c, "INSERT INTO stock_moves(item_id, qty_milli, reason, note, at, user_id) VALUES ($i, $q, $r, $n, $at, $u)", t,
-                    ("$i", id), ("$q", item.StockMilli), ("$r", "opening stock"), ("$n", "Moved from the older program"), ("$at", now), ("$u", userId));
+                // The stock comes in worth its quantity times the cost price it had (half-up, as the stock report always worked it out), and the books take it in as an opening entry (decision 32).
+                var move = StockCost.Insert(c, t, id, item.StockMilli, "opening stock", null, "Moved from the older program", clock.UtcNow, userId, StockCost.Worth(item.StockMilli, item.Input.CostMinor));
+                books.SyncStockMove(c, t, move, userId);
                 moves++; plannedStock += item.StockMilli;
             }
             Remember(c, t, check, "item", item.OldKey, id, runId);

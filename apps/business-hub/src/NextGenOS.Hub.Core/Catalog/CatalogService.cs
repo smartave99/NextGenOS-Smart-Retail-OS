@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using NextGenOS.Hub.Books;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
@@ -7,7 +8,7 @@ using NextGenOS.Hub.Shop;
 namespace NextGenOS.Hub.Catalog;
 
 /// <summary>Items (products, menu items, titles, services, materials) and their stock.</summary>
-public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock, Access access)
+public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock, Access access, BooksService books)
 {
     private const string Columns = "id, kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, active";
 
@@ -114,24 +115,47 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
 
     public long OnHandMilli(long itemId) => Convert.ToInt64(db.Scalar("SELECT COALESCE(SUM(qty_milli), 0) FROM stock_moves WHERE item_id = $i", ("$i", itemId)) ?? 0L);
 
-    /// <summary>Changes the stock of an item: a count, damage, a delivery. The reason is kept with who did it.</summary>
+    /// <summary>
+    /// Changes the stock of an item: a count, damage, a delivery. The reason is kept with who did it. The change is valued (decision 36): stock taken off leaves at the average cost, stock found
+    /// by a count joins at the average cost, and a delivery joins at the item's last cost price; the books take it in at once (a loss or a gain, or purchases for a delivery).
+    /// </summary>
     public void Adjust(long itemId, long deltaMilli, string reason, string? note = null, long? userId = null)
     {
         access.Require(Perm.Stock);
         var item = Get(itemId) ?? throw new HubException("not-found", "That item was not found.");
         if (!item.TrackStock) throw new HubException("not-tracked", $"Stock is not tracked for {item.Name}.");
         if (deltaMilli == 0) return;
-        db.InTransaction((c, t) => HubDb.Exec(c, "INSERT INTO stock_moves(item_id, qty_milli, reason, note, at, user_id) VALUES ($i, $q, $r, $n, $at, $u)", t,
-            ("$i", itemId), ("$q", deltaMilli), ("$r", reason), ("$n", note), ("$at", Iso.Text(clock.UtcNow)), ("$u", userId)));
+        db.InTransaction((c, t) =>
+        {
+            long value;
+            if (deltaMilli < 0) value = -StockCost.TakeOut(c, t, itemId, -deltaMilli);
+            else
+            {
+                var last = StockCost.LastCost(c, t, itemId);
+                value = reason == "delivery" && last > 0 ? StockCost.Worth(deltaMilli, last) : StockCost.BringIn(c, t, itemId, deltaMilli);
+            }
+            var move = StockCost.Insert(c, t, itemId, deltaMilli, reason, null, note, clock.UtcNow, userId, value);
+            books.SyncStockMove(c, t, move, userId);
+        });
     }
 
-    /// <summary>Stock of every tracked item, with what is on hand now.</summary>
+    /// <summary>
+    /// Stock of every tracked item, with what is on hand now and what it is worth. The cost shown is the average of what is on the shelf (the item's last cost price when nothing is, or when the
+    /// shelf holds stock whose value is not known).
+    /// </summary>
     public IReadOnlyList<StockRow> StockList(bool lowOnly = false)
     {
         var rows = db.Query(
-            "SELECT i.id, i.name, i.category, i.unit, i.reorder_milli, i.cost_minor, COALESCE((SELECT SUM(qty_milli) FROM stock_moves m WHERE m.item_id = i.id), 0) AS on_hand " +
+            "SELECT i.id, i.name, i.category, i.unit, i.reorder_milli, i.cost_minor, COALESCE((SELECT SUM(qty_milli) FROM stock_moves m WHERE m.item_id = i.id), 0) AS on_hand, " +
+            "COALESCE((SELECT SUM(value_minor) FROM stock_moves m WHERE m.item_id = i.id), 0) AS on_value " +
             "FROM items i WHERE i.track_stock = 1 AND i.active = 1 ORDER BY i.category COLLATE NOCASE, i.name COLLATE NOCASE",
-            r => new StockRow(r.Int("id"), r.Text("name"), r.TextOrNull("category"), r.Text("unit"), r.Int("on_hand"), r.Int("reorder_milli"), r.Int("cost_minor")));
+            r =>
+            {
+                var onHand = r.Int("on_hand");
+                var value = r.Int("on_value");
+                var average = onHand > 0 && value > 0 ? StockCost.Share(value, 1000, onHand) : r.Int("cost_minor");
+                return new StockRow(r.Int("id"), r.Text("name"), r.TextOrNull("category"), r.Text("unit"), onHand, r.Int("reorder_milli"), average, value);
+            });
         return lowOnly ? rows.Where(x => x.OnHandMilli <= x.ReorderMilli).ToList() : rows;
     }
 

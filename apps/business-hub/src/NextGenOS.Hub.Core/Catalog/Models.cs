@@ -60,4 +60,5 @@ public sealed class ItemInput
     public Dictionary<string, string> Attrs { get; set; } = new();
 }
 
-public sealed record StockRow(long ItemId, string Name, string? Category, string Unit, long OnHandMilli, long ReorderMilli, long CostMinor);
+/// <summary>One tracked item's stock. <paramref name="CostMinor"/> is the average cost of what is on the shelf (the last cost price when there is no average); <paramref name="ValueMinor"/> is what the stock on the shelf is worth in money, from its moves.</summary>
+public sealed record StockRow(long ItemId, string Name, string? Category, string Unit, long OnHandMilli, long ReorderMilli, long CostMinor, long ValueMinor = 0);

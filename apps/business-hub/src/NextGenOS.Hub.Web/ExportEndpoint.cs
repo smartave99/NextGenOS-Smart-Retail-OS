@@ -41,7 +41,7 @@ public static class ExportEndpoint
                     app.Reports.TopCustomers(start, end, 1000).Select(c => (IReadOnlyList<object?>)new object?[] { c.Name, c.Documents, M(c.TotalMinor) }));
                 break;
             case "stock":
-                text = Csv.Build(new[] { "Item", "On hand", "Cost each", "Value" },
+                text = Csv.Build(new[] { "Item", "On hand", "Average cost each", "Value" },
                     app.Reports.StockValues().Select(s => (IReadOnlyList<object?>)new object?[] { s.Name, ShopContext.Qty(s.OnHandMilli), M(s.CostMinor), M(s.ValueMinor) }));
                 break;
             case "register-sales" or "register-credits" or "register-purchases":

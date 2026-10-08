@@ -332,6 +332,7 @@ public class ImportFromOlderPosTests
         // The Hub now holds the numbers the report showed.
         Assert.Equal(28_000, f.App.Catalog.StockList().Sum(s => s.OnHandMilli));
         Assert.Equal(287_000, f.App.Reports.StockValues().Sum(v => v.ValueMinor));
+        Assert.Equal(287_000, f.App.Books.TrialBalance().Single(r => r.Name == "Stock on the shelves").BalanceMinor);       // and the books took the stock in as an opening entry (decisions 32 and 36)
         var rice = f.App.Catalog.FindByCode("8901000000019")!;
         Assert.Equal("Basmati rice 5 kg", rice.Name);
         Assert.Equal(12000, rice.TradePriceMinor);

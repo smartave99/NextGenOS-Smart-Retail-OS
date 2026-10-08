@@ -31,6 +31,7 @@ public sealed class BooksService(HubDb db, IClock clock)
         ["cash"] = ("asset", 1000, "Cash"),
         ["method"] = ("asset", 1010, "Received by "),                      // one for each way of paying that is not cash: ref = the way
         ["receivable"] = ("asset", 1100, "Customers owe us"),
+        ["stock"] = ("asset", 1200, "Stock on the shelves"),
         ["retention-receivable"] = ("asset", 1150, "Held back by customers"),
         ["supplier-advances"] = ("asset", 1160, "Paid to suppliers in advance"),
         ["tax-input"] = ("asset", 1300, " paid on purchases"),            // one for each part of the tax: ref = its name
@@ -43,6 +44,8 @@ public sealed class BooksService(HubDb db, IClock clock)
         ["sales"] = ("income", 4000, "Sales"),
         ["rounding"] = ("income", 4900, "Rounding"),
         ["purchases"] = ("expense", 5000, "Purchases"),
+        ["cogs"] = ("expense", 5100, "Cost of goods sold"),
+        ["stock-adjust"] = ("expense", 5200, "Stock lost, damaged or gained"),
         ["suspense"] = ("asset", 9999, "Needs checking"),
     };
 
@@ -196,7 +199,67 @@ public sealed class BooksService(HubDb db, IClock clock)
             Post(c, t, historic ? issuedAt : clock.UtcNow, "void", doc.Id, $"{KindName(doc.Type)} {doc.Number} cancelled", userId, original);
         }
         if (!hasEntry) return;
+        PostStockCost(c, t, doc, userId);
         foreach (var paymentId in HubDb.Query(c, "SELECT id FROM payments WHERE document_id = $d ORDER BY id", r => r.GetInt64(0), t, ("$d", doc.Id))) SyncPayment(c, t, paymentId, userId);
+    }
+
+    // ---- the cost of stock (decision 36, average cost) ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Writes down what the stock a document moved was worth, as entries of their own beside the bill's (the bill's entry is never touched). A sale takes the stock's cost off the shelf into
+    /// "Cost of goods sold"; goods a customer brings back, or a cancelled sale, put it back; a purchase moves what was bought out of "Purchases" onto the shelf, and a cancelled purchase
+    /// moves it back. A move whose value is not known (made before values were kept) writes nothing. Does nothing for what is already posted.
+    /// </summary>
+    private void PostStockCost(SqliteConnection c, SqliteTransaction t, DocRow doc, long? userId)
+    {
+        var counter = doc.Type == "purchase" ? "purchases" : "cogs";
+        foreach (var reason in new[] { "sale", "return", "purchase", "void" })
+        {
+            var source = "stock-" + reason;
+            if (Exists(c, t, source, doc.Id)) continue;
+            var moved = HubDb.Query(c, "SELECT COALESCE(SUM(value_minor), 0), COUNT(value_minor), MIN(at) FROM stock_moves WHERE document_id = $d AND reason = $r",
+                r => (Value: r.GetInt64(0), Known: r.GetInt64(1), At: r.IsDBNull(2) ? (DateTimeOffset?)null : Iso.Parse(r.GetString(2))), t, ("$d", doc.Id), ("$r", reason)).Single();
+            if (moved.Known == 0 || moved.Value == 0 || moved.At is not { } at) continue;
+            var memo = reason switch
+            {
+                "sale" => $"Cost of {doc.Number}",
+                "return" => $"Cost of goods back from {doc.Number}",
+                "purchase" => $"Stock bought, {doc.Number}",
+                _ => $"Stock of {doc.Number} undone",
+            };
+            Post(c, t, at, source, doc.Id, memo, userId, StockLines(counter, moved.Value));
+        }
+    }
+
+    /// <summary>The two lines of a change in what the stock is worth: the shelf goes up (debit) when the value is positive and down (credit) when it is negative; the other account takes the opposite side.</summary>
+    private static List<Line> StockLines(string counterRole, long value) => value > 0
+        ? new List<Line> { new("stock", null, null, value, 0), new(counterRole, null, null, 0, value) }
+        : new List<Line> { new("stock", null, null, 0, -value), new(counterRole, null, null, -value, 0) };
+
+    /// <summary>
+    /// Posts the value of a move of stock that no document made: the stock a shop was opened with or moved across with (against "Opening balances", decision 32), a delivery that came with no
+    /// purchase (against purchases), and a count, damage or expiry (a loss or a gain). Does nothing for what is posted, or has no value.
+    /// </summary>
+    public void SyncStockMove(SqliteConnection c, SqliteTransaction t, long moveId, long? userId = null)
+    {
+        if (Exists(c, t, "stock-move", moveId)) return;
+        var m = HubDb.Query(c,
+            "SELECT m.reason, m.value_minor, m.at, i.name FROM stock_moves m JOIN items i ON i.id = m.item_id WHERE m.id = $id AND m.document_id IS NULL",
+            r => (Reason: r.GetString(0), Value: r.IsDBNull(1) ? 0L : r.GetInt64(1), At: Iso.Parse(r.GetString(2)), Item: r.GetString(3)), t, ("$id", moveId)).FirstOrDefault();
+        if (m.Reason is null || m.Value == 0) return;
+        var counter = m.Reason is "opening stock" or "valuation" ? "opening-balance" : m.Reason == "delivery" ? "purchases" : "stock-adjust";
+        var what = m.Reason switch { "opening stock" or "valuation" => "Opening stock", "delivery" => "Delivery", "count" => "Stock count", "damaged" => "Damaged or expired", _ => "Stock change" };
+        Post(c, t, m.At, "stock-move", moveId, $"{what}: {m.Item}", userId, StockLines(counter, m.Value));
+    }
+
+    /// <summary>Posts the moves of loose stock (no document) that have a value and are not posted yet: what an older shop was opened with, and what was brought across.</summary>
+    private void PostLooseStock(SqliteConnection c, SqliteTransaction t)
+    {
+        foreach (var id in HubDb.Query(c,
+                     "SELECT m.id FROM stock_moves m WHERE m.document_id IS NULL AND m.value_minor IS NOT NULL AND m.value_minor <> 0 AND NOT EXISTS (" +
+                     "SELECT 1 FROM journal_entries e WHERE e.tenant_id = $t AND e.site_id = $s AND e.source = 'stock-move' AND e.source_id = m.id) ORDER BY m.id",
+                     r => r.GetInt64(0), t, ("$t", Tenant), ("$s", Site)))
+            SyncStockMove(c, t, id);
     }
 
     /// <summary>Posts one payment or refund (money in or out), if it is not posted yet. A payment that belongs to a bill is posted only after the bill is.</summary>
@@ -247,6 +310,7 @@ public sealed class BooksService(HubDb db, IClock clock)
                 Sync(c, t, id, null, historic: true);
             foreach (var id in HubDb.Query(c, "SELECT id FROM payments WHERE document_id IS NULL AND method <> $a ORDER BY id", r => r.GetInt64(0), t, ("$a", DocumentService.AccountCredit))) SyncPayment(c, t, id);
             PostOpeningBalances(c, t);
+            PostLooseStock(c, t);
             return Convert.ToInt32(HubDb.Scalar(c, "SELECT COUNT(*) FROM journal_entries", t) ?? 0) - before;
         });
     }
@@ -291,7 +355,7 @@ public sealed class BooksService(HubDb db, IClock clock)
 
     public sealed record StatementRow(string Code, string Name, long AmountMinor);
 
-    /// <summary>What came in and what went out in a period, from the books. Purchases are counted as costs when bought; the value of stock still on the shelf is not yet counted, so this is not the final word on profit.</summary>
+    /// <summary>What came in and what went out in a period, from the books. What goods cost is counted when they are sold ("Cost of goods sold", at the average cost, decision 36); goods bought but not sold are on the shelf, not a cost yet. Purchases that are not stock (and stock sold before its cost was kept) are costs when bought.</summary>
     public sealed record ProfitAndLoss(IReadOnlyList<StatementRow> Income, IReadOnlyList<StatementRow> Costs)
     {
         public long IncomeMinor => Income.Sum(x => x.AmountMinor);

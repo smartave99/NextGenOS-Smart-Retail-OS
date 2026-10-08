@@ -38,8 +38,8 @@ public sealed class HubApp
         Shop = new ShopContextProvider(SettingsStore);
         Numbering = new Numbering(Shop);
         Parties = new PartyService(db, Shop, clock, Access);
-        Catalog = new CatalogService(db, Shop, clock, Access);
         Books = new BooksService(db, clock);
+        Catalog = new CatalogService(db, Shop, clock, Access, Books);
         Loyalty = new LoyaltyService(db, Shop, clock);
         Offers = new OffersService(db, Shop, clock, Audit, Access);
         Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Access);
@@ -61,7 +61,7 @@ public sealed class HubApp
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
-        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Access);
+        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         // The shop's own copies, made every night to a second place the owner chose (Settings, Backups), and putting one back.
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
         // A store with one main PC and many counter PCs on the shop's own network: switched off unless the owner chose it (and the Hub was started again since). Nothing leaves the shop.

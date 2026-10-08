@@ -159,8 +159,11 @@ export function planPack({ intake, kit, slug }) {
   if (eco.website.wanted) {
     // A website is built for one customer (its name, address and country are built in): only the one named for this customer is used, for each system the release has.
     const site = pick(kit, 'website', { kit: slug });
+    const systems = site.map((f) => (f.os === 'windows' ? 'Windows' : 'Linux')).join(' and ');
     items.push({ id: 'website', title: 'The website', wanted: true, files: site, status: site.length ? 'ready' : 'missing',
-      note: site.length ? `The website built for this customer (${site.map((f) => f.os === 'windows' ? 'Windows' : 'Linux').join(' and ')}), with its public settings.` : 'The website\'s public settings are in the pack. A website for this customer has not been built yet: each customer has their own build. Make it in this customer\'s "Website and app" step, then make the pack again.' });
+      note: site.length
+        ? (site.some((f) => f.assembled) ? `The website package made for this customer on this PC (${systems}), with the customer's settings inside${site.every((f) => f.licenceIncluded) ? ' and the licence file' : site.some((f) => f.licenceIncluded) ? ' and, in some of them, the licence file' : '; no licence file is inside yet'}.` : `The website built for this customer (${systems}), with its public settings.`)
+        : 'The website\'s public settings are in the pack. The website package for this customer has not been made yet. Make it in this customer\'s "Website and app" step (on this PC, no internet needed), then make the pack again.' });
   }
   if (eco.android.wanted) {
     // The app (to put on a phone) and, when there is one, the same app as the file the Play Store takes.
@@ -266,20 +269,27 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
       for (const f of item.files) copy(`${folder}/${f.name}`, f.path);
       put(`${folder}/website-settings.env`, websiteEnv(intake));
       const line = websiteSettingsLine(intake);
+      const assembled = item.files.length > 0 && item.files.every((f) => f.assembled);
       put(`${folder}/READ ME FIRST.txt`, readme(`${business}: the website`, item.files.length ? [
-        `The website built for ${business} is in this folder: ${item.files.map((f) => f.name).join(', ')}.`,
+        `The website ${assembled ? 'package made' : 'built'} for ${business} is in this folder: ${item.files.map((f) => f.name).join(', ')}.`,
         'Use the one for the computer that will run the website: "windows" for Windows 10 or 11 (64-bit), "linux" for Ubuntu, Linux Mint or Debian (64-bit). Unpack it and read "READ ME FIRST.txt" inside. It carries its own Node.js: nothing has to be installed first.',
         ...item.files.map((f) => `Fingerprint of ${f.name} (SHA-256): ${f.sha256}`),
         ...(kit.trial ? ['', 'This website was built without the licence keys (a trial build). It can never be licensed. Never give it to a customer.'] : []),
         '',
-        'The name, address, country and kind of business are built into this website, from website-settings.env (it holds no password). To change them, make a new website.',
-        'It needs the licence for the website, and its own accounts (its database and its picture storage). Those are set up by the person who puts the website online; the folder inside lists them in private-settings.example.env.',
+        ...(assembled ? [
+          'The shop\'s name, address, country, colours and logo are in the folder "customer" inside the website (it holds no password), and the website reads them when it starts. To change them, make the website package again in the Setup Studio.',
+          item.files.every((f) => f.licenceIncluded) ? 'The licence file for the website is inside, in the folder "licence" (licence.ngos).' : 'The licence file is not inside yet (at least in one of the files): put the licence file you were given into the folder "licence" inside the website, named licence.ngos. Until it is there, the website shows a page that says it is not available.',
+          'It also needs its own accounts (its database and its picture storage). Those are set up by the person who puts the website online; the folder inside lists them in private-settings.example.env.',
+        ] : [
+          'The name, address, country and kind of business are built into this website, from website-settings.env (it holds no password). To change them, make a new website.',
+          'It needs the licence for the website, and its own accounts (its database and its picture storage). Those are set up by the person who puts the website online; the folder inside lists them in private-settings.example.env.',
+        ]),
       ] : [
-        `The website for ${business} has not been built yet. A website is built for each customer, because its name, address and country are built in.`,
-        'website-settings.env holds those public settings. It holds no password.',
-        'To have it built: in the NextGenOS Setup Studio, open this customer, go to the step "Website and app" and press the build button. The Studio brings the finished website back; then make the pack again.',
+        `The website package for ${business} has not been made yet. Each customer's website is the same program with the customer's own folder and licence file beside it.`,
+        'website-settings.env holds the customer\'s public settings. It holds no password.',
+        'To make it: in the NextGenOS Setup Studio, open this customer, go to the step "Website and app" and press "Make the website package". It is done on that PC and needs no internet. Then make the pack again.',
         '',
-        `Without the Studio's build service, a person who can run the release workflow can build it by hand: on GitHub, open Actions, "Release", Run workflow. Type ${customerId} as "Website customer"${line ? ' and paste this line as "Website settings":' : ', and give the settings of website-settings.env (the box takes one line; a setting that holds a semicolon needs a brand kit in brand-kits/ instead):'}`,
+        `Another way, without the Studio, for a person who can run the release workflow: on GitHub, open Actions, "Release", Run workflow. Type ${customerId} as "Website customer"${line ? ' and paste this line as "Website settings":' : ', and give the settings of website-settings.env (the box takes one line; a setting that holds a semicolon needs a brand kit in brand-kits/ instead):'}`,
         ...(line ? ['', line, ''] : []),
         `The release makes ${websiteFileName(customerId, 'windows')} and ${websiteFileName(customerId, 'linux')}. Download them into the programs folder of the Setup Studio and make the pack again.`,
         'The website also needs its own accounts (its database and its picture storage). Those are set up by the person who puts the website online.',
@@ -307,7 +317,8 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
 
   // The hand-over sheet, last, so it can name what is in the pack.
   const logoUri = logo ? `data:image/${logo.ext === 'jpg' ? 'jpeg' : logo.ext === 'svg' ? 'svg+xml' : logo.ext};base64,${logo.bytes.toString('base64')}` : null;
-  const sheet = handoverFor({ intake, info, company, pack: { ai: plan.some((p) => p.id === 'ai' && p.status === 'ready') } });
+  const websites = (plan.find((p) => p.id === 'website')?.files ?? []).filter((f) => f.assembled).map((f) => ({ os: f.os, name: f.name, sha256: f.sha256, licenceIncluded: !!f.licenceIncluded }));
+  const sheet = handoverFor({ intake, info, company, pack: { ai: plan.some((p) => p.id === 'ai' && p.status === 'ready') }, websites });
   put('START HERE.html', handoverHtml(sheet, { colour: intake.look.primaryColor, logo: logoUri }));
 
   // What is in it, with every file's fingerprint.

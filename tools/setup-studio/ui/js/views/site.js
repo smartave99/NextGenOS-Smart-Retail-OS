@@ -1,8 +1,11 @@
-// The "Website and app" step: the customer's website and Android app are made for each customer (their name, colours and settings are built in), by a build service, not on this PC.
-// The Studio sends it this customer's public settings, watches the build and says in plain words which step it is on, then brings the finished files back into this customer's folder,
-// from where the installer step puts them in the pack. A salesperson can see what is ready and what would be sent; a reviewer or administrator starts the build.
+// The "Website and app" step.
+//   The website: made on this PC, with no GitHub and no internet (website-package.js): the website program from the programs + this customer's folder + this customer's licence file.
+//   The Android app: has the customer's name, colours and settings built into it, so it is made by a build service, not on this PC (the website can be made that way too, but need not).
+// For the build service the Studio sends this customer's public settings, watches the build and says in plain words which step it is on, then brings the finished files back into this
+// customer's folder, from where the installer step puts them in the pack. A salesperson can see what is ready and what would be sent; a reviewer or administrator starts the build.
 import { h, icon, toast, when, ago } from '../dom.js';
 import { get, post } from '../api.js';
+import { render as renderWebsitePackage } from './website-package.js';
 
 const STEP_LOOK = { done: ['check', 'tone-ok'], working: ['refresh', 'muted'], waiting: ['clock', 'muted'], failed: ['warn', 'tone-warn'], skipped: ['info', 'muted'] };
 const STEP_WORD = { done: 'done', working: 'going on now', waiting: 'waiting', failed: 'did not work', skipped: 'left out' };
@@ -45,8 +48,8 @@ export async function render(ctx) {
     const failedBefore = parts.some((p) => p.state === 'failed');
     const nodes = [];
 
-    nodes.push(h('div', { class: 'card' }, h('h2', {}, 'Website and app'),
-      h('p', { class: 'lead' }, `${c.name}'s website and Android app have ${c.name}'s own name, colours and settings built into them, so each customer's are made for them. The Studio asks the build service to make them, watches it, and brings the finished files back into this customer's folder. Closing the Studio does not stop the build: open this step again and the Studio picks it up.`),
+    nodes.push(h('div', { class: 'card', id: 'site-service' }, h('h2', {}, 'The Android app, and the other way to get a website'),
+      h('p', { class: 'lead' }, `${c.name}'s Android app has ${c.name}'s own name, colours and settings built into it, and making it needs program files that never come to this PC. So the Studio asks the build service (a private place away from this PC) to make it, watches it, and brings the finished file back into this customer's folder. The build service can make the website as well, but you do not need it for that: the website package above is made on this PC. Closing the Studio does not stop a build: open this step again and the Studio picks it up.`),
       !s.service.ready ? h('div', { class: 'notice warn', id: 'site-not-connected' }, icon('warn'), h('div', {}, s.service.why, ctx.can.settings ? [' ', h('a', { href: '#/settings', id: 'open-connect' }, 'Open Settings')] : ' Ask an administrator.')) : null,
       s.blockers.map((t) => h('div', { class: 'notice warn mt-s', 'data-blocker': '' }, icon('warn'), t)),
       (s.notes ?? []).map((t) => h('div', { class: 'notice mt-s', 'data-note': '' }, icon('info'), t))));
@@ -113,5 +116,10 @@ export async function render(ctx) {
   }
 
   await refresh();
-  return box;
+  // The website package is made on this PC, so it does not wait for the build service; a problem reaching its page must not hide the rest of the step.
+  let local = null;
+  if (c.intake.ecosystem.website.wanted) {
+    try { local = await renderWebsitePackage(ctx); } catch (e) { local = h('div', { class: 'notice warn', id: 'site-local-failed' }, icon('warn'), `The website package part could not be shown: ${e.message}`); }
+  }
+  return h('div', { class: 'col', id: 'site-both' }, local, box);
 }

@@ -16,6 +16,8 @@ import { previewInput, previewHtml, brandCss, readAsset } from './preview.mjs';
 import { makeZip } from './zip.mjs';
 import { readBaseKit } from './basekit.mjs';
 import { buildPack, planPack, PackError } from './pack.mjs';
+import { inspectLicence } from './website-assemble.mjs';
+import { SYSTEMS, systemLabel, websiteSystems, describeLicence, makeWebsitePackage, websitesMade, newestWebsitesMade, withLocalWebsites } from './website-local.mjs';
 import { handoverFor } from './handover.mjs';
 import { inside } from './fsx.mjs';
 import { askForProposal, preview as aiPreview, describeTools, ADAPTERS, AiError } from './ai/index.mjs';
@@ -39,11 +41,14 @@ export function defaultWorkspaceFolder(env = process.env) {
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const PREVIEW_CSP = "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
+/** The kit that comes with the Studio: the programs of one release, in a folder called kit beside the Studio's program, with base-kit.json. The Studio uses it when it is there. */
+export const BUILT_IN_KIT = resolve(here, '..', 'kit');
+
 /**
  * Starts the Studio. Returns { server, url, token, close, state }. `folder` is the workspace folder (made at first use). `build` is for tests only: it points the build service
- * client at a stand-in on this PC (addresses, how often to look); the real Studio always talks to the one real address.
+ * client at a stand-in on this PC (addresses, how often to look); the real Studio always talks to the one real address. `kitFolder` is for tests only too: where the built-in kit is.
  */
-export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, build = {} } = {}) {
+export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0, env = process.env, onBeat = null, onQuit = null, build = {}, kitFolder = BUILT_IN_KIT } = {}) {
   const hooks = { beat: onBeat, quit: onQuit };
   const token = randomBytes(18).toString('base64url');
   const tokenBuf = Buffer.from(token);
@@ -165,58 +170,95 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
   });
 
   // ---- the programs folder, the customer pack, the hand-over sheet ------------------------------------------------------------------
-  const programsFolder = () => String(state.ws.settings().programs?.folder ?? '');
+  // Where the programs are: the folder an administrator chose in Settings, else the kit that came with the Studio (a folder called kit beside the Studio's program), else nowhere.
+  const builtInPresent = () => existsSync(join(kitFolder, 'base-kit.json'));
+  const programsSource = () => {
+    const chosen = String(state.ws?.settings().programs?.folder ?? '');
+    if (chosen) return { folder: chosen, source: 'chosen' };
+    if (builtInPresent()) return { folder: kitFolder, source: 'built-in' };
+    return { folder: '', source: 'none' };
+  };
+  const programsFolder = () => programsSource().folder;
   const kitSummary = (kit) => ({ ok: kit.ok, folder: kit.folder, version: kit.version, trial: kit.trial, signing: kit.signing, problems: kit.problems, files: kit.files.map((f) => ({ name: f.name, role: f.role, os: f.os, arch: f.arch, bytes: f.bytes })) });
   const noKit = { ok: false, folder: '', version: null, trial: false, signing: { windows: 'unknown', android: 'unknown' }, problems: [], files: [] };
-  route('GET', '/api/programs', {}, async () => ({ programs: programsFolder() ? kitSummary(await readBaseKit(programsFolder())) : noKit }));
+  /** The kit that came with the Studio, in short (for Settings: whether it is there, whether it is whole, which release it is). */
+  const builtInSummary = async () => {
+    if (!builtInPresent()) return { present: false };
+    const kit = await readBaseKit(kitFolder, { quick: true });
+    return { present: true, ok: kit.ok, version: kit.version, trial: kit.trial, files: kit.files.length, problems: kit.problems };
+  };
+  const programsAnswer = async (extra = {}) => {
+    const src = programsSource();
+    return { programs: src.folder ? kitSummary(await readBaseKit(src.folder, { quick: true })) : noKit, source: src.source, builtIn: await builtInSummary(), ...extra };
+  };
+  route('GET', '/api/programs', {}, () => programsAnswer());
   route('PUT', '/api/programs', { limit: 5_000 }, async ({ me, body }) => {
     if (!can(me, 'settings')) throw new StudioError('Only an administrator can choose the programs folder.', 403, 'role');
     const folder = String(body.folder ?? '').trim().replace(/^["']|["']$/g, '');
+    // An empty box goes back to the kit that came with the Studio (or to no programs at all, when there is none).
+    if (!folder) { state.ws.saveSettings(me, { programs: { folder: '' } }); return programsAnswer(); }
     const kit = await readBaseKit(folder);
-    if (!folder) { state.ws.saveSettings(me, { programs: { folder: '' } }); return { programs: noKit }; }
     if (!kit.ok) return { programs: kitSummary(kit), saved: false };
     state.ws.saveSettings(me, { programs: { folder: kit.folder } });
-    return { programs: kitSummary(kit), saved: true };
+    return programsAnswer({ saved: true });
   });
   // What the Studio still needs before it can give a customer their outputs, in plain words. The Studio builds nothing itself, so each output comes from somewhere else: say where.
   route('GET', '/api/readiness', {}, async () => {
-    const folder = programsFolder();
-    const kit = folder ? await readBaseKit(folder) : null;
+    const { folder, source } = programsSource();
+    const kit = folder ? await readBaseKit(folder, { quick: true }) : null;
     const service = builds().connection();
+    const builtIn = source === 'built-in';
+    const sites = kit ? websiteSystems(kit).filter((s) => s.file) : [];
+    const ids = state.ws.ids();
+    const haveLicence = ids.filter((id) => state.ws.websiteLicence(id)).length;
     const items = [
       {
         id: 'programs', title: 'The shop program (installer)', where: 'settings',
         state: !folder ? 'missing' : !kit.ok ? 'problem' : kit.trial ? 'trial' : 'ready',
         text: !folder
           ? 'The Studio does not build programs. It puts a customer\'s installer together from the files of a release. On GitHub open the release, download every file into one folder, then choose that folder in Settings, "The programs folder". Until then it cannot give anyone an installer.'
-          : !kit.ok ? `The programs folder has a problem: ${kit.problems?.[0] ?? 'it cannot be read'}. Fix it in Settings, "The programs folder".`
+          : !kit.ok ? (builtIn ? `The programs that came with the Studio have a problem: ${kit.problems?.[0] ?? 'they cannot be read'}. Ask NextGenOS for a new Studio, or choose a folder of release files in Settings, "The programs folder".` : `The programs folder has a problem: ${kit.problems?.[0] ?? 'it cannot be read'}. Fix it in Settings, "The programs folder".`)
           : kit.trial ? `These files (version ${kit.version}) come from a trial release without licence keys. The Studio can make a pack from them only to try it, never to give to a customer. A release made with your licence keys is needed for a real customer.`
-          : `Release ${kit.version} is in place.`,
+          : `Release ${kit.version} is in place${builtIn ? ' (the programs that came with the Studio)' : ''}.`,
       },
       {
-        id: 'build-service', title: 'The website and the Android app for each customer', where: 'settings',
+        id: 'website', title: 'The website program', where: 'settings',
+        state: !folder ? 'missing' : !kit.ok ? 'problem' : !sites.length ? 'missing' : kit.trial ? 'trial' : sites.length < SYSTEMS.length ? 'partly' : 'ready',
+        text: !folder ? 'The website is one finished program that is the same for every customer; it is one of the programs of a release (website-linux.zip and website-windows.zip). There are no programs yet (see above), so there is no website program to put a customer\'s settings beside, and no website package can be made.'
+          : !kit.ok ? 'The programs have a problem (see above), so the website program is not used until that is put right.'
+          : !sites.length ? `The programs do not hold the website program (website-linux.zip and website-windows.zip). Ask NextGenOS for the newest release${builtIn ? ' (a newer Studio carries it)' : ', and choose its folder in Settings, "The programs folder"'}. Until then no website package can be made on this PC.`
+          : kit.trial ? `The website program (from release ${kit.version}) comes from a trial release made without licence keys. A website package made from it is only to try; it can never be licensed and is never given to a customer.`
+          : sites.length < SYSTEMS.length ? `Only the website program for ${sites.map((s) => s.label).join(' and ')} is in the programs. A website package can be made for that system only.`
+          : `The website program (from release ${kit.version}) is in the programs, for ${sites.map((s) => s.label).join(' and ')}. On a customer's page, in the step "Website and app", "Make the website package" puts that customer's name, colours, logo and settings beside it. This is done on this PC and needs no internet.`,
+      },
+      {
+        id: 'build-service', title: 'The Android app for each customer', where: 'settings',
         state: service.ready ? 'ready' : 'missing',
-        text: service.ready ? 'The build service is connected: a reviewer or administrator can ask for a customer\'s website and app in the customer\'s step "Website and app".'
-          : `Each customer's website and app have the customer's settings built into them, so they are built on GitHub, not on this PC. ${service.why} An administrator connects it once (Settings, "Connect the build service"). Until then no website or app can be made.`,
+        text: service.ready ? 'The build service is connected: a reviewer or administrator can ask for a customer\'s Android app in the customer\'s step "Website and app".'
+          : `Each customer's Android app has the customer's settings built into it, so it is built on GitHub, not on this PC. ${service.why} An administrator connects it once (Settings, "Connect the build service"). Until then no Android app can be made. The website does not need this.`,
       },
       {
-        id: 'licence', title: 'The customer\'s licence', where: null, state: 'not-built',
-        text: 'A customer\'s licence is made in the NextGenOS Licence Studio, by the person who sells. Making it from this Studio\'s output button is planned and is not in this version.',
+        id: 'licence', title: 'The customer\'s website licence file', where: null, state: 'not-built',
+        text: `The Studio cannot ask the Licence Studio for a licence yet; that is planned and is not in this version. A person makes the website licence in the NextGenOS Licence Studio, saves the file, and puts it in place on the customer's page, in the step "Website and app". ${ids.length ? `Licence files in place: ${haveLicence} of ${ids.length} customers.` : 'There are no customers yet.'} A website package can be made without it, but the website will not start until the licence file is added.`,
       },
     ];
-    return { items, allReady: items.every((i) => i.state === 'ready') };
+    return { items, allReady: items.every((i) => i.state === 'ready'), source };
   });
   const latest = (id) => state.ws.releaseNumbers(id).at(-1) ?? null;
+  /** The programs plus the website and the app made for this customer from this release (by the build service, or on this PC): they count as if they were in the programs folder. */
+  const withCustomerOutputs = async (programs, id, n, verify) => withLocalWebsites(
+    await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(id), release: n, customerId: id, verify }),
+    { builds: state.ws.get(id).builds, folderOf: (release) => state.ws.websiteFolder(id, release), release: n, customerId: id, verify });
   route('GET', '/api/customers/:id/outputs', {}, async ({ params }) => {
     const customer = state.ws.get(params.id);
     const n = latest(params.id);
-    if (!n) return { release: null, programs: noKit, items: [], builds: customer.builds };
+    const src = programsSource();
+    if (!n) return { release: null, programs: noKit, source: src.source, items: [], builds: customer.builds };
     const parts = state.ws.releaseParts(params.id, n);
-    const programs = programsFolder() ? await readBaseKit(programsFolder()) : null;
-    // The website and the app made for this customer from this release (by the build service) count as if they were in the programs folder.
-    const kit = programs?.ok ? await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(params.id), release: n, customerId: params.id }) : null;
+    const programs = src.folder ? await readBaseKit(src.folder, { quick: true }) : null;
+    const kit = programs?.ok ? await withCustomerOutputs(programs, params.id, n, false) : null;
     const items = kit ? planPack({ intake: parts.intake, kit, slug: params.id }).map((i) => ({ id: i.id, title: i.title, status: i.status, note: i.note, files: i.files.map((f) => f.name) })) : [];
-    return { release: parts.info, programs: programs ? kitSummary(programs) : noKit, items, trial: !!kit?.trial, builds: customer.builds };
+    return { release: parts.info, programs: programs ? kitSummary(programs) : noKit, source: src.source, items, trial: !!kit?.trial, builds: customer.builds };
   });
   route('POST', '/api/customers/:id/outputs/pack', { limit: 2_000 }, async ({ me, params, body }) => {
     if (!can(me, 'build')) throw new StudioError('Your role cannot make installers.', 403, 'role');
@@ -226,7 +268,7 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     const programs = await readBaseKit(programsFolder());
     if (!programs.ok) throw new StudioError('The programs folder has problems:\n' + programs.problems.join('\n'), 409, 'programs', programs.problems);
     // Every fingerprint of the website and app made for this customer is read again before they are copied into the pack.
-    const kit = await withSiteBuilds(programs, { folder: state.ws.siteBuildsFolder(params.id), release: n, customerId: params.id, verify: true });
+    const kit = await withCustomerOutputs(programs, params.id, n, true);
     if (kit.siteProblems.length) throw new StudioError('The website or app made for this customer cannot be used:\n' + kit.siteProblems.join('\n'), 409, 'site', kit.siteProblems);
     const parts = state.ws.releaseParts(params.id, n);
     if (state.aiRunning.has('pack:' + params.id)) throw new StudioError('A pack is already being made for this customer.', 409);
@@ -255,8 +297,104 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     const n = latest(params.id);
     if (!n) throw new StudioError('Approve a setup first.', 409);
     const parts = state.ws.releaseParts(params.id, n);
-    const made = [...(state.ws.get(params.id).builds ?? [])].reverse().find((b) => b.kind === 'pack' && b.release === n);
-    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: made ? { ai: !!made.parts?.some((p) => p.id === 'ai' && p.status === 'ready') } : null }) };
+    const all = state.ws.get(params.id).builds ?? [];
+    const made = [...all].reverse().find((b) => b.kind === 'pack' && b.release === n);
+    // The website packages made on this PC for this release, with their fingerprints (the pack's own sheet names the same ones).
+    const websites = newestWebsitesMade(all, n).map((b) => ({ os: b.os, name: `website-${params.id}-${b.os}.zip`, sha256: b.sha256, licenceIncluded: !!b.licenceIncluded }));
+    return { sheet: handoverFor({ intake: parts.intake, info: parts.info, company: companySettings(), pack: made ? { ai: !!made.parts?.some((p) => p.id === 'ai' && p.status === 'ready') } : null, websites }) };
+  });
+
+  // ---- the website package, made on this PC: the website program from the programs (the kit) + this customer's folder + this customer's licence file -----------------------------
+  const wantsWebsite = (intake) => intake.ecosystem?.website?.wanted === true;
+  const NO_WEBSITE = 'This customer was not set up to get a website. Switch it on in the details (Extras), prepare the setup again and have it approved again.';
+  /** Everything the website step needs: what is there, what is missing, what is already made. Nothing is changed. */
+  async function websiteStatus(id) {
+    const customer = state.ws.get(id);
+    const n = latest(id);
+    const blockers = [];
+    let parts = null;
+    if (!n) blockers.push('Approve a setup first. The website package is made from an approved release.');
+    else { try { parts = state.ws.releaseParts(id, n); } catch (e) { blockers.push(e.message); } }
+    if (parts && !wantsWebsite(parts.intake)) blockers.push(NO_WEBSITE);
+    const src = programsSource();
+    const kit = src.folder ? await readBaseKit(src.folder, { quick: true }) : null;
+    const systems = websiteSystems(kit ?? { files: [] }).map((s) => ({ id: s.id, label: s.label, who: s.who, available: !!s.file, name: s.file?.name ?? `website-${s.id}.zip` }));
+    const domain = parts?.intake.ecosystem?.website?.domain ?? '';
+    const licence = describeLicence(state.ws.websiteLicence(id), { siteUrl: domain ? `https://${domain}` : '' });
+    // Newest first. A record is "replaced" when a newer one exists for the same release and system (the file of that name is the newer one).
+    const seen = new Set();
+    const made = websitesMade(customer.builds).slice(0, 40).map((b) => {
+      const name = `website-${id}-${b.os}.zip`;
+      const key = `${b.release}/${b.os}`;
+      const replaced = seen.has(key);
+      seen.add(key);
+      let there = false;
+      try { there = !replaced && statSync(join(state.ws.websiteFolder(id, b.release), name)).size === b.bytes; } catch { there = false; }
+      return { at: b.at, by: b.by?.name ?? '', release: b.release, os: b.os, label: systemLabel(b.os), name, bytes: b.bytes, sha256: b.sha256, programs: b.programs, trial: !!b.trial, licenceIncluded: !!b.licenceIncluded, forThisRelease: b.release === n, replaced, there };
+    });
+    const why = blockers[0] ?? (!kit ? 'There are no programs yet. An administrator chooses the programs folder in Settings, or the Studio comes with its own programs.' : !kit.ok ? `The programs have a problem: ${kit.problems[0] ?? 'they cannot be read'}.` : !systems.some((s) => s.available) ? 'The programs do not hold the website program (website-linux.zip and website-windows.zip). Ask NextGenOS for the newest release.' : null);
+    return {
+      release: n, blockers, why, canMake: !why && !state.aiRunning.has('website:' + id), busy: state.aiRunning.has('website:' + id),
+      programs: { source: src.source, ok: !!kit?.ok, version: kit?.version ?? null, trial: !!kit?.trial, problems: kit?.problems ?? [] },
+      systems, licence, made, siteName: domain || null,
+    };
+  }
+  route('GET', '/api/customers/:id/website-package', {}, ({ params }) => websiteStatus(params.id));
+  route('PUT', '/api/customers/:id/website-package/licence', { limit: 60_000 }, async ({ me, params, body }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot put a licence file in place. Ask a reviewer or an administrator.', 403, 'role');
+    state.ws.get(params.id);
+    const checked = inspectLicence(String(body.text ?? ''));
+    if (checked.problems.length) throw new StudioError(`This file cannot be used. ${checked.problems.join(' ')}`, 400, 'licence');
+    state.ws.saveWebsiteLicence(me, params.id, checked.token);
+    return websiteStatus(params.id);
+  });
+  route('DELETE', '/api/customers/:id/website-package/licence', {}, async ({ me, params }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot take a licence file away. Ask a reviewer or an administrator.', 403, 'role');
+    state.ws.removeWebsiteLicence(me, params.id);
+    return websiteStatus(params.id);
+  });
+  route('POST', '/api/customers/:id/website-package/make', { limit: 2_000 }, async ({ me, params, body }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot make the website package. Ask a reviewer or an administrator.', 403, 'role');
+    const id = params.id;
+    state.ws.get(id);
+    const n = latest(id);
+    if (!n) throw new StudioError('Approve a setup first. The website package is made from an approved release.', 409);
+    const parts = state.ws.releaseParts(id, n);
+    if (!wantsWebsite(parts.intake)) throw new StudioError(NO_WEBSITE, 409, 'not-wanted');
+    const want = [...new Set((Array.isArray(body.systems) ? body.systems : []).map(String))].filter((s) => SYSTEMS.some((x) => x.id === s));
+    if (!want.length) throw new StudioError('Choose at least one system: Linux or Windows.', 400, 'choose');
+    const src = programsSource();
+    if (!src.folder) throw new StudioError('There are no programs yet. An administrator chooses the programs folder in Settings (the files of a NextGenOS release), or the Studio comes with its own programs.', 409, 'no-programs');
+    const kit = await readBaseKit(src.folder);
+    if (!kit.ok) throw new StudioError('The programs have problems:\n' + kit.problems.join('\n'), 409, 'programs', kit.problems);
+    const where = src.source === 'built-in' ? 'the programs that came with the Studio' : 'the programs folder';
+    const lacking = want.filter((os) => !websiteSystems(kit).find((s) => s.id === os)?.file);
+    if (lacking.length) throw new StudioError(`The website program for ${lacking.map(systemLabel).join(' and ')} (${lacking.map((os) => `website-${os}.zip`).join(', ')}) is not in ${where}. Ask NextGenOS for the newest release, or make the package for the other system.`, 409, 'no-website-program');
+    if (state.aiRunning.has('website:' + id)) throw new StudioError('A website package is already being made for this customer. Please wait for it.', 409);
+    state.aiRunning.add('website:' + id);
+    try {
+      const slot = state.ws.websiteLicence(id);
+      const results = [];
+      for (const os of want) {
+        const r = await makeWebsitePackage({ id, parts, kit, os, licenceFile: slot?.file ?? null, person: me.name, folder: state.ws.websiteFolder(id, n), allowTrial: body.allowTrial === true, where });
+        state.ws.recordBuild(me, id, { kind: 'website-local', release: n, os, file: r.name, bytes: r.bytes, sha256: r.sha256, programs: kit.version, trial: r.trial, licenceIncluded: r.licenceIncluded },
+          { action: 'website.assembled', detail: `${r.name} from release ${n}: ${r.licenceIncluded ? 'with the licence file' : 'no licence file yet'}${r.trial ? ' (a trial build, no licence keys)' : ''}`, keepState: true });
+        results.push({ os, name: r.name, bytes: r.bytes, sha256: r.sha256, licenceIncluded: r.licenceIncluded, trial: r.trial, notes: r.notes });
+      }
+      return { ...(await websiteStatus(id)), results };
+    } finally { state.aiRunning.delete('website:' + id); }
+  });
+  route('GET', '/api/customers/:id/website-package/:n/:os/website.zip', { raw: true }, ({ me, params, res }) => {
+    if (!can(me, 'build')) throw new StudioError('Your role cannot download the website package.', 403, 'role');
+    const n = Number(params.n);
+    if (!Number.isInteger(n) || n < 1 || !SYSTEMS.some((s) => s.id === params.os)) throw new StudioError('That website package was not found.', 404);
+    const record = websitesMade(state.ws.get(params.id).builds, n).find((b) => b.os === params.os);
+    if (!record) throw new StudioError('No website package was made from that release for that system.', 404);
+    const file = inside(state.ws.websiteFolder(params.id, n), `website-${params.id}-${params.os}.zip`);
+    if (!existsSync(file) || statSync(file).size !== record.bytes) throw new StudioError('The website package is no longer there. Make it again.', 404);
+    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': statSync(file).size, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename="${basename(file)}"`, 'Content-Security-Policy': CSP });
+    createReadStream(file).pipe(res);
+    return undefined;
   });
 
   // ---- the build service: a customer's website and Android app are made off this PC, for each customer, and come back into the pack ---------
@@ -427,6 +565,8 @@ export async function startStudio({ folder = defaultWorkspaceFolder(), port = 0,
     }
   });
   await new Promise((r, j) => { server.once('error', j); server.listen(port, '127.0.0.1', r); });
-  const url = `http://127.0.0.1:${server.address().port}/?k=${token}`;
+  // The kit that came with the Studio can be large: it is read once now, in the background, so that the first page does not wait for it. (A kit that cannot be read is said on the page.)
+  if (builtInPresent()) readBaseKit(kitFolder, { quick: true }).catch(() => {});
+  const url =`http://127.0.0.1:${server.address().port}/?k=${token}`;
   return { server, url, token, state, close: () => new Promise((r) => { state.builds?.close(); server.close(() => r()); server.closeAllConnections?.(); }) };
 }

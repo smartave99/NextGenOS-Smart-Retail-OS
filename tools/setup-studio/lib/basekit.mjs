@@ -23,11 +23,24 @@ export async function sha256File(path) {
   return h.digest('hex');
 }
 
+// What was read from disk this time round, so that a screen that only LOOKS at the programs (and is opened often) does not read every installer again each time.
+// Only the screens use it ({ quick: true }); every action that copies or uses a file reads it again in full.
+const lookedAt = new Map();
+async function fingerprintOf(path, bytes, quick) {
+  const mtimeMs = statSync(path).mtimeMs;
+  const known = lookedAt.get(path);
+  if (quick && known && known.bytes === bytes && known.mtimeMs === mtimeMs) return known.sha256;
+  const sha256 = await sha256File(path);
+  lookedAt.set(path, { bytes, mtimeMs, sha256 });
+  return sha256;
+}
+
 /**
  * Reads and checks a programs folder. Returns { ok, folder, version, trial, signing, files, problems }, where files are [{ name, role, os, arch, kit?, bytes, sha256, path }].
  * Every problem is a sentence a person can act on. When the manifest is missing or unreadable nothing else is looked at.
+ * `quick` is for screens that only show what is there: a file whose size and time are the same as the last full read is not read again. Anything that uses a file asks without it.
  */
-export async function readBaseKit(folder) {
+export async function readBaseKit(folder, { quick = false } = {}) {
   const problems = [];
   const root = folder ? resolve(String(folder)) : '';
   const out = { ok: false, folder: root, version: null, trial: false, signing: { windows: 'unknown', android: 'unknown' }, files: [], problems };
@@ -47,9 +60,12 @@ export async function readBaseKit(folder) {
     if (!ROLES[f.role]) continue;   // a part this Studio does not know (a newer release): left alone
     const path = join(root, name);
     if (!existsSync(path)) { problems.push(`${name} is missing. Download it into the same folder.`); continue; }
-    const bytes = statSync(path).size;
-    if (bytes !== f.bytes) { problems.push(`${name} is ${bytes < f.bytes ? 'incomplete' : 'not the file that was released'} (${bytes} bytes, expected ${f.bytes}). Download it again.`); continue; }
-    if (await sha256File(path) !== f.sha256) { problems.push(`${name} does not match its fingerprint, so it was damaged or changed. Download it again.`); continue; }
+    let bytes;
+    try {
+      bytes = statSync(path).size;
+      if (bytes !== f.bytes) { problems.push(`${name} is ${bytes < f.bytes ? 'incomplete' : 'not the file that was released'} (${bytes} bytes, expected ${f.bytes}). Download it again.`); continue; }
+      if (await fingerprintOf(path, bytes, quick) !== f.sha256) { problems.push(`${name} does not match its fingerprint, so it was damaged or changed. Download it again.`); continue; }
+    } catch { problems.push(`${name} cannot be read (is it open in another program, or is the folder locked?). Close what uses it and try again.`); continue; }
     out.files.push({ name, role: f.role, os: String(f.os ?? ''), arch: String(f.arch ?? ''), ...(f.kit ? { kit: String(f.kit) } : {}), bytes, sha256: f.sha256, path });
   }
   if (!out.files.some((f) => f.role.startsWith('hub-'))) problems.push('No Hub program was found in this folder.');

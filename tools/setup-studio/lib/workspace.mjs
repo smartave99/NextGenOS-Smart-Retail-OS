@@ -1,7 +1,8 @@
 // The Studio's workspace: one folder holding the team, the customers, every approved release and a tamper-evident activity record. Plain files, written carefully,
-// so a person can back it up by copying the folder. It lives outside the code (never in the repository) and holds no password in plain form and no licence key.
+// so a person can back it up by copying the folder. It lives outside the code (never in the repository) and holds no password in plain form and no licence-signing key.
+// A customer's website licence file (already signed by the Licence Studio, which the Studio cannot sign for) may sit in licences/<id>/; a backup does not carry it.
 //
-//   studio.json  team.json  audit.jsonl  customers/<id>/{customer,intake,proposal}.json  customers/<id>/releases/<n>/  backups/  builds/
+//   studio.json  team.json  audit.jsonl  customers/<id>/{customer,intake,proposal}.json  customers/<id>/releases/<n>/  backups/  builds/  licences/
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -476,6 +477,42 @@ export class Workspace {
 
   /** Where the files made for one customer by the build service are kept (the website, the app), beside the numbered folders of its packs. Rebuilt on demand, so not in a backup. */
   siteBuildsFolder(id) { this.#dir(id); return inside(this.folder, 'builds', id, 'website-app'); }
+
+  /** Where the website packages assembled on this PC for one customer are kept, one folder for each approved release. Made again on demand, so not in a backup. */
+  websiteFolder(id, n) { this.#dir(id); return inside(this.folder, 'builds', id, 'website-local', String(Number(n))); }
+
+  // ---- the customer's website licence file (a slot) -----------------------------------------------------------------------------------------
+
+  /**
+   * The slot for the licence file of the customer's website: one file that a person puts here (it comes from the Licence Studio; the Studio does not ask for it yet). It is
+   * outside customers/, so a backup of the workspace never carries a licence. The signing key is never here: the file is a signed licence, which the website checks itself.
+   */
+  websiteLicence(id) {
+    this.#dir(id);
+    const file = inside(this.folder, 'licences', id, 'website.ngos');
+    if (!existsSync(file)) return null;
+    return { file, text: readFileSync(file, 'utf8').trim() };
+  }
+
+  /** Puts the licence file in the slot (its form was looked at by the caller). Only what it is, never its text, goes in the activity record. */
+  saveWebsiteLicence(actor, id, text) {
+    need(actor, 'build', 'put a licence file in place');
+    this.#meta(id);
+    const token = String(text ?? '').trim();
+    if (!token || token.length > 20000 || /\s/.test(token)) throw new StudioError('That is not a licence file: it is one line of letters and numbers, without spaces.');
+    const had = this.websiteLicence(id);
+    writeAtomic(inside(this.folder, 'licences', id, 'website.ngos'), token + '\n', { mode: 0o600 });
+    this.log(actor, 'licence.slot', id, `${had ? 'Website licence file replaced' : 'Website licence file put in place'} (fingerprint ${sha256(token).slice(0, 16)})`);
+  }
+
+  removeWebsiteLicence(actor, id) {
+    need(actor, 'build', 'take a licence file away');
+    this.#meta(id);
+    const had = this.websiteLicence(id);
+    if (!had) throw new StudioError('There is no licence file for this customer\'s website.', 404);
+    rmSync(had.file, { force: true });
+    this.log(actor, 'licence.slot', id, `Website licence file taken away (fingerprint ${sha256(had.text).slice(0, 16)})`);
+  }
 
   // ---- safe keeping ---------------------------------------------------------------------------------------------------------------------
 

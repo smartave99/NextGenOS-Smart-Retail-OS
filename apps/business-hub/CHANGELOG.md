@@ -4,6 +4,10 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### When a licence ends (decision 15)
+- **A paid licence that has ended keeps working and says so; a trial stops.** What happens at the end date is written inside the signed licence (never a setting on the PC): the Licence Studio signs "keep working with a banner" for a paid licence and "stop" for a trial. The Hub shows a banner across every screen: for a trial, when it ends; for a paid licence that has ended, that it ended and the shop keeps working; for a PC that could not check in, how many days it still works. Staff can still switch any licence off at any time.
+- Not yet: the same banner in the older Windows programs, and "read-only, export your data" for a stopped trial.
+
 ### What stock costs (average cost, decision 36)
 - **Every item has one cost: the average of what was paid, worked out again at each purchase.** A purchase brings its goods in at what its lines cost without tax and after discounts; a sale takes its goods off at the average cost of that moment (the last unit takes whatever is left, so nothing stays behind); goods a customer brings back return at the cost they left at, and the returns of one bill add up to exactly what it cost; a cancelled sale or purchase undoes its value; a count or damage is valued at the average, a delivery with no order at the last cost price. Database step 15, with its way back.
 - **The books count profit from what was sold.** Bought goods sit in *Stock on the shelves* and become *Cost of goods sold* when sold, so *Books* no longer shows a loss on paper for stock that has not been sold. Goods lost, damaged or found go to *Stock lost, damaged or gained*. The stock report, its download and the books show the same stock value. Stock that was already on the shelves (an older shop, or one moved across) is given its value once, as an opening entry; old bills are not worked out again.

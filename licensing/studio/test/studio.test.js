@@ -179,6 +179,29 @@ test('terms: an activation never outlasts the licence; trial is flagged', () => 
   assert.equal(act.until, trial.exp); // 21 days would pass the end of the trial, so it stops at the end of the trial
 });
 
+test('end date (decision 15): a paid licence signs "banner" and keeps working and checking in after it; a trial signs "stop" and is refused', () => {
+  const ctx = makeStudio();
+  const paid = newLicence(ctx, { term: 'y1' });
+  const trial = newLicence(ctx, { term: 'trial30' });
+  assert.equal(C.verifyToken(ctx.studio.licenceToken(ctx.studio.getLicence(paid.lid)), ctx.trusted, 'lic').end, 'banner');
+  assert.equal(C.verifyToken(ctx.studio.licenceToken(ctx.studio.getLicence(trial.lid)), ctx.trusted, 'lic').end, 'stop');
+
+  const first = ctx.studio.activate({ key: paid.licence_key, fp: fp('p') }, 'ip');
+  assert.ok(first.act);
+  ctx.state.t = paid.exp + 40 * DAY;                                        // long after the end date
+  const again = ctx.studio.checkin({ lid: paid.lid, act: first.act, fp: fp('p') }, 'ip');
+  const act = C.verifyToken(again.act, ctx.trusted, 'act');
+  assert.equal(act.next, ctx.state.t + 7 * DAY);                              // not cut short at the end date
+  assert.equal(act.until, act.next + 14 * DAY);
+  const lic = C.verifyToken(again.lic, ctx.trusted, 'lic');
+  assert.equal(lic.exp, paid.exp);                                           // it still says it ended, so the program shows the banner
+
+  assert.throws(() => ctx.studio.activate({ key: trial.licence_key, fp: fp('t') }, 'ip'), (e) => e.code === 'expired');
+  // staff can still stop it
+  ctx.studio.setStatus(paid.lid, 'suspended', 'unpaid', ADMIN, 'ip');
+  assert.throws(() => ctx.studio.checkin({ lid: paid.lid, act: first.act, fp: fp('p') }, 'ip'), (e) => e.code === 'suspended');
+});
+
 test('roles: sales cannot exceed plan caps, issue perpetual licences or unbound licences', () => {
   const ctx = makeStudio();
   const customer = ctx.studio.createCustomer({ name: 'X' }, SALES, 'ip');

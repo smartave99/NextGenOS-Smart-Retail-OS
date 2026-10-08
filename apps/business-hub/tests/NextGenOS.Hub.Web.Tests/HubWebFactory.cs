@@ -26,6 +26,9 @@ public sealed class HubWebFactory : WebApplicationFactory<Program>
     /// <summary>Where the copy made before an update goes (the Hub:BackupFolder setting); null: next to the shop's file.</summary>
     public string? BackupFolder { get; set; }
 
+    /// <summary>Shapes the stand-in licence further (for example makes it a trial that ends on a day, or a paid licence that has ended). Read when the licence is first looked at.</summary>
+    public Action<LicenceState>? ShapeLicence { get; set; }
+
     /// <summary>The licence's number of PCs for the stand-in licence (0: no limit). Read on every pairing, as the real one is.</summary>
     public int Devices { get; set; }
 
@@ -51,9 +54,13 @@ public sealed class HubWebFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Production");
         builder.ConfigureTestServices(services =>
         {
-            services.AddSingleton(new ProductLicence(() => Licensed
-                ? new LicenceState { Status = LicenceStatus.Valid, Licence = new LicenceClaims { Modules = [.. Modules], Limits = new Limits { Devices = Devices } } }
-                : new LicenceState { Status = LicenceStatus.Missing }));
+            services.AddSingleton(new ProductLicence(() =>
+            {
+                if (!Licensed) return new LicenceState { Status = LicenceStatus.Missing };
+                var state = new LicenceState { Status = LicenceStatus.Valid, Licence = new LicenceClaims { Modules = [.. Modules], Limits = new Limits { Devices = Devices } } };
+                ShapeLicence?.Invoke(state);
+                return state;
+            }));
             services.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter>(_ => new RemoteAddressFilter());
         });
     }

@@ -403,9 +403,15 @@ class Studio {
       product: PRODUCT, edition: lic.plan_code, modules: lic.modules, limits: lic.limits, bind: lic.bind,
       brand: brandRow ? { id: `B-${brandRow.id}`, ...brandRow.data } : null,
       reseller: reseller ? { id: `R-${reseller.id}`, name: reseller.name } : null,
-      act: lic.act, trial: lic.trial, white: { level: lic.white_level || 'theme' },
+      act: lic.act, trial: lic.trial, end: Studio.endAction(lic), white: { level: lic.white_level || 'theme' },
     }, this.signer);
   }
+
+  /**
+   * What the licence does at its end date, written into the signed licence (spec 4.1a, decision 15): a trial stops, a paid licence keeps working and shows a banner. It is derived from
+   * the licence, not chosen on its own, so a trial cannot be made to keep working and a paid licence cannot be made to stop by a setting.
+   */
+  static endAction(lic) { return lic.trial ? 'stop' : 'banner'; }
 
   activationToken(lic, fpList, longOffline) {
     const t = this.now();
@@ -417,7 +423,8 @@ class Studio {
       next = t + (lic.act.checkInDays || 7) * DAY;
       until = next + (lic.act.graceDays || 14) * DAY;
     }
-    if (lic.exp) { next = Math.min(next, lic.exp); until = Math.min(until, lic.exp); }
+    // An activation never outlasts a licence that stops at its end date; one that keeps working after it (a paid licence) goes on checking in.
+    if (lic.exp && Studio.endAction(lic) === 'stop') { next = Math.min(next, lic.exp); until = Math.min(until, lic.exp); }
     return C.signToken({ typ: 'act', lid: lic.lid, rev: lic.rev, iat: t, fp: fpList, fpMin: Studio.fpMin(fpList.length), next, until }, this.signer);
   }
 
@@ -471,7 +478,7 @@ class Studio {
     if (lic.status === 'revoked') return new ApiError(403, 'revoked', 'This licence has been withdrawn. Please contact your supplier.');
     if (lic.status === 'suspended') return new ApiError(403, 'suspended', 'This licence is on hold. Please contact your supplier.');
     if (t < lic.nbf) return new ApiError(403, 'not_started', 'This licence has not started yet.');
-    if (lic.exp && t > lic.exp) return new ApiError(403, 'expired', 'This licence has ended. Please renew it.');
+    if (lic.exp && t > lic.exp && Studio.endAction(lic) === 'stop') return new ApiError(403, 'expired', 'This licence has ended. Please renew it.');
     return null;
   }
 

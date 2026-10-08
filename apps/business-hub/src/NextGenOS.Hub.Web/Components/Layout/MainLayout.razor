@@ -3,6 +3,7 @@
 @inject Session Sess
 @inject NextGenOS.Licensing.AspNetCore.BrandService Brand
 @inject IJSRuntime Js
+@inject NextGenOS.Licensing.AspNetCore.ProductLicence Licence
 
 <div class="shell">
     <nav class="side" aria-label="Main">
@@ -30,6 +31,11 @@
             <button type="button" class="btn ghost small" @onclick="ToggleTheme" aria-label="Switch between light and dark">@(dark ? "Light" : "Dark")</button>
             <button type="button" class="btn ghost small" @onclick="SignOut">Sign out</button>
         </header>
+        @* A trial, a PC that could not check in, or a paid licence that has ended and keeps working (decision 15): said in words across every screen, never a reason to stop the till. *@
+        @if (Licence.State.Banner is { } licenceBanner)
+        {
+            <div class="notice warn licence-banner" id="licence-banner" role="status">@licenceBanner</div>
+        }
         <main id="content">
             @Body
         </main>

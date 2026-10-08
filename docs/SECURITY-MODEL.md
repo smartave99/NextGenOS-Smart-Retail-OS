@@ -20,7 +20,7 @@ The layers below do that. They are described with what each one really stops.
 | A licence is a **signed statement** | ECDSA (P-256, SHA-256). The programs hold only the **public** key, so reading a program does not let anyone make a licence. |
 | The private key stays with us | It lives only in the Licence Studio, stored encrypted (scrypt + AES-256-GCM), unlocked by a passphrase kept in the Studio's environment. It is never in this repository or in anything a customer receives. |
 | A copy of the files does not work on another PC | A licence is **activated** for one PC. The activation is tied to a fingerprint of that PC (BIOS, board, disk, system id and CPU, as salted hashes; most must match). A licence file copied to another PC fails the match. |
-| Licences can be switched off | A signed **revocation list** is fetched at check-in. Suspended, revoked and expired licences stop. |
+| Licences can be switched off | A signed **revocation list** is fetched at check-in. Suspended, revoked and expired licences stop (a paid licence past its end date keeps working with a banner: the choice is signed into the licence, decision 15; a trial always stops). |
 | Turning the clock back does not help | The programs remember the latest time they saw (with a code tied to the PC); a clock moved back more than a day stops the program until it checks in. |
 | Work never stops because the internet is down | There is a grace period; offline PCs use an activation code. |
 | It fails closed | Any unexpected problem reading the licence counts as "not licensed". |

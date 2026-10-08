@@ -61,6 +61,51 @@ namespace NextGenOS.Licensing.Tests
         }
 
         [Fact]
+        public void A_paid_licence_past_its_end_date_keeps_working_with_a_banner_and_a_trial_stops()
+        {
+            var vectors = Load();
+            LicenceState Run(string name)
+            {
+                var c = vectors["cases"].First(x => (string)x["name"] == name);
+                return LicenceEvaluator.Evaluate(new EvaluationInput
+                {
+                    LicenceToken = (string)c["lic"], ActivationToken = c["act"].Type == JTokenType.Null ? null : (string)c["act"],
+                    RevocationListToken = c["crl"].Type == JTokenType.Null ? null : (string)c["crl"],
+                    Fingerprint = Fp(c["fp"]), Host = c["host"].Type == JTokenType.Null ? null : (string)c["host"],
+                    Now = (long)c["now"], TrustedKeys = vectors["publicKeys"].Select(k => new TrustedKey((string)k["kid"], (string)k["publicKey"])).ToList(),
+                });
+            }
+
+            var ended = Run("ended_paid_keeps_working");
+            Assert.Equal(LicenceStatus.Ended, ended.Status);
+            Assert.True(ended.IsUsable);
+            Assert.Contains("ended on", ended.Message);
+            Assert.Contains("keeps working", ended.Message);
+            Assert.Equal(ended.Message, ended.Banner);                     // the program shows it across every screen
+            Assert.True(ended.Licence.KeepsWorkingAfterEnd);
+
+            var trial = Run("ended_trial_stops_even_if_it_says_banner");
+            Assert.Equal(LicenceStatus.Expired, trial.Status);
+            Assert.False(trial.IsUsable);
+            Assert.False(trial.Licence.KeepsWorkingAfterEnd);              // a claim cannot make a trial keep working
+            Assert.Null(trial.Banner);
+
+            Assert.Equal(LicenceStatus.Expired, Run("expired").Status);    // a licence that does not say "banner" stops, as before
+            Assert.Equal(LicenceStatus.Valid, Run("not_ended_paid_is_valid").Status);
+            Assert.Null(Run("not_ended_paid_is_valid").Banner);
+            Assert.Equal(LicenceStatus.Revoked, Run("ended_paid_that_is_revoked").Status);   // staff can always stop a licence
+            Assert.Equal(LicenceStatus.Invalid, Run("end_claim_changed_after_signing").Status);
+        }
+
+        [Fact]
+        public void A_trial_that_has_not_ended_shows_how_long_is_left()
+        {
+            var trial = new LicenceState { Status = LicenceStatus.Valid, Licence = new LicenceClaims { Trial = true, Expires = new DateTime(2026, 10, 22, 0, 0, 0, DateTimeKind.Utc).Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).Ticks / TimeSpan.TicksPerSecond } };
+            Assert.Contains("This is a trial. It ends on 22 October 2026", trial.Banner);
+            Assert.Null(new LicenceState { Status = LicenceStatus.Valid, Licence = new LicenceClaims { Trial = false } }.Banner);
+        }
+
+        [Fact]
         public void Grace_counts_the_days_left()
         {
             var vectors = Load();

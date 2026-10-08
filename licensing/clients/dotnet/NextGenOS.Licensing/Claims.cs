@@ -101,7 +101,12 @@ namespace NextGenOS.Licensing
         [JsonProperty("reseller")] public ResellerInfo Reseller { get; set; }
         [JsonProperty("act")] public ActivationTerms Terms { get; set; }
         [JsonProperty("trial")] public bool Trial { get; set; }
+        /// <summary>What happens when the licence has ended (spec 4.1a): "stop" or "banner". Absent means "stop".</summary>
+        [JsonProperty("end")] public string End { get; set; }
         [JsonProperty("white")] public WhiteLabel White { get; set; }
+
+        /// <summary>True when the program goes on working after the end date, with a banner: the licence says "banner" and it is not a trial (a trial always stops).</summary>
+        public bool KeepsWorkingAfterEnd { get { return !Trial && End == "banner"; } }
     }
 
     public sealed class ActivationClaims

@@ -26,7 +26,7 @@ The rule (`CLAUDE.md`, section 6): **every installer carries everything it needs
 
 - The program runtime: **self-contained .NET** (no .NET to install).
 - Every native library: the database engine, the picture and barcode library, the printer libraries.
-- Culture and number formats: the Hub does not depend on the system's ICU (it formats money, dates and numbers itself, from the country pack).
+- Culture and number formats: the Hub carries its own copy of ICU (the language data, `Microsoft.ICU.ICU4C.Runtime`, app-local) and writes money, dates and numbers itself, from the country pack, with the neutral culture; it does not depend on the PC's own language data or settings.
 - For the website package: its own Node.js runtime (an official build, checked against nodejs.org's fingerprint), the built server and static files, the libraries it needs, the database engine (Prisma) and the picture library (sharp, libvips) **for that system**, and nothing else. For the Android app: everything inside the package.
 
 ## What is checked on the packages we build today

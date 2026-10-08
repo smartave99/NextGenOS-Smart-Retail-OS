@@ -22,10 +22,11 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 - **Safer updates**: before an update changes an existing shop's database, the whole file is copied next to it (`shop.db.before-update-….bak`), and the new database step has a tested way back.
 
 ### Changed
+- **The Hub carries its own copy of the language data (ICU)** and no longer runs without it. Nothing has to be installed first. This was needed so that the reader for the older program's SQL Server database can connect at all. Numbers, dates and text are still written the same way on every PC whatever language the PC is set to (the shop's country settings decide how money and dates look). The program's folder is about 30 MB bigger. The Linux package was built, installed and started with it here; the Windows side is checked by the release workflow on a Windows runner.
 - Only the owner has the new permission `ai`; the other roles are unchanged.
 
 ### Not yet
-- **Move from the older POS: the connection to a real SQL Server has never been tried, and in this build it cannot connect.** The SQL driver refuses to work while the Hub runs without the system's language data (how the Hub is built), so *Check* answers that it cannot read the older program's database from this copy yet. The rest (the report, the move, the log) is tested on a small stand-in database. A spreadsheet or CSV source is named but not built. `docs/old-programs/DATABASE.md` says how a person verifies it on a real PC.
+- **Move from the older POS: the connection to a real SQL Server has never been tried.** The Hub now carries its own language data (see *Changed*), which the SQL driver needs, so *Check* can try to connect; it has only been tried against a refused connection on this side, never against a real server. The rest (the report, the move, the log) is tested on a small stand-in database. A spreadsheet or CSV source is named but not built. `docs/old-programs/DATABASE.md` says how a person verifies it on a real PC.
 - Nothing in the shop writes business events yet (sales, voids and stock changes will, from the business map onwards).
 - A durable queue for AI jobs (the waiting line there is lives in memory), removing names before text goes to an online service (an e-mail address or phone number already makes a text personal data), downloading or checking model files, the command-line assistants, cameras, events and the business map (Version 2, phases 2 to 8).
 

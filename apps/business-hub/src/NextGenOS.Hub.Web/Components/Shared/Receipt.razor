@@ -48,6 +48,13 @@
     {
         <div class="r"><span>Change</span><span>@Shop.Money(given)</span></div>
     }
+    @if (Points is { } pts)
+    {
+        <hr />
+        @if (pts.UsedCent > 0) { <div class="r"><span>Points used</span><span>@P(pts.UsedCent)</span></div> }
+        @if (pts.EarnedCent > 0) { <div class="r"><span>Points earned</span><span>@P(pts.EarnedCent)</span></div> }
+        <div class="r"><span>Points now</span><span>@P(pts.BalanceCent)</span></div>
+    }
     @if (View.Document.BalanceMinor > 0)
     {
         <div class="r b"><span>Balance due</span><span>@Shop.Money(View.Document.BalanceMinor)</span></div>
@@ -59,6 +66,10 @@
 @code {
     [Parameter, EditorRequired] public DocumentView View { get; set; } = default!;
     [Parameter, EditorRequired] public ShopContext Shop { get; set; } = default!;
+    /// <summary>Loyalty points this bill earned and used, and the customer's balance; null when there is nothing to say.</summary>
+    [Parameter] public NextGenOS.Hub.Loyalty.LoyaltyService.Summary? Points { get; set; }
+
+    private static string P(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     private string Title => View.Document.Type switch
     {

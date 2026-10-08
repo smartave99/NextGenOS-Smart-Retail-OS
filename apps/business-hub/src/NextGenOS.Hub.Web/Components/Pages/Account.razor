@@ -33,6 +33,29 @@ else
         }
     </div>
 
+    @if (App.Loyalty.Enabled && !supplier)
+    {
+        var points = App.Loyalty.Ledger(Id);
+        <div class="card" id="points-card">
+            <h2>Loyalty points</h2>
+            <p>Points now: <strong id="points-balance">@PointsText(points.LastOrDefault()?.BalanceCent ?? 0)</strong> (worth @Money(App.Loyalty.ValueOf(points.LastOrDefault()?.BalanceCent ?? 0)))</p>
+            @if (points.Count > 0)
+            {
+                <div class="tbl-wrap">
+                <table class="tbl" id="points-statement">
+                    <thead><tr><th>Date</th><th>What</th><th class="num">Points</th><th class="num">Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in points.AsEnumerable().Reverse().Take(30))
+                    {
+                        <tr><td>@Day(p.At)</td><td>@p.Memo</td><td class="num">@(p.PointsCent > 0 ? "+" : "")@PointsText(p.PointsCent)</td><td class="num">@PointsText(p.BalanceCent)</td></tr>
+                    }
+                    </tbody>
+                </table>
+                </div>
+            }
+        </div>
+    }
+
     <div class="card tbl-wrap">
         @if (rows.Count == 0)
         {
@@ -78,6 +101,8 @@ else
         method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods.FirstOrDefault() ?? "cash";
         return Task.CompletedTask;
     }
+
+    private static string PointsText(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     // a customer's account runs by debit (they owe more); a supplier's by credit (we owe more)
     private long Billed(NextGenOS.Hub.Books.BooksService.LedgerRow r) => supplier ? r.CreditMinor : r.DebitMinor;

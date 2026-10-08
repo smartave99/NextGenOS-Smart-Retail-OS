@@ -25,7 +25,7 @@ public sealed record Document(
     int CurrencyDecimals, bool PricesIncludeTax, string? SellerRegion, string? BuyerRegion, bool RoundTotal, bool Registered,
     long SubtotalMinor, long TaxMinor, long TotalMinor, long PayableMinor, long PaidMinor, long TipsMinor, long RetentionMinor, long AdvanceMinor,
     long? TableId, long? ProjectId, long? RefDocumentId, long? UserId, string? Notes, IReadOnlyDictionary<string, string> Meta,
-    long BillDiscountMinor = 0, long BillDiscountPctMilli = 0)
+    long BillDiscountMinor = 0, long BillDiscountPctMilli = 0, long LoyaltyPointsUsedCent = 0, long LoyaltyDiscountMinor = 0)
 {
     /// <summary>True when a discount was given on the whole bill (as an amount or a percent).</summary>
     public bool HasBillDiscount => BillDiscountMinor > 0 || BillDiscountPctMilli > 0;

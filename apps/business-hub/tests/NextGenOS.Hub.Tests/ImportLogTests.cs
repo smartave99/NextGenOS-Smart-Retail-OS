@@ -37,7 +37,7 @@ public class ImportLogTests
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
         f.App.Parties.Create(new NextGenOS.Hub.Catalog.PartyInput { Kind = "customer", Name = "Asha" });
-        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines" }).ToArray();
+        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines", "loyalty_ledger" }).ToArray();
 
         f.App.Db.Rollback(5);
 

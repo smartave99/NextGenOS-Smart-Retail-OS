@@ -117,6 +117,28 @@ else if (tab == "parts")
         <div class="row"><button type="button" class="btn primary" id="save-parts" @onclick="SaveParts">Save</button></div>
     </section>
 }
+else if (tab == "loyalty")
+{
+    <section class="card" id="loyalty-card">
+        <h2>Loyalty points</h2>
+        <p class="muted">Customers earn points on what they buy and use them on a later bill, as money off. Points belong to a named customer, so choose the customer at the till.</p>
+        <div class="stack">
+            <label class="check"><input type="checkbox" id="loy-on" @bind="s.LoyaltyOn" /> Give loyalty points</label>
+            <label for="loy-mode">What an item earns when it has no setting of its own</label>
+            <select id="loy-mode" @bind="s.LoyaltyDefaultMode">
+                <option value="none">Nothing</option>
+                <option value="per">A percent of what the customer pays (before tax)</option>
+                <option value="point">Points for each one sold</option>
+            </select>
+            <label for="loy-value">@(s.LoyaltyDefaultMode == "point" ? "Points for each one sold" : "Percent")</label>
+            <input id="loy-value" inputmode="decimal" @bind="loyaltyValueText" maxlength="10" />
+            <label for="loy-worth">What one point is worth when it is used (in @Shop.CurrencyCode)</label>
+            <input id="loy-worth" inputmode="decimal" @bind="pointWorthText" maxlength="10" placeholder="for example 0.50" />
+            <p class="muted small">Each item can have its own setting under Items. Points used on a bill come off before tax, and a customer cannot use more points than they have.</p>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="save-loyalty" @onclick="SaveLoyalty">Save</button></div>
+    </section>
+}
 else if (tab == "look")
 {
     <section class="card">
@@ -505,6 +527,7 @@ else if (tab == "activity")
     private ShopSettings s = new();
     private string payText = "";
     private string cashierDiscount = "0";
+    private string loyaltyValueText = "", pointWorthText = "";
     private readonly Dictionary<string, string> rates = new();
     private readonly Dictionary<string, string> parts = new();
     private readonly Dictionary<string, bool> features = new();
@@ -520,6 +543,7 @@ else if (tab == "activity")
         yield return ("shop", "Business");
         yield return ("tax", "Tax");
         yield return ("parts", "Parts and words");
+        yield return ("loyalty", "Loyalty points");
         yield return ("look", "Look");
         yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
@@ -540,6 +564,8 @@ else if (tab == "activity")
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
         cashierDiscount = ShopContext.Qty(s.CashierDiscountPctMilli).TrimEnd('0').TrimEnd('.');
+        loyaltyValueText = ShopContext.Qty(s.LoyaltyDefaultValueMilli).TrimEnd('0').TrimEnd('.');
+        pointWorthText = ShopContext.Qty(s.LoyaltyPointValueMilli).TrimEnd('0').TrimEnd('.');
         rates.Clear();
         foreach (var kv in s.RateOverrides) rates[kv.Key] = kv.Value;
         parts.Clear();
@@ -682,6 +708,18 @@ else if (tab == "activity")
         if (s.CashierDiscountPctMilli is < 0 or > 100_000) throw new HubException("cashier-discount", "The cashier's discount limit must be between 0 and 100 percent.");
         App.Shop.Save(s);
         App.Audit.Log(Me.Id, "settings", "shop", null, "business details");
+    }, "Saved.");
+
+    private Task SaveLoyalty() => Run(() =>
+    {
+        if (s.LoyaltyDefaultMode is not ("none" or "per" or "point")) s.LoyaltyDefaultMode = "none";
+        s.LoyaltyDefaultValueMilli = s.LoyaltyDefaultMode == "none" ? 0 : NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(loyaltyValueText);
+        if (s.LoyaltyDefaultMode != "none" && s.LoyaltyDefaultValueMilli <= 0) throw new HubException("loyalty", "Please type the percent or the points as a number above nothing, like 5 or 2.5.");
+        if (s.LoyaltyDefaultMode == "per" && s.LoyaltyDefaultValueMilli > 100_000) throw new HubException("loyalty", "A percent cannot be more than 100.");
+        s.LoyaltyPointValueMilli = NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(pointWorthText);
+        if (s.LoyaltyOn && s.LoyaltyPointValueMilli <= 0) throw new HubException("loyalty", "Please say what one point is worth, like 0.50, so that points can be used.");
+        App.Shop.Save(s);
+        App.Audit.Log(Me.Id, "settings", "loyalty", null, s.LoyaltyOn ? "loyalty points on" : "loyalty points off");
     }, "Saved.");
 
     // ---- tax ----------------------------------------------------------------------------------------------------------------------

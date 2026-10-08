@@ -115,6 +115,18 @@
                 }
             }
 
+            @if (App.Loyalty.Enabled && customer is not null)
+            {
+                var balance = App.Loyalty.Balance(customer.Id);
+                <div class="row wrap loyalty-row" id="loyalty-row">
+                    <span>Points: <strong id="points">@PointsText(balance)</strong> (worth @Money(App.Loyalty.ValueOf(balance)))</span>
+                    @if (balance > 0)
+                    {
+                        <input id="use-points" class="disc-in" inputmode="decimal" aria-label="Points to use" placeholder="Points to use" value="@(cart.Document.LoyaltyPointsUsedCent > 0 ? PointsText(cart.Document.LoyaltyPointsUsedCent) : "")" @onchange="e => UsePoints(e.Value?.ToString())" />
+                    }
+                </div>
+            }
+
             <h3>Payment</h3>
             <div class="pay-methods" role="group" aria-label="Way of paying">
                 @foreach (var m in Shop.PaymentMethods)
@@ -296,7 +308,7 @@
     {
         if (Me.Can(Perm.Discount) || cart?.Result is not { } result) return;
         var gross = Shop.Minor(result.Totals.Gross);
-        var off = Shop.Minor(result.Totals.Discount);
+        var off = Shop.Minor(result.Totals.Discount) - cart.Document.LoyaltyDiscountMinor;     // points are the customer's own: they do not count against a cashier's limit
         var limit = Shop.Settings.CashierDiscountPctMilli;
         if (gross > 0 && (decimal)off * 100_000m > (decimal)limit * gross)
         {
@@ -315,6 +327,15 @@
             KeepWithinLimit(() => cart = App.Documents.UpdateLine(cart!.Document.Id, line.Id, discountPctMilli: beforePct, discountAmountMinor: beforeAmount));
         });
     }
+
+    private static string PointsText(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private void UsePoints(string? text) => Run(() =>
+    {
+        var milli = NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(text);
+        if (!string.IsNullOrWhiteSpace(text) && (milli <= 0 || milli % 10 != 0)) throw new HubException("loyalty", "Please type the points as a number, like 20 or 12.5.");
+        cart = App.Documents.SetLoyaltyPoints(cart!.Document.Id, milli / 10);
+    });
 
     private void SetBillDiscount(string? text)
     {

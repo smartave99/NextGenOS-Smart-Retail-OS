@@ -1,6 +1,6 @@
 # Old Windows POS, study 04: users, printing, backup, settings, language, messages, small CRM, branches, extras
 
-**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A, B.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
+**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A, B, C, D, E, F, G.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
 
 ## What to know first (10 lines)
 
@@ -358,15 +358,495 @@ The layouts were not opened. To know exactly which field a given style prints, a
 - The layouts and field lists of all `.rpt` files; the cipher price code; where the layout designer gets its units.
 - How `Print_WhatsApp` makes its file (that is topic F).
 
-## C. Backup and restore, database tools (not yet written)
+## C. Backup and restore, database tools
 
-## D. Shortcut keys and the till's settings screens (not yet written)
+Status of this topic: written. Covers manual backup, restore, "auto backup" (it runs only when someone logs out), the cloud (Google Drive) copy, SQL Server connection setup, and the data-moving tools (Excel import and export, staff import launcher, online synchronisation). Company creation and deletion are in H.
 
-## E. Language conversion and transliteration (not yet written)
+### C.0 The five things to know
 
-## F. Messages: WhatsApp, SMS, email, chat, broadcast (not yet written)
+1. **Backup is the SQL Server `BACKUP DATABASE` command run by the SQL Server itself.** The program only sends the text `backup database <name> to disk='<path>' with format`; the path is on the **server's** disk, not the PC the person sits at (`B/frmMainMenu.vb:8754`). If SQL Server is on another PC, "Save as" shows that PC's disks only by luck of the shared drive letters. The Hub's data is one file the program can copy itself.
+2. **"Auto backup" is not automatic in time: it runs only at logout.** There is no timer. Closing the main window is blocked with "Please Logout the application" (`B/frmMainMenu.vb:8915`), so the backup is tied to the logout menu. A shop that switches the PC off without logging out has no backup that day.
+3. **The fixed place is `D:\SBPE_DATA\`.** One path in the code is the drive D: and a folder named after the older vendor (SBPE). A PC with no D: drive gets an error box at every logout (`B/frmMainMenu.vb:8788`, `13829`). **Do not port the name or the drive.**
+4. **The cloud backup sends the whole database to a Google Drive.** Through a compiled library `GDClient.dll` that is **not in the repository** (`SmartAvenue99 POS.vbproj:114`, `Original_Binaries\GDClient.dll`). Whose Drive account it is, and the key it uses, are inside that library: a secret is stored there and cannot be read here. That is every sale, customer, supplier and price leaving the shop (compare `CLAUDE.md` section 15 and decision 11). It must be off unless the owner turned it on; in the old program it is a status in one table.
+5. **Restore overwrites without a safety copy.** It forces the database to single-user mode (throwing every other connection off, `ROLLBACK IMMEDIATE`) and restores `WITH REPLACE` from any `.bak` file chosen, after one yes/no warning that the names "should be the same" (`B/frmMainMenu.vb:10956-11010`). It takes no copy of the current data first, does not check that the file is a backup of this shop, and does not verify the file. **The Hub must do the opposite** (decision 11: a few clicks, a copy first).
 
-## G. Leads, follow-up, support, reminders (not yet written)
+### C.1 What a person sees
+
+| Screen or menu | What it does |
+|---|---|
+| Menu: Backup | A save-file dialog (file name = database name + ".bak"), then the server writes the backup there; writes "Sucessfully Performed the Backup" to `Logs`. |
+| Menu: Restore | Warning, open-file dialog (`*.bak`), restore as above; then reads the company name again and updates the master list. Refused in "Trial" mode (the company name shown is "Trial"). |
+| Auto Backup Configuration (`frmAutobackup`) | One row: destination folder path (a "Select Folder" button), "Auto Offline Backup Status" (Enable/Disable), "Auto Cloud Backup Status" (Enable/Disable). Save, Update, Delete, New. Only one row is allowed ("Record Already Exists, please update the information only", `B/frmAutobackup.vb:666`). |
+| Menu: Cloud Backup Management (c40) | Needs internet and not "Trial" mode; opens `FrmGDClientSample`, a list of the shop's backups on the Drive (with a browse button and a grid), the screen from which a cloud restore (`Restoredata`) is started. Not read in detail (its logic is inside `GDClient.dll`). |
+| SQL Server Setting (`frmSqlServerSetting`) | Server name (a "Search Servers" link lists servers on the network), SQL user name, SQL password, "Test Data Base Connection", "Save SQL Server Setting". Writes `SQLSettings.dat` next to the program: three plain lines, server, user, password. A secret is stored here. |
+| Staff import launcher (`frmPostImport`) | Labelled "This page only for NextGen OS staff software updation purpose": seven buttons that open the Excel import screens for category, sub-category, customers, suppliers, products, customer outstanding, supplier outstanding. |
+| Excel import and export | `frmExportImportExcel_Customers`, `_Suppliers`, `_Salesman`, `_OpeningStock`, `_ProductsRecord` (+`1`), `frmImportPro` (products): each has "Download Sample Format", upload an `.xlsx` or `.xls` (the customer, supplier, salesman, opening-stock and product screens use the ClosedXML library for `.xlsx` and an OLE DB driver for old `.xls`, which need no Excel; **only `frmImportPro` (products) uses Microsoft Office interop, so Microsoft Excel must be installed for that one**), a grid to check, then save. The two outstanding imports ask for the `sadmin` password first (A.6). |
+| Manual Data Synchronization (`frmAuto_Migrate`, with the engine `MigratePendingRows` in the same file and a near-copy in the main menu, `B/frmMainMenu.vb:10120` area) | Admin only. "Start/Stop Auto Data Synchronization" and a "Last synchronization (date and time)". It copies changed rows of many tables from the shop's SQL Server database to a **second, online SQL Server database** (the `Online_DBName` of the shop in the company master list, reached through `RaintechMaster_Online_connection`), matching rows by a `SyncGuid` column and a `Version`, marking local rows `is_remote = 1`, and deleting remote rows whose guid is no longer local (`B/frmAuto_Migrate.vb:371-580`). A table `AutoMigrationControl(ID, IsEnabled, UpdatedOn, UpdatedBy)` holds the on/off. Part of the Android-app and multi-branch feature (c36); see F and H. |
+| Google Sheet setting and report (`frmGSheet_Setting`, `frmGSheet_Report`) | Spreadsheet id, "IsEnabled", a G_Id; a report called "Google Sheet Customer" with a From date. It sends customer data to a Google Sheet. See F. |
+| Logs (`frmLogs`) | The audit list (A.8). |
+
+### C.2 Tables
+
+| Table | Columns | Meaning |
+|---|---|---|
+| `Autobackup` | `ID, c1, c2, c3` | `c1` = destination folder, `c2` = "Enabled"/"Disabled" for the offline backup, `c3` = same for the cloud backup. Read into the main menu's text boxes `TextBox1` to `TextBox3` at sign-in (`Autobackupstatusdisplay`, `B/frmMainMenu.vb:12543`). The screen's own switch for each is a drop-down with "Enable"/"Disable" but the code compares with "Enabled": the saved value must therefore be the word "Enabled" (how the drop-down value turns into that word was not followed). |
+| `AutoMigrationControl` | `ID, IsEnabled, UpdatedOn, UpdatedBy` | On/off of the online synchronisation (one row, `ID = 1`). |
+| `GSheet_setting` | `ID, spreadsheetId, gid, IsEnabled` | The Google Sheet that receives customer rows; only one row is enabled at a time (`B/frmGSheet_Setting.vb:510`, `586`). |
+
+### C.3 The flows, step by step
+
+**Manual backup** (`B/frmMainMenu.vb:8754-8785`): read the database name from `TempDBSettings.dat`; show a save dialog; if the person picks a file, run `backup database <name> to disk='<file>' with format`; write a `Logs` line and a message. The database name and the file name are put into the SQL text by joining strings; a file name with a quote in it breaks or changes the command. The database name comes from a file, not typed, so it is not an injection source; the file name is. **Fix** (use the Hub's own copy; parameters).
+
+**Logout, two variants.** Two main-screen layouts have two near-copies of the logout (`btnTA0_Click` at `:11576` and `btnAT0_Click` at `:13722`). Both first ask "Do you really want to logout from application?". Then:
+
+| Variant | Offline status | Cloud status | What happens |
+|---|---|---|---|
+| A (`:11576`) | not "Enabled" | any | Run the cloud step if the cloud is enabled (`cloud()` checks its own status); ask "Do you want take offline backup database before logout?"; if yes, `Backup()` (a save dialog). Then exit. |
+| A | "Enabled" | not "Enabled" | `autoBackup()`: write `D:\SBPE_DATA\<db>.bak` silently. Exit. |
+| A | "Enabled" | "Enabled" | the cloud step only (`cloud()`: write to `<program folder>\SBPE_DATA\`, run `icacls ... /grant Users:(OI)(CI)RW` on that folder through `cmd.exe`, back up, upload to Drive, show the file id, then **delete every file** in `D:\SBPE_DATA\`). No folder copy. |
+| B (`:13722`) | any | "Enabled" and internet | `cloudbackup_anil`: empty `D:\SBPE_DATA`, back up there, upload, show the file id, empty the folder again; then also write the offline copy to the configured folder (`TextBox1`, name `<db>.bak`, creating the folder if missing). |
+| B | "Enabled" | not "Enabled" | the offline copy to the configured folder. |
+| B | "Enabled" | no internet | ask first, then the offline copy. |
+
+Every offline copy file has the same name (`<db>.bak`), so each logout **overwrites yesterday's backup**: there is no history of backups, only the last. A bad day's data can replace a good backup.
+
+**Restore** (`:10956`): described above. A second form of it (`Restore1`, `:11005`) reads the server's default data path (`SERVERPROPERTY('InstanceDefaultDataPath')`) so the restore can move the files there, which suggests restoring a backup made on another PC; and a third (`Restoredata`, `:11062`) is the "cloud restore" without the trial check and without updating the master list.
+
+**Connection setup** (`frmSqlServerSetting`): test opens a connection with the typed server, user and password to `master`; save writes the three lines to `SQLSettings.dat`. `CreateDB` (a separate sub) can make the demo database using Windows login (`Integrated Security=True`). The connection string for each later statement is rebuilt from these files each time (`B/ModCS.vb`).
+
+**Excel import** (for example `frmImportPro`): ask for a file, refuse anything but `.xls`/`.xlsx`, read it with Excel, check each row, show errors in a list, then insert. The detailed column maps are in the screens' "sample format" files; not read.
+
+### C.4 Quirks and probable bugs (keep or fix?)
+
+1. Logout-only backup; one file overwritten each time; server-side path. **Fix:** the Hub makes a dated copy on a schedule to a place the owner chooses, and keeps several (decision 11: every night).
+2. `D:\SBPE_DATA` and the delete-all of that folder after upload (it removes any other file a person put there). **Fix.**
+3. `icacls ... grant Users` gives every Windows user write access to the backup folder (`B/frmMainMenu.vb:8830`; the `runas` setting is ignored because `UseShellExecute = False`, so it works only if the program already runs as an administrator). **Fix:** never loosen folder rights.
+4. Cloud copy goes to an account hidden in a binary. **Fix:** off by default; when the owner turns it on, say in plain words what goes out and where, encrypt it, and keep the key with the owner (decision 11; `CLAUDE.md` section 15).
+5. Restore: no copy first, no verify, no check of which shop the file belongs to, kicks everyone off. **Fix.**
+6. One import screen (`frmImportPro`) needs Microsoft Excel on the PC (Office interop); the others use ClosedXML and OLE DB. **Fix:** read `.xlsx` with a library that does not need Office (the Hub already reads and writes CSV for reports; check the licence of any library before adding, CLAUDE.md section 3).
+7. Errors are shown as a raw message box with the SQL error text. **Fix** (plain words).
+8. The status words "Enable"/"Disable" in the drop-down and "Enabled" in the comparison. **Not understood** how they are joined.
+
+### C.5 Worked test examples (by hand; none run)
+
+- **TV-C1 (backup command).** Database name `ShopA` (from `TempDBSettings.dat`), chosen file `E:\Back\ShopA.bak`. Text sent to the server: `backup database ShopA to disk='E:\Back\ShopA.bak'with format` (no space before `with`; SQL Server accepts it). The command runs on the server: the file lands on the server's E: drive.
+- **TV-C2 (the second day).** Offline status "Enabled", folder `F:\Safe`: Monday logout writes `F:\Safe\ShopA.bak`; Tuesday logout runs the same statement `WITH FORMAT`, which replaces the media set, so Monday's backup is gone and only Tuesday's remains.
+- **TV-C3 (D: missing).** Offline "Enabled", cloud "Disabled", variant A, PC without D: the statement `backup database ShopA to disk='D:\SBPE_DATA\ShopA.bak'` fails on the server; the program shows the server's error text and still logs out.
+- **TV-C4 (restore).** The person restores `old.bak` made from database `ShopB` while connected to `ShopA`: the program only shows the "names should be the same" warning; it then runs `RESTORE DATABASE ShopA FROM disk='...' WITH REPLACE`. If `old.bak` holds a different company, `ShopA` now holds the other company's data and the master list's company name is updated from it.
+- **TV-C5 (what leaves the shop).** Cloud status "Enabled" and internet present at logout: a full copy of the database, named `<db>.bak`, is uploaded; the number of rows is whatever the database holds (all sales, customers, suppliers). Nothing of this is filtered.
+
+### C.6 What the Hub has and how it differs
+
+- **Hub:** only a safety copy before a schema update (`VACUUM INTO`, `shop.db.before-update-<from>-to-<to>.bak`, `BackupNow(label)` exists in `HubDb`), a rollback tool for the person who looks after the PC, and CSV export of reports. **No nightly backup, no restore screen, no history, no "is the last backup good?" status** (decision 11: Not built). `docs/old-programs/06-hub-map.md` 3.4 says the same.
+- **Differences that need the owner's word:** the old program uploads to a Google Drive when asked; decision 11 says the online copy is **encrypted, off until the owner turns it on, with a plain-words notice** and the key stays with the owner. The old cloud copy is the opposite on all four points.
+- **Port in this order (smallest safe):** (1) a "Back up now" button and a "Restore from a copy" screen in Settings for the owner, using `HubDb.BackupNow` and a restore that first makes a copy of the current file and checks the chosen file opens as a Hub database of the same shop (tests: back up, change, restore, data is as at backup; restore of a wrong file is refused); (2) a nightly job through `HubApp.Upkeep` to a folder the owner picks, keeping the last N copies with the date in the name, and a status on the Today page ("last backup: ... worked/failed"); (3) the optional encrypted online copy (not before the owner decides the provider); (4) Excel/CSV import of items and customers for onboarding (the old "staff import launcher") only as part of the move-from-old-POS tool (`docs/old-programs/DATABASE.md`).
+
+### C.7 Not understood (topic C)
+
+- Where `GDClient.dll` gets its Google account from, and how files are named and listed in Drive; what the "Cloud Backup Management" screen lists.
+- Whether `frmMigratedb_auto` (1,166 lines) and `frmFileupload` are used at all (no caller found in the main menu).
+- What the helper programs `MoneyLeaf.exe` and `RECEIPT_PRINTER.exe` are: the logout code kills any process by those names and deletes the files from the program folder (`B/frmMainMenu.vb:11570-11600`). They are not in this repository.
+- How the Enable/Disable drop-down turns into the word "Enabled" in `Autobackup`.
+- The exact Excel column maps of the import screens (the "sample format" files).
+
+## D. Shortcut keys and the till's settings screens
+
+Status of this topic: written. Covers the function keys of the four till screens, the shortcut help list, and every settings screen that changes how the till behaves (what it is, its table and column, its effect). The tax and total arithmetic that some of these switches drive is in `docs/old-programs/01-selling-buying-stock.md`; here only the switch is described.
+
+### D.0 The five things to know
+
+1. **The same key does different jobs in different tills.** F2 is **Save** in the classic till (`frmPOS`) but **Add** in the touch tills (`frmPOSNew`, `frmPOSNewTuch`, `frmPOSTouch`); F12 is **Save** in `frmPOSNewTuch`/`frmPOSNew` but **payment mode** in `frmPOSTouch`. A cashier trained on one till presses the wrong key on another (D.2).
+2. **The shortcut "help" list is only a list.** The table `tbl_formwise_shortcut_key(form_name, shortcut_key, details)` is shown by the help button of a till (`frmFormwise_Shortcutkey`); the keys that really work are written in each till's key handler, so the list can disagree with the code (`B/frmFormwise_Shortcutkey.vb:42`, `B/frmPOS.vb:13810`).
+3. **There is no settings screen for tax rules; there are about 20 small ones.** Each is a table with one row (or a few) and one or two columns, read when the till opens: round-off, tax mode, default tax mode of new items, default loyalty, default item discount, default category/unit/GST, cursor start field, payment modes shown, invoice code prefix and suffix, cipher price code, product-screen menu switches. Most store the words "Yes"/"No" or "Enable"/"Enabled" as text and compare text (D.3).
+4. **Until a row exists, the till uses a built-in default** (round-off No; tax "GST"; invoice prefix "GST" and suffix "<year>/<year>"). Those built-in defaults are India words in code (CLAUDE.md section 8: they must come from a country pack in the Hub).
+5. **Several rights are default-deny, which is good.** A Sales Person with no `CashierSetting` row cannot change a line discount, a bill discount, a rate or the invoice date (A.4, D.3 item 1). Keep that default.
+
+### D.1 What a person sees
+
+The settings are spread over the Settings menu (c29) and the main screen. The screens: User Permission Settings (`frmOtherSettings`, cashier rights), Auto Roundoff, Tax Type (`frmTaxSetting`), Prefix and Suffix Invoice Code (`frmInvCode`), Terminal Setting (`frmTerminalSetting`, also in B), Pos Cursor Setting, Multi-payment mode settings, Product Default Setting (`frmProductDefault`), Cipher Code Setting (`frmCipherSetting`), the product-menu switches (`frmProductSeting`, `frmBulkProductSeting`), Loyalty Point Validation (`frmLoyaltyvalid`), Loyalty default (`frmLSetDefault`), Kitchen Section (`frmKitchen_Section`), E-Way Bill settings (`frmEwaysetting`, `frmEwayBillSetting`), SMS and e-mail settings (F), the E-Com configuration (I), System Info (`frmSystemInfo`, a read-only viewer of this PC's processor, motherboard and public IP; "Save to file" writes `temp.txt`; the public IP is fetched over plain HTTP from an outside site, `B/frmSystemInfo.vb:508`).
+
+### D.2 The function keys, till by till (from the key-down handlers)
+
+| Key | `frmPOS` (classic) `:13810` | `frmPOSNew` `:15120` and `frmPOSNewTuch` `:16279` | `frmPOSTouch` |
+|---|---|---|---|
+| F1 | New bill | New | New |
+| F2 | **Save** | **Add** (add the line) | **Add** |
+| F3 | Update (a saved bill) | Update | Update |
+| F4 | Delete | Delete | **Cash sale** |
+| F5 | Get data (retrieve a bill) | Get data | Get data |
+| F6 | Print | Print | Print |
+| F7 | Scan items | **Cash** (payment row) | Cash |
+| F8 | Select salesman | Credit card | Credit card |
+| F9 | Customer selection | Debit card | Debit card |
+| F10 | Product selection | Wallet | Wallet |
+| F11 | Add | Credit customer | Credit customer |
+| F12 | Add (second add button) | **Save** | **Payment mode** |
+| Ctrl+P | focus the product search box | focus the product box in `frmPOSNew`; in `frmPOSNewTuch` also the product-selection button (Ctrl+P is handled twice) | focus the product box **and** click product selection (two handlers for one key) |
+| Ctrl+C | focus the customer box | focus the customer box | focus the customer box **and** click customer selection (two handlers) |
+| Ctrl+S | | scan items | scan items |
+| Ctrl+B | | select salesman | select salesman |
+| Esc | "Do you want to close?" | same | same |
+| Others | letters and digits type into the product box while the result list is open (`:16857-17260`) | Ctrl+W webcam, Ctrl+H last-sold history, Ctrl+M, Ctrl+U | Ctrl+Q quantity change dialog, Ctrl+D discount dialog, Ctrl+A |
+
+The table is read from the handlers; `frmPOSNewTuch_Quotation`, `_Service`, `_StockInward`, `_StockTransfer` are copies of the touch till and were assumed to share its keys (not read key by key). The classic till also calls a helper (`RetailCheckoutLayouts.HandleShortcut`, `B/RetailCheckoutLayouts.vb:429`) that only switches tab pages: it belongs to the 2026 look-and-feel rewrap of the recovered program, not to the original and not to port.
+
+### D.3 Every setting that changes behaviour (table, column, effect)
+
+| # | Setting (screen) | Table and column | Values | Effect |
+|---|---|---|---|---|
+| 1 | Cashier rights (`frmOtherSettings`) | `CashierSetting(ID, UserID, ATEID, ATGBD, ATCR, INVD)` | "Yes"/"No" each | `ATEID` allow to edit item discount, `ATGBD` allow to give bill discount, `ATCR` allow to change rate, `INVD` allow to change invoice date. Only users of type Sales Person are offered (`:263`). The till reads them at open (`GetSalesPersonSettings`, `B/frmPOS.vb:15869`) and enables or disables the discount box, the bill-discount box, the rate box and the date picker (`CheckValidations`, `:14793`); Admin and Moderator are always allowed. No row, nothing allowed. |
+| 2 | Auto Roundoff | `Autoroundoff(ID, c1)` | "Yes"/"No" | One row only (`Select count(*) ... Having count(*) >= 1` blocks a second, `B/frmAutoRoundoff.vb:491`). "Yes" ticks the till's round-off box (`frmPOS.vb:8020`); the total is then rounded to a whole number, half to even (01 section 1.5). |
+| 3 | Tax Type | `Setting(PurchaseTax, SalesTax)` | "GST" / "NON GST" | A shop-wide mode for purchases and for sales; "NON GST" puts zero tax on every line and uses its own invoice series "SINV-" (01 section 1.2). Also a "Select GST/NON GST" pop-up (`frmGstNonGst`) in the tills. |
+| 4 | Default tax type of new items (`frmProductDefault`) | `Defaulttaxtype(stax_type, ptax_type)`, one row `id = 1` | "Inclusive", "Exclusive", "Exempt GST", "No Taxes" | What a new product gets as its sale and purchase tax mode (`B/frmProductDefault.vb:475`, `835`, `848`; the quick-add product in the touch till reads them, `frmPOSNewTuch.vb:28661`). |
+| 5 | Default loyalty of new items | `tbl_loyalty_setting(id=1, mode, points)` | mode "per" or "point"; points a number | The `Product.loyality_mode` / value a new product starts with (`frmProductDefault.vb:866`, `frmPOSNewTuch.vb:28676`, and the Excel product import). "per" = percent of the line, "point" = points per unit. Compare 02 section A1.6. |
+| 6 | Loyalty point validation | `Lpointstatus(ID, c1, c2, c3)` | `c1` point (percent of the bill), `c2` status "Enable"/..., `c3` "Calculate on" (WITH GST or not) | The older, percent-of-bill scheme used by the classic till (`B/frmPOS.vb:7438`). One row only. |
+| 7 | Default discount | `tbl_DiscountDefault(id=1, Rate)` | a percent | The discount a new product starts with (`frmProductDefault.vb:434`, `883`). |
+| 8 | Default sub category, unit, GST rate | `SubCategory.IsDefault`, `UnitMaster.IsDefault`, `TaxCat.IsDefault` | "Yes"/"No" | Exactly one row of each is "Yes" (the screen sets all to "No" and then one to "Yes", `:700-726`; the unit is matched by its text). The product entry screen pre-fills them (`frmProduct.vb:5887`). Note the three statements are sent as one text with two commands, not in a transaction. |
+| 9 | Bill style / barcode style default | `BillPreview` / `PosPrinterSetting.BillStyleId`; `BarcodePreview.is_active` (and `GorillaBarcodePreview` for a second product form) | style id | Which bill and label template is used (B.3, B.5). |
+| 10 | Pos Cursor Setting | `tbl_form_cursor(id, form_itemname, is_default)` | "Product Name", "Barcode", "Customer", "Mobile Number" | Which box has the focus when a touch till opens (`cursor_default`, `frmPOSNewTuch.vb:16706-16735`). One default at a time. Used by the touch tills only. |
+| 11 | Payment modes shown | `tbl_BillPaymentMode(id, Mode_Index, paymentmode, amount, status)` | `status` 1/0 | The multi-payment screen lists the modes with `status = 1` in `Mode_Index` order, then two fixed rows "By Return" and "Change" (`B/frmMultiBillPayment.vb:184`, `frmMultiPaymentModeSettings.vb:81-120`). A tick in the settings grid saves at once. Saving also reloads the payment screen. The modes themselves (16 of them, 01 section 2.1) are rows in this table. |
+| 12 | Invoice prefix and suffix | `Invcode(ID, Code, c1 ... c21)` | text | 11 document types x (prefix, suffix) = 22 values. By the code: `Code` = sale prefix, `c1` to `c9` = prefixes of purchase, sale return, purchase return, quotation, purchase order, receipt, payment, income, expense (expense prefix `c9` read by `frmBrokerCalc.vb:262`), `c10` = sale suffix (`frmPOS.vb:7970`), `c11` to `c19` = the matching suffixes (expense suffix `c19`), then `c20` and `c21` by elimination the estimate prefix and suffix. **The mapping of `c1` to `c8` and `c11` to `c18` to document names is from the on-screen order and the two columns that were checked; not checked column by column.** |
+| 13 | Terminal and printer | `PosPrinterSetting` | see B.2 | Printer, drawer, scale, displays, UPI id, brand name, "show images" per PC. |
+| 14 | Cipher price code | `CipherCode(ID, c0 ... c14)` | `c0` to `c9` the code character for digits 0 to 9; `c10`, `c11` retail and wholesale price +/-; `c12`, `c13` the first and second dummy numbers; `c14` Activate "Yes"/"No" | Builds the coded price printed on cipher labels (D.5). |
+| 15 | Product-screen menu switches | `product_menu_setting(menu_name, is_active)`, `Bulk_product_menu_setting(menu_name, is_active)` | 1/0 | Which fields or buttons the product entry and the bulk editor show. The bulk editor reads the flag **inverted** (`case when is_active=0 then 1 else 0`, `B/frmProductBulkUpdate.vb:768`). |
+| 16 | Kitchen / order sections | `Kitchen(KitchenName, Printer, IsEnabled)`; `Product.Kitchen` | "Yes"/"No" | A product's section and the printer for its slip (B.3). A shared network printer is typed as `\\Server\Printer`. |
+| 17 | E-way bill | `EwayBill(c1)` "Enable"; `EwayBillAPISetting(ID, API URL, IsEnabled, IsDefault, Username, password)` | | Turns the e-way bill field on the till and keeps the API address and **login** of the government-portal service. A secret is stored here (the grid even shows the password column). See `docs/old-programs/03-india-tax-and-staff.md`. |
+| 18 | Auto backup | `Autobackup` | | C.2. |
+| 19 | User control (51 switches) | `UserControl` | | A.4. |
+| 20 | Language | `Language_set`, registry `DefaultLanguage` | | E. |
+
+### D.4 Quirks and probable bugs (keep or fix?)
+
+1. **Keys differ by till** (D.0 item 1). **Fix:** one key map for the Hub's sell screen, shown on the screen, stored as data so a customer can change it (CLAUDE.md section 8: a visible hint like "F2" is customer-visible).
+2. **Settings kept as the words "Yes"/"No"/"Enabled"/"Disable"** and compared with text, in several spellings (C.4 item 8). A typo or a changed word silently turns a setting off. **Fix:** a real on/off value.
+3. **One-row tables enforced by a count check in the screen, not by the table.** Two screens open at once can add two rows; which one wins when reading (`Read` takes the first row returned, with no `ORDER BY`) is not defined. **Fix.**
+4. **Defaults for the shop are India words in code:** "GST", the suffix built from the two year boxes ("25/26" style), the NON GST series "SINV-". **Do not copy;** the Hub gets them from the country pack and the customer's profile.
+5. **`Setting`, `Defaulttaxtype` and the others are read on every till open** with a new database connection each time and no cache, with errors shown as raw message boxes.
+6. **The "particulars", "language" and "copy" tick boxes of the till are not saved settings** (they are per-bill toggles), so a cashier sets them again every bill.
+7. **Cipher code can lose information** (D.5, TV-D4).
+8. **Renaming a user detaches the user's `CashierSetting`** (it is keyed by the user id text, A.9 item 7).
+
+### D.5 The cipher price code, step by step
+
+Used on cipher labels so the customer cannot read the shop's price code. When "Activate" (`c14`) is "Yes", the retail code starts from the selling price plus the first dummy number (`c12`), and the wholesale code from the wholesale price (the column `Product.ReorderPoint`) plus the second dummy (`c13`) (`B/frmProduct.vb:5519-5525`, `5678-5681`; a rounded variant adds the dummy to `Round(price)`, `:5602`). With a tick box "Num Code / Char Code" the text is then passed through a loop (`:5535-5600`): up to 1000 times, look for the first digit in the order 0, 1, 2, ... 9 that is still in the text and replace **one** occurrence of it with the code character stored for that digit; stop when no digit is left. Result saved in `Product_OpeningStock.RCipher` and `WCipher`. If the table has no row, each digit maps to itself (0 to 0, ..., 9 to 9) and "Activate" is "No".
+
+### D.6 Worked test examples (by hand; none run)
+
+- **TV-D1 (invoice number).** Prefix `Code` = "INV", suffix `c10` = "25/26"; the last row of `SaleGST` has ID 41. Next sale number = "INV" + "-" + "0042" + "-" + "25/26" = `INV-0042-25/26`. With no `Invcode` row: prefix "GST", suffix "<F1>/<F2>" (the two year boxes of the till), so `GST-0042-25/26` if the boxes say 25 and 26. The number is `ID + 1`, padded to 4 digits up to 9999 (`GenerateIDGST`, `B/frmPOS.vb:7887-7940`; at 10 000 and above the padding code was not read, assumed none). For NON GST: `SINV-<NoTax counter>-<suffix>`.
+- **TV-D2 (cashier rights).** Sales Person "ravi" has a row with `ATEID = "Yes"`, `ATGBD = "No"`, `ATCR = "No"`, `INVD = "No"`: the line-discount boxes are editable; the bill-discount box, the rate box and the invoice date are disabled. With no row: all four disabled. An Admin: all four enabled.
+- **TV-D3 (round-off switch).** `Autoroundoff.c1 = "Yes"`, total 100.50: rounded 100.00 (half to even), round-off -0.50, grand total 100.00. With "No" or no row: 100.50. (The Hub rounds half up and would give 101.00, 01 vector R.)
+- **TV-D4 (cipher).** Mapping 0 to "Z", 1 to "A", 5 to "X", others default; price 150 with Activate "No": text "150". Iteration 1 replaces the "0": "15Z"; iteration 2 "1": "A5Z"; iteration 3 "5": "AXZ". Result `AXZ`. **Loss case:** mapping 1 to "5" and 5 to "X"; price 15: iteration 1 (digit 1) gives "55"; iteration 2 (first "5") gives "X5"; iteration 3 gives "XX". The price 15 and the price 55 both give `XX` and the code cannot be read back. **Fix:** map all digits at once (one pass) and refuse a code that uses a digit.
+- **TV-D5 (cursor).** `tbl_form_cursor` has "Barcode" as default: a touch till opens with the cursor in the barcode box. With none marked default: no focus is set.
+- **TV-D6 (payment modes).** Modes with `status = 1` are listed in `Mode_Index` order; the two rows "By Return" and "Change" are always appended and read-only (`:184-205`).
+
+### D.7 What the Hub has and how it differs
+
+- **Hub:** one JSON object `ShopSettings` in `settings` row `shop` (`Shop/ShopSettings.cs`): `PricesIncludeTax`, `TaxRegistered`, `RoundTotal`, `AllowNegativeStock`, `CashierDiscountPctMilli` (the biggest discount a cashier may give, as a percent of the bill; owners and managers have no limit), `ReceiptFooter`, loyalty (`LoyaltyOn`, `LoyaltyDefaultMode` "none"/"per"/"point", value, point value), `PaymentMethods`, feature switches, vocabulary and rate overrides. Settings tabs: Business, Tax, Parts and words, Look, Printers, People, AI, Licence, Activity. Printers as profiles (B.8). Roles are fixed (A.11).
+- **Hub has no function-key map** on the sell screen (key handlers exist only on search and scan inputs).
+- **Differences:** the old rights are four yes/no flags per Sales Person; the Hub has one limit (a percent) for every cashier, and no rate-change or back-date right (a Hub bill is dated by the server clock). The old switch "NON GST" is the Hub's `TaxRegistered = false`. The old default tax mode per item maps to the per-document `PricesIncludeTax` (the Hub has no tax mode per item, `06-hub-map.md` 4.2). Default category, unit, GST and discount for a new item have no Hub setting (the Hub's item form has its own defaults from the pack). Invoice prefix and suffix: the Hub numbers documents itself (`06-hub-map.md` 4.5); a customer-chosen prefix and a year suffix are not offered.
+- **Port in this order (smallest safe):** (1) three more permissions or limits: change price, back-date, bill discount beyond the percent limit, with tests that a cashier without them is refused **in the service**; (2) a keyboard map for the sell screen as data in the profile, with a hint line on screen, one map for all counters; (3) invoice prefix/suffix per document type as customer settings with the country pack's neutral default (no "GST"); (4) a "starting values for a new item" screen (tax mode, discount, loyalty, unit, category); (5) the cursor start field and the list of payment methods shown, both already near what the Hub has; (6) drop the cipher code unless a customer asks, and if so, one pass per digit and a check that the code uses no digit.
+
+### D.8 Not understood (topic D)
+
+- The exact mapping of `Invcode.c1` to `c8` and `c11` to `c18` to document types (checked only the sale and expense columns).
+- Whether `Setting` has one row or one per company, and its column order (read by name in other studies).
+- The captions and effect of the touch tills' quantity and discount dialogs (`frmPOS_Update`, `frmPOS_Update2`) and of Ctrl+A, Ctrl+M, Ctrl+U.
+- Which text the Enable/Disable drop-downs store for the status words (C.4 item 8).
+- `frmGodownConfig`, `frmBagBox` (a piece/box chooser), `frmUnitButton` (main unit and alternate unit with a default quantity) were not read beyond their captions.
+
+## E. Language conversion and transliteration
+
+Status of this topic: written. Covers the screen-word translation table, the language chosen at sign-in, the "Language Conversion" screen, the transliteration libraries, and the local-language product name printed on bills.
+
+### E.0 The five things to know
+
+1. **"Language" means two different things here.** (a) **Screen words:** every screen, when it opens, replaces its captions with the words stored for the signed-in language in table `Language_set`. (b) **Local-language product names:** a second name for each product (a transliteration of the English name) that a bill can print instead of the English one. They are separate mechanisms with separate tables and columns.
+2. **The screen-word table matches on the exact English caption text.** `Language_set(id, default_lang_eng, other_lang, lang_hin)`: `default_lang_eng` is the English caption as written in code, `other_lang` the replacement, and **`lang_hin` holds the language name (for example "Hindi"), not Hindi text**. A control changes only if its current `Text` equals a stored English caption character for character (`B/frmUserControl.vb:1073-1128`, the same method is copied into 227 forms). Message-box texts, drop-down items, tool tips, grid cell values and every report (`.rpt`) are never translated.
+3. **In the recovered source the transliteration does nothing.** Both libraries are stubs: `DevNet.Translitration`'s `DoWork` returns the input word unchanged with `Success = true`; `DevNetTRLN.Transliterator.Translate` returns its text unchanged (`Source/Libraries/DevNet.Translitration/.../Translitration.cs`, `Source/Libraries/DevNetTRLN/.../Transliterator.cs`). The real compiled library is `Original_Binaries\DevNetTRLN.dll`, which is not in the repository, so **what service did the real work, and what data it sent out, is not known**. The code checks for an internet connection before converting, which suggests an online service. Not verified.
+4. **It is transliteration (sound written in another script), not translation.** "Sale" would become the sound of "Sale" in Devanagari, not the word for selling. The response object has the fields `at, error, input, result[], success`, the shape of an online input-method service. A shop that wants real translated words has to type them (or import them from Excel).
+5. **All the language names are Indian.** The enum has 21 (Assamese, Bangla, Boro, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam, Manipuri, Marathi, Nepali, Oriya, Panjabi, Sanskrit, Sindhi, Sinhala, Tamil, Telugu, Urdu); the product screen offers 9 (Hindi `hi`, Bengali `bn`, Gujarati `gu`, Marathi `mr`, Tamil `ta`, Telugu `te`, Kannada `kn`, Malayalam `ml`, Punjabi `pa`); the conversion screen starts with "Hindi" selected (`B/frmConvert_Language.vb:373`). CLAUDE.md section 8: no default may assume India or Hindi.
+
+### E.1 What a person sees
+
+| Screen | File | Purpose |
+|---|---|---|
+| Sign-in language box | `frmLogin` (`cmbLang`) | Lists `SELECT DISTINCT lang_hin FROM Language_set` plus "ENGLISH" (added by code, selected by default, `B/frmLogin.vb:677-707`). The choice is kept in `GlobalVariables.LoggedInLang_code` and, **only when an Admin signs in**, saved to the Windows registry (`HKEY_CURRENT_USER\Software\<product>`, value `DefaultLanguage`) and read back next time (`:595`, `665-674`). For other roles the box starts at "ENGLISH" again each time unless the registry value is already there. |
+| Language Conversion | `frmConvert_Language` (menu entry, `B/frmMainMenu.vb:14422`) | A language box (all 21), a search box, two lists: English captions and the other-language text; links "Convert Lang" and "Store Marked Data"; "Import" and "Export Excel" (ClosedXML); a bottom list of everything stored (`loadAll`); a pair of boxes (English, other) with Save/Update for typing one entry by hand. |
+| Product entry: "Convert Lang" link | `frmProduct` (and the two bulk editors) | A language drop-down of the 9 above and a link that puts the "converted" product name into the box `txtFeatures`, saved as `Product.Description` (`B/frmProduct.vb:7062-7090`, `3623`, `7377`). Needs internet. Refuses an empty name. |
+| Bill language tick box | the tills (`chkLang`) | When ticked, the bill's name column shows the local name instead of the English one (B.3). |
+
+### E.2 Tables and columns
+
+| Table.column | Meaning |
+|---|---|
+| `Language_set.default_lang_eng` | The English caption exactly as in the program. Primary lookup key. |
+| `Language_set.other_lang` | The text to show. |
+| `Language_set.lang_hin` | The **language name** (misleading name; "hin" is a leftover of the first language, Hindi). |
+| `Product.Description` | The product's **local-language name** (not a description; the product form's box is called `txtFeatures`). Grid column 19 of the till holds it; the bill reads it when `chkLang` is ticked. |
+| Registry `DefaultLanguage` | The last language an Admin signed in with, per Windows user and per PC. |
+
+The seed rows of `Language_set` are not in the repository (the database scripts are missing), so which captions and languages the real program shipped with is not known.
+
+### E.3 The flows, step by step
+
+**Applying the words** (`Convert_Language` in each form): read all rows of `Language_set` where `lang_hin` equals the signed-in language (the value is joined into the SQL text, `...WHERE lang_hin= '<name>'`; it comes from a drop-down filled from the same table, so not typed by a person); build a dictionary English to other (the **first** row wins when an English caption appears twice); walk every control of the form: for labels, buttons, group boxes, check boxes and radio buttons whose `Text` is a key, replace it; then do the same for the column headers of grids and list views and the pages of tab controls (`UpdateAllHeaders`, `UpdateDataGridViewHeaders` and the like). With "ENGLISH" there are no rows, so nothing changes. Each form runs this in its own load event; a form that forgot to call it stays English.
+
+**Typing one entry** (`Button1_Click`, `:782-820`): English text and other text both required; if a row id is loaded it is updated (`update Language_set set other_lang=@d1 where id=@d2`), else a new row is inserted with the language of the drop-down. There is no check that the English caption exists in the program, or that the same caption is not already stored for this language.
+
+**Automatic conversion** (`LinkLabel3_LinkClicked`, `:408-480`): needs internet and a chosen language. For each row of the left list: remove the punctuation characters (the slashes, ! @ # $ % ^ & * ( ) _ + = brackets and braces, ; : quotes, | < > , . ? and the back-tick and tilde) and squeeze spaces; look the **original** English text up in `Language_set` by `default_lang_eng` only; if **any** language already has a row for it, skip it; otherwise split on spaces, transliterate every word separately, join with spaces and add a row to the right list. "Store Marked Data" (`Button8_Click`) inserts the ticked rows with the chosen language name. **The left list is filled from `ReceivedDataTable`, which nothing in the recovered code sets** (the only caller is the main-menu entry, `:14422-14429`), so opened from the menu the left list is empty and the automatic route cannot run. The routes that work are typing, Excel import and the search.
+
+**Excel import** (`:640-710`): choose a workbook; the first row is skipped; columns taken by position become `Englsih`, `Other Language`, `Language_code` (sic); for each row the program counts matching rows and then inserts **if the count is `>= 0`**, which is always true, so the duplicate check never works (`:687-695`). Importing the same file twice stores every row twice (harmless on screen because the first wins, but the table grows).
+
+**Local product name on a bill:** in the product screen "Convert Lang" puts the result in `txtFeatures`; saving writes it to `Product.Description` (the insert statement lists `Description` fourth after the sub-category). In the till the grid keeps it in column 19; with `chkLang` ticked the print routine feeds column 19 into the bill's name column instead of the product name (`B/frmPOS.vb:8173` onward, the branch taken when `chkLang` is ticked). **If a product has no local name the name column is empty on the bill.**
+
+### E.4 Quirks and probable bugs (keep or fix?)
+
+1. Caption matching on exact English text: any change of a caption in code silently loses its translation, and a caption used on two screens with different meanings gets one translation. **Fix:** the Hub uses stable keys, not the English text.
+2. The same caption can have only one automatic conversion across all languages (the existence test ignores the language). **Fix.**
+3. Duplicate check on import never blocks (`>= 0`). **Fix.**
+4. Empty local name prints a blank line on the bill. **Fix:** fall back to the normal name.
+5. The language chosen is remembered only for Admins and only on that PC and Windows user. **Fix:** a per-person (or per-counter) setting kept with the shop's data.
+6. `lang_hin` joined into SQL; low risk (from a drop-down) but **fix** with a parameter.
+7. Transliteration is not translation (E.0 item 4); the recovered libraries do nothing. **Do not port the libraries.** An outside service must never be called with product names unless the owner allowed it (decision 10 and CLAUDE.md section 15); a local model or typed names are the safe routes.
+8. A bill printed in a local script needs a font and a printer that can draw it; the reports use the Windows fonts of the PC (`Fonts` folder at the top of `apps/pos-desktop` ships some). Not checked per template.
+
+### E.5 Worked test examples (by hand; none run)
+
+- **TV-E1 (apply).** `Language_set` has (Sale, X1, Hindi), (Sale, X2, Tamil), (Sale, X3, Hindi). Signed in as "Hindi": a label with text `Sale` becomes `X1` (the first Hindi row wins, `X3` is ignored). A label `Sale ` (trailing space) or `sale` stays English. Signed in as "ENGLISH": nothing changes.
+- **TV-E2 (cleaning).** English caption `Sale Return (Cr.Note)`: cleaned text is `Sale Return CrNote`; the words `Sale`, `Return`, `CrNote` are converted one by one and joined with single spaces; the row stored under the original `Sale Return (Cr.Note)` has no brackets or dot in its other-language text.
+- **TV-E3 (stub).** With the recovered libraries `Translate("Rice", "Hindi")` returns `Rice`; `DoWork("Rice", Hindi)` returns success with result `["Rice"]`.
+- **TV-E4 (import twice).** A workbook of 3 data rows (plus a header) imported twice leaves 6 rows in `Language_set`.
+- **TV-E5 (bill).** Product "Rice" with `Description` = local name Y and `chkLang` ticked: the bill's name column shows Y; with `Description` empty: empty. With `chkLang` off: "Rice".
+- **TV-E6 (sign-in).** An Admin signs in with "Tamil": registry `DefaultLanguage = Tamil`. A Sales Person signing in afterwards on the same PC and Windows user finds the box on Tamil too (read from the registry at load) but their own choice is not saved.
+
+### E.6 What the Hub has and how it differs
+
+- **Hub:** screens in plain English. `ShopSettings.VocabularyOverrides` lets the owner rename industry words (singular and plural, for example "customer" to "Member"), `ShopContext.Singular/Plural` read them. Country packs carry currency, tax and time zone. There is **no screen translation, no second name for an item, no language choice**. Decision 21: English first; client wording as a setting; translations country by country, made with AI and checked by a local speaker; no unchecked machine translation on money or tax screens.
+- **Differences:** the old program translated captions of the program itself from a shop-editable table; the Hub's rule is that all customer-visible words are the customer's settings and the program's own screens are translated later, per country, under review. The old local product name is a real, useful feature for shops whose customers read another script.
+- **Port in this order (smallest safe):** (1) an optional **second name for an item** (kept in the item's loose-facts JSON, so no schema change), a "print second name on bills" option in the shop settings, and a bill that falls back to the normal name when the second name is empty (tests: second name printed when on; fallback when empty; off prints the normal name); (2) the list of offered languages comes from the country pack, with no Indian default; (3) later, when a country opens, screen translations as keyed resource files (not English-text matching) reviewed by a local speaker; (4) transliteration only through a local model or by typing, never an outside call without the owner's yes.
+
+### E.7 Not understood (topic E)
+
+- What the original `DevNetTRLN.dll` and `DevNet.Translitration` really did, and where they sent text.
+- Who is meant to fill `ReceivedDataTable` of the conversion screen (perhaps an older menu path).
+- `Configuration.defaultLanguage()` (used for the label of the conversion screen; the class is in another library, `DevNetSR`, not read for this).
+- The seed contents of `Language_set` and whether the shipped database had any rows.
+- Whether report templates have language variants (none found by name).
+
+## F. Messages: WhatsApp, SMS, email, chat, broadcast
+
+Status of this topic: written. Covers SMS, the two WhatsApp routes, e-mail (send, bulk, inbox), the AI helper that drafts e-mails, the customer "mobile notification" feed, the LAN chat and the contact book. For each: what a person sees, the tables, **what leaves the shop, to whom, through which service, and which customer data goes**, and how that compares with `CLAUDE.md` section 15 and `docs/PLATFORM-DECISIONS.md` decisions 4 and 10. Two of the three messaging libraries in the recovered source are empty stand-ins (F.0 item 3), so the real behaviour of one route cannot be seen.
+
+### F.0 The five things to know
+
+1. **Every message route sends the customer's phone number and name outside the shop, and most also send amounts.** A sale message holds the customer's name, invoice number, date, the amount and the shop name; a debtor message holds the **amount the customer owes**; a WhatsApp bill is the **whole invoice as a PDF** (customer, items, prices, tax). Nothing is marked with a data class, nothing asks the customer's consent, and nothing records who was sent what (only the SMS text is logged, without the number).
+2. **The WhatsApp "API" route uploads the bill PDF to a web server over plain FTP and gives the sender a public link.** `clswhatsApp.CreateFtpFolder` copies the PDF to a temporary folder, uploads it with the FTP user and password stored in table `WappApi`, builds a link from the stored file address plus a folder named after an instance id or token, and asks a relay service to fetch that link and send it on WhatsApp (`B/clswhatsApp.vb`). The code does not delete the uploaded file afterwards (not found). Plain FTP sends the password and the file unencrypted.
+3. **The three recovered messaging libraries are not alike.** `DevNetWP` is real, readable code: a client for a WhatsApp relay service reached by web requests, with the library's built-in base address pointing at the previous vendor's own server (not copied here) and a built-in access token (a secret is stored here). It also registers, for every new connection, a **public webhook-testing website** as the place incoming events are posted (`Source/Libraries/DevNetWP/.../clsWhatsapp.cs:87`): anyone who knows that address could read what the relay posts there. `DevNet.WhatsApp.V2` (the "Chrome" route) is an **empty stand-in**: `CurrentState` always says `READY` and `Send` always returns `Success` without sending anything (`Source/Libraries/DevNet.WhatsApp.V2/.../WhatsApp.cs`); the real compiled library is not in the repository, so how it worked (it used the Chrome driver library, `DevNet.ChromeDriverManager`, to drive WhatsApp Web on the shop PC after a QR sign-in) is inferred from names only. `DevNetFB` (Firebase) is real code (1,925 lines) and is the channel of the owner-phone and customer-phone feeds.
+4. **Everything that needs an address or a key reads it from tables or from a file next to the program, in plain text.** The SMS web address (with a gateway user and password inside it), the WhatsApp text and media addresses (with the token inside), the FTP password, the e-mail password (`EmailSetting.Password`), the OpenAI key (`tbl_api_setting`), the second WhatsApp service's id file (`2ndW.txt`). A secret is stored in each of these places. Cloud addresses and keys of the Firebase feeds were already moved out of the source into `cloud.json` in the licence folder by the owner's earlier edit (`libs`/`licensing/clients/dotnet/NextGenOS.Licensing/CloudSettings.cs`: nothing set means "not configured", which the programs treat as no internet), which is the right pattern.
+5. **Messages are in English words with Indian money words fixed in code.** "Dear Sir/Madam, <name>, Thank you for purchasing from us. Your Invoice No. ..., Date. ..., Amount is Rs.<amount>, Best wishes from <shop>." and "Your pending amount is Rs. ...". The country code box defaults to "+91". CLAUDE.md section 8: all of this must be the customer's own template and the country pack's currency.
+
+### F.1 What a person sees
+
+| Screen | File | Purpose |
+|---|---|---|
+| SMS Setting | `frmSMSSetting` | The web address of an SMS gateway with two place-holders `@MobileNo` and `@Message` (the on-screen example is a gateway app on the same PC at `127.0.0.1`, with a user and password written inside the address); tick boxes IsEnabled, IsDefault, "Auto SMS Enabled". |
+| SMS sender | `frmSendSMS_Sales`, `frmSendSMS_Services` | After a sale or a service: a mobile number box and a message box filled with the standard text; Send. |
+| Bulk SMS to debt customers | `frmCreditCustomerSMS` | Tick customers with an amount owed, an editable ending sentence (default "Please pay as soon as possible."), send to all ticked. |
+| Loyalty SMS | `frmLoyaltySMS` | Points message to a customer by SMS or WhatsApp (both the SMS address and `WappApi` are read). |
+| Offer message | `frmOfferMessage` | Stores one offer text (`OfferMsg.Msg`) used by the offer sender. |
+| WhatsApp configuration | `frmWAppAPIServer` (relay route, with FTP and API addresses, Initialize, Reconnect, Reset instance, Reboot instance, Logout) and `frmWAppAPIServer2` (browser route: "Download Chrome Driver", Headless, Initialize, Terminate; status "Engine : Not Ready", "Sender Id") | Sets up the route; the main menu also shows "WhatsApp : Ready". |
+| WhatsApp instant message | `frmWhatsappMessage` | Type a number and a text, send. |
+| Bulk WhatsApp documents | `frmBulkWhatsappDoc` | Lists customers (all except the walk-in "Cash") with search by name, number or address, for a bulk document send. (Purpose from its caption and its queries; the send flow was not read line by line.) |
+| Bulk WhatsApp to debt customers | `frmBulkWapp2CrCustomer` | Same idea for customers who owe money (caption "Bulk WhatsApp Messenger to Debt Customer"; not read line by line). |
+| Gift voucher sender | `frmGiftCodeSender` | Reads unused gift vouchers (customer name, contact, amount, validity, code) to send them by WhatsApp (caption "Digital Gift Voucher Sender"). |
+| Mobile APK sender | `frmCustomerMobileAppSender` | Lists customers (name, state, phone) to send the shop's customer-app download by WhatsApp (caption "WhatsApp Bulk Mobile Apk Sender to Customers"). |
+| Customer mobile notification | `frmCustomerMobileRpt`, `frmInfoBrodcast` | Pushes one customer's name, address, GSTIN, phone, coupon and points to a cloud database path so the customer's phone app can show them (F.3). |
+| E-mail settings | `frmEmailSetting` (SMTP: server, SMTP address, e-mail id, password, port, TLS/SSL) and `frmEmailSetting_login` (a second account with an application password for the inbox) | |
+| E-mail dashboard | `frmEmailDashboard` (+ `2`, `3`: older copies) | Inbox read over IMAP, sent list, compose (To, CC, BCC, attachments), Reply, and a tick box "AI Message". |
+| Bulk e-mail | `frmSendEmail` | Pick customers that have an e-mail address, a subject, a body and one attachment, send to each. |
+| E-Mail Sender | `frmEmailsender` | A single-mail sender (username and password boxes on the form). |
+| LAN chat | `frmLanChat` | Type a text; it is sent to another PC's IP address. |
+| Contacts | `frmContacts`, `frmCustomerContactList`, `frmSupplierContactList` | A small phone book of persons and numbers, and lists of customers or suppliers with photos. |
+| SMS record | `frmSMS` | List of sent SMS texts. |
+
+### F.2 Tables and columns
+
+| Table | Columns | Meaning |
+|---|---|---|
+| `SMSSetting` | `ID, APIURL, IsDefault, IsEnabled, AutoSMS` | The gateway web address and switches ("Yes"/"No" text). Only the row with `IsDefault='Yes'` and `IsEnabled='Yes'` is used. The address holds the gateway's user and password. |
+| `SMS` | `Message, Date` | Log of sent texts. **No recipient, no status.** |
+| `WappApi` | `ID, c1, c2, WApi, FtpUrl, FtpUser, FtpPassword, FileUrl, ApiMsg` | `c1` = country-code prefix typed by the shop ("+91" when the row is missing, `B/frmPOS.vb:14740`); `c2` = "Enabled"; `ApiMsg` = text-message address with `{No}` and `{Msg}`; `WApi` = media address with `{No}`, `{Msg}`, `{url}` and the instance id and token; `FtpUrl/FtpUser/FtpPassword` the upload place; `FileUrl` the public address of the uploaded files. One row (`Select count(*) ... Having count(*) >= 1`). |
+| `FTP_Category` | `c2, FtpUrl, FtpUser, FtpPassword, FileUrl` | The same FTP idea for the online shop (I). |
+| `tbl_Whatsapp_Status_Setting` | `ID=1, SMS_status` ... | A switch row the touch till toggles with the `sadmin` password check (A.6). |
+| `EmailSetting` | `ID, ServerName, SMTPAddress, Username, Password, Port, TLS_SSL_Required, IsDefault, IsActive, inbox_json_file` | The shop's mail account. Password in plain text. `inbox_json_file` is where the dashboard keeps a copy of the inbox. |
+| `EmailSetting_login` | same columns | A second account whose "Password(App)" is a mail provider's application password. |
+| `tbl_api_setting` | `id, url, apikey, isDefault, isEnabled` | The address and key of the AI text service (OpenAI-style) used to draft e-mails and by the readers in I. |
+| `OfferMsg` | `ID, Msg` | One stored offer text. |
+| `Company_Contacts` | `ID, ContactPerson, ContactNo` | The phone book. |
+| `GSheet_setting` | `ID, spreadsheetId, gid, IsEnabled` | The Google Sheet that receives customer rows (C.2). |
+| Files | `2ndW.txt` (second WhatsApp service id), `Ext` (the Android feed's cloud address and key), `cloud.json` (licence folder) | Plain files beside the program. |
+
+### F.3 What leaves the shop, channel by channel
+
+| Channel | Triggered by | To whom / which service | Customer data sent | Notes against section 15 |
+|---|---|---|---|---|
+| SMS | a button after a sale, the "Auto SMS" switch on a sale or a customer receipt, bulk screens | the gateway named in `SMSSetting.APIURL` (could be a phone app on the same PC, or an online SMS company); an ordinary web request, `http` unless the shop typed `https` | phone number, customer name, invoice or receipt number, date, amount (or the amount owed), shop name | no consent flag; user and password inside the address; the number goes into the address as typed, the text is URL-encoded (`ModFunc.SMSFunc`, `B/ModFunc.vb:119`) |
+| WhatsApp, relay route | buttons on the sale and receipt screens, bulk screens, gift and APK senders | the relay named in `WappApi` (the library's own default is the previous vendor's server) and an FTP host of the shop's choosing | phone number, text, and the **bill PDF** (uploaded first) | plain FTP, public link, file not deleted, token in the address |
+| WhatsApp, second relay | `CreateFtpFolder2`: reads an id from `2ndW.txt` | `api.ultramsg.com` (a commercial WhatsApp relay), with a token | phone number, filename, link to the uploaded document, caption text | same |
+| WhatsApp, browser route | the stand-in `WhatsApp.Send` | WhatsApp Web driven by Chrome on the shop PC | phone number, text, attachment | unofficial automation of a consumer app; the account can be blocked by WhatsApp; the real code is missing |
+| E-mail | bulk e-mail, bill e-mail, password recovery, the dashboard | the shop's own SMTP account (`EmailSetting`) with SSL; IMAP inbox (MailKit) read from the same provider | customer name and address, the body, attachments, **the user's own password in the recovery mail (A.7)** | password stored in plain text; a failed send opens a message box per recipient |
+| AI draft of an e-mail | tick "AI Message" in the dashboard | OpenAI chat service, model `gpt-3.5-turbo`, key from `tbl_api_setting` | the **subject line** and a fixed instruction (the subject only; no customer data) | outside AI service; the subject is typed by the shop. Compare decision 10 (public details only): a subject line can contain a name |
+| Customer mobile feed | opening `frmCustomerMobileRpt`; then a one-second timer rewrites values | a Firebase database whose address and key come from `cloud.json` ("reports") | customer name, address, GSTIN, contact number, coupon amounts and dates, loyalty points, written under a path built from an Android id | a live customer record in a cloud database, refreshed every second; needs the owner's explicit permission under decision 4 |
+| Owner-phone feed | the main menu's Android service (c36, `AID` "Enabled") | the Firebase service in `DevNetFB`, address and key from the `Ext` file | company details and the shop's report figures and stock (what exactly was not read line by line) | company id = a hash of the database name and the **disk serial number** of the PC |
+| Google Sheet | `frmGSheet_*` | Google Sheets | customer rows | inside a compiled library; not read |
+| LAN chat | the LAN chat form | another PC in the shop on TCP port 44444, plain text | whatever is typed, with the sender's terminal name and IP | no sign-in; the listener runs while the form is open |
+
+### F.4 The flows that matter
+
+**Sale message (classic till).** After a bill is saved, if the internet is reachable and the till's "SMS" tick box is on (it starts on when `SMSSetting.AutoSMS = 'Yes'`), the till reads the default enabled `APIURL`, builds the standard text, calls `SMSFunc(mobile, text, url)` (a web request that replaces `@MobileNo` with the number as typed and `@Message` with the URL-encoded text), writes the text to `SMS`, and shows "Successfully SMS Sent" **without checking the gateway's answer** (`B/frmPOS.vb:10165-10200`). A gateway error shows "SMS is not sent" only if the request itself throws. There is no queue and no retry: the web request runs inside the save flow, on the cashier's screen, so a slow gateway makes the till wait (`WebClient.DownloadString` has no timeout set). This is the opposite of `CLAUDE.md` section 15 ("AI work never runs in the checkout path"; the same reasoning applies to any outside call).
+
+**Phone number.** The WhatsApp phone is `WappApi.c1 + contact number` (prefix box plus the number stored for the customer); a stored number that already begins with a country code or a leading zero becomes a wrong number. SMS uses the number exactly as stored.
+
+**WhatsApp text.** Template from `WappApi.ApiMsg` or `WApi` with `{No}`, `{Msg}`, `{url}` replaced by plain text replacement (the message is **not** URL-encoded in the WhatsApp functions, `B/clswhatsApp.vb`), then a web request: a message with `&`, `#`, `%` or a new line cuts or breaks the address.
+
+**WhatsApp bill.** `Print_WhatsApp` makes a PDF `WhatsApp\Report.pdf` in the program folder; each time the main menu starts, the program deletes the files in that folder (`B/frmMainMenu.vb:9491-9500`), so a PDF lives until the next start. The PDF is then uploaded as above.
+
+**Bulk sends.** The debtor, loyalty, offer and document screens loop over ticked customers and call the same single-send functions one by one on the screen thread (no delay, no limit, no "stop" seen), so a long list blocks the window. Customers who never agreed to be messaged are included (the customer record has no consent column; the only related switch is `is_loyalityDisable`).
+
+**E-mail.** `ModFunc.SendMail` builds one message per recipient (so recipients do not see each other), HTML body, SSL on, any failure shows a message box (`B/ModFunc.vb:581-612`). The inbox is read with IMAP over SSL with the stored password.
+
+### F.5 Quirks and probable bugs (keep or fix?)
+
+1. No consent, no opt-out, no record of recipient or result. **Fix:** a per-customer permission, a message log (who, when, channel, result, template, not the full text of private amounts), see F.8.
+2. Passwords and tokens in tables and in web addresses in plain text. **Fix:** names only in the database and values in the secret store (`ISecretStore`), shown masked (CLAUDE.md section 15).
+3. Plain FTP and a public link for bill PDFs. **Do not port.**
+4. A public webhook-testing site registered for incoming events. **Do not port.**
+5. Calls in the save path with no timeout. **Fix:** a background queue; a failure says "message not sent" quietly and never stops a sale.
+6. English text and "Rs." fixed in code. **Fix:** templates are the customer's data with fields for name, number, date, amount; the currency comes from the country pack.
+7. Unofficial WhatsApp automation and third-party relays. **Do not port;** if WhatsApp is wanted, use the provider's official business interface for the country, later, as a provider interface.
+8. The chat forms `frmChat`, `frmChat1` to `frmChat4` are 40-line chart windows (a `Chart` control), not chat; junk.
+9. LAN chat has no sign-in and listens on all addresses of the PC while open. **Drop** or fold into the Hub's counter-to-counter notes later.
+10. Success is reported without checking the gateway's reply. **Fix.**
+
+### F.6 Worked test examples (by hand; none run)
+
+- **TV-F1 (SMS text).** Customer "Anil", invoice "GST-0042-25/26", date "07-10-2026", grand total 1,180.00, shop "ABC Store": the text is `Dear Sir/Madam, Anil , Thank you for purchasing from us. Your Invoice No. GST-0042-25/26, Date. 07-10-2026 , Amount is Rs.1180.00, Best wishes from ABC Store.` (the code joins the pieces with exactly these spaces and commas, `B/frmPOS.vb:10182`). The amount is `Format(Round(value, 2), "0.00")` with half-to-even rounding; on a stored two-decimal total this changes nothing.
+- **TV-F2 (gateway address).** Template `http://127.0.0.1:9500/api?action=sendmessage&recipient=@MobileNo&messagetype=SMS:TEXT&Message=@Message`, number `9876543210`, text `Dear Sir, Rs.50`: the address becomes `...recipient=9876543210&messagetype=SMS:TEXT&Message=Dear+Sir%2c+Rs.50` (space as `+`, comma as `%2c`).
+- **TV-F3 (WhatsApp number).** Prefix `+91`, stored number `9876543210` gives `+919876543210`. Stored `09876543210` gives `+9109876543210` (wrong); stored `+919876543210` gives `+91+919876543210` (wrong).
+- **TV-F4 (message with an ampersand).** WhatsApp text `Tea & Sugar offer` replaces `{Msg}` unchanged, so the request address contains `Msg=Tea & Sugar offer`; everything after `&` is read as a new parameter and the delivered message is `Tea ` (by the way the address is split; not run).
+- **TV-F5 (debtor SMS).** Customer "ravi", balance 1,500.00, ending sentence default: `Dear Sir/Madam RAVI, Your pending amount is Rs. 1500.00, Please pay as soon as possible. , Best wishes from : ABC Store ` (name upper-cased, note the space before the comma and the trailing space, `B/frmCreditCustomerSMS.vb:563`).
+- **TV-F6 (gate).** An automatic SMS after a customer receipt needs all of: internet reachable, a `SMSSetting` row with `IsDefault='Yes'`, `IsEnabled='Yes'` and `AutoSMS='Yes'`. With `AutoSMS='No'` the sale screen's tick box starts off but a cashier can tick it; the receipt screen sends nothing.
+- **TV-F7 (bulk e-mail).** 3 customers with an e-mail address and 1 without: the list shows 3 (the query keeps `EmailID is NOT NULL and EmailID <> ''`, `B/frmSendEmail.vb:228`); if the second address is rejected by the server a message box appears and the loop goes on to the third.
+
+### F.7 What the Hub has and how it differs
+
+- **Hub today:** no message sending at all (`docs/old-programs/06-hub-map.md` 2.3, "no message sending"), no customer consent field, no templates, no contacts. It has the building blocks: an `ISecretStore` (names in the database, values in the operating system's store), `DataClass` values `PERSONAL` and `FINANCIAL`, a pure routing rule (`Ai/Routing.cs`) written for AI services that fails closed, feature flags off by default, an append-only audit log, and the licensed background worker for non-checkout work (`HubWorker`, 6.6 of the map).
+- **Differences:** the old program sent first and had no rules; the Hub's rules say a feature is off by default, local first, the owner told in plain words what leaves, to whom, for which feature, and each kind of data classed. Customer name, number and amounts are `PERSONAL` and `FINANCIAL`: they may go to a messaging provider only if the owner turned that provider on for that purpose (decision 4).
+- **Port in this order (smallest safe), each behind a flag that is off by default:**
+  1. **Message templates as the customer's data** (profile/setup) with named fields (customer name, document number, date, amount, shop name) and the currency from the country pack; a preview screen that shows the exact text and says in plain words which service would receive it. Tests: changing the template changes the text; no default text names a country or a currency.
+  2. **A `message_log` table** (new table, `tenant_id`/`site_id`, rolled back by a rollback file) with who, when, channel, status, template id and the document id; no full text of amounts, no secrets.
+  3. **A per-customer "may be contacted by" permission** (a new side table keyed by customer id, as the map suggests for new customer facts), default off; every bulk screen sends only to customers with it on.
+  4. **A channel interface** (`IMessageChannel`: send, status) with the first implementations the owner can run on their own: e-mail through the owner's SMTP account, and SMS through the owner's own gateway address (including a phone-app gateway on the shop network). Secrets in `ISecretStore`. Sends happen from a queue in the background worker, never in the sale transaction; a failure shows "message not sent" and nothing else.
+  5. **"Send this bill"** buttons (manual) before any automatic sending; automatic after-sale sending last, with the owner's switch.
+  6. **Debtor reminders** only after the Hub has a customer ledger (the first gap in `06-hub-map.md` and `02` A1), so the amount owed is correct.
+  7. **WhatsApp** only through the provider's official business interface for the country, as another channel behind the same interface, once the owner chooses a provider; the FTP-upload and browser-automation routes are not ported.
+  8. The cloud feeds (customer app, owner app) are a separate decision (decision 12's opt-in totals-only head office view is the only cloud view the owner has allowed).
+
+### F.8 Not understood (topic F)
+
+- How the real `DevNet.WhatsApp.V2` library worked (it is replaced by a stand-in), what it sent, and whether it kept a session on disk.
+- The exact contents of the owner-phone feed (`DevNetFB.FirebaseService`, 1,925 lines): which tables and fields it publishes. Only its start-up wiring was read (`B/frmMainMenu.vb:9366-9400`).
+- What `frmSMS_AutoDetect`, `frmEmailsender` (a form with username and password boxes) and the `frmEmailDashboard2/3` copies add over `frmEmailDashboard`.
+- How phone numbers are validated before sending (no check was found in the screens read).
+- The Google Sheet write path (inside a compiled library).
+
+## G. Leads, follow-up, support, reminders (small CRM)
+
+Status of this topic: written. Covers sales leads and their products, follow-ups, the link from a quotation to a lead, converting a lead into a customer, the after-sales support tickets and call log, and the reminder notes. Read for the rules and tables; the long screens (1,000 to 3,000 lines each) are mostly grids and filters.
+
+### G.0 The five things to know
+
+1. **It is a small sales-lead book plus a help-desk, built round four tables:** `tbl_lead_master` (the lead), `tbl_followup_lead` (every contact with it), `CustomerSupportForm` (a support ticket) and `Reminder` (a dated note). A lead is a person who has not bought yet; the support ticket is for a customer who has.
+2. **Lead status is a three-word list: NEW LEAD, FOLLOW-UP, FINISHED** (`B/frmFollowUp_Lead.Designer.vb`, `cmbStatus`). Interest is Low/Medium/High; follow-up rating 1 to 5. A bill made from a quotation that carries a lead id **closes the lead by itself** with the remark "Bill Generated" (`B/frmPOSNewTuch.vb:25034`).
+3. **The reminder date typed on a follow-up is only stored and listed.** No timer or start-up check reads `tbl_followup_lead.reminder_date` (searched: only the follow-up screens and the quotation till). The only reminder that pops up is the plain `Reminder` table, counted on the main screen at start-up (`B/frmMainMenu.vb:15605`), switch c44 ("Reminder Record") does nothing (A.4).
+4. **Column names mislead:** `coordinate_mode` holds "GPS" or "Manual" in the lead screen (how the location was entered) but the follow-up screen's drop-down of the same name holds "Owner, Salesman, Accountant, Manager, Clerk" (who coordinates); the support table has `SoftwareName` and `SoftwareValidity` columns that come from the older vendor's own help desk and are filled with the licence holder's company name (`B/frmCustomerSupport1.vb:2399`); the "Help" button on the sign-in screen opens the support-log report (`B/frmLogin.vb:975`), which is the shop's own call log, not a way to reach NextGenOS.
+5. **All lead and support data is personal data** (name, phone, address, what the person asked for). The screens send nothing outside by themselves; the only outside step is the optional bulk message screens (F). Under CLAUDE.md section 15 it is `PERSONAL` and stays on the main PC.
+
+### G.1 What a person sees
+
+| Screen | File | Purpose |
+|---|---|---|
+| Lead Generate | `frmLead2` (1,798 lines; the main screen), `frmLeadGenerate` (322 lines, an older simple entry) | Mobile number, customer or company name, state (a fixed list of Indian states and territories), address, coordinate mode, interest mode, product (from the lead-product list), remarks, allotted user; list below; Excel import (the grid carries a `lead_id` column); lead id shown as `L-` plus a number. |
+| Lead Product | `frmLead_Product` | The list of products leads can ask about: name and a photo (`tbl_lead_product(ID, product_name, CPhoto)`), Export. |
+| List of Leads | `frmLeadGenerateRecord` (1,615 lines) | Search and filters by date, status, allotted user and text; each row shows its latest follow-up status; open for update. Admin and Moderator see more buttons (15 role checks, `B/frmLeadGenerateRecord.vb`). |
+| Lead Follow-Up Entry | `frmFollowUp_Lead` | Choose a lead; add a remark, follow-up date, status, reminder date and time, "follow-up by", rating; see earlier follow-ups; a button builds a quotation for this lead. |
+| FollowUp Lead Records | `frmFollowUp_LeadRecords` | List of follow-ups with the lead's details. |
+| Lead Update | `frmLead_Update` | Edit a lead; **"Gen. Quotation"** opens the quotation till with the lead carried over; **make a customer** (`InsertCustomer`) copies the lead into the `Customer` master (see G.3). |
+| Support Form | `frmCustomerSupport1` (3,377 lines; `frmCustomerSupport`, 2,750 lines, is an older version tied to receipts) | Pick a customer (shows the account balance, first and last invoice date, the number of earlier tickets), type "Current Issue", choose Support type (FIX SUPPORT or GENERAL SUPPORT) and the user it is assigned to, save; a list of open tickets. |
+| Support dashboard | `frmCustomerSupportForm_Dashboard` | List and close tickets with date filters; close sets the status and the date. |
+| Support log | `frmCustomerSupportLog`, `_Dashboard`, `_Report` | A call log: "Calling No." and the call's details; a dashboard marks entries successful or failed. |
+| Set Reminder | `frmReminder`, `frmReminderRecord`, `frmReminderShow` | Type a message and a date; list; show today's. |
+
+### G.2 Tables and columns
+
+| Table | Columns | Meaning and traps |
+|---|---|---|
+| `tbl_lead_master` | `id, lead_id, lead_date, customer_name, coordinate_mode, mobile, state, address, interest_mode, productname, remarks, alloted_user` | `id` is a number made by the program (the screen inserts it explicitly); `lead_id` is the text `L-<number>` shown to people; `alloted_user` is a user id text from `Registration` (the same renaming trap as A.9 item 7). The state is chosen from a fixed list of Indian states and union territories (`B/frmLead2.Designer.vb`; the table `tbl_State` is also read). |
+| `tbl_followup_lead` | `lead_id (the id number), remarks, followup_date, lead_status, reminder_date, reminder_time, followup_by, rating` | One row per contact. The follow-up keeps the **integer** `id` while the master's text `lead_id` is `L-n`; the join is on the integer (`b.lead_id` vs `a.lead_id` in the list queries). |
+| `tbl_lead_product` | `ID, product_name, CPhoto` | Lead products; inserted with `SET IDENTITY_INSERT ON` and an explicit ID. |
+| `CustomerSupportForm` | `LogID, LogTimestamp, support_token_no, CustomerName, RegisteredMobileNumber, CallingNumber, CurrentIssue, SoftwareName, SoftwareValidity, Status, Remark, Feedback, Rating, EmailAddress, SupportType, CustomerId, join_user, Close_date` | A ticket. `Status` is "Open" when made and "Closed" when closed (`Close_date` set to now). `support_token_no` is a ticket number typed into a box (how it is generated was not followed; the screen also counts earlier tickets by customer, `B/frmCustomerSupport1.vb:2230-2245`). `join_user` is the assigned user. |
+| `CustomerSupportLog` | `support_token_no, CustomerName, RegisteredMobileNumber, CallingNumber, CurrentIssue, SoftwareName, SoftwareValidity, Status, Remark, Feedback, Rating, EmailAddress` | Same shape; the call log. |
+| `CustomerSupportLog_Dashboard` | (not listed) | Status updates for log rows ("successful", "failed"). |
+| `Reminder` | `msg, mdate` | A note and its date; no id column seen in the insert. |
+
+### G.3 The flows
+
+**New lead** (`frmLead2`): the number part of `L-n` comes from `GenerateID()` (the next number, `:848`); required fields are checked by the screen (customer name, mobile, state); the insert lists all twelve columns. A mobile number may repeat (the duplicate check that was read is against `Customer`, not against leads).
+
+**Follow-up** (`frmFollowUp_Lead`, `:863`): insert a row with the lead's integer id, the remark, the follow-up date (now), the chosen status, the reminder date only if the date picker is ticked (`dtpReminderDate.Checked`, else null), the reminder time from a drop-down, the user and the rating; update re-writes the same fields. The latest follow-up status is shown in the lead list.
+
+**Quotation from a lead** (`Gen. Quotation` in `frmLead_Update`, `frmFollowUp_Lead` reads `InvoiceInfo_Quotation` and its product rows to show earlier quotations): the quotation till receives the lead id in a hidden label (`lblLead_Id`). When that quotation is converted to a bill in the till and the quotation number and a non-zero lead id are present, the till inserts a follow-up row: remark "Bill Generated", status FINISHED, reminder date today, time now, "follow-up by" the signed-in user (`B/frmPOSNewTuch.vb:25030-25050`, also in `frmPOSNewTuch_Quotation` and `frmPOSTouch`).
+
+**Lead to customer** (`InsertCustomer`, `frmLead_Update:701-780`): needs customer name, state and mobile; refuses if the mobile already exists in `Customer` (the second check, name plus `_` plus mobile, sits inside a branch that runs only when the name box is empty, which was refused a few lines earlier, so it never runs); then inserts a `Customer` row with the new `ID`/`CustomerID` (from `autoCust`) and **invented values**: the name becomes `<typed name>_<mobile>` (for example `Anil_9812345678`), the address is the word `local`, the city `localcity`, the e-mail `abc@gmail.com`, and GSTIN, PAN, bank fields and the rest are empty or default; a gift QR image is made from the mobile number (`Generate_GiftQR`). The numbering is that of the customer master (02 A1.1). The lead's real address is not copied (the insert passes `local`), which loses data. The lead is not deleted and is not marked converted by this step (the quotation-to-bill step is what closes it).
+
+**Support ticket** (`DataInsert`, `:2540-2580`): required: customer, issue, support type, assigned user; inserts with `Status = 'Open'` and the customer id; the ticket list shows the open ones; the dashboard closes a ticket: `UPDATE CustomerSupportForm SET Status='Closed', Close_date=GETDATE(), Remark=@Remark WHERE LogId=@LogId`. A short update changes only name, number, issue, type, customer and user.
+
+**Reminder** (`frmReminder`): `insert into Reminder(msg, mdate) Values (@d1,@d2)`; at the start of the main menu `SELECT COUNT(*) FROM Reminder WHERE mdate=@today`; if more than zero a number badge and an enabled icon appear; clicking opens `frmReminderShow` with the day's messages (`SELECT msg from Reminder where mdate=@d1`). Only the **exact date** matches: a reminder dated yesterday and not seen is never shown again unless someone opens the record list.
+
+### G.4 Quirks and probable bugs (keep or fix?)
+
+1. Lead reminders never fire (G.0 item 3). **Fix** (the Hub's Today page can list "follow-ups due today and overdue").
+2. Reminder matches the exact date only; missed days vanish from the badge. **Fix:** show due and overdue.
+3. Two id forms for a lead (`L-n` text and the integer) joined across tables; support tickets use a typed token number. **Fix:** one id, the display text made from it.
+4. Lead state list is the Indian list in code. **Fix:** regions come from the country pack (CLAUDE.md section 8).
+5. Converting to a customer does not record which customer a lead became, writes invented values (`local`, `localcity`, `abc@gmail.com`, a name with the mobile glued on) and drops the real address. A later bulk e-mail would go to the invented address. **Fix:** copy the real fields, leave unknown ones empty (never invent), and keep a link.
+6. Support-ticket columns for a software vendor (`SoftwareName`, `SoftwareValidity`) are filled with the licence holder's company name. **Drop.**
+7. Names in `alloted_user` and `join_user` are user-id texts (detach on rename). **Fix** (A.9).
+8. The ticket and lead screens run long queries with the filter text joined into the SQL (`like N'%...%'` built by string joining, as in the customer lists). **Fix** (parameters).
+9. Role checks in the lead list (Admin and Moderator see more) are the only permission; no user can be stopped from reading all leads. **Keep the idea,** decide the roles in the Hub.
+
+### G.5 Worked test examples (by hand; none run)
+
+- **TV-G1 (lead to bill).** Lead 7 (`L-7`, status NEW LEAD). Follow-up 1: status FOLLOW-UP, reminder 10 October 10:30. A quotation is made for lead 7, then turned into a bill by the quotation till: a new follow-up row (lead 7, "Bill Generated", FINISHED, reminder = today, time = now) is added. The list now shows FINISHED for lead 7 (the latest follow-up wins). If the quotation was made without the lead id (`lblLead_Id` = 0 or empty) nothing is added.
+- **TV-G2 (reminders).** Three reminders dated today and one dated yesterday: the badge shows 3; the screen opened from the badge lists the 3 messages; yesterday's is never counted again.
+- **TV-G3 (support ticket).** A new ticket for customer 12 with 2 earlier tickets: the screen shows "tickets so far: 2" and, after saving, the customer has 3 (`COUNT(support_token_no) ... WHERE CustomerId = 12`); the new row's status is "Open"; closing sets "Closed", the close date to the server's current time and the remark typed at closing.
+- **TV-G4 (lead to customer).** Lead "Anil", mobile 9812345678, state Kerala, address "12 Market Road": if no customer has that number, a customer is created named `Anil_9812345678`, address `local`, city `localcity`, e-mail `abc@gmail.com`, state Kerala. If a customer already has the number: refused, no row. Two different leads with the same name and different numbers give two customers with different names (because of the `_mobile` suffix).
+- **TV-G5 (reminder time).** A follow-up with the reminder box unticked stores a null date; with the box ticked and no time chosen the time is null (the code stores null when the time box is empty); both are shown blank in the list.
+
+### G.6 What the Hub has and how it differs
+
+- **Hub:** none of these. `parties` has kinds (customer, supplier, staff, member); `Appointments` (bookings by staff and day, check in, charge, cancel) and `Projects` (quotes for construction) exist; the `quote` document type exists only for projects. There is no lead, no follow-up, no ticket, no reminder. The Today page is where a "due today" list would go (`06-hub-map.md` 5.4).
+- **Differences:** the old CRM is tied to the quotation till (a lead's quote becomes its bill and closes it); the Hub has no shop quotation yet (MERGE-PLAN row "Estimates and quotations" and decision 35), so the link comes after that.
+- **Port in this order (smallest safe):** (1) **reminders** first, as a new table `reminders(due_date, text, done, created_by)` with a "due today and overdue" card on the Today page (small, useful on its own); (2) **leads and follow-ups** as three new tables (`leads`, `lead_followups`, a `lead_products` list that can simply be the item list), with the statuses as data (NEW, FOLLOW-UP, FINISHED, but customer-renamable), regions from the country pack, a due list for follow-ups, and a "make a customer" button that records the link; (3) the **quotation link** after the Hub has shop quotations; (4) **service tickets** for after-sales (open, closed, assigned user, close date, remark) with no vendor columns, and a rating only if the owner wants it; (5) no outgoing messages from any of these unless the owner turns the message feature on (F.7). All new tables carry `tenant_id` and `site_id` and a rollback file (`06-hub-map.md` 3.5).
+- **Tests to write:** closing a lead when its quotation becomes a bill; a reminder shows on its date and stays on the overdue list until marked done; a follow-up with no reminder date never appears on the due list; converting a lead refuses a number already used by a customer.
+
+### G.7 Not understood (topic G)
+
+- How `support_token_no` is made (a text box on the form; its automatic fill was not found).
+- What `CustomerSupportLog_Dashboard` stores beyond the status updates, and what "successful/failed" mean for a call.
+- Whether the Excel import of leads (`frmLead2`) updates existing rows by `lead_id` or only inserts.
+- `frmCustomerSupport` (older) is tied to the credit-customer receipt and an automatic SMS (F.4) after a payment; its ticket flow was not read.
+- What `coordinate_mode = GPS` does (no map or location call was found in the screens read).
 
 ## H. Branches, companies, financial-year change, transfers (not yet written)
 

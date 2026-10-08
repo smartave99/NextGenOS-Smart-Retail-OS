@@ -24,6 +24,14 @@ public sealed class ShopSettings
     /// <summary>The biggest discount a cashier may give at the till, as a percent of the bill in thousandths (5000 = 5%). 0 means none; owners and managers have no limit.</summary>
     public long CashierDiscountPctMilli { get; set; }
     public string ReceiptFooter { get; set; } = "Thank you!";
+    /// <summary>Loyalty points (decision 31). Off until the owner turns them on in Settings; the starting words and numbers below are neutral (nothing is earned until a value is set).</summary>
+    public bool LoyaltyOn { get; set; }
+    /// <summary>What an item earns when it has no setting of its own: "none", "per" (a percent of what the line comes to, before tax) or "point" (points for each unit sold).</summary>
+    public string LoyaltyDefaultMode { get; set; } = "none";
+    /// <summary>In thousandths: for "per", the percent (5000 = 5%); for "point", the points for each unit (2000 = 2 points).</summary>
+    public long LoyaltyDefaultValueMilli { get; set; }
+    /// <summary>What one point is worth when used on a bill, in thousandths of a whole unit of the money (500 = half a unit).</summary>
+    public long LoyaltyPointValueMilli { get; set; }
     public bool SetupDone { get; set; }
     /// <summary>Parts of the Hub the owner switched on or off, over the industry's defaults (name → on/off).</summary>
     public Dictionary<string, bool> FeatureOverrides { get; set; } = new();

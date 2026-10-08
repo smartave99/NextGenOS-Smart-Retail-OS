@@ -77,7 +77,7 @@ else
         }
     </div>
 
-    <Receipt View="view" Shop="Shop" />
+    <Receipt View="view" Shop="Shop" Points="@Points()" />
 
     @if (credits.Count > 0)
     {
@@ -158,6 +158,8 @@ else
     });
 
     private bool keepAsCredit;
+
+    private NextGenOS.Hub.Loyalty.LoyaltyService.Summary? Points() => view?.Party is { } p && App.Loyalty.Enabled ? App.Loyalty.ForDocument(Id, p.Id) : null;
 
     private const string PayPanel = "pay", ReturnPanel = "return", VoidPanel = "void";
 

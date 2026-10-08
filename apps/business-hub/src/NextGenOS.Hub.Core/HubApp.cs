@@ -7,6 +7,7 @@ using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Lending;
+using NextGenOS.Hub.Loyalty;
 using NextGenOS.Hub.Ontology;
 using NextGenOS.Hub.Printing;
 using NextGenOS.Hub.Projects;
@@ -35,7 +36,8 @@ public sealed class HubApp
         Parties = new PartyService(db, Shop, clock);
         Catalog = new CatalogService(db, Shop, clock);
         Books = new BooksService(db, clock);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books);
+        Loyalty = new LoyaltyService(db, Shop, clock);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty);
         Users = new UserService(db, clock, Audit);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
@@ -65,6 +67,7 @@ public sealed class HubApp
     public PartyService Parties { get; }
     public CatalogService Catalog { get; }
     public BooksService Books { get; }
+    public LoyaltyService Loyalty { get; }
     public DocumentService Documents { get; }
     public UserService Users { get; }
     public RestaurantService Restaurant { get; }

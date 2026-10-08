@@ -172,7 +172,7 @@ public class BooksTests
         var before = f.App.Books.TrialBalance().Select(r => (r.Code, r.Name, r.DebitMinor, r.CreditMinor)).ToList();
         var balanceBefore = f.App.Books.CustomerBalance(buyer.Id);
         var shopPath = f.App.Db.Path;
-        f.App.Db.Rollback(HubDb.LatestVersion - 1);                    // the books step is undone: the bills and payments stay
+        f.App.Db.Rollback(6);                    // the books step (and the newer ones) is undone: the bills and payments stay
         Assert.Empty(f.App.Db.Query("SELECT name FROM sqlite_master WHERE name = 'journal_entries'", r => r.GetString(0)));
         var again = HubApp.Open(shopPath, f.Clock);                     // forward again: opening the shop posts what was not posted
         Assert.Equal(0, again.Books.CatchUp());

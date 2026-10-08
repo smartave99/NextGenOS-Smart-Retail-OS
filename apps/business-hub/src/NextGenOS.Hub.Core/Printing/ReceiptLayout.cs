@@ -91,6 +91,7 @@ public static class ReceiptLayout
     private static string Title(DocumentView view, ShopContext shop) => view.Document.Type switch
     {
         DocTypes.CreditNote => "Credit note",
+        DocTypes.DebitNote => "Debit note",
         DocTypes.Quote => "Quote",
         DocTypes.Purchase => "Purchase order",
         DocTypes.ProgressBill => "Progress bill",

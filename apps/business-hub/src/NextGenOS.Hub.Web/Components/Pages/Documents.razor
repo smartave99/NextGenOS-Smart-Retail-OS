@@ -15,7 +15,7 @@
         <option value="credit-note">Credit notes</option>
         @if (Shop.Features.Projects) { <option value="progress-bill">Progress bills</option> }
         <option value="quote">Quotes</option>
-        @if (Shop.Features.Purchases) { <option value="purchase">Purchases</option> }
+        @if (Shop.Features.Purchases) { <option value="purchase">Purchases</option> <option value="debit-note">Goods sent back</option> }
     </select>
     <label class="check"><input type="checkbox" @bind="unpaid" @bind:after="Find" /> Not paid in full</label>
 </div>
@@ -70,7 +70,7 @@
 
     private string Kind(string t) => t switch
     {
-        DocTypes.Invoice => Shop.Singular("invoice"), DocTypes.CreditNote => "Credit note", DocTypes.Quote => "Quote", DocTypes.Order => "Order", DocTypes.Purchase => "Purchase", DocTypes.ProgressBill => "Progress bill", _ => t,
+        DocTypes.Invoice => Shop.Singular("invoice"), DocTypes.CreditNote => "Credit note", DocTypes.DebitNote => "Debit note", DocTypes.Quote => "Quote", DocTypes.Order => "Order", DocTypes.Purchase => "Purchase", DocTypes.ProgressBill => "Progress bill", _ => t,
     };
 
     private MarkupString Status(NextGenOS.Hub.Documents.Document d) => new(d.Status switch

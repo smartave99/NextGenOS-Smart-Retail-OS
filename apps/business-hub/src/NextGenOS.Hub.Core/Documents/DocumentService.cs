@@ -816,6 +816,10 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             if (header.Status == DocStatus.Void) throw new HubException("already-void", "That document is already void.");
             if (HubDb.Scalar(c, "SELECT 1 FROM documents WHERE ref_document_id = $id AND type = 'credit-note' AND status = 'issued' LIMIT 1", t, ("$id", documentId)) is not null)
                 throw new HubException("has-credit-note", "A credit note was already made for this document. Cancel it through another credit note.");
+            if (header.Type == DocTypes.DebitNote)
+                throw new HubException("debit-note-final", "Goods that were sent back cannot be cancelled here. If they came back, receive them again as a new purchase.");
+            if (HubDb.Scalar(c, "SELECT 1 FROM documents WHERE ref_document_id = $id AND type = 'debit-note' AND status = 'issued' LIMIT 1", t, ("$id", documentId)) is not null)
+                throw new HubException("has-debit-note", "Goods were already sent back to the supplier for this purchase, so it cannot be cancelled.");
             if (header.Status == DocStatus.Issued)
             {
                 var lines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", documentId));
@@ -911,6 +915,83 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         return Get(id)!;
     }
 
+    /// <summary>
+    /// Goods sent back to a supplier after a purchase was received (a debit note; the older POS's "purchase return"): the lines go out of stock at what they cost, the tax is taken back, and what we
+    /// owe the supplier falls by the total. The credit is first put against what is still unpaid on that purchase; what is left over is either paid back by the supplier now (when
+    /// <paramref name="refundMethod"/> is given, never more than was paid) or stays as credit with the supplier. Worked like the purchase itself: same tax position, same prices and discounts.
+    /// </summary>
+    public DocumentView CreateDebitNote(long purchaseId, IReadOnlyList<(long LineId, long QtyMilli)> returns, string reason, string? refundMethod, long? userId)
+    {
+        access.Require(Perm.Purchases);
+        if (string.IsNullOrWhiteSpace(reason)) throw new HubException("reason", "Please say why.");
+        var id = db.InTransaction((c, t) =>
+        {
+            var purchase = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", purchaseId)).SingleOrDefault() ?? throw new HubException("not-found", "That document was not found.");
+            if (purchase is not { Type: DocTypes.Purchase, Status: DocStatus.Issued }) throw new HubException("not-purchase", "Goods can be sent back only for a purchase that was received.");
+            var original = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", purchaseId));
+            // What was already sent back, counted by the purchase line each return line points to.
+            var already = HubDb.Query(c,
+                "SELECT l.ref_line_id, SUM(l.qty_milli) AS q, SUM(l.discount_amount_minor) AS da FROM document_lines l JOIN documents d ON d.id = l.document_id " +
+                "WHERE d.ref_document_id = $id AND d.type = 'debit-note' AND d.status = 'issued' GROUP BY l.ref_line_id",
+                r => (RefLine: r.IntOrNull("ref_line_id"), Qty: r.Int("q"), Amount: r.Int("da")), t, ("$id", purchaseId));
+            var purchaseResultText = HubDb.Scalar(c, "SELECT result FROM documents WHERE id = $id", t, ("$id", purchaseId)) as string;
+            var purchaseResult = purchaseResultText is null ? null : NewtonJson.DeserializeObject<TaxResult>(purchaseResultText);
+            var noteLines = new List<LineInput>();
+            foreach (var (lineId, qty) in returns.Where(x => x.QtyMilli > 0))
+            {
+                var line = original.FirstOrDefault(l => l.Id == lineId) ?? throw new HubException("line", "That line is not on the purchase.");
+                var given = already.Where(a => a.RefLine == line.Id).ToList();
+                var done = given.Sum(a => a.Qty);
+                if (qty + done > line.QtyMilli) throw new HubException("too-many", $"Only {ShopContext.Qty(line.QtyMilli - done)} of {line.Description} can still be sent back.");
+                // A line that had an amount discount, or any line of a purchase that had a discount on the whole bill, gives back exactly its share of what was taken off (the last part gives
+                // back what is left, so the pieces add up to the whole). Any other line goes back at its percent.
+                var position = original.ToList().FindIndex(l => l.Id == lineId);
+                var taken = purchaseResult is not null && position >= 0 && position < purchaseResult.Lines.Count ? (long)MoneyText.Parse(purchaseResult.Lines[position].Discount, purchase.CurrencyDecimals) : 0;
+                var byAmount = taken > 0 && (line.DiscountAmountMinor > 0 || purchase.HasBillDiscount);
+                long returnDiscount = 0;
+                if (byAmount)
+                {
+                    var left = taken - given.Sum(a => a.Amount);
+                    returnDiscount = qty + done == line.QtyMilli ? left : Math.Min(left, (long)((2 * (BigInteger)taken * qty + line.QtyMilli) / (2 * (BigInteger)line.QtyMilli)));
+                    returnDiscount = Math.Min(returnDiscount, Gross(qty, line.UnitPriceMinor));
+                }
+                noteLines.Add(new LineInput
+                {
+                    ItemId = line.ItemId, Description = line.Description, QtyMilli = qty, Unit = line.Unit, UnitPriceMinor = line.UnitPriceMinor, DiscountPctMilli = byAmount ? 0 : line.DiscountPctMilli,
+                    DiscountAmountMinor = returnDiscount, RefLineId = line.Id, TaxCode = line.TaxCode, CustomerDiscount = line.CustomerDiscount, ItemCode = line.ItemCode, ExtraTaxPctMilli = line.ExtraTaxPctMilli,
+                });
+            }
+            if (noteLines.Count == 0) throw new HubException("empty", "Choose what is being sent back.");
+            var noteId = CreateDraft(c, t, new DraftOptions { Type = DocTypes.DebitNote, Direction = "in", PartyId = purchase.PartyId, RefDocumentId = purchaseId, UserId = userId, Notes = reason.Trim(), Lines = noteLines, PricesIncludeTax = purchase.PricesIncludeTax });
+            // The return carries the supplier's number and the places as the purchase had them, so that the tax is worked out in the same position.
+            HubDb.Exec(c, "UPDATE documents SET party_tax_id = $tax, buyer_region = $br, seller_region = $sr WHERE id = $id", t, ("$tax", purchase.PartyTaxId), ("$br", purchase.BuyerRegion), ("$sr", purchase.SellerRegion), ("$id", noteId));
+            Recalculate(c, t, noteId);
+            var note = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", noteId)).Single();
+            var noteDocLines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", noteId));
+            var now = clock.UtcNow;
+            var number = numbering.Next(c, t, DocTypes.DebitNote, now);
+            // The credit goes first against what is still unpaid on that purchase; only the rest can come back in money.
+            var applied = Math.Min(note.TotalMinor, Math.Max(0, purchase.PayableMinor - purchase.PaidMinor));
+            var refund = refundMethod is null ? 0 : note.TotalMinor - applied;
+            HubDb.Exec(c, "UPDATE documents SET type = 'debit-note', number = $n, status = 'issued', issued_at = $at, paid_minor = $paid, registered = $reg WHERE id = $id", t,
+                ("$n", number), ("$at", Iso.Text(now)), ("$paid", applied + refund), ("$reg", purchase.Registered ? 1 : 0), ("$id", noteId));
+            if (applied > 0)
+            {
+                // What the supplier credits is kept honest on the purchase: it counts as paid there. It moves no money, and the books already net it (the return takes it off what we owe).
+                InsertPayment(c, t, purchaseId, purchase.PartyId, null, new PaymentInput { Method = AccountCredit, AmountMinor = applied, Reference = "goods sent back, " + number }, userId, "payment", now);
+                HubDb.Exec(c, "UPDATE documents SET paid_minor = paid_minor + $a WHERE id = $id", t, ("$a", applied), ("$id", purchaseId));
+            }
+            if (refund > 0) InsertPayment(c, t, noteId, purchase.PartyId, null, new PaymentInput { Method = refundMethod!, AmountMinor = refund, Reference = "paid back for " + purchase.Number }, userId, "refund", now);
+            MoveStock(c, t, noteId, noteDocLines, -1, "purchase-return", userId, now, purchaseId);
+            books.Sync(c, t, noteId, userId);
+            books.Sync(c, t, purchaseId, userId);
+            audit.Log(c, t, userId, "debit-note", "document", noteId, number + " for " + purchase.Number + ": " + reason.Trim());
+            Announce(c, t, "purchase.returned", noteId, userId, null);
+            return noteId;
+        });
+        return Get(id)!;
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------------------------------------
 
     /// <summary>How much a party owes on issued sales documents.</summary>
@@ -962,7 +1043,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     private void MoveStock(SqliteConnection c, SqliteTransaction t, long documentId, IReadOnlyList<DocLine> lines, int direction, string reason, long? userId, DateTimeOffset at, long? originId = null)
     {
         var context = shop.Current;
-        var bought = reason == "purchase" ? CostOfPurchasedLines(c, t, documentId, lines) : null;
+        var bought = reason is "purchase" or "purchase-return" ? CostOfPurchasedLines(c, t, documentId, lines) : null;
         foreach (var group in lines.Where(l => l.ItemId is not null).GroupBy(l => l.ItemId!.Value))
         {
             var tracked = Convert.ToInt64(HubDb.Scalar(c, "SELECT track_stock FROM items WHERE id = $i", t, ("$i", group.Key)) ?? 0L) != 0;
@@ -981,6 +1062,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             {
                 "sale" => -StockCost.TakeOut(c, t, group.Key, -qty),
                 "purchase" => bought![group.Key],
+                "purchase-return" => -bought![group.Key],   // goods sent back leave at what the lines of the return come to without tax: what they cost on the purchase
                 "return" when originId is { } invoice => StockCost.Returned(c, t, invoice, documentId, group.Key, qty),
                 "void" => Undone(c, t, documentId, group.Key, qty),
                 _ => 0L,

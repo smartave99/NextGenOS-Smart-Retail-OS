@@ -172,12 +172,12 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
         return catalog.StockList().Where(s => s.OnHandMilli > 0).Select(s => new StockValue(s.ItemId, s.Name, s.OnHandMilli, s.CostMinor, s.ValueMinor)).ToList();
     }
 
-    /// <summary>Purchases received in the period and what is still unpaid to suppliers.</summary>
+    /// <summary>Purchases received in the period (goods sent back to suppliers taken off) and what is still unpaid to suppliers (credit from goods sent back already counts as paid).</summary>
     public (long ReceivedMinor, long UnpaidMinor) Purchases(DateOnly from, DateOnly to)
     {
         Allowed();
         var time = shop.Current.Time;
-        var received = Convert.ToInt64(db.Scalar("SELECT COALESCE(SUM(total_minor), 0) FROM documents WHERE type = 'purchase' AND status = 'issued' AND issued_at >= $f AND issued_at < $t",
+        var received = Convert.ToInt64(db.Scalar("SELECT COALESCE(SUM(CASE type WHEN 'debit-note' THEN -total_minor ELSE total_minor END), 0) FROM documents WHERE type IN ('purchase','debit-note') AND status = 'issued' AND issued_at >= $f AND issued_at < $t",
             ("$f", Iso.Text(time.StartOfDay(from))), ("$t", Iso.Text(time.StartOfNextDay(to)))) ?? 0L);
         var unpaid = Convert.ToInt64(db.Scalar("SELECT COALESCE(SUM(payable_minor - paid_minor), 0) FROM documents WHERE type = 'purchase' AND status = 'issued' AND paid_minor < payable_minor") ?? 0L);
         return (received, unpaid);

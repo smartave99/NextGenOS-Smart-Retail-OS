@@ -9,7 +9,7 @@ public sealed class Numbering(ShopContextProvider shop)
 {
     private static readonly Dictionary<string, string> Prefixes = new()
     {
-        ["invoice"] = "INV", ["quote"] = "QUO", ["order"] = "ORD", ["credit-note"] = "CN", ["purchase"] = "PO", ["progress-bill"] = "PB", ["receipt"] = "RCT",
+        ["invoice"] = "INV", ["quote"] = "QUO", ["order"] = "ORD", ["credit-note"] = "CN", ["debit-note"] = "DN", ["purchase"] = "PO", ["progress-bill"] = "PB", ["receipt"] = "RCT",
     };
 
     public static string PrefixOf(string type) => Prefixes.TryGetValue(type, out var p) ? p : type.ToUpperInvariant();

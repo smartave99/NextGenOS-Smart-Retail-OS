@@ -50,7 +50,7 @@ public static class ExportEndpoint
                 text = Csv.Build(new[] { "Item", "On hand", "Average cost each", "Value" },
                     app.Reports.StockValues().Select(s => (IReadOnlyList<object?>)new object?[] { s.Name, ShopContext.Qty(s.OnHandMilli), M(s.CostMinor), M(s.ValueMinor) }));
                 break;
-            case "register-sales" or "register-credits" or "register-purchases":
+            case "register-sales" or "register-credits" or "register-purchases" or "register-purchase-returns":
             {
                 var kind = report["register-".Length..];
                 text = Csv.Build(new[] { "Number", "Date", "Name", shop.Country.Tax.BusinessId?.Label ?? "Tax number", shop.Country.Tax.Regions?.Label ?? "Place", "Before tax", "Tax parts", "Extra tax", "Tax", "Other", "Total" },

@@ -4,6 +4,12 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Goods sent back to a supplier
+- **A received purchase has a new button, *Send goods back*.** Type how many of each go back and why. The goods leave the stock at what they cost, the tax paid on them is taken back, and what you owe the supplier goes down by the total of the new **debit note** (numbered `DN-...`, printed and listed like the other documents). The credit is first put against what is still unpaid on that purchase; if the purchase was already paid, you choose whether the supplier **pays the money back now** or it **stays as credit with the supplier**.
+- You cannot send back more than you received (counting what already went back), and a shop that does not allow negative stock cannot send back what it no longer has. A purchase that was sent back cannot be cancelled, and a return cannot be cancelled.
+- The *Buying* report takes the goods sent back off, the tax summary takes them off, and the tax registers have a **Goods sent back** tab (with its spreadsheet file).
+- Worked from the older POS's own example (send back 1 of 12 units at 33.33 with 5% off and 9% + 9% tax: 31.66 + 2.85 + 2.85 = 37.36). Not yet: serial numbers, reverse charge, returning to a lot.
+
 ### New versions of the program, through the main PC
 - **The main PC looks, about once a day, for a newer version** (when this copy was built to, and the owner has not switched it off): *Settings, Updates* says where things stand, and the first screen reminds the owner when a version is ready. It sends only the program's name and version and a time stamp: nothing about the shop.
 - **A new version is trusted only when the makers' own release made it.** GitHub signs a statement that this repository's release workflow, started by a version tag, made this very file; it is checked before anything is downloaded, and the file's size and fingerprint are checked when it is kept and again when the owner approves. Nobody has to keep an update-signing key.

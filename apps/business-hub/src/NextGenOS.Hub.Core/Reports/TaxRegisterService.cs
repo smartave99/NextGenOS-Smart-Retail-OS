@@ -15,6 +15,8 @@ public static class RegisterKinds
     public const string Credits = "credits";
     /// <summary>Purchases from suppliers.</summary>
     public const string Purchases = "purchases";
+    /// <summary>Goods sent back to suppliers (debit notes).</summary>
+    public const string PurchaseReturns = "purchase-returns";
 }
 
 /// <summary>One bill, credit note or purchase as a line of a register: who, when, how much before tax, each tax part, the total, and what else made up the total.</summary>
@@ -93,6 +95,7 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop, Acces
         RegisterKinds.Sales => Read("'invoice','progress-bill'", "out", from, to).Select(d => ToRow(d, "bill")).ToList(),
         RegisterKinds.Credits => Read("'credit-note'", "out", from, to).Select(d => ToRow(d, "credit")).ToList(),
         RegisterKinds.Purchases => Read("'purchase'", "in", from, to).Select(d => ToRow(d, "purchase")).ToList(),
+        RegisterKinds.PurchaseReturns => Read("'debit-note'", "in", from, to).Select(d => ToRow(d, "purchase-return")).ToList(),
         _ => throw new HubException("register", "That register does not exist."),
     };
 
@@ -156,7 +159,7 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop, Acces
         var unplaced = 0;
         var documents = db.Query(
             "SELECT id, type, direction, party_tax_id, buyer_region, seller_region, result FROM documents WHERE status = 'issued' AND registered = 1 AND " +
-            "((direction = 'out' AND type IN ('invoice','progress-bill','credit-note')) OR (direction = 'in' AND type = 'purchase')) AND issued_at >= $f AND issued_at < $t ORDER BY issued_at, id",
+            "((direction = 'out' AND type IN ('invoice','progress-bill','credit-note')) OR (direction = 'in' AND type IN ('purchase','debit-note'))) AND issued_at >= $f AND issued_at < $t ORDER BY issued_at, id",
             r => (Id: r.Int("id"), Type: r.Text("type"), Direction: r.Text("direction"), TaxId: r.TextOrNull("party_tax_id"), Buyer: r.TextOrNull("buyer_region"), Seller: r.TextOrNull("seller_region"), Result: r.TextOrNull("result")),
             ("$f", Iso.Text(time.StartOfDay(from))), ("$t", Iso.Text(time.StartOfNextDay(to))));
         foreach (var d in documents)
@@ -165,7 +168,7 @@ public sealed class TaxRegisterService(HubDb db, ShopContextProvider shop, Acces
             var result = NewtonJson.DeserializeObject<TaxResult>(d.Result);
             if (result is null) continue;
             var side = d.Direction == "out" ? "outward" : "inward";
-            var sign = d.Type == DocTypes.CreditNote ? -1 : 1;
+            var sign = d.Type is DocTypes.CreditNote or DocTypes.DebitNote ? -1 : 1;   // goods given back to a customer, or sent back to a supplier, are taken off
             var hasId = !string.IsNullOrWhiteSpace(d.TaxId);
             var between = !string.IsNullOrEmpty(d.Buyer) && d.Buyer != d.Seller;
             var codes = db.Query("SELECT tax_code FROM document_lines WHERE document_id = $id ORDER BY line_no", r => r.Text("tax_code"), ("$id", d.Id));

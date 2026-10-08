@@ -27,6 +27,7 @@
     @if (Shop.Features.Purchases)
     {
         <button type="button" role="tab" class="@(tab == "purchases" ? "on" : "")" aria-selected="@(tab == "purchases")" @onclick='() => Open("purchases")'>Purchases</button>
+        <button type="button" role="tab" class="@(tab == "purchase-returns" ? "on" : "")" aria-selected="@(tab == "purchase-returns")" @onclick='() => Open("purchase-returns")'>Goods sent back</button>
     }
     @foreach (var l in lists)
     {
@@ -143,6 +144,7 @@ else
         "sales" => "Bills to customers",
         "credits" => "Credit notes given",
         "purchases" => "Purchases",
+        "purchase-returns" => "Goods sent back to suppliers",
         _ => lists.FirstOrDefault(l => "list-" + l.Id == tab)?.Label ?? "",
     };
 
@@ -197,7 +199,7 @@ else
         else if (tab == "codes") codes = r.CodesSold(from, to);
         else rows = tab switch
         {
-            "sales" or "credits" or "purchases" => r.Register(tab, from, to),
+            "sales" or "credits" or "purchases" or "purchase-returns" => r.Register(tab, from, to),
             _ => lists.First(l => "list-" + l.Id == tab).Rows,
         };
     }

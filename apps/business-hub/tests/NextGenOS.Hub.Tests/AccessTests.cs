@@ -64,6 +64,7 @@ public class AccessTests : IDisposable
         yield return new("Documents.ReceiveOnAccount", new[] { Perm.Sell }, a => a.Documents.ReceiveOnAccount(partyId, 100, "cash"));
         yield return new("Documents.Void", new[] { Perm.Void }, a => a.Documents.Void(0, "no reason", null));
         yield return new("Documents.CreateCreditNote", new[] { Perm.Sell }, a => a.Documents.CreateCreditNote(0, Array.Empty<(long, long)>(), "returned", "cash", null));
+        yield return new("Documents.CreateDebitNote", new[] { Perm.Purchases }, a => a.Documents.CreateDebitNote(0, Array.Empty<(long, long)>(), "sent back", null, null));
 
         yield return new("Catalog.Create", new[] { Perm.Catalog }, a => a.Catalog.Create(new ItemInput()));
         yield return new("Catalog.Update", new[] { Perm.Catalog }, a => a.Catalog.Update(itemId, new ItemInput()));

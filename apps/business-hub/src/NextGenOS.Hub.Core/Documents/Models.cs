@@ -10,6 +10,8 @@ public static class DocTypes
     public const string Order = "order";
     public const string CreditNote = "credit-note";
     public const string Purchase = "purchase";
+    /// <summary>Goods sent back to a supplier after a purchase was received (the older POS calls it a purchase return): a purchase turned the other way.</summary>
+    public const string DebitNote = "debit-note";
     public const string ProgressBill = "progress-bill";
 }
 

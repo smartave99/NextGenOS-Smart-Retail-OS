@@ -15,7 +15,7 @@ async function boot() {
   const root = mkdtempSync(join(tmpdir(), 'studio-srv-'));
   process.env.SETUP_STUDIO_HOME = join(root, 'home');
   const env = process.env;   // the live settings, as the real Studio uses
-  const studio = await startStudio({ folder: join(root, 'ws'), env });
+  const studio = await startStudio({ folder: join(root, 'ws'), env, kitFolder: join(root, 'no-built-in-kit') });
   const base = studio.url.split('?')[0].replace(/\/$/, '');
   const call = async (method, path, { body, session, key = studio.token, headers = {} } = {}) => {
     const res = await fetch(base + path, { method, headers: { 'content-type': 'application/json', 'x-studio-key': key ?? '', ...(session ? { 'x-studio-session': session } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });

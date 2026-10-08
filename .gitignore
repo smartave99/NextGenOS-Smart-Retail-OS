@@ -85,3 +85,6 @@ licensing/studio/node_modules/
 
 # What the Brand Studio makes from a kit (made again whenever it is needed)
 brand-exports/
+
+# The kit that comes with a delivered Setup Studio (the programs of one release, large installers): it is put there for a delivered Studio and is never committed
+tools/setup-studio/kit/

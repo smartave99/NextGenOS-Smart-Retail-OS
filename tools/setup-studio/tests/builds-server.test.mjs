@@ -22,7 +22,7 @@ async function boot({ stand = {}, folderOf = null } = {}) {
   process.env.SETUP_STUDIO_HOME = join(root, 'home');
   const gh = folderOf?.gh ?? await standInGitHub({});
   Object.assign(gh.options, stand);
-  const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, build: { api: gh.url, pollMs: 15, ceilingMs: 10_000, requestTimeoutMs: 1500, downloadTimeoutMs: 5000, lostContactLimit: 3 } });
+  const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, kitFolder: join(root, 'no-built-in-kit'), build: { api: gh.url, pollMs: 15, ceilingMs: 10_000, requestTimeoutMs: 1500, downloadTimeoutMs: 5000, lostContactLimit: 3 } });
   const base = studio.url.split('?')[0].replace(/\/$/, '');
   const call = async (method, path, { body, session } = {}) => {
     const res = await fetch(base + path, { method, headers: { 'content-type': 'application/json', 'x-studio-key': studio.token, ...(session ? { 'x-studio-session': session } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });

@@ -8,7 +8,7 @@ using NextGenOS.Hub.Shop;
 namespace NextGenOS.Hub.Printing;
 
 /// <summary>Printing for the shop: bills to the receipt printer, tickets to the kitchen, labels to the label printer. A printer that is off never loses a sale: the message says what to check.</summary>
-public sealed class HubPrinting(PrinterStore printers, PrintService service, DocumentService documents, CatalogService catalog, ShopContextProvider shop, AuditService audit)
+public sealed class HubPrinting(PrinterStore printers, PrintService service, DocumentService documents, CatalogService catalog, ShopContextProvider shop, AuditService audit, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Loyalty.LoyaltyService loyalty)
 {
     public PrinterStore Printers => printers;
 
@@ -29,7 +29,8 @@ public sealed class HubPrinting(PrinterStore printers, PrintService service, Doc
     {
         var view = documents.Get(documentId) ?? throw new HubException("not-found", "That bill was not found.");
         var printer = Choose(PrinterRole.Receipt, printerId);
-        try { await service.PrintReceiptAsync(printer, ReceiptLayout.Bill(view, shop.Current, printer.Columns), ct); }
+        var points = view.Party is { } who && loyalty.Enabled ? loyalty.ForDocument(documentId, who.Id) : null;
+        try { await service.PrintReceiptAsync(printer, ReceiptLayout.Bill(view, shop.Current, printer.Columns, offers.ForDocument(documentId), points), ct); }
         catch (PrinterException ex) { throw Failed(ex); }
         audit.Log(userId, "bill-printed", "document", documentId, printer.Name);
     }

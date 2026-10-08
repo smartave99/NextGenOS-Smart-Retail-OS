@@ -43,6 +43,8 @@
                 <select id="s-region" @bind="s.Region">@foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }</select>
             }
             <label for="s-foot">Words at the bottom of every bill</label><input id="s-foot" @bind="s.ReceiptFooter" maxlength="160" />
+            <label for="s-gift">Words printed when a bill earns a gift voucher</label><input id="s-gift" @bind="s.GiftVoucherText" maxlength="240" />
+            <p class="muted small">Use {code}, {amount} and {valid}: they are filled in for each voucher.</p>
             <label for="s-pay">Ways of paying (separated by commas)</label><input id="s-pay" @bind="payText" maxlength="200" />
             <label class="check"><input type="checkbox" @bind="s.PricesIncludeTax" /> The prices I type already include tax</label>
             <label class="check"><input type="checkbox" @bind="s.TaxRegistered" /> My business is registered for @Shop.Country.Tax.Name</label>

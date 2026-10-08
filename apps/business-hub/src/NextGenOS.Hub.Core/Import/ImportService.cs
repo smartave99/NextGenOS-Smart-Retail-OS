@@ -15,7 +15,7 @@ namespace NextGenOS.Hub.Import;
 /// is done before the import so that the import needs no connection to the old system at all.
 /// This class does not check who is asking: the screen does (the owner only), as for every service in the Hub.
 /// </summary>
-public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, CatalogService catalog, PartyService parties)
+public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, CatalogService catalog, PartyService parties, NextGenOS.Hub.Offers.OffersService offers)
 {
     private const string Tenant = "local";
     private const string Site = "main";
@@ -97,6 +97,7 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
             long id;
             try { id = parties.Create(c, t, party.Input); }
             catch (HubException ex) { throw new HubException(ex.Code, "\"" + party.Input.Name + "\" could not be added, so nothing was moved. " + ex.Message); }
+            if (party.DiscountPctMilli > 0) offers.SetPartyDiscount(c, t, id, party.DiscountPctMilli, true, userId);
             if (party.BalanceMinor != 0)
             {
                 HubDb.Exec(c, "INSERT INTO party_opening_balances(party_id, balance_minor, as_of, run_id) VALUES ($p, $b, $at, $r)", t,

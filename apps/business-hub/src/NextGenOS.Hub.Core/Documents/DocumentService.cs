@@ -14,7 +14,7 @@ namespace NextGenOS.Hub.Documents;
 /// Invoices, quotes, orders, credit notes, purchases and progress bills. One place does the money: it builds the lines, asks the tax engine for the
 /// amounts (so every country is right to the last cent), keeps the answer with the document, takes payments, moves stock and numbers the document.
 /// </summary>
-public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty)
+public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers)
 {
     /// <summary>The "way of paying" that uses credit a customer already has with the shop (an advance, or a return kept as credit). It moves no money and is not in the shop's list of ways of paying.</summary>
     public const string AccountCredit = "account";
@@ -22,9 +22,9 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     private const string DocColumns =
         "id, type, number, status, direction, party_id, issued_at, created_at, due_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
         "subtotal_minor, tax_minor, total_minor, payable_minor, paid_minor, tips_minor, retention_minor, advance_minor, table_id, project_id, ref_document_id, user_id, notes, meta, " +
-        "bill_discount_minor, bill_discount_pct_milli, loyalty_points_used_cent, loyalty_discount_minor";
+        "bill_discount_minor, bill_discount_pct_milli, loyalty_points_used_cent, loyalty_discount_minor, offer_discount_minor";
 
-    private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id";
+    private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id, discount_source, free_for_line_id";
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -36,12 +36,12 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         r.Flag("registered"), r.Int("subtotal_minor"), r.Int("tax_minor"), r.Int("total_minor"), r.Int("payable_minor"), r.Int("paid_minor"), r.Int("tips_minor"),
         r.Int("retention_minor"), r.Int("advance_minor"), r.IntOrNull("table_id"), r.IntOrNull("project_id"), r.IntOrNull("ref_document_id"), r.IntOrNull("user_id"),
         r.TextOrNull("notes"), JsonSerializer.Deserialize<Dictionary<string, string>>(r.Text("meta")) ?? new Dictionary<string, string>(),
-        r.Int("bill_discount_minor"), r.Int("bill_discount_pct_milli"), r.Int("loyalty_points_used_cent"), r.Int("loyalty_discount_minor"));
+        r.Int("bill_discount_minor"), r.Int("bill_discount_pct_milli"), r.Int("loyalty_points_used_cent"), r.Int("loyalty_discount_minor"), r.Int("offer_discount_minor"));
 
     private static DocLine MapLine(SqliteDataReader r) => new(
         r.Int("id"), (int)r.Int("line_no"), r.IntOrNull("item_id"), r.Text("description"), r.Int("qty_milli"), r.TextOrNull("unit"), r.Int("unit_price_minor"),
         r.Int("discount_pct_milli"), r.Text("tax_code"), r.TextOrNull("customer_discount"), r.Flag("fired"), r.TextOrNull("note"), r.TextOrNull("station"), r.IntOrNull("boq_id"),
-        r.Int("discount_amount_minor"), r.IntOrNull("ref_line_id"));
+        r.Int("discount_amount_minor"), r.IntOrNull("ref_line_id"), r.TextOrNull("discount_source"), r.IntOrNull("free_for_line_id"));
 
     public Document? GetHeader(long id) => db.QueryOne($"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, ("$id", id));
 
@@ -136,6 +136,12 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         var price = input.UnitPriceMinor ?? item?.PriceFor(party?.PriceLevel ?? "retail") ?? throw new HubException("price-missing", "Please give a price.");
         if (price < 0) throw new HubException("price", "A price cannot be negative.");
         CheckLineDiscount(input.DiscountPctMilli, input.DiscountAmountMinor, input.QtyMilli, price);
+        // A line sold to a customer with a standing discount, or of an item on offer, gets that discount unless a person gave one (or this line is a copy that must stay as it was).
+        var discountPct = input.DiscountPctMilli;
+        string? discountSource = null;
+        if (item is not null && discountPct == 0 && input.DiscountAmountMinor == 0 && input.RefLineId is null && !input.NoAutoDiscount
+            && HubDb.Query(c, "SELECT type, direction FROM documents WHERE id = $id", r => (Type: r.Text("type"), Direction: r.Text("direction")), t, ("$id", documentId)).FirstOrDefault() is { Direction: "out", Type: DocTypes.Invoice or DocTypes.Order or DocTypes.Quote })
+            (discountPct, discountSource) = offers.AutoLineDiscount(c, t, item.Id, party?.Id);
         string taxCode;
         try { taxCode = context.TaxCode(input.TaxCode ?? item?.TaxCode ?? "standard"); }
         catch (ArgumentException ex) { throw new HubException("tax", ex.Message); }
@@ -143,10 +149,10 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             throw new HubException("customer-discount", $"\"{input.CustomerDiscount}\" is not a discount of {context.Country.Name}.");
         var lineNo = Convert.ToInt32(HubDb.Scalar(c, "SELECT COALESCE(MAX(line_no), 0) + 1 FROM document_lines WHERE document_id = $id", t, ("$id", documentId)) ?? 1);
         HubDb.Exec(c,
-            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id) " +
-            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq)", t,
+            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id, discount_source) " +
+            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq, $source)", t,
             ("$d", documentId), ("$n", lineNo), ("$item", item?.Id), ("$desc", description), ("$q", input.QtyMilli), ("$unit", input.Unit ?? item?.Unit), ("$price", price),
-            ("$disc", input.DiscountPctMilli), ("$damt", input.DiscountAmountMinor), ("$refline", input.RefLineId), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
+            ("$disc", discountPct), ("$damt", input.DiscountAmountMinor), ("$source", discountSource), ("$refline", input.RefLineId), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
     }
 
     public DocumentView UpdateLine(long documentId, long lineId, long? qtyMilli = null, long? discountPctMilli = null, string? note = null, string? customerDiscount = null, bool clearCustomerDiscount = false, long? discountAmountMinor = null)
@@ -158,11 +164,13 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             if (discountPctMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
             if (discountAmountMinor is < 0) throw new HubException("discount", "A discount cannot be less than nothing.");
             if (discountPctMilli is > 0 && discountAmountMinor is > 0) throw new HubException("discount", "Give the discount as a percent or as an amount, not both.");
+            RequireNotFree(c, t, lineId, documentId);
             // Giving one kind of discount takes the other kind off the line.
             HubDb.Exec(c,
                 "UPDATE document_lines SET qty_milli = COALESCE($q, qty_milli), " +
                 "discount_pct_milli = CASE WHEN COALESCE($a, 0) > 0 THEN 0 ELSE COALESCE($d, discount_pct_milli) END, " +
                 "discount_amount_minor = CASE WHEN COALESCE($d, 0) > 0 THEN 0 ELSE COALESCE($a, discount_amount_minor) END, note = COALESCE($n, note), " +
+                "discount_source = CASE WHEN $d IS NOT NULL OR $a IS NOT NULL THEN NULL ELSE discount_source END, " +
                 "customer_discount = CASE WHEN $clear = 1 THEN NULL ELSE COALESCE($cd, customer_discount) END WHERE id = $id AND document_id = $doc", t,
                 ("$q", qtyMilli), ("$d", discountPctMilli), ("$a", discountAmountMinor), ("$n", note), ("$cd", Blank(customerDiscount)), ("$clear", clearCustomerDiscount ? 1 : 0), ("$id", lineId), ("$doc", documentId));
             var now = HubDb.Query(c, "SELECT qty_milli, unit_price_minor, discount_amount_minor FROM document_lines WHERE id = $id AND document_id = $doc", r => (Qty: r.Int("qty_milli"), Price: r.Int("unit_price_minor"), Amount: r.Int("discount_amount_minor")), t, ("$id", lineId), ("$doc", documentId)).FirstOrDefault();
@@ -177,6 +185,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         db.InTransaction((c, t) =>
         {
             RequireOpen(c, t, documentId);
+            RequireNotFree(c, t, lineId, documentId);
             if (Convert.ToInt64(HubDb.Scalar(c, "SELECT fired FROM document_lines WHERE id = $id AND document_id = $doc", t, ("$id", lineId), ("$doc", documentId)) ?? 0L) != 0)
                 throw new HubException("already-sent", "That line was already sent to the kitchen. Void the bill, or tell the kitchen, instead.");
             HubDb.Exec(c, "DELETE FROM document_lines WHERE id = $id AND document_id = $doc", t, ("$id", lineId), ("$doc", documentId));
@@ -278,9 +287,54 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                     if (item is not null) HubDb.Exec(c, "UPDATE document_lines SET unit_price_minor = $p WHERE id = $id", t, ("$p", item.PriceFor(party.PriceLevel)), ("$id", lineId));
                 }
             }
+            offers.ReapplyLineDiscounts(c, t, documentId, partyId);
             Recalculate(c, t, documentId);
         });
         return Get(documentId)!;
+    }
+
+    // ---- coupons, vouchers and offers on a sale that is being made ------------------------------------------------------------------------
+
+    /// <summary>Puts a coupon or gift voucher (by its code) on a sale that is being made. It is used up only when the bill is made.</summary>
+    public DocumentView ApplyCode(long documentId, string code)
+    {
+        db.InTransaction((c, t) =>
+        {
+            RequireOpen(c, t, documentId);
+            offers.AttachCode(c, t, documentId, code);
+            Recalculate(c, t, documentId);
+        });
+        return Get(documentId)!;
+    }
+
+    /// <summary>Takes a coupon or gift voucher off a sale that is being made (it stays good for another bill).</summary>
+    public DocumentView RemoveCode(long documentId, long voucherId)
+    {
+        db.InTransaction((c, t) =>
+        {
+            RequireOpen(c, t, documentId);
+            offers.DetachCode(c, t, documentId, voucherId);
+            Recalculate(c, t, documentId);
+        });
+        return Get(documentId)!;
+    }
+
+    /// <summary>The cashier chooses not to use the offer that fits the bill (or to use it after all).</summary>
+    public DocumentView SetOfferDeclined(long documentId, bool declined)
+    {
+        db.InTransaction((c, t) =>
+        {
+            RequireOpen(c, t, documentId);
+            offers.SetDeclined(c, t, documentId, declined);
+            Recalculate(c, t, documentId);
+        });
+        return Get(documentId)!;
+    }
+
+    private static void RequireNotFree(SqliteConnection c, SqliteTransaction t, long lineId, long documentId)
+    {
+        if (HubDb.Scalar(c, "SELECT free_for_line_id FROM document_lines WHERE id = $id AND document_id = $doc", t, ("$id", lineId), ("$doc", documentId)) is not null)
+            throw new HubException("free-line", "That line is free goods that come with the line it follows. Change that line instead.");
     }
 
     // ---- the money -------------------------------------------------------------------------------------------------------------
@@ -288,6 +342,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Works the amounts out again with the tax engine and keeps them (and the engine's full answer) with the document.</summary>
     public void Recalculate(SqliteConnection c, SqliteTransaction t, long documentId)
     {
+        offers.Refresh(c, t, documentId);   // free goods and offers follow the lines, so they are brought up to date before the amounts are worked out
         var context = shop.Current;
         var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", documentId)).Single();
         var lines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", documentId));
@@ -339,7 +394,15 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     }
 
     /// <summary>What a line comes to after its own discount.</summary>
-    public static long NetOf(DocLine line) => Gross(line.QtyMilli, line.UnitPriceMinor) - LineDiscountOf(line);
+    public static long NetOf(DocLine line) => NetOf(line.QtyMilli, line.UnitPriceMinor, line.DiscountPctMilli, line.DiscountAmountMinor);
+
+    /// <summary>What a line comes to after its own discount, from its numbers: the amount discount if there is one, else the percent, never more than the line.</summary>
+    public static long NetOf(long qtyMilli, long priceMinor, long discountPctMilli, long discountAmountMinor)
+    {
+        var gross = Gross(qtyMilli, priceMinor);
+        var discount = discountAmountMinor > 0 ? discountAmountMinor : (long)((2 * (BigInteger)gross * discountPctMilli + 100_000) / 200_000);
+        return gross - Math.Min(discount, gross);
+    }
 
     /// <summary>How much of the bill's discount falls on each line (in the order of the lines). Nothing when the bill has no discount.</summary>
     public static long[] BillDiscountShares(Document header, IReadOnlyList<DocLine> lines)
@@ -347,7 +410,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         var nets = lines.Select(NetOf).ToArray();
         var total = nets.Sum();
         var typed = header.BillDiscountPctMilli > 0 ? (long)((2 * (BigInteger)total * header.BillDiscountPctMilli + 100_000) / 200_000) : header.BillDiscountMinor;
-        return Allocate(nets, Math.Min(typed + header.LoyaltyDiscountMinor, total));   // loyalty points used on the bill are part of its discount
+        return Allocate(nets, Math.Min(typed + header.LoyaltyDiscountMinor + header.OfferDiscountMinor, total));   // points used, offers and coupons on the bill are part of its discount (never more than the bill)
     }
 
     /// <summary>
@@ -467,6 +530,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         }
         books.Sync(c, t, documentId, options.UserId);
         loyalty.OnIssued(c, t, documentId, options.UserId);
+        offers.OnIssued(c, t, documentId, options.UserId);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
         return documentId;
     }
@@ -507,10 +571,11 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             {
                 Type = DocTypes.Invoice, PartyId = quote.PartyId, UserId = userId, RefDocumentId = quote.Id, PricesIncludeTax = quote.PricesIncludeTax, Notes = $"From quote {quote.Number}",
                 BillDiscountMinor = quote.BillDiscountMinor, BillDiscountPctMilli = quote.BillDiscountPctMilli,
-                Lines = lines.Select(l => new LineInput
+                // Goods given free are left out here: the bill works them out again from the lines they came with, the same way.
+                Lines = lines.Where(l => !l.IsFree).Select(l => new LineInput
                 {
                     ItemId = l.ItemId, Description = l.Description, QtyMilli = l.QtyMilli, Unit = l.Unit, UnitPriceMinor = l.UnitPriceMinor, DiscountPctMilli = l.DiscountPctMilli,
-                    DiscountAmountMinor = l.DiscountAmountMinor, TaxCode = l.TaxCode, CustomerDiscount = l.CustomerDiscount, Note = l.Note,
+                    DiscountAmountMinor = l.DiscountAmountMinor, TaxCode = l.TaxCode, CustomerDiscount = l.CustomerDiscount, Note = l.Note, NoAutoDiscount = true,
                 }).ToList(),
             });
         });
@@ -542,6 +607,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             if (row.Status != DocStatus.Open || row.Number is not null || row.Type is not (DocTypes.Invoice or DocTypes.Quote))
                 throw new HubException("not-draft", "Only a sale that was never finished can be thrown away.");
             HubDb.Exec(c, "DELETE FROM document_lines WHERE document_id = $id", t, ("$id", documentId));
+            HubDb.Exec(c, "DELETE FROM document_offers WHERE document_id = $id", t, ("$id", documentId));   // a new sale can be given the number of one thrown away, so nothing of it may stay behind
             HubDb.Exec(c, "DELETE FROM documents WHERE id = $id", t, ("$id", documentId));
         });
     }
@@ -556,6 +622,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             foreach (var id in ids)
             {
                 HubDb.Exec(c, "DELETE FROM document_lines WHERE document_id = $id", t, ("$id", id));
+                HubDb.Exec(c, "DELETE FROM document_offers WHERE document_id = $id", t, ("$id", id));
                 HubDb.Exec(c, "DELETE FROM documents WHERE id = $id", t, ("$id", id));
             }
             return ids.Count;
@@ -652,7 +719,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             }
             HubDb.Exec(c, "UPDATE documents SET status = 'void', notes = COALESCE(notes || char(10), '') || $why WHERE id = $id", t, ("$why", "Void: " + reason.Trim()), ("$id", documentId));
             books.Sync(c, t, documentId, userId);
-            if (header.Status == DocStatus.Issued) loyalty.OnVoid(c, t, documentId, userId);
+            if (header.Status == DocStatus.Issued) { loyalty.OnVoid(c, t, documentId, userId); offers.OnVoid(c, t, documentId, userId); }
             audit.Log(c, t, userId, "void", "document", documentId, reason.Trim());
         });
         return Get(documentId)!;

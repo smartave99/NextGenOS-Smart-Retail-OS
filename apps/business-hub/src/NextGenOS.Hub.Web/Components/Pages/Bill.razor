@@ -79,7 +79,7 @@ else
         }
     </div>
 
-    <Receipt View="view" Shop="Shop" Points="@Points()" />
+    <Receipt View="view" Shop="Shop" Points="@Points()" Offers="@App.Offers.ForDocument(Id)" />
 
     @if (credits.Count > 0)
     {

@@ -25,10 +25,10 @@ public sealed record Document(
     int CurrencyDecimals, bool PricesIncludeTax, string? SellerRegion, string? BuyerRegion, bool RoundTotal, bool Registered,
     long SubtotalMinor, long TaxMinor, long TotalMinor, long PayableMinor, long PaidMinor, long TipsMinor, long RetentionMinor, long AdvanceMinor,
     long? TableId, long? ProjectId, long? RefDocumentId, long? UserId, string? Notes, IReadOnlyDictionary<string, string> Meta,
-    long BillDiscountMinor = 0, long BillDiscountPctMilli = 0, long LoyaltyPointsUsedCent = 0, long LoyaltyDiscountMinor = 0)
+    long BillDiscountMinor = 0, long BillDiscountPctMilli = 0, long LoyaltyPointsUsedCent = 0, long LoyaltyDiscountMinor = 0, long OfferDiscountMinor = 0)
 {
-    /// <summary>True when a discount was given on the whole bill (as an amount or a percent).</summary>
-    public bool HasBillDiscount => BillDiscountMinor > 0 || BillDiscountPctMilli > 0;
+    /// <summary>True when something was taken off the whole bill: a discount typed in (an amount or a percent), loyalty points used, or an offer or a coupon.</summary>
+    public bool HasBillDiscount => BillDiscountMinor > 0 || BillDiscountPctMilli > 0 || LoyaltyDiscountMinor > 0 || OfferDiscountMinor > 0;
 
     public long BalanceMinor => Status == DocStatus.Issued ? Math.Max(0, PayableMinor - PaidMinor) : 0;
 
@@ -38,7 +38,11 @@ public sealed record Document(
 
 public sealed record DocLine(
     long Id, int LineNo, long? ItemId, string Description, long QtyMilli, string? Unit, long UnitPriceMinor, long DiscountPctMilli, string TaxCode,
-    string? CustomerDiscount, bool Fired, string? Note, string? Station, long? BoqId, long DiscountAmountMinor = 0, long? RefLineId = null);
+    string? CustomerDiscount, bool Fired, string? Note, string? Station, long? BoqId, long DiscountAmountMinor = 0, long? RefLineId = null, string? DiscountSource = null, long? FreeForLineId = null)
+{
+    /// <summary>True for goods given free with another line ("buy so many, get so many free").</summary>
+    public bool IsFree => FreeForLineId is not null;
+}
 
 public sealed class LineInput
 {
@@ -53,6 +57,8 @@ public sealed class LineInput
     public long DiscountAmountMinor { get; set; }
     /// <summary>For a line of a credit note: the invoice line it gives back.</summary>
     public long? RefLineId { get; set; }
+    /// <summary>Keep the discount exactly as given (none included): do not look for the customer's standing discount or an item offer. For copying a line that already has its final discount.</summary>
+    public bool NoAutoDiscount { get; set; }
     public string? TaxCode { get; set; }
     public string? CustomerDiscount { get; set; }
     public string? Note { get; set; }

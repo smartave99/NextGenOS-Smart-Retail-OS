@@ -45,7 +45,11 @@ else
                     <span class="nm">@Qty(line.QtyMilli) × @line.Description@if (line.Fired) { <span class="chip ok">Sent</span> }</span>
                     <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>
                     <div class="ctl">
-                        @if (!line.Fired)
+                        @if (line.IsFree)
+                        {
+                            <span class="muted small">Free with the dish above</span>
+                        }
+                        else if (!line.Fired)
                         {
                             <button type="button" class="qbtn" aria-label="One less of @line.Description" @onclick="() => Change(line, -1000)">−</button>
                             <button type="button" class="qbtn" aria-label="One more of @line.Description" @onclick="() => Change(line, 1000)">+</button>

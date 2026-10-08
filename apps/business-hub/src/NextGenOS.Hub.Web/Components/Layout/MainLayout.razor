@@ -67,6 +67,7 @@
         if (Can(Perm.Sell) || Can(Perm.Reports) || Can(Perm.Loans)) yield return new Link("documents", Shop.Plural("invoice"), "receipt");
         if (Can(Perm.Reports)) yield return new Link("reports", "Reports", "chart");
         if (Can(Perm.Reports)) yield return new Link("books", "Books", "receipt");
+        if (f.CounterSale && Can(Perm.Discount)) yield return new Link("offers", "Offers", "tag");
         if (Can(Perm.Settings)) yield return new Link("settings", "Settings", "gear");
     }
 

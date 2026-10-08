@@ -8,6 +8,7 @@ using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Loyalty;
+using NextGenOS.Hub.Offers;
 using NextGenOS.Hub.Ontology;
 using NextGenOS.Hub.Printing;
 using NextGenOS.Hub.Projects;
@@ -37,7 +38,8 @@ public sealed class HubApp
         Catalog = new CatalogService(db, Shop, clock);
         Books = new BooksService(db, clock);
         Loyalty = new LoyaltyService(db, Shop, clock);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty);
+        Offers = new OffersService(db, Shop, clock, Audit);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers);
         Users = new UserService(db, clock, Audit);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
@@ -46,7 +48,7 @@ public sealed class HubApp
         Purchasing = new PurchaseService(Documents, Catalog, Parties);
         Reports = new ReportService(db, Shop, clock, Catalog);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
-        Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit);
+        Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
         // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
         Ai = new AiFoundation(db, clock, Audit, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", ai);
         // The business event history (observations, events, evidence pointers) and its forgetting. Writing waits for the owner's switch; nothing in the shop's own screens writes to it yet.
@@ -55,7 +57,7 @@ public sealed class HubApp
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
-        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties);
+        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers);
     }
 
     public HubDb Db { get; }
@@ -68,6 +70,7 @@ public sealed class HubApp
     public CatalogService Catalog { get; }
     public BooksService Books { get; }
     public LoyaltyService Loyalty { get; }
+    public OffersService Offers { get; }
     public DocumentService Documents { get; }
     public UserService Users { get; }
     public RestaurantService Restaurant { get; }

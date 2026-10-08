@@ -94,6 +94,13 @@
                         <select id="p-level" @bind="form.PriceLevel"><option value="retail">Normal prices</option><option value="trade">Trade prices</option></select>
                     }
                 }
+                @if (Me.Can(Perm.Discount) && form.Kind is "customer" or "client")
+                {
+                    <div class="field-row">
+                        <div><label for="p-discount">Always give this much off (percent, optional)</label><input id="p-discount" inputmode="decimal" placeholder="for example 5" @bind="discount" /></div>
+                        <div><label class="check"><input id="p-discount-on" type="checkbox" @bind="discountOn" /> Use this discount</label></div>
+                    </div>
+                }
                 <label for="p-notes">Notes</label>
                 <textarea id="p-notes" rows="2" @bind="form.Notes" maxlength="500"></textarea>
                 @if (editing is not null)
@@ -120,6 +127,8 @@
     private string? formError;
     private string limit = "";
     private bool active = true;
+    private string discount = "";
+    private bool discountOn = true;
 
     private string CurrentKind => kind.Length > 0 ? kind : Shop.Industry.PartyKinds.First().Id;
     private bool showOwed => Shop.Features.Credit && (kind is "customer" or "client");
@@ -161,6 +170,8 @@
         form = new PartyInput { Kind = CurrentKind, MemberType = CurrentKind == "member" ? App.Library.MemberTypes().FirstOrDefault()?.Id : null };
         limit = "";
         active = true;
+        discount = "";
+        discountOn = true;
     }
 
     private void Edit(Party p)
@@ -174,6 +185,9 @@
         };
         limit = p.CreditLimitMinor > 0 ? Shop.Text(p.CreditLimitMinor) : "";
         active = p.Active;
+        var (pct, on) = App.Offers.PartyDiscount(p.Id);
+        discount = pct > 0 ? Qty(pct) : "";
+        discountOn = pct == 0 || on;
     }
 
     private void Save()
@@ -188,12 +202,22 @@
                 var prop = typeof(PartyInput).GetProperty(blank)!;
                 if (prop.GetValue(form) is string s && string.IsNullOrWhiteSpace(s)) prop.SetValue(form, null);
             }
-            if (editing is null) App.Parties.Create(form);
+            var setDiscount = Me.Can(Perm.Discount) && form.Kind is "customer" or "client";
+            long discountMilli = 0;
+            if (setDiscount && discount.Trim().Length > 0)
+            {
+                try { discountMilli = ShopContext.QtyMilli(discount.Trim().TrimEnd('%').Trim()); }
+                catch (FormatException) { throw new HubException("discount", "Please type the discount as a percent, like 5, or leave it empty."); }
+                if (discountMilli is < 0 or > 100_000) throw new HubException("discount", "A discount must be between 0 and 100 percent.");
+            }
+            long savedId;
+            if (editing is null) savedId = App.Parties.Create(form).Id;
             else
             {
-                App.Parties.Update(editing.Id, form);
+                savedId = App.Parties.Update(editing.Id, form).Id;
                 if (active != editing.Active) App.Parties.SetActive(editing.Id, active);
             }
+            if (setDiscount) App.Offers.SetPartyDiscount(savedId, discountMilli, discountOn, Me.Id);
             form = null;
             Find();
             Info = "Saved.";

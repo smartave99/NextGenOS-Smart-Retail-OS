@@ -58,6 +58,43 @@ public class PrintingTests
     }
 
     [Fact]
+    public async Task A_bill_on_paper_says_what_the_screen_says_about_discounts_offers_free_goods_points_and_a_gift_voucher()
+    {
+        var (f, r) = Shop();
+        using (f)
+        {
+            f.App.PrinterProfiles.Save(Receipt());
+            var settings = f.App.Shop.Current.Settings;
+            settings.GiftVoucherText = "Present {code} worth {amount}";
+            settings.LoyaltyOn = true;
+            settings.LoyaltyDefaultMode = "point";
+            settings.LoyaltyDefaultValueMilli = 1_000;
+            settings.LoyaltyPointValueMilli = 500;
+            f.App.Shop.Save(settings);
+            var asha = f.App.Parties.Create(new PartyInput { Kind = "customer", Name = "Asha" });
+            var pen = f.App.Catalog.Create(new ItemInput { Kind = "stock", Name = "Pen", PriceMinor = 10_000, TaxClass = "standard" });
+            f.App.Offers.SaveOffer(new NextGenOS.Hub.Offers.OfferInput { Kind = NextGenOS.Hub.Offers.OfferKinds.BuyGet, ItemId = pen.Id, MinQtyMilli = 3_000, FreeQtyMilli = 1_000 });
+            f.App.Offers.SaveOffer(new NextGenOS.Hub.Offers.OfferInput { Kind = NextGenOS.Hub.Offers.OfferKinds.GiftRule, FromMinor = 1, AmountMinor = 3_000 });
+            f.App.Offers.SaveOffer(new NextGenOS.Hub.Offers.OfferInput { Kind = NextGenOS.Hub.Offers.OfferKinds.BillRange, Name = "Welcome offer", FromMinor = 1, AmountMinor = 500 });
+            var coupon = f.App.Offers.GenerateCoupons(new[] { asha.Id }, 1_000, null, null).Single();
+            var draft = f.App.Documents.CreateDraft(new DraftOptions { PartyId = asha.Id, Lines = { new LineInput { ItemId = pen.Id, QtyMilli = 3_000, DiscountPctMilli = 10_000 } } });
+            draft = f.App.Documents.ApplyCode(draft.Document.Id, coupon.Code);
+            var bill = f.App.Documents.Issue(draft.Document.Id, new IssueOptions { Payments = { new PaymentInput { AmountMinor = draft.Document.PayableMinor } } });
+            var gift = f.App.Offers.ForDocument(bill.Document.Id).Earned.Single();
+            await f.App.Printing.PrintBillAsync(bill.Document.Id);
+            var text = Text(r.Sent.Single());
+            Assert.Contains("(-10%)", text);                              // the line's discount
+            Assert.Contains("1 free", text);                              // the free pen
+            Assert.Contains("Discount given", text);
+            Assert.Contains("Welcome offer", text);
+            Assert.Contains("Coupon " + coupon.Pretty, text);
+            Assert.Contains("Points earned", text);
+            Assert.Contains("Points now", text);
+            Assert.Contains("Present " + gift.Pretty + " worth Rs30.00", text);   // the shop's own words, filled in
+        }
+    }
+
+    [Fact]
     public async Task Without_a_printer_the_message_says_where_to_add_one_and_nothing_is_lost()
     {
         var (f, _) = Shop();

@@ -19,13 +19,24 @@
     {
         var r = View.ResultFor(line);
         <div>@line.Description</div>
-        <div class="r"><span>@Qty(line.QtyMilli) × @Shop.Money(line.UnitPriceMinor)@(line.DiscountPctMilli > 0 ? $" (−{Qty(line.DiscountPctMilli)}%)" : line.DiscountAmountMinor > 0 ? $" (−{Shop.Money(line.DiscountAmountMinor)})" : "")</span><span>@(r is null ? "" : Shop.Money(Shop.Minor(r.LineTotal)))</span></div>
+        @if (line.IsFree)
+        {
+            <div class="r"><span>@Qty(line.QtyMilli) free</span><span>@Shop.Money(0)</span></div>
+        }
+        else
+        {
+            <div class="r"><span>@Qty(line.QtyMilli) × @Shop.Money(line.UnitPriceMinor)@(line.DiscountPctMilli > 0 ? $" (−{Qty(line.DiscountPctMilli)}%)" : line.DiscountAmountMinor > 0 ? $" (−{Shop.Money(line.DiscountAmountMinor)})" : "")</span><span>@(r is null ? "" : Shop.Money(Shop.Minor(r.LineTotal)))</span></div>
+        }
     }
     <hr />
     @if (View.Result is { } result)
     {
         var t = result.Totals;
         if (Shop.Minor(t.Discount) > 0) { <div class="r"><span>Discount given</span><span>−@Shop.Money(Shop.Minor(t.Discount))</span></div> }
+        foreach (var applied in Offers?.Applied ?? Array.Empty<NextGenOS.Hub.Offers.AppliedOffer>())
+        {
+            <div class="r muted offer-line"><span>@applied.Label</span><span>−@Shop.Money(applied.AmountMinor)</span></div>
+        }
         <div class="r"><span>@(Shop.Settings.PricesIncludeTax ? "Before tax" : "Subtotal")</span><span>@Shop.Money(Shop.Minor(t.Taxable))</span></div>
         @foreach (var c in t.Components ?? new List<Component>())
         {
@@ -59,6 +70,11 @@
     {
         <div class="r b"><span>Balance due</span><span>@Shop.Money(View.Document.BalanceMinor)</span></div>
     }
+    @foreach (var gift in Offers?.Earned ?? Array.Empty<NextGenOS.Hub.Offers.Voucher>())
+    {
+        <hr />
+        <div class="c gift-text" data-gift="@gift.Code">@NextGenOS.Hub.Offers.OffersService.GiftText(Shop.Settings.GiftVoucherText, gift, Shop.Money)</div>
+    }
     <hr />
     <div class="c">@Shop.Settings.ReceiptFooter</div>
 </div>
@@ -68,6 +84,8 @@
     [Parameter, EditorRequired] public ShopContext Shop { get; set; } = default!;
     /// <summary>Loyalty points this bill earned and used, and the customer's balance; null when there is nothing to say.</summary>
     [Parameter] public NextGenOS.Hub.Loyalty.LoyaltyService.Summary? Points { get; set; }
+    /// <summary>What offers and codes took off this bill, and the gift voucher it earned; null when there is nothing to say.</summary>
+    [Parameter] public NextGenOS.Hub.Offers.DocumentOffers? Offers { get; set; }
 
     private static string P(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 

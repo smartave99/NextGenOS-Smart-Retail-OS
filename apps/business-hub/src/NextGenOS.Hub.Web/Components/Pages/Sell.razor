@@ -54,6 +54,15 @@
             @foreach (var line in cart.Lines)
             {
                 var result = cart.ResultFor(line);
+                if (line.IsFree)
+                {
+                    <div class="line free-goods" data-free="true">
+                        <span class="nm">@line.Description</span>
+                        <span class="amt">Free</span>
+                        <div class="ctl"><span class="muted small">@Qty(line.QtyMilli) free with the one above</span></div>
+                    </div>
+                    continue;
+                }
                 <div class="line">
                     <span class="nm">@line.Description</span>
                     <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>
@@ -79,6 +88,24 @@
                 <div class="row discount-row">
                     <label for="bill-discount" class="grow">Discount on the whole bill</label>
                     <input id="bill-discount" class="disc-in" inputmode="decimal" placeholder="10% or an amount" value="@BillDiscountText()" @onchange="e => SetBillDiscount(e.Value?.ToString())" />
+                </div>
+            }
+            var offers = App.Offers.ForDocument(cart.Document.Id);
+            @if (offers.Applied.Count > 0 || offers.Declined is not null || App.Offers.AnyUnusedVouchers)
+            {
+                <div class="offers" id="offers">
+                    @foreach (var applied in offers.Applied)
+                    {
+                        <div class="total-row muted offer-row" data-offer="@applied.Kind"><span>@applied.Label</span><span>−@Money(applied.AmountMinor) @if (applied.VoucherId is { } voucherId) { <button type="button" class="btn ghost small" aria-label="Take off @applied.Label" @onclick="() => TakeOffCode(voucherId)">×</button> } else { <button type="button" class="btn ghost small" aria-label="Leave out @applied.Label" @onclick="() => LeaveOutOffer(true)">Leave out</button> }</span></div>
+                    }
+                    @if (offers.Declined is { } skipped)
+                    {
+                        <div class="total-row muted offer-row"><span>@skipped.Label (@Money(skipped.AmountMinor)) is not used</span><span><button type="button" class="btn ghost small" id="use-offer" @onclick="() => LeaveOutOffer(false)">Use it</button></span></div>
+                    }
+                    <div class="row code-row">
+                        <input id="voucher-code" class="disc-in" autocomplete="off" aria-label="Coupon or voucher code" placeholder="Coupon or voucher code" @bind="code" @bind:event="oninput" @onkeydown="OnCodeKey" />
+                        <button type="button" class="btn secondary small" id="use-code" @onclick="UseCode">Use code</button>
+                    </div>
                 </div>
             }
             @if (cart.Result is { } given && Shop.Minor(given.Totals.Discount) > 0)
@@ -180,6 +207,24 @@
     private readonly List<PaymentInput> payments = new();
     private bool finished;
     private bool drawerPrinter;
+    private string code = "";
+
+    private void OnCodeKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") UseCode();
+    }
+
+    /// <summary>Puts a coupon or gift voucher on the sale. It is used up only when the bill is made.</summary>
+    private void UseCode() => Run(() =>
+    {
+        if (cart is null) return;
+        cart = App.Documents.ApplyCode(cart.Document.Id, code);
+        code = "";
+    });
+
+    private void TakeOffCode(long voucherId) => Run(() => cart = App.Documents.RemoveCode(cart!.Document.Id, voucherId));
+
+    private void LeaveOutOffer(bool leaveOut) => Run(() => cart = App.Documents.SetOfferDeclined(cart!.Document.Id, leaveOut));
 
     private Task OpenDrawer() => Run(async () => { await App.Printing.OpenDrawerAsync(null, Me.Id); });
 
@@ -264,7 +309,7 @@
     {
         Run(() =>
         {
-            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && l.DiscountPctMilli == 0 && l.DiscountAmountMinor == 0 && l.Note is null);
+            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && !l.IsFree && l.Note is null && (l.DiscountSource is not null || (l.DiscountPctMilli == 0 && l.DiscountAmountMinor == 0)));
             if (cart is null)
                 cart = App.Documents.CreateDraft(new DraftOptions { UserId = Me.Id, PartyId = customer?.Id, Lines = { new LineInput { ItemId = item.Id } } });
             else if (existing is not null)
@@ -328,8 +373,10 @@
     private void KeepWithinLimit(Action putBack)
     {
         if (Me.Can(Perm.Discount) || cart?.Result is not { } result) return;
-        var gross = Shop.Minor(result.Totals.Gross);
-        var off = Shop.Minor(result.Totals.Discount) - cart.Document.LoyaltyDiscountMinor;     // points are the customer's own: they do not count against a cashier's limit
+        // What counts against a cashier's limit is what a person typed: points, offers, coupons, the customer's own rate and free goods were all agreed beforehand.
+        var automatic = cart.Lines.Where(l => l.IsFree || l.DiscountSource is not null).Sum(DocumentService.LineDiscountOf);
+        var gross = Shop.Minor(result.Totals.Gross) - cart.Lines.Where(l => l.IsFree).Sum(l => DocumentService.Gross(l.QtyMilli, l.UnitPriceMinor));
+        var off = Shop.Minor(result.Totals.Discount) - cart.Document.LoyaltyDiscountMinor - cart.Document.OfferDiscountMinor - automatic;
         var limit = Shop.Settings.CashierDiscountPctMilli;
         if (gross > 0 && (decimal)off * 100_000m > (decimal)limit * gross)
         {

@@ -150,6 +150,8 @@ public class ImportFromOlderPosTests
         Assert.Equal(60000, asha.BalanceMinor);                         // C4: Sales D 1,000 less Receipt C 400: owes 600.00
         Assert.Equal(50000, Person(plan, "customer:3").BalanceMinor);   // C1: opening DR 500 is the ledger's first row: 500.00, not 1,000.00
         Assert.Equal(-20000, Person(plan, "customer:4").BalanceMinor);  // C2: opening CR 200: the shop owes the customer 200.00
+        Assert.Equal(10_000, Person(plan, "customer:3").DiscountPctMilli);   // Bilal's fixed 10% (switch Yes) is kept as his own discount
+        Assert.Equal(0, Person(plan, "customer:4").DiscountPctMilli);
         Assert.Equal(0, Person(plan, "customer:5").BalanceMinor);       // C10: no rows at all
         Assert.Equal(0, Person(plan, "customer:6").BalanceMinor);       // typed 50, but not in the ledger: the ledger rules
         Assert.Contains(plan.Report.Findings, x => x.Code == "opening-missing");
@@ -343,6 +345,8 @@ public class ImportFromOlderPosTests
         Assert.Equal(100_000, people["Asha"].CreditLimitMinor);
         Assert.Equal(100_000_000_000, people["Bilal"].CreditLimitMinor);   // not enforced in the old program: NOT zero
         Assert.Equal(0, people["Chen"].CreditLimitMinor);
+        Assert.Equal((10_000L, true), f.App.Offers.PartyDiscount(people["Bilal"].Id));   // the older program's fixed discount came across
+        Assert.Equal((0L, false), f.App.Offers.PartyDiscount(people["Asha"].Id));
         Assert.Equal(60_000, f.App.Importer.OpeningBalance(people["Asha"].Id));
         Assert.Equal(-20_000, f.App.Importer.OpeningBalance(people["Chen"].Id));
         Assert.Null(f.App.Importer.OpeningBalance(people["Dana"].Id));

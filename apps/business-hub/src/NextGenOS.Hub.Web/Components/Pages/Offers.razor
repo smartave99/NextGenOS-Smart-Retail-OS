@@ -1,0 +1,352 @@
+@page "/offers"
+@attribute [Authorize(Policy = Perm.Discount)]
+@inherits HubPage
+@using NextGenOS.Hub.Offers
+
+<PageTitle>Offers</PageTitle>
+<h1>Offers</h1>
+<p class="sub">Money off, free goods, coupons and gift vouchers. The till uses them by itself. Nothing is sent to anyone from here: give a coupon code to the customer yourself.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-offers" class="@(tab == "offers" ? "on" : "")" aria-selected="@(tab == "offers")" @onclick='() => Pick("offers")'>Offers</button>
+    <button type="button" role="tab" id="tab-coupons" class="@(tab == "coupons" ? "on" : "")" aria-selected="@(tab == "coupons")" @onclick='() => Pick("coupons")'>Coupons</button>
+    <button type="button" role="tab" id="tab-gifts" class="@(tab == "gifts" ? "on" : "")" aria-selected="@(tab == "gifts")" @onclick='() => Pick("gifts")'>Gift vouchers</button>
+</div>
+
+@if (tab == "offers")
+{
+    <div class="toolbar">
+        <span class="muted">Each offer runs on the days you set, and stops by itself.</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn primary" id="add-offer" @onclick="NewOffer">Add an offer</button>
+    </div>
+    <div class="card tbl-wrap">
+        @if (offers.Count == 0)
+        {
+            <div class="empty">No offers yet. Press “Add an offer”.</div>
+        }
+        else
+        {
+            <table class="tbl" id="offers-table">
+                <thead><tr><th>Offer</th><th>Days</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var o in offers)
+                {
+                    <tr>
+                        <td><strong>@Describe(o)</strong>@if (!string.IsNullOrWhiteSpace(o.Name)) { <br /><span class="muted small">@o.Name</span> }</td>
+                        <td>@Days(o.ValidFrom, o.ValidTo)@if (!o.Enabled) { <span class="chip">Off</span> }else if (!o.IsLive(Today)) { <span class="chip warn">Not today</span> }</td>
+                        <td class="right">
+                            <button type="button" class="btn ghost small" @onclick="() => EditOffer(o)">Change</button>
+                            <button type="button" class="btn ghost small" @onclick="() => ToggleOffer(o)">@(o.Enabled ? "Switch off" : "Switch on")</button>
+                            <button type="button" class="btn ghost small" aria-label="Delete this offer" @onclick="() => DeleteOffer(o)">Delete</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+else if (tab == "coupons")
+{
+    <div class="card">
+        <h2>Make coupons</h2>
+        <p class="muted">One coupon for each customer you choose, each with its own code. A coupon takes its amount off one bill, once.</p>
+        <label for="c-find">Find a customer</label>
+        <input id="c-find" autocomplete="off" placeholder="Name or phone" @bind="couponQuery" @bind:event="oninput" />
+        @if (couponQuery.Trim().Length >= 2)
+        {
+            <div class="chips">
+                @foreach (var p in Candidates())
+                {
+                    <button type="button" @onclick="() => ChooseCustomer(p)">@p.Name</button>
+                }
+            </div>
+        }
+        @if (chosen.Count > 0)
+        {
+            <div class="chips" aria-label="Chosen customers">
+                @foreach (var p in chosen)
+                {
+                    <button type="button" class="on" aria-label="Take @p.Name off the list" @onclick="() => chosen.Remove(p)">@p.Name ×</button>
+                }
+            </div>
+        }
+        <div class="field-row">
+            <div><label for="c-amount">Amount</label><input id="c-amount" inputmode="decimal" @bind="couponAmount" /></div>
+            <div><label for="c-from">First day (optional)</label><input id="c-from" type="date" @bind="couponFrom" /></div>
+            <div><label for="c-to">Last day (optional)</label><input id="c-to" type="date" @bind="couponTo" /></div>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="make-coupons" @onclick="MakeCoupons">Make coupons</button></div>
+        @if (made.Count > 0)
+        {
+            <h3>Just made</h3>
+            <p class="muted small">Give each customer their code. The same list is kept below.</p>
+            <table class="tbl" id="made-coupons">
+                <thead><tr><th>Customer</th><th>Code</th><th class="num">Amount</th></tr></thead>
+                <tbody>@foreach (var v in made) { <tr><td>@v.PartyName</td><td class="codes-made">@v.Pretty</td><td class="num">@Money(v.AmountMinor)</td></tr> }</tbody>
+            </table>
+        }
+    </div>
+    @VoucherTable(vouchers)
+}
+else
+{
+    <p class="muted">A gift voucher is given with a bill, to a named customer, when the bill falls in a “gift voucher” offer. They use it on a later visit.</p>
+    @VoucherTable(vouchers)
+}
+
+@if (form is not null)
+{
+    <div class="sheet-back" @onclick="() => form = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="@(form.Id is null ? "New" : "Change") offer" @onclick:stopPropagation="true">
+            <h2>@(form.Id is null ? "Add an offer" : "Change the offer")</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <label for="o-kind">What kind of offer</label>
+                <select id="o-kind" @bind="form.Kind" disabled="@(form.Id is not null)">
+                    <option value="@OfferKinds.BillRange">Money off a bill</option>
+                    <option value="@OfferKinds.GiftRule">A gift voucher with a bill</option>
+                    <option value="@OfferKinds.ItemPercent">Percent off one @Shop.Singular("item").ToLowerInvariant()</option>
+                    <option value="@OfferKinds.BuyGet">Buy some, get some free</option>
+                </select>
+                <label for="o-name">A name (optional, shown on the bill)</label>
+                <input id="o-name" @bind="form.Name" maxlength="80" />
+                @if (form.Kind is OfferKinds.BillRange or OfferKinds.GiftRule)
+                {
+                    <p class="muted small">The amount is what the items come to, before tax, after the discounts on each line.</p>
+                    <div class="field-row">
+                        <div><label for="o-from">Bills from</label><input id="o-from" inputmode="decimal" @bind="form.FromText" /></div>
+                        <div><label for="o-upto">up to (empty: no top)</label><input id="o-upto" inputmode="decimal" @bind="form.ToText" /></div>
+                    </div>
+                    <label for="o-amount">@(form.Kind == OfferKinds.BillRange ? "Money off the bill" : "Worth of the voucher")</label>
+                    <input id="o-amount" inputmode="decimal" @bind="form.AmountText" />
+                }
+                else
+                {
+                    <label for="o-find">@Shop.Singular("item")</label>
+                    <input id="o-find" autocomplete="off" placeholder="Type a name" @bind="form.ItemQuery" @bind:event="oninput" />
+                    @if (form.ItemQuery.Trim().Length >= 2)
+                    {
+                        <div class="chips">
+                            @foreach (var item in App.Catalog.Search(form.ItemQuery, null, null, 8))
+                            {
+                                <button type="button" class="@(form.ItemId == item.Id ? "on" : "")" @onclick="() => PickItem(item)">@item.Name</button>
+                            }
+                        </div>
+                    }
+                    @if (form.ItemName is { } picked) { <div class="row"><strong>@picked</strong></div> }
+                    @if (form.Kind == OfferKinds.ItemPercent)
+                    {
+                        <label for="o-pct">Percent off</label>
+                        <input id="o-pct" inputmode="decimal" @bind="form.PctText" />
+                    }
+                    else
+                    {
+                        <div class="field-row">
+                            <div><label for="o-min">Buy this many</label><input id="o-min" inputmode="decimal" @bind="form.MinText" /></div>
+                            <div><label for="o-free">and get this many free</label><input id="o-free" inputmode="decimal" @bind="form.FreeText" /></div>
+                        </div>
+                    }
+                }
+                <div class="field-row">
+                    <div><label for="o-first">First day (optional)</label><input id="o-first" type="date" @bind="form.ValidFrom" /></div>
+                    <div><label for="o-last">Last day (optional)</label><input id="o-last" type="date" @bind="form.ValidTo" /></div>
+                </div>
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-offer" @onclick="SaveOffer">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private sealed class OfferForm
+    {
+        public long? Id;
+        public string Kind = OfferKinds.BillRange;
+        public string Name = "";
+        public string FromText = "", ToText = "", AmountText = "", PctText = "", MinText = "", FreeText = "", ItemQuery = "";
+        public long? ItemId;
+        public string? ItemName;
+        public DateOnly? ValidFrom, ValidTo;
+    }
+
+    private string tab = "offers";
+    private IReadOnlyList<Offer> offers = Array.Empty<Offer>();
+    private IReadOnlyList<Voucher> vouchers = Array.Empty<Voucher>();
+    private OfferForm? form;
+    private string? formError;
+
+    private string couponQuery = "";
+    private readonly List<Party> chosen = new();
+    private string couponAmount = "";
+    private DateOnly? couponFrom, couponTo;
+    private IReadOnlyList<Voucher> made = Array.Empty<Voucher>();
+
+    protected override Task LoadAsync()
+    {
+        offers = App.Offers.Offers();
+        vouchers = App.Offers.Vouchers(tab == "gifts" ? "gift" : "coupon");
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string next)
+    {
+        tab = next;
+        made = Array.Empty<Voucher>();
+        vouchers = App.Offers.Vouchers(tab == "gifts" ? "gift" : "coupon");
+    }
+
+    private string Describe(Offer o) => o.Kind switch
+    {
+        OfferKinds.BillRange => $"Bills from {Money(o.FromMinor ?? 0)}{(o.ToMinor is { } to ? " to " + Money(to) : " up")}: {Money(o.AmountMinor)} off",
+        OfferKinds.GiftRule => $"Bills from {Money(o.FromMinor ?? 0)}{(o.ToMinor is { } top ? " to " + Money(top) : " up")} earn a gift voucher worth {Money(o.AmountMinor)}",
+        OfferKinds.ItemPercent => $"{o.ItemName}: {Qty(o.PctMilli)}% off",
+        _ => $"{o.ItemName}: buy {Qty(o.MinQtyMilli)}, get {Qty(o.FreeQtyMilli)} free",
+    };
+
+    private static string Days(DateOnly? from, DateOnly? to) =>
+        from is null && to is null ? "Every day" : from is null ? "Until " + Show(to!.Value) : to is null ? "From " + Show(from.Value) : Show(from.Value) + " to " + Show(to.Value);
+
+    private static string Show(DateOnly d) => d.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+    // ---- offers ---------------------------------------------------------------------------------------------------------------------------------
+
+    private void NewOffer()
+    {
+        formError = null;
+        form = new OfferForm();
+    }
+
+    private void EditOffer(Offer o)
+    {
+        formError = null;
+        form = new OfferForm
+        {
+            Id = o.Id, Kind = o.Kind, Name = o.Name ?? "", ItemId = o.ItemId, ItemName = o.ItemName, ValidFrom = o.ValidFrom, ValidTo = o.ValidTo,
+            FromText = o.FromMinor is { } f ? Shop.Text(f) : "", ToText = o.ToMinor is { } t ? Shop.Text(t) : "", AmountText = o.AmountMinor > 0 ? Shop.Text(o.AmountMinor) : "",
+            PctText = o.PctMilli > 0 ? Qty(o.PctMilli) : "", MinText = o.MinQtyMilli > 0 ? Qty(o.MinQtyMilli) : "", FreeText = o.FreeQtyMilli > 0 ? Qty(o.FreeQtyMilli) : "",
+        };
+    }
+
+    private void PickItem(Item item)
+    {
+        form!.ItemId = item.Id;
+        form.ItemName = item.Name;
+        form.ItemQuery = "";
+    }
+
+    private long MoneyOf(string text, string what)
+    {
+        if (!TryMoney(Shop, text, out var minor) || minor < 0) throw new HubException("offer-number", $"Please type {what} as a number, like 250 or 99.50.");
+        return minor;
+    }
+
+    private static long Milli(string text, string what)
+    {
+        try { return ShopContext.QtyMilli((text ?? "").Trim()); }
+        catch (FormatException) { throw new HubException("offer-number", $"Please type {what} as a number, like 5 or 2.5."); }
+    }
+
+    private void SaveOffer()
+    {
+        formError = null;
+        try
+        {
+            var f = form!;
+            var input = new OfferInput { Id = f.Id, Kind = f.Kind, Name = f.Name, ItemId = f.ItemId, ValidFrom = f.ValidFrom, ValidTo = f.ValidTo, Enabled = true };
+            if (f.Kind is OfferKinds.BillRange or OfferKinds.GiftRule)
+            {
+                input.FromMinor = string.IsNullOrWhiteSpace(f.FromText) ? 0 : MoneyOf(f.FromText, "the lowest bill");
+                input.ToMinor = string.IsNullOrWhiteSpace(f.ToText) ? null : MoneyOf(f.ToText, "the highest bill");
+                input.AmountMinor = string.IsNullOrWhiteSpace(f.AmountText) ? 0 : MoneyOf(f.AmountText, "the amount");
+            }
+            else if (f.Kind == OfferKinds.ItemPercent) input.PctMilli = string.IsNullOrWhiteSpace(f.PctText) ? 0 : Milli(f.PctText, "the percent");
+            else
+            {
+                input.MinQtyMilli = string.IsNullOrWhiteSpace(f.MinText) ? 0 : Milli(f.MinText, "how many to buy");
+                input.FreeQtyMilli = string.IsNullOrWhiteSpace(f.FreeText) ? 0 : Milli(f.FreeText, "how many are free");
+            }
+            if (f.Id is { } id) input.Enabled = App.Offers.GetOffer(id)?.Enabled ?? true;
+            App.Offers.SaveOffer(input, Me.Id);
+            form = null;
+            offers = App.Offers.Offers();
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void ToggleOffer(Offer o) => Run(() =>
+    {
+        App.Offers.SetOfferEnabled(o.Id, !o.Enabled, Me.Id);
+        offers = App.Offers.Offers();
+    });
+
+    private void DeleteOffer(Offer o) => Run(() =>
+    {
+        App.Offers.DeleteOffer(o.Id, Me.Id);
+        offers = App.Offers.Offers();
+    }, "The offer was deleted. Bills already made keep what it gave them.");
+
+    // ---- coupons ------------------------------------------------------------------------------------------------------------------------------
+
+    private IEnumerable<Party> Candidates() =>
+        App.Parties.Search(null, couponQuery, 12).Where(p => p.Kind is not ("supplier" or "staff") && chosen.All(c => c.Id != p.Id)).Take(8);
+
+    private void ChooseCustomer(Party p)
+    {
+        chosen.Add(p);
+        couponQuery = "";
+    }
+
+    private void MakeCoupons() => Run(() =>
+    {
+        var amount = TryMoney(Shop, couponAmount, out var minor) && minor > 0 ? minor : 0;
+        made = App.Offers.GenerateCoupons(chosen.Select(p => p.Id).ToList(), amount, couponFrom, couponTo, true, Me.Id);
+        chosen.Clear();
+        couponAmount = "";
+        vouchers = App.Offers.Vouchers("coupon");
+    }, "The coupons are made. Give each customer their code.");
+
+    private void ToggleVoucher(Voucher v) => Run(() =>
+    {
+        App.Offers.SetVoucherEnabled(v.Id, !v.Enabled, Me.Id);
+        vouchers = App.Offers.Vouchers(tab == "gifts" ? "gift" : "coupon");
+    });
+
+    private (string Text, string Css) State(Voucher v) => v.State(Today) switch
+    {
+        "ready" => ("Ready", "chip ok"), "used" => ("Used", "chip"), "expired" => ("Ran out", "chip warn"), "waiting" => ("Not yet", "chip warn"), _ => ("Off", "chip"),
+    };
+
+    private RenderFragment VoucherTable(IReadOnlyList<Voucher> rows) => @<div class="card tbl-wrap">
+        @if (rows.Count == 0)
+        {
+            <div class="empty">Nothing here yet.</div>
+        }
+        else
+        {
+            <table class="tbl" id="voucher-table">
+                <thead><tr><th>Code</th><th>@(tab == "gifts" ? "For" : "Customer")</th><th class="num">Amount</th><th>Days</th><th></th><th></th></tr></thead>
+                <tbody>
+                @foreach (var v in rows)
+                {
+                    var state = State(v);
+                    <tr>
+                        <td class="codes-made">@v.Pretty</td>
+                        <td>@v.PartyName</td>
+                        <td class="num">@Money(v.AmountMinor)</td>
+                        <td>@Days(v.ValidFrom, v.ValidTo)</td>
+                        <td><span class="@state.Css">@state.Text</span></td>
+                        <td class="right">@if (!v.Used) { <button type="button" class="btn ghost small" @onclick="() => ToggleVoucher(v)">@(v.Enabled ? "Switch off" : "Switch on")</button> }</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>;
+}

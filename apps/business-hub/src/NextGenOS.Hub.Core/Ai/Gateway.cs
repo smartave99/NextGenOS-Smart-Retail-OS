@@ -21,7 +21,7 @@ public sealed record AiAnswer<T>(T? Value, string? ProviderId, string? Refusal, 
 /// The one door to AI services. A feature gives it the request, what kind of data it holds and which switch it belongs to; the gateway checks the licence and the switch, applies the privacy
 /// rules (<see cref="Routing"/>), keeps to the limits, tries the allowed services best first, and writes down what happened. Business code never calls a service itself.
 /// </summary>
-public sealed class AiGateway(ProviderService providers, FeatureFlagService flags, UsageService usage, IProviderFactory factory)
+public sealed class AiGateway(ProviderService providers, FeatureFlagService flags, UsageService usage, IProviderFactory factory, EgressLog egress, PersonalValues people)
 {
     private sealed record Called<T>(T Value, string Model, int TokensIn, int TokensOut);
 
@@ -36,6 +36,31 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
         RunAsync<EmbeddingResponse, IEmbeddingProvider>(AiTask.Embed, context, request.Inputs, EstimateTokens(request.Inputs), cancel,
             async p => { var r = await p.EmbedAsync(request, cancel); return new Called<EmbeddingResponse>(r, r.Model, r.TokensIn, 0); });
 
+    /// <summary>
+    /// Asks a service to do one of the closed list of purposes (blueprint AI-014). The text sent is built here from the purpose's fixed instruction and its allowed fields only; whatever else was
+    /// supplied is left out, and a value that is not the shape its field allows (or is a card number, a contact detail, a link, an instruction, or a name or address the shop keeps for a person)
+    /// stops the whole request before anything is sent. What was sent is written down field by field, with the version of the owner's permission it relied on; never the values and never the reply.
+    /// </summary>
+    public Task<AiAnswer<LlmResponse>> GenerateAsync(EgressRequest request, long? userId, CancellationToken cancel)
+    {
+        var purpose = EgressPurposes.Find(request.Purpose);
+        if (purpose is null)
+        {
+            var note = new EgressNote(Clip(request.Purpose), [], request.Fields.Keys.Order(StringComparer.Ordinal).ToList());
+            return Task.FromResult(Refuse<LlmResponse>(new AiContext("egress", DataClass.Public, userId), AiTask.Generate, DataClass.Public, "The program does not know that reason for sending anything to an AI service, so nothing was sent.", [], note));
+        }
+
+        var built = EgressGuard.Build(purpose, request.Fields, people.Known());
+        var summary = new EgressNote(purpose.Id, built.Sent, built.Dropped);
+        var context = new AiContext(purpose.Feature, built.Ok ? built.DataClass : purpose.MostPrivateClass, userId, purpose.Flag);
+        if (!built.Ok) return Task.FromResult(Refuse<LlmResponse>(context, purpose.Task, context.DataClass, built.Refusal!, [], summary));
+        var texts = new[] { built.Text };
+        return RunAsync<LlmResponse, ILlmProvider>(purpose.Task, context, texts, EstimateTokens(texts) + purpose.MaxTokens, cancel,
+            async p => { var r = await p.GenerateAsync(new LlmRequest([new LlmMessage("user", built.Text)], MaxTokens: purpose.MaxTokens), cancel); return new Called<LlmResponse>(r, r.Model, r.TokensIn, r.TokensOut); }, summary);
+    }
+
+    private static string Clip(string? text) => text is { Length: > 60 } ? text[..60] : text ?? "";
+
     /// <summary>Asks a service whether it is there. Nothing of the shop is sent; it is not counted as a use.</summary>
     public async Task<ProviderHealth> CheckAsync(string providerId, CancellationToken cancel)
     {
@@ -48,17 +73,17 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
     }
 
     private async Task<AiAnswer<T>> RunAsync<T, TProvider>(string task, AiContext context, IEnumerable<string> texts, long estimatedTokens, CancellationToken cancel,
-        Func<TProvider, Task<Called<T>>> call) where T : class where TProvider : class, IAiProvider
+        Func<TProvider, Task<Called<T>>> call, EgressNote? egressNote = null) where T : class where TProvider : class, IAiProvider
     {
         // What the text itself shows counts, whatever the caller called it: a card number makes it payment data (that never leaves this computer), an e-mail address or a phone
         // number makes anything that was called public, internal or confidential personal data (which an online service gets only with the owner's permission).
         var dataClass = Strictest(context.DataClass, texts);
 
-        if (!flags.Licensed) return Refuse<T>(context, task, dataClass, "The AI features are not part of this shop's licence.", []);
-        if (context.Flag is not null && !flags.IsEnabled(context.Flag)) return Refuse<T>(context, task, dataClass, "This feature is switched off. The owner can switch it on in the AI settings.", []);
+        if (!flags.Licensed) return Refuse<T>(context, task, dataClass, "The AI features are not part of this shop's licence.", [], egressNote);
+        if (context.Flag is not null && !flags.IsEnabled(context.Flag)) return Refuse<T>(context, task, dataClass, "This feature is switched off. The owner can switch it on in the AI settings.", [], egressNote);
 
         var decision = Routing.Decide(new RouteQuestion(task, dataClass, context.Feature, flags.IsEnabled(FlagKey.RemoteAi), context.PreferredProvider), providers.Facts());
-        if (!decision.Allowed) return Refuse<T>(context, task, dataClass, decision.Refusal ?? "No AI service may do this.", decision.Trace);
+        if (!decision.Allowed) return Refuse<T>(context, task, dataClass, decision.Refusal ?? "No AI service may do this.", decision.Trace, egressNote);
 
         var trace = decision.Trace.ToList();
         string? last = null;
@@ -77,6 +102,7 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
             if (over is not null)
             {
                 usage.Record(new UsageEntry(id, record.DefaultModel, task, context.Feature, dataClass, 0, 0, 0, 0, Outcome.OverBudget, over, context.UserId));
+                LogEgress(egressNote, context, dataClass, record, record.DefaultModel, Outcome.OverBudget, 0, 0, 0, over);
                 trace.Add(new RouteStep(id, record.Name, false, over));
                 last = over;
                 continue;
@@ -88,6 +114,7 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
                 var done = await call(provider);
                 var cost = Budget.Cost(done.TokensIn, done.TokensOut, record.PriceInMicrosPer1k, record.PriceOutMicrosPer1k);
                 usage.Record(new UsageEntry(id, done.Model, task, context.Feature, dataClass, done.TokensIn, done.TokensOut, cost, watch.ElapsedMilliseconds, Outcome.Ok, null, context.UserId));
+                LogEgress(egressNote, context, dataClass, record, done.Model, Outcome.Ok, done.TokensIn, done.TokensOut, cost, null);
                 return new AiAnswer<T>(done.Value, id, null, trace);
             }
             catch (OperationCanceledException) when (cancel.IsCancellationRequested)
@@ -98,8 +125,9 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
             {
                 // A service that fails is not the end: the next allowed one is tried. The record keeps the reason (a key in it is hidden first).
                 last = e is ProviderException ? e.Message : record.Name + " failed unexpectedly.";
-                usage.Record(new UsageEntry(id, record.DefaultModel, task, context.Feature, dataClass, 0, 0, 0, watch.ElapsedMilliseconds, Outcome.Failed,
-                    Secrets.Redact(e is ProviderException p ? p.Kind + ": " + e.Message : e.GetType().Name), context.UserId));
+                var why = Secrets.Redact(e is ProviderException p ? p.Kind + ": " + e.Message : e.GetType().Name);
+                usage.Record(new UsageEntry(id, record.DefaultModel, task, context.Feature, dataClass, 0, 0, 0, watch.ElapsedMilliseconds, Outcome.Failed, why, context.UserId));
+                LogEgress(egressNote, context, dataClass, record, record.DefaultModel, Outcome.Failed, 0, 0, 0, why);
                 trace.Add(new RouteStep(id, record.Name, false, last));
             }
         }
@@ -107,10 +135,23 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
         return new AiAnswer<T>(null, null, "No AI service could do this just now. " + last, trace);
     }
 
-    private AiAnswer<T> Refuse<T>(AiContext context, string task, string dataClass, string reason, IReadOnlyList<RouteStep> trace) where T : class
+    private AiAnswer<T> Refuse<T>(AiContext context, string task, string dataClass, string reason, IReadOnlyList<RouteStep> trace, EgressNote? egressNote = null) where T : class
     {
         usage.Record(new UsageEntry(null, null, task, context.Feature, dataClass, 0, 0, 0, 0, Outcome.Refused, reason, context.UserId));
+        LogEgress(egressNote, context, dataClass, null, null, Outcome.Refused, 0, 0, 0, reason);
         return new AiAnswer<T>(null, null, reason, trace);
+    }
+
+    /// <summary>Writes down, for a request made through a purpose, which fields it carried, where it went and which permission of the owner it relied on. Never a value.</summary>
+    private void LogEgress(EgressNote? note, AiContext context, string dataClass, ProviderRecord? provider, string? model, string outcome, int tokensIn, int tokensOut, long cost, string? detail)
+    {
+        if (note is null) return;
+        string? consent = null;
+        if (provider is not null && Routing.NeedsConsent(dataClass, provider.Location))
+            consent = providers.Consents(provider.Id).FirstOrDefault(c => c.DataClass == dataClass && (c.Features == "*" || c.Features.Split(',').Contains(context.Feature)))?.GrantedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        // Only a request that reached a service sent anything (a service that then failed was still sent it); a request that was refused, or stopped by a limit, sent nothing.
+        var sent = outcome is Outcome.Ok or Outcome.Failed ? note : note with { Sent = [] };
+        egress.Record(sent, context.Feature, dataClass, provider, consent, model, outcome, tokensIn, tokensOut, cost, detail, context.UserId);
     }
 
     private static string Strictest(string given, IEnumerable<string> texts)
@@ -141,8 +182,9 @@ public sealed class AiFoundation
         Providers = new ProviderService(db, clock, audit, Secrets, factory, access);
         Models = new ModelRegistry(db, clock, audit, access);
         Usage = new UsageService(db, clock);
+        Egress = new EgressLog(db, clock, access);
         Hardware = new HardwareService(options.Probe ?? new SystemHardwareProbe(), dataFolder, clock);
-        Gateway = new AiGateway(Providers, Flags, Usage, factory);
+        Gateway = new AiGateway(Providers, Flags, Usage, factory, Egress, new PersonalValues(db));
         Jobs = new AiJobQueue(Gateway);
     }
 
@@ -152,6 +194,8 @@ public sealed class AiFoundation
     public ProviderService Providers { get; }
     public ModelRegistry Models { get; }
     public UsageService Usage { get; }
+    /// <summary>What was sent to AI services, field by field (never values).</summary>
+    public EgressLog Egress { get; }
     public HardwareService Hardware { get; }
     public AiGateway Gateway { get; }
     /// <summary>The waiting line in front of the gateway, for work that should not crowd out a person who is waiting (reports, cameras).</summary>

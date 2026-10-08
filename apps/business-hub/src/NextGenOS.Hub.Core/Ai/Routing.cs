@@ -155,8 +155,18 @@ public static partial class TextGuard
         {
             foreach (Match match in DigitRuns().Matches(text))
             {
-                var digits = new string(match.Value.Where(char.IsAsciiDigit).ToArray());
-                if (digits.Length is >= 13 and <= 19 && Luhn(digits)) return true;
+                // A card number written in groups may have other digits before or after it in the same run ("4111 1111 1111 1111 51"), so every run of whole groups is tried, not only the whole run.
+                var groups = match.Value.Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries);
+                for (var from = 0; from < groups.Length; from++)
+                {
+                    var digits = "";
+                    for (var to = from; to < groups.Length; to++)
+                    {
+                        digits += new string(groups[to].Where(char.IsAsciiDigit).ToArray());
+                        if (digits.Length > 19) break;
+                        if (digits.Length >= 13 && Luhn(digits)) return true;
+                    }
+                }
             }
         }
         catch (RegexMatchTimeoutException)

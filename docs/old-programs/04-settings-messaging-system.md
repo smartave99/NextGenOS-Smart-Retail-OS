@@ -1,10 +1,19 @@
 # Old Windows POS, study 04: users, printing, backup, settings, language, messages, small CRM, branches, extras
 
-**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A, B, C, D, E, F, G, H, I.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
+**Status (7 to 8 October 2026): all ten topics (A to J), the first-ten-lines summary and the closing section K are written.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
 
 ## What to know first (10 lines)
 
-(written last)
+1. **Sign-in is weaker than it looks.** A password is stored as Base64 (readable), "Password Recovery" e-mails the real password, three wrong tries only disable a button until restart, a hidden user type `*****` and a hard-coded id `sadmin` exist, and the 51 per-user switches and the role checks mostly **hide menu entries** without checking inside the target screen (A.0, A.9). Keep the idea of default-deny till rights (`CashierSetting`); drop everything else.
+2. **Printing is 192 Crystal Reports files** (about 137 reached; 38 bill styles, 20 label styles), chosen per PC name; if no printer of the right type is set it prints nothing and says nothing; images go through fixed `C:\Temp` files; the bill table carries cost price and margin. Keep the **bill data model** (33 line columns, about 50 named values), not the files (B.0, B.3).
+3. **"Auto backup" runs only at logout**, overwrites one file, writes to `D:\SBPE_DATA`, and the cloud copy sends the whole database to a Google Drive through a compiled library that is not in the repository. **Restore overwrites with no safety copy.** The Hub has no backup yet (decision 11) (C.0, C.6).
+4. **About 20 small settings tables** hold "Yes"/"No" text; the same function key means different things in different tills (F2 is Save in one, Add in the others); the invoice number is prefix, counter, suffix with India words as defaults; the cipher price code can map two prices to one code (D.0, D.5).
+5. **Two kinds of "language":** screen words matched on exact English captions (`Language_set`, 227 copies of one method), and a local-language product name printed on bills (`Product.Description`). Both transliteration libraries in the recovered source are **empty stand-ins** that return the input (E.0).
+6. **Every message route sends phone number, name and often amounts or a bill PDF outside the shop** (SMS gateway, WhatsApp relay with a plain-FTP upload and a public link, e-mail, a cloud feed to a customer app, OpenAI for drafts and for reading pictures), with no consent field and no log of recipients. The `DevNet.WhatsApp.V2` browser route is an empty stand-in. The Hub sends nothing; port channels one by one behind flags, with data classes and the secret store (F.0, F.3, F.7).
+7. **Small CRM:** leads, follow-ups, quotations that close a lead when billed, support tickets and date reminders. Lead reminders never fire; converting a lead into a customer **invents values** (`local`, `localcity`, `abc@gmail.com`) (G.0, G.3).
+8. **A company is a SQL Server database**; creating or deleting one is a button on the sign-in or main screen (delete = `DROP DATABASE`, no backup); the branch group lives in an online MySQL registry; the year change only resets invoice counters. The Hub numbers automatically per type and fiscal year but cannot continue a customer's old numbers (add a starting number) (H.0, H.6).
+9. **Extras:** the UPI QR is built locally from the shop's own details and shown on a second screen (worth porting as a payment-code display); the e-commerce screens push each product over a plain GET and FTP; the AI readers send pictures to OpenAI; `Receiver` is a totals-only head-office view like decision 12 (I.0 to I.8).
+10. **Leftovers:** 68 screens were not named in any study; about 20 are junk, 4 are pick-list pop-ups, about 38 are lists of topics already studied, and seven are real features (expiry ageing report, online orders, till dashboards, approved-discount register, the `InvoiceInfoD` empty-bill record, item-wise purchase register, purchase-wise merge) (J.0, J.4). **Nothing here was run;** `DBScript.sql` and several compiled libraries are not in the repository (K).
 
 ## 0. How to read this file
 
@@ -973,7 +982,7 @@ Status of this topic: written. One short section per extra: what it is, the tabl
 
 ### I.3 Gallery and customer display
 
-`frmGallery` ("Gallery") stores pictures in table `Gallery(ID, c1 = SN, c2 = image id, c3 = image bytes, c4 = "Display Screen Image" yes/no)`; the pictures marked for the display screen are shown on the customer-facing second monitor between sales (a slideshow of the shop's adverts), together with the bill lines and the UPI QR (`B/frmAutoUPI.vb`, `Form2`, `frmScrDsply`). `frmWalletList` lists the wallet payment names set for a till (read from `PosPrinterSetting`). Switch c14 hides the gallery menu. **Port:** a customer-display page (bill lines, total, payment code, shop pictures) is a good Hub feature for a touch counter: pictures are the customer's own files (no stock pictures), the layout is a look setting (decision 30), nothing leaves the PC.
+`frmGallery` ("Gallery") stores pictures in table `Gallery(ID, c1 = SN, c2 = image id, c3 = image bytes, c4 = "Display Screen Image" yes/no)`; the pictures marked for the display screen are shown on the customer-facing second monitor between sales (a slideshow of the shop's adverts) in `Form2`, together with the UPI QR (`B/frmAutoUPI.vb`); the bill lines and totals of the sale in progress are shown by `Form3` on the same monitor (J.1). `frmWalletList` lists the wallet payment names set for a till (read from `PosPrinterSetting`). Switch c14 hides the gallery menu. **Port:** a customer-display page (bill lines, total, payment code, shop pictures) is a good Hub feature for a touch counter: pictures are the customer's own files (no stock pictures), the layout is a look setting (decision 30), nothing leaves the PC.
 
 ### I.4 Camera
 
@@ -1046,8 +1055,133 @@ All use the key and address in `tbl_api_setting` (`GetApiDtl`: `id, url, apikey,
 - What `frmSaleAmtCal` changes on the till line; what `frmMine` is for; what `frmKeyBord` and `frmKeyBordProduct` look like and where they open from.
 - The exact columns of the pivot tables in `frmGSTCalc` and `frmGSTCalc1` (they were read only by caption and the shape of the query).
 
-## J. The "left over, not grouped" screens (not yet written)
+## J. The "left over, not grouped" screens
 
-## K. Not understood (whole file) and what was not read
+Status of this topic: written. `docs/MERGE-PLAN.md` counts 31 screens as "left over" but does not name them. To find them I took all 397 names in `apps/pos-desktop/Documentation/UI_SCREEN_INVENTORY.csv` and kept those that **no study file names yet** (studies 01, 02, 03, 05 and topics A to I of this file): 68 names. I then looked at each one: its size, its caption, the tables its SQL touches, and which screens open it. Many turned out to be the list, record or report window of a topic that is already studied; a few are real features nobody has written down; the rest are tests, stubs and pick-lists.
 
-(written last)
+### J.0 The five things to know
+
+1. **About 20 of the 68 are junk or test code** (tests, empty shells, error pop-ups, copies): nothing to port. One that looks like junk is not: `Form3` is the customer's second-screen bill window.
+2. **Four of the 68 (and about eight in all) are pick-list pop-ups** cloned from one template (their title bar still says `frmState`): a small grid with one column ("Select Yes/No", "Select Cr/Dr", "Select Type", "Select Psc/Box", "Select GST/NON GST"). They are drop-down lists drawn as windows; the Hub's pages use ordinary drop-downs.
+3. **About 38 are the "List of ..." / "... Report" window of a master, voucher or document** whose rules are already in studies 01 to 03. They are read-only grids with filters and an Export button. Port each with its master (the table in the "covered by" column).
+4. **Seven are real features worth writing down (J.4)**: the **expiry ageing report** (`btnGetData`), the **online orders** screen (`frmOrder`), the two **till dashboards** (`frmCustBalanceLedger`, `frmProductLedgerPOS`), the **customer approved-discount register** (`frmCustomerDiscRecord`), the **empty-bill record** (`InvoiceInfoD`), the **item-wise purchase register** (`frmPurchaseStock`) and the **purchase-wise merge** (`frmPurchaseWiseMerge`, not to be ported).
+5. **No screen in this group is a licence, a payment or a tax rule that changes money**; the money rules are in the screens already studied.
+
+### J.1 Junk: tests, stubs, error boxes, copies (do not port)
+
+| Screen | Lines | What it is | Evidence |
+|---|---|---|---|
+| `Form3`, `Form4` | 185, 29 | `Form3` is **not junk**: it is the customer-facing bill window on the second monitor (a grid of the lines and the labels TOTAL ITEM, BILL SUNDRY, TAXABLE AMT, TAX AMT, BILL DISCOUNT, ROUNDOFF, TOTAL BILL AMOUNT), filled by the till's `GridDisplayMonitor` when `PosPrinterSetting.SecDisplay = "Yes"` (`B/frmPOS.vb:19285-19300`); `Form2` is the picture and QR window next to it (I.1, I.3). `Form4` (29 lines) is opened by nobody. | captions and `GridDisplayMonitor` |
+| `frmTest1` | 233 | A form titled "Menu" that reads the two tile-menu tables (`tbl_master_menu`, `tbl_master_menu_header`, A.4); looks like a test of the tile menu; opened once from the main menu | `frmMainMenu.vb` |
+| `frmTestnew` | 193 | A test form that reads `Product_Join` | caption "frmTest" |
+| `frmMigrate_test` | 18 | An empty form (18 lines) | no code |
+| `frmChat2`, `frmChat3` (and `frmChat`, `frmChat1`, `frmChat4`) | 40 each | **Not chat:** each is an empty window with one chart control, opened by the balance sheet | F.5 item 8 |
+| `Error5`, `Error6`, `Error8` | 38 each | The three pop-ups of the screen lock: "Please Enter User ID.", "Please Enter Password.", "Unlock Failed...Please Try Again !" (A.6) | opened by `frmScreenlock` |
+| `frmCustomDialog2`, `frmCustomDialog3` (and `frmCustomDialog`, `frmCustomDialog1`) | 59, 54 | Pop-ups with an image: password changed, e-mail not set up, e-mail not found (A.7) | opened by `frmChangePassword`, `frmRecoveryPassword` |
+| `Calender` | 157 | A calendar pop-up (a date picker window) used by three screens | caption "Calendar" |
+| `frmSubcategory_DirectEntry` | 233 | "New Sub Category" quick entry, opened by nobody | no caller found |
+| `frmGoProduct` | 288 | Reads `tbl_product` (a table only this screen, `frmProductEntry` and `frmPOSTouch` mention); opened by the product entry; looks like a leftover of an older product model | not read further |
+| `frmCustomersNew`, `frmSuppliers` | 1,177 and 1,092 | **Mis-captioned lists:** titled "Product New & Update", they are the customer and supplier search lists (a copy of the product list with the columns changed); the real masters are `frmCustomer` and `frmSupplier` | captions and tables |
+| `frmCategoryNew`, `frmSubCategoryNew`, `frmUnitMasterNew` | 671, 1,003, 991 | The "List of category / sub category" search windows of the category, sub-category and unit masters (the sub-category and unit lists even share the caption "List of sub category") | tables `category`, `subcategory`, `unitmaster` |
+
+### J.2 Pick-list pop-ups (title bar says `frmState`)
+
+`frmCreditDebit` (Select Cr/Dr), `frmInEx` (Select Type: income or expense), `frmYesNo` (Select Yes/No), `frmBagBox` (Select Psc/Box), `frmGstNonGst` (Select GST/NON GST), `frmCategoryPopup` (a category pick-list, 620 lines, opened by the sub-category list), `frmState` (the state list), plus `frmContactPhoto` (a 42-line photo viewer). Each is a window with one grid column, opened by clicking a text box; they exist because the old controls were text boxes, not drop-downs. **Drop;** the options (Yes/No, Cr/Dr, income/expense, piece/box, tax or no tax) are fields of the Hub's forms.
+
+### J.3 List, record and report windows of topics already studied
+
+| Screen | Lines | Shows | Covered by | Port with |
+|---|---|---|---|---|
+| `frmSupplierRecord` | 942 | list of suppliers (`Supplier`) | 02 A3 | the supplier master |
+| `frmProductRecord`, `frmProductRec1` | 1,571, 3,057 | list of products, the second the product-with-lots grid (opening stock, `Product_OpeningStock`, `Temp_Stock`) | 01 section 6, 02 A2 | the items screen and lots |
+| `frmCreditCustomerReceiptRecord` | 714 | list of receipts from customers | 01 section 2.8 | customer receipts |
+| `frmCustomerLedger_Loyalty` | 584 | the loyalty points ledger (`CustomerLedgerBook_Loyality`) | 02 A1.6, decision 31 | loyalty |
+| `frmStockEntryRecord`, `frmStockEntryRecord1`, `frmStockEntryReport` | 486, 621, 391 | stock entry list and report (`Stock_Store`) | 01 section 6 | stock entry |
+| `frmStockAdjustment_Store_Record` | 696 | stock adjustment list | 01 section 6 | adjustments |
+| `FrmStockOutPrint` | 298 | print of a transfer token (`P_Transfer`) | 01 section 6.5 | transfers |
+| `frmServicesRecord`, `frmServicesRecord1` | 890, 867 | list of service jobs and service bills | 03 (services) | services |
+| `frmVoucherRecord`, `frmVoucherReport`, `frmExpDashboard` | 678, 525, 699 | expense vouchers list, report and dashboard (`Voucher`, `Voucher_OtherDetails`) | 02 B | accounting vouchers |
+| `frmIncomeRecord`, `frmIncomeDashboard` | 781, 699 | income vouchers list and dashboard (`Income`, `Income_OtherDetails`) | 02 B | accounting vouchers |
+| `frmAdvanceEntryRecord`, `frmAdvanceEntryReport`, `frmDeductionReport` | 467, 574, 535 | employee advance and deduction lists | 03 (staff) | staff and pay |
+| `frmEmployeesRecord`, `frmEmployeePaymentRecord`, `frmEmployeePaymentReport` | 386, 449, 542 | employee list, pay entries, pay report | 03 (staff) | staff and pay |
+| `frmBank`, `frmBankList` | 623, 282 | list of banks (`Bank`, `BankBranch`), list of the shop's bank accounts (`BankAccountRegistration`) | 02 B | banking |
+| `frmBillSundry` | 717 | the "bill sundry head" master (extra charges such as freight; tables `BillSundry`, with `Stock` and `SalesReturn` joined) | 01 section 1.4 (freight) | extra charges on bills |
+| `frmPayment_Withdrawal` | 1,474 | money paid out or taken out of a bank account (`Payment_Withdraw`, `BankAccountRegistration`) with a receipt print (`rptPayment_WithdrawalReceipt`, B.4) | 02 B | banking |
+| `frmComboPackBarcode` | 1,608 | labels for combo packs (`ComboPack`; templates `CBarcode`, `BarcodeCustomise1/2`, B.4) | 02 A2 (combo packs), B.5 | combo packs and labels |
+| `frmTouchProduct` | 805 | the "Product List" window of the tills, searched by product name (`Temp_Stock`, `ComboPack`) | 01 section 1.1 | the sell screen's item search |
+| `frmPurcOrderRetrieve1` | 509 | purchase order register (`PurchaseOrder`, `PurchaseOrder_Join`) | 01 section 5 | purchase orders |
+| `frmSalesInvoiceRecordD` | 1,464 | list of the "D" bills (J.4 item 5) | J.4 | empty-bill record |
+| `frmSalesPmtInfo` | 694 | "Sales Payment Record": per invoice the payment date, total paid and mode (`Invoice_Payment`) with a filter and Excel export | 01 section 2.1 | payments report |
+| `frmCustomerSupportLog_Dashboard`, `frmCustomerSupportLog_Report`, `frmEmailDashboard3` | 1,375, 478, 1,772 | support-log dashboard and report; the third copy of the e-mail dashboard | G, F | support log; e-mail |
+| `frmExportImportExcel_ProductsRecord`, `frmExportImportExcel_ProductsRecord1` | (C.1) | product import and export through Excel; the second is a copy | C.1 | onboarding import |
+| `frmPos_Cursor_Setting` | 128 | the cursor-start setting (D.3 row 10) | D | settings |
+| `frmMobileIDDialog` | 225 | shows the shop's "Mobile ID" for the owner's phone app, with a Copy button and an "(OFF)" toggle and a "2nd Display (ON)" link | F.3, I.3 | owner-phone feed (decision 12) |
+
+### J.4 Real features not written down before
+
+1. **Expiry product (item ageing) report** (`btnGetData`, caption "Expiry Product (Item Aging) Record", 1,389 lines). Lists the lots of `Temp_Stock` whose expiry falls in a window: buttons for the next **7, 15, 30, 90, 180, 365 days**, or a From and To date; a search by product name; "With -Ve Stock Qty Show" tick; Export Excel; "No(s) of items" and "Total quantity". Rule from the query (`B/btnGetData.vb:727`): `Qty > 0` (unless the negative-stock tick is on), product `Status = 'Yes'`, `Expdate > ''`, and `Convert(Datetime, Expdate, 103) >= From` and `< To + 1 day`; rows already past their date are painted pink (`:977`, `:1055`). **Trap:** `Expdate` is kept as **text** and read as day/month/year (style 103); a date typed any other way breaks the conversion for the whole query. **Port: yes**, once lots with expiry dates exist in the Hub (`06-hub-map.md` 3.2; 01 section 6); store real dates; window buttons as data; expired lots are blocked at sale (01 section 1.3).
+2. **Online orders** (`frmOrder`, 1,196 lines). Pulls orders from the shop's website API (`GET <WebUrl>/api/get-order?...`, the same `WebUrl` as the product push, I.2) into a grid: order id, customer, order date, address, city, total, status, payment mode, a "Bill Status" column, delivery charges, delivery date and time; an order can be turned into a bill in the touch tills (`Orderupdate`, `frmPOSTouch.vb:30722`, writes the bill number back). Outside call and customer data as in I.2. **Port:** only with the storefront (a design item for the Hub and `apps/storefront-web-mobile`), as an order inbox on the main PC; not as a GET to a vendor's web API.
+3. **Customer dashboard and product dashboard pop-ups on the till** (`frmCustBalanceLedger` "Customer Dash Board", 232 lines; `frmProductLedgerPOS` "Product Dash Board", 541 lines). Read-only: the first shows the selected customer's running balance and ledger lines from `CustomerLedgerBook`; the second shows the selected product's purchase history and stock (`Product`, `Supplier`, `Stock_Product`). **Port: yes,** as a side panel on the sell screen (customer balance needs the Hub's missing customer ledger first, 02 A1).
+4. **Customer Approved Discount Register** (`frmCustomerDiscRecord`, 631 lines; table `CustDiscApply(InvNo, InvDate, CustName, CustAddress, CustContact, InvAmt, InvTaxAmt, AppliedDiscPer, AppliedDiscAmt, ByBroker, BrokerID, BrokerContact, Item, BCode)`). When a customer's fixed discount is applied on a bill, a row is written (`insert into CustDiscApply`, deleted again if the bill is deleted); the register lists them per customer and broker. It is the audit trail for "discount approved" customers (the `DiscStatus` flag, 02 A1.9) and for broker-sourced sales (`ByBroker`). **Port:** as an audit report over the Hub's discount lines once bill discounts are complete (decision 33).
+5. **The empty-bill record `InvoiceInfoD`** (`SaleD`, `frmPOSTouch.vb:30735`, called when Save is pressed with **no items** on the grid): inserts a short row (`InvoiceNo` from its own counter `autoD`, date, customer id "1", salesman, grand total, paid, remarks, round-off, till id, operator, bill discount, bill cash) into a shadow table `InvoiceInfoD`; `frmSalesInvoiceRecordD` lists them with their lines from `Invoice_ProductD`. Its purpose (a "no sale" or amount-only bill, a drawer-open record) is not stated anywhere in the code. **Not understood;** do not port until the owner says what shops used it for.
+6. **Purchases register, item wise** (`frmPurchaseStock`, 888 lines; tables `Supplier`, `Stock_Product`, `Stock`): purchases listed by item with supplier, rate, quantity and date. **Port:** a report of the Hub's purchase lines once purchase lines keep cost (06 section 8).
+7. **Purchase-wise merge** (`frmPurchaseWiseMerge`, 1,173 lines, no caption): loads a purchase invoice number (`BtnLoadInvoiceNo`), shows its lines (product, HSN, barcode, quantity, MRP, price, discount and tax columns) and, from the click handlers, runs statements `update Temp_stock set qty = qty + (n) where ProductID=@d1 and Barcode=@d2` and the same with `- (n)`, where `n` is a grid cell value joined into the SQL text. So it adds or takes away stock of a lot by a grid number; its exact trigger (what the person is merging) was not followed. **Do not port as it is** (SQL built from a grid value, no audit); the Hub's `Adjust` with a reason and a user (01 section 6) is the right tool.
+
+### J.5 Worked test examples (by hand; none run)
+
+- **TV-J1 (expiry window).** Today 7 October 2026; a "30 days" window from 7 October to 6 November (the handler's exact dates were not read; the query rule is `From <= date < To + 1 day`). A lot with `Expdate` "06/11/2026" and `Qty` 5 is listed; "07/11/2026" is not; a lot with `Expdate` "30/09/2026" is only listed if the From date is earlier, and then painted pink; a lot with `Qty` 0 is hidden unless the negative-stock tick is on; a lot with an empty `Expdate` is never listed (`Expdate > ''`).
+- **TV-J2 (date text).** `Expdate` typed as "2026-12-01" is not day/month/year; style 103 cannot read it, so the query probably stops with a conversion error for every row in the report (SQL Server rejects the whole statement; not run).
+- **TV-J3 (discount register).** A customer with a fixed 5% discount buys 1,000.00 of goods with 50.00 tax: one `CustDiscApply` row (`InvAmt` 1,000.00 or the bill amount as saved, `InvTaxAmt` 50.00, `AppliedDiscPer` 5, `AppliedDiscAmt` 50.00); deleting the bill deletes the row by `InvNo`. (The amounts follow the screen's column names; the exact source text boxes were not traced.)
+- **TV-J4 (empty bill).** Save pressed on a new till with no lines: a row in `InvoiceInfoD` with a number from its own counter and totals 0.00; nothing in `InvoiceInfo`, no stock change.
+
+### J.6 What the Hub has and the verdict list
+
+| Group | Hub today | Verdict |
+|---|---|---|
+| Junk (J.1, J.2) | n/a | Drop all. |
+| Lists and reports of covered topics (J.3) | Reports page and lists for sales, items, people, purchases | Port with their masters; each list is read-only. |
+| Expiry ageing report | none (no lots) | **Port** after lots. |
+| Online orders | none | With the storefront only. |
+| Customer and product dashboards on the till | none | **Port** as side panels (needs the customer ledger). |
+| Approved-discount register | none | Port as an audit report after discounts are complete. |
+| Empty-bill record | none | Ask the owner. |
+| Purchases register item wise | purchases screen only | Port as a report. |
+| Purchase-wise merge | `CatalogService.Adjust` | Drop; use `Adjust`. |
+
+### J.7 Not understood (topic J)
+
+- The 31 names the MERGE-PLAN means by "left over": the plan does not list them; the 68 above are a superset found by elimination, and some of them (all the lists of J.3) belong to groups the plan already counts.
+- The purpose of `InvoiceInfoD` / `Invoice_ProductD` (J.4 item 5).
+- The exact From/To dates the expiry buttons set (the handlers repeat the same long query; only the query was read).
+- Whether `frmSalesPmtInfo` and `frmCustomerDiscRecord` are limited by role (they are opened from windows that are, A.4; the windows themselves were not checked).
+
+## K. Not understood (whole file), what was not read, and questions for the owner
+
+### K.1 What was not read, on purpose or for lack of the file
+
+- **Not in the repository, so not readable:** `DBScript.sql` and `CompanyMasterDBScript.sql` (every table definition, default and seed row; the collation; `Registration` keys; `Language_set` rows); the compiled libraries `GDClient.dll` (Google Drive backup), the original `DevNetTRLN.dll` and `DevNet.Translitration` (real transliteration), the real `DevNet.WhatsApp.V2` (Chrome route), `DevNet.PhonePe`, `DevNet.GS` (apart from its GSTIN validator), `MyDBLibrary` (`DBHelper`, master connection string), `Original_Binaries\*`.
+- **Not opened:** the layouts of all 192 `.rpt` files (B.4); `DevNetFB.FirebaseService` beyond its start-up wiring (F.3); the Chrome-driver manager; `frmEmailDashboard2`, `frmEmailDashboard3`, `frmEmailsender`, `frmSMS_AutoDetect`, the older `frmCustomerSupport`, `frmKeyBord`, `frmKeyBordProduct`, `frmMine`, `frmProductSeting` details, `frmGodownConfig` and the godown/token screens beyond 01; the Excel sample-format files; the duplicated bulk screens beyond their queries (`frmBulkWhatsappDoc`, `frmBulkWapp2CrCustomer`, `frmGiftCodeSender`, `frmCustomerMobileAppSender`, `frmLoyaltySMS`).
+- **Read by caption, tables and one flow only:** the lists and reports of J.3; the lead and support grids (G); the E-Com screens (I.2); the head-office `Receiver` screen (I.8).
+- **Nothing was built or run.** Every worked example (TV-A1 to TV-J4) was worked by hand from the code; a few text values (Base64 of sample passwords) were checked with a one-line script, not with the old program. No hardware, printer, Windows PC, SQL Server, WhatsApp, SMS gateway or mail account was used. A skipped check is not a passed check (CLAUDE.md section 2).
+
+### K.2 Open items that need a person (collected from the topics)
+
+1. How the hidden user type `*****` and the id `sadmin` were created (A.12), and whether any shop still has them.
+2. The database collation and the real contents of `Language_set`, `Invcode`, `CipherCode` and the menu tables, which only a real database or the two scripts can show (A, D, E).
+3. Which cloud account `GDClient.dll` used and what the owner-phone feed (`FirebaseService`) published (C.7, F.8): both matter before any customer's data from the old program is trusted to have stayed on the shop's PC.
+4. What `InvoiceInfoD` ("D" bills) were used for (J.4 item 5).
+5. What the original transliteration did and where it sent text (E.7).
+
+### K.3 Questions for the owner (not answered by `docs/PLATFORM-DECISIONS.md`; the rest of the topics are settled by decisions 4, 10, 11, 12, 13, 21 and 31 to 35)
+
+1. **Roles:** keep five fixed roles in code (as the Hub has) or let the owner of each shop define roles and their permissions as data (the old POS let an admin set 51 switches per user)? CLAUDE.md section 8 points to data. (A.11)
+2. **Re-check password** before risky actions (delete a company, restore a backup, import balances): ask the signed-in owner for their password, replacing the hard-coded `sadmin`. Yes? (A.6)
+3. **Virtual company on estimate bills** (a second business identity printed on estimates): port, port with limits (real tax number or none, labelled, audited), or leave out? (H.4 item 7)
+4. **Empty-bill record (`InvoiceInfoD`):** what was it for? (J.4 item 5)
+5. **Messaging:** which channels first (e-mail through the owner's own mail account, SMS through the owner's own gateway), and is an official WhatsApp business interface wanted later per country? And a per-customer permission to be contacted, default off? (F.7)
+6. **Customer-facing second screen** (bill lines, adverts, payment code): build it for the touch counter look (decision 30)? (I.3)
+7. **Starting invoice number per document type** for shops moving from the old program in the middle of a year: add as a setting? (H.6)
+
+### K.4 Reuse and where the work goes (CLAUDE.md section 17)
+
+Nothing new was built in this study. Where each topic plugs in: users and rights into `Hub.Core/Security` and the page policies (A.11); printing into `libs/dotnet/NextGenOS.Devices` and `Hub.Core/Printing` plus an HTML invoice template (B.8); backup into `HubDb.BackupNow` and `HubApp.Upkeep` (C.6); settings into `ShopSettings` and `Numbering` (D.7, H.6); language into `VocabularyOverrides` and an item attribute (E.6); messages into a new `IMessageChannel` beside `Ai/Routing.cs` and `ISecretStore` (F.7); CRM into new tables and the Today page (G.6); extras into the AI routing, the storefront and a customer display (I.10); leftovers per J.6. Add this to `docs/OPEN-WORK.md` when a topic is taken up.

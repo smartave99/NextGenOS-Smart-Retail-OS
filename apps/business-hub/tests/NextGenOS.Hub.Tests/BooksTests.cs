@@ -316,6 +316,30 @@ public class BooksTests
         AssertBalanced(f);
     }
 
+    [Fact]
+    public void Profit_and_the_position_of_the_shop_are_read_from_the_books_and_the_two_sides_are_always_equal()
+    {
+        using var f = Shop("wholesale");
+        var supplier = f.App.Parties.Create(new PartyInput { Kind = "supplier", Name = "National Foods" });
+        var rice = f.App.Catalog.Create(new ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 20_000, TaxClass = "standard" });
+        var po = f.App.Purchasing.CreateOrder(supplier.Id, new[] { new PurchaseLine { ItemId = rice.Id, QtyMilli = 10_000, CostMinor = 10_000 } });
+        f.App.Purchasing.Receive(po.Document.Id);
+        f.App.Purchasing.Pay(po.Document.Id, 50_000, "bank");
+        var buyer = f.App.Parties.Create(new PartyInput { Kind = "customer", Name = "Sharma Store", CreditLimitMinor = 10_000_000 });
+        f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, OnCredit = true, Lines = { Line("Rice", 20_000, 3000) }, Payments = { new PaymentInput { Method = "cash", AmountMinor = 30_000 } } });
+        var profit = f.App.Books.Profit(null, null);
+        Assert.Equal(60_000, profit.IncomeMinor);                    // 3 x 200.00 sold, before tax
+        Assert.Equal(100_000, profit.CostsMinor);                    // 10 x 100.00 bought, before tax
+        Assert.Equal(-40_000, profit.NetMinor);                      // the stock still on the shelf is not counted yet, so this is a loss on paper
+        var position = f.App.Books.Position(null);
+        Assert.Equal(position.AssetsMinor, position.LiabilitiesMinor + position.EquityMinor);
+        Assert.Equal(-40_000, position.ProfitSoFarMinor);
+        // a period that has nothing in it
+        var none = f.App.Books.Profit(f.Clock.UtcNow.AddDays(10), f.Clock.UtcNow.AddDays(11));
+        Assert.Equal(0, none.NetMinor);
+        AssertBalanced(f);
+    }
+
     // ---- many things in a row ------------------------------------------------------------------------------------------------------------
 
     [Fact]

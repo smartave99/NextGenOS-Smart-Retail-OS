@@ -82,6 +82,13 @@ try {
   assert.match(await page.locator('#statement').innerText(), /Credit note/);
   step('a return can be kept as credit on the customer\'s account instead of money back');
 
+  // the books: the two sides always equal
+  await go(page, 'Books');
+  await page.locator('#b-trial').waitFor();
+  assert.strictEqual(await page.locator('#b-debit').innerText(), await page.locator('#b-credit').innerText(), 'debits equal credits');
+  assert.ok(Math.abs(money(await page.locator('#b-assets').innerText()) - money(await page.locator('#b-liab').innerText()) - money(await page.locator('#b-worth').innerText())) < 0.011, 'what the shop has = what it owes + what it is worth');
+  step('the Books page shows debits equal to credits');
+
   // the list shows it
   await go(page, 'People');
   await page.locator('tr', { hasText: 'Credit Test Store' }).locator('td.num', { hasText: /^Credit / }).waitFor();

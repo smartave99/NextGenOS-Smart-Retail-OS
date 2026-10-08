@@ -289,6 +289,42 @@ public sealed class BooksService(HubDb db, IClock clock)
         r => new TrialRow(r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt64(3), r.GetInt64(4)),
         ("$from", from is { } f ? Iso.Text(f) : null), ("$to", to is { } o ? Iso.Text(o) : null));
 
+    public sealed record StatementRow(string Code, string Name, long AmountMinor);
+
+    /// <summary>What came in and what went out in a period, from the books. Purchases are counted as costs when bought; the value of stock still on the shelf is not yet counted, so this is not the final word on profit.</summary>
+    public sealed record ProfitAndLoss(IReadOnlyList<StatementRow> Income, IReadOnlyList<StatementRow> Costs)
+    {
+        public long IncomeMinor => Income.Sum(x => x.AmountMinor);
+        public long CostsMinor => Costs.Sum(x => x.AmountMinor);
+        public long NetMinor => IncomeMinor - CostsMinor;
+    }
+
+    public ProfitAndLoss Profit(DateTimeOffset? from, DateTimeOffset? to)
+    {
+        var rows = TrialBalance(from, to);
+        return new ProfitAndLoss(
+            rows.Where(r => r.Kind == "income" && r.BalanceMinor != 0).Select(r => new StatementRow(r.Code, r.Name, -r.BalanceMinor)).ToList(),
+            rows.Where(r => r.Kind == "expense" && r.BalanceMinor != 0).Select(r => new StatementRow(r.Code, r.Name, r.BalanceMinor)).ToList());
+    }
+
+    /// <summary>What the shop has, owes and is worth on a day (the day's end, so everything before <paramref name="before"/>). Profit so far is what income and costs have left over since the books began; it makes the two sides equal.</summary>
+    public sealed record BalanceSheet(IReadOnlyList<StatementRow> Assets, IReadOnlyList<StatementRow> Liabilities, IReadOnlyList<StatementRow> Equity, long ProfitSoFarMinor)
+    {
+        public long AssetsMinor => Assets.Sum(x => x.AmountMinor);
+        public long LiabilitiesMinor => Liabilities.Sum(x => x.AmountMinor);
+        public long EquityMinor => Equity.Sum(x => x.AmountMinor) + ProfitSoFarMinor;
+    }
+
+    public BalanceSheet Position(DateTimeOffset? before)
+    {
+        var rows = TrialBalance(null, before);
+        return new BalanceSheet(
+            rows.Where(r => r.Kind == "asset" && r.BalanceMinor != 0).Select(r => new StatementRow(r.Code, r.Name, r.BalanceMinor)).ToList(),
+            rows.Where(r => r.Kind == "liability" && r.BalanceMinor != 0).Select(r => new StatementRow(r.Code, r.Name, -r.BalanceMinor)).ToList(),
+            rows.Where(r => r.Kind == "equity" && r.BalanceMinor != 0).Select(r => new StatementRow(r.Code, r.Name, -r.BalanceMinor)).ToList(),
+            rows.Where(r => r.Kind == "income").Sum(r => -r.BalanceMinor) - rows.Where(r => r.Kind == "expense").Sum(r => r.BalanceMinor));
+    }
+
     public sealed record LedgerRow(DateTimeOffset At, string Memo, long DebitMinor, long CreditMinor, long BalanceMinor);
 
     /// <summary>

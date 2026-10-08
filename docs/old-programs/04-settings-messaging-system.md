@@ -1,6 +1,6 @@
 # Old Windows POS, study 04: users, printing, backup, settings, language, messages, small CRM, branches, extras
 
-**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A, B, C, D, E, F, G, H.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
+**Status (7 October 2026): IN PROGRESS. The skeleton is saved; topics are filled one at a time and saved after each. Topics done so far: A, B, C, D, E, F, G, H, I.** Nothing here was run: it was read from the source (a read-only study; nothing was built or run). The source is the owner's own (`docs/PLATFORM-DECISIONS.md`, decision 27).
 
 ## What to know first (10 lines)
 
@@ -937,7 +937,114 @@ Status of this topic: written. Covers what a "company" is, how one is created an
 - Whether `Online_DBName` is a real second SQL Server database on the vendor's server or a name inside the group registry.
 - What `frmBagBox` (a "Select Psc/Box" pick-list) and `frmState` do beyond the lists they show.
 
-## I. UPI QR, online-shop link, gallery, camera, image reader, calculator and other extras (not yet written)
+## I. UPI QR, online-shop link, gallery, camera, image reader, calculator and other extras
+
+Status of this topic: written. One short section per extra: what it is, the tables, what leaves the shop, and whether it is worth porting. Customer-visible words and images here are the customer's data (CLAUDE.md section 8).
+
+### I.0 The five things to know
+
+1. **Most extras are small and local.** The calculators, the cash-denomination counter, the cash-refund calculator, the camera and the gallery read no outside service. The ones that talk to the outside are the e-commerce push, the AI readers (image, PDF) and the online image library.
+2. **The UPI QR is built on the PC from the shop's own payment details and shown on the customer's second screen.** The payment itself is not seen by the program: the cashier confirms it by hand. This matches decision 13 ("the software records the amount and the method; it never sees a card number"). The "PhonePe UPI gateway" screen is a 114-line shell around a compiled library that is not in the repository (`DevNet.PhonePe`, obfuscated); its behaviour is unknown.
+3. **The AI readers send pictures to an outside AI service.** `frmImageReader` (a product photo, to get a product name), `frmPdfReader` (a supplier invoice, to get its lines), the quick-add product in the touch till, and the customer and supplier forms (a visiting-card or invoice image, to fill the buyer or seller details) post the picture to `api.openai.com` with the shop's key from `tbl_api_setting`. A supplier invoice or a buyer's invoice image holds names, addresses, tax numbers and prices. Under decision 10 and CLAUDE.md section 15 this is `PERSONAL`/`FINANCIAL` data to an outside service and needs the owner's explicit yes for that purpose, per feature.
+4. **The e-commerce screens are a one-way catalogue push to a website API of the previous vendor's design**, not an order system (I.2).
+5. **Defaults are India's:** the denominations (2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1), the rupee sign, "UPI", the GST calculator, state lists. All must come from the country pack in the Hub.
+
+### I.1 UPI QR
+
+| Item | Detail |
+|---|---|
+| Screens | `frmAutoUPI` ("UPI Gateway"), `frmUPIQRCodeImg` ("UPI QR Code Image": a stored picture of the shop's own QR with a name; rotate, browse), `QRGenerator` (a general QR maker), `frmPhonePeUPI` (shell). |
+| Tables | `UPIImg` (the stored QR pictures by UPI name; read and written by `frmUPIQRCodeImg`), `PosPrinterSetting.UPIID` and `BrandName` (B.2), and the bill value `UPI` ("UPI PAY :" printed when a UPI amount is more than zero and the tick box is on, B.3). |
+| How it works | `frmAutoUPI_Load` fills a `Bank` object (account number, IFSC code, payee name, amount, note) and calls `UPI.Generate(bank)`, which returns a picture; the picture goes to a box on the cashier screen and to `Form2.PictureBox1`, the customer-facing window shown on the second monitor if `PosPrinterSetting.SecDisplay = "Yes"` (`B/frmAutoUPI.vb:80-130`). The same call is in `frmPOSNew`, `frmQuotation`, `frmPOSNewTuch_StockInward`. The QR text format comes from a library outside the repository; the project references `QRCoder` to draw QR images (`SmartAvenue99 POS.vbproj:171`). |
+| Leaves the shop | nothing by itself. |
+| Rules | The amount in the QR is the amount due at the time; a failed `Double.Parse` leaves the amount empty (the customer types it). Payment is confirmed by the cashier adding a UPI/online payment row (01 section 2.1). |
+| Port | A "show payment code to the customer" step is useful anywhere with a static payment address; keep it **as data**: the payment-address format belongs to the country pack, the address and payee name to the shop's profile (decision 13 says certified provider connections come later, per country). Not before the second-screen customer display exists. |
+
+### I.2 Online shop ("E-Com")
+
+| Item | Detail |
+|---|---|
+| Screens | `frmEComSeting` (settings), `frmECategory`, `frmESubCategory`, `frmEProduct` (the main one, 1,470 lines), `frmEMain` (a 301-line shell). |
+| Table | `FTP_Category(c2 "Enabled", FtpUrl, FtpUser, FtpPassword, FileUrl, WebUrl)`: one row; **the FTP user and password are stored in plain text** (a secret is stored here). |
+| Flow | For each product the screen lists local products beside the online ones and "Post" or "Bulk Post". Post builds one web address `<WebUrl>/api/ins-product?id=..&pname=..&sname=..&cid=..&sid=..&psdesc=..&pgms=..&pprice=..&sprice=..&status=..&stock=..&pimg=..&prel=..&date=..&discount=..&popular=..&barcode=..&mode=..` (the values joined unencoded) and calls it with GET; if the reply contains the word `true` it uploads the product picture to the FTP server (`B/frmEProduct.vb:1060-1100`). Categories and sub-categories are pushed the same way, with a choice of FTP or SFTP (`frmECategory.vb:457-500`). Fields: seller or shop name, publish or unpublish, "make popular", "send notification", stock, small description, quantity unit text (gms, kg, ltr, ml, pcs), sale price, MRP, discount. |
+| Leaves the shop | product names, descriptions, **stock quantities, prices, discounts, barcodes** and pictures, to the website named in `WebUrl` over a plain GET and an FTP upload. |
+| Quirks | Unencoded values break on `&`, `#` or non-Latin letters; success is detected by looking for the text `true` in the reply; plain FTP. |
+| Hub | The storefront program (`apps/storefront-web-mobile`) has its own product data (Prisma); there is no feed from the Hub. A catalogue feed from the Hub to the storefront is a design question (the shop's stock quantity and prices are `INTERNAL`; a public catalogue is `PUBLIC` data). **Do not port the push as it is;** design a feed under decision 4 (nothing leaves unless the owner allows it) when the storefront is tied to the shop program. |
+
+### I.3 Gallery and customer display
+
+`frmGallery` ("Gallery") stores pictures in table `Gallery(ID, c1 = SN, c2 = image id, c3 = image bytes, c4 = "Display Screen Image" yes/no)`; the pictures marked for the display screen are shown on the customer-facing second monitor between sales (a slideshow of the shop's adverts), together with the bill lines and the UPI QR (`B/frmAutoUPI.vb`, `Form2`, `frmScrDsply`). `frmWalletList` lists the wallet payment names set for a till (read from `PosPrinterSetting`). Switch c14 hides the gallery menu. **Port:** a customer-display page (bill lines, total, payment code, shop pictures) is a good Hub feature for a touch counter: pictures are the customer's own files (no stock pictures), the layout is a look setting (decision 30), nothing leaves the PC.
+
+### I.4 Camera
+
+`FormCamera` ("Camera") and `frmCamera` ("Webcam", "Picture Preview"): capture a still from a webcam with the AForge video libraries (`SmartAvenue99 POS.vbproj:57-60`) for a customer photo, a user photo (A.5), a signature or a product picture; also used by `Ctrl+W` in the touch till. Nothing leaves the PC. **Hub:** the Hub already has a camera barcode scan page (`CameraScan.razor`, `scan.js`); a photo capture for items and people can use the same browser permission; a person's photo is `PERSONAL`, kept on the main PC.
+
+### I.5 Image reader and PDF reader (AI)
+
+| Screen | What it sends | Model | Result |
+|---|---|---|---|
+| `frmImageReader` (314 lines) | one product photo as base64 | OpenAI `gpt-4o` | the product name only ("extracts product names from images") |
+| `frmPdfReader` (1,369 lines) | an invoice image or a PDF page as base64 | `gpt-4o` | a JSON list of items (serial no, product name, HSN code, quantity, rate and so on) to fill a purchase entry; fields "MRP(%) of Rate" help set the MRP |
+| Quick add in the touch till (`frmPOSNewTuch.vb:27925`) | a product photo | `gpt-4o-mini` | text on the image or, if none, the main object's name |
+| Customer and supplier forms (`frmCustomer.vb:3470`, `frmSupplier.vb:2947`) | an invoice image | `gpt-4o-mini` | the buyer (or seller) details extracted from the invoice |
+| E-mail dashboard | the subject line | `gpt-3.5-turbo` | a drafted letter (F.3) |
+
+All use the key and address in `tbl_api_setting` (`GetApiDtl`: `id, url, apikey, isDefault, isEnabled`); the key is in plain text in the table. **Port rule:** these become Hub tasks through the existing AI routing (`Ai/Routing.cs`): a supplier-invoice image is `FINANCIAL` and `PERSONAL`, so it runs on a local model by default and goes online only if the owner turned on an online service and gave permission for that data class and feature; never in the checkout path; the result is a proposal the person confirms (CLAUDE.md section 15: the assistant only recommends). A prompt that names a country's tax code (HSN) belongs in the country pack.
+
+### I.6 Calculators and cash tools
+
+| Tool | File | What it does |
+|---|---|---|
+| Calculator | `Calculator` (1,195 lines) | An on-screen four-function calculator. Junk to port (the operating system has one). |
+| GST Calculator | `GSTCalculator` | Amount and GST % in, two columns out: **tax included in the amount** and **tax excluded** (rule below). |
+| Output Tax (Sales), Input Tax (Purchase) | `frmGSTCalc`, `frmGSTCalc1` | "Search by Sales Invoice Date" (From, To), GetData, Export Excel: a rate-wise tax table for the date range built by one dynamic pivot query (`B/frmGSTCalc.vb:343`); the purchase twin does the same for purchases. Not read line by line; the tax reports and GSTR forms are in `docs/old-programs/03-india-tax-and-staff.md`. |
+| Cash Refund Calculator | `Cashrefund` | Received cash minus the bill amount = change to give (`TextBox3 = Val(TextBox1) - Val(TextBox2)`). |
+| Cash Denominator | `Denomination` | Count notes and coins: for each of 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1 a count box, the amount (count times denomination), and a grand total of the notes and of the currency. Nothing is saved. |
+| Sale amount adjuster | `frmSaleAmtCal` ("Item's Adjustable Amount") | A small dialog on the till: shows price, tax type, total tax % and total discount, and lets the cashier enter an adjustable line amount (not read further). |
+| Broker calculator | `frmBrokerCalc` | A voucher number (default prefix "EXP" from the invoice-code table, D.3 row 12) and a broker commission figure; ties to the broker ledger (`frmBroker`, `frmBrokerLedger`, 02). |
+| On-screen keyboards | `frmKeyBord`, `frmKeyBordProduct`, and the sign-in "OnScreen Keyboard" button (starts `osk.exe`) | Touch input. The Hub is a browser page: the browser or the operating system supplies the keyboard. Junk. |
+
+### I.7 Catalogue, banner and image tools
+
+`frmBanarCreate` and `frmProductImageMaker` (both captioned "Product Catalogue - cum - Image Update") build a printed or shareable catalogue page from `Temp_Stock` lots with a chosen catalogue style (`CatalogStyle`, B.2) and the report `CryCatalogue`; `frmProductImageUpdator` and `frmOnlineImage` ("Online Image Library") update a product's picture in `Product_Join` from the computer's files (a file-open filter for images was seen; an internet image search was not found in the code read). `frmInvoicePhoto` stores a picture against a bill (`Update InvImg set Image=@d1 where ID=@d2`). **Port:** product pictures per item and a printable catalogue are Hub-sized features for later; the catalogue style and wording are the customer's data.
+
+### I.8 Staff-only and legacy screens met here
+
+`FrmApp` ("Auto WhatsApp Launcher (Rel. 17)", 463 lines, F), `Receiver` (2,034 lines, "Company ID": the **head-office view**, below), `frmMine` (1,042 lines, caption "Form1"; a text-formatting editor with font, alignment and colour menus; purpose not found), `frmAbout` ("License Registered To", a Download link), `frmSplash` (the start-up window with the licence read, edited by the owner earlier), `frmLoading`, `frmYesNo`, `frmCustomDialog`, `frmCustomDialog1` to `3` (59-line pop-ups with an image), `frmSystemInfo` (D.1).
+
+**Head-office view (`Receiver`).** Given a company id it reads the other company's name, address, state and GSTIN, and its figures from the cloud feed (F.3) and shows **Today's** sales, purchase, sale return, purchase return, receipt, payment, service advance, service amount, income, expenses, cash-in-hand and cash-in-bank, and the same **Total** for the financial year (`B/Receiver.vb:488-520`, titles `TodayTitle1..12`, `FYTitle..`). This is a **totals-only** multi-store view, the same shape as decision 12; the old way sends it through a cloud database the previous vendor ran.
+
+### I.9 Worked test examples (by hand; none run)
+
+- **TV-I1 (GST calculator, tax included).** Amount 118.00, GST 18%: base = 118 x 100 / 118 = 100.00; tax = 118 - 100 = 18.00; CGST = 9.00; SGST = 9.00; IGST = 18.00. Tax excluded for the same amount: total = 118 + 118 x 18 / 100 = 139.24; tax = 21.24; CGST = SGST = 10.62 (`B/GSTCalculator.vb:252-290`; every figure is rounded to 2 places with half-to-even on the unrounded double, then shown as "0.00").
+- **TV-I2 (rounding of the halves).** Amount 100.00, GST 5%, tax included: base = 100 x 100 / 105 = 95.238095, shown 95.24; tax = 100 - 95.238095 = 4.761905, shown 4.76; CGST and SGST are each 2.380952 shown 2.38 (so 2.38 + 2.38 = 4.76, equal to the tax here; with other amounts the two halves can differ from the tax by 0.01 because each is rounded separately; not worked for a tie because double-precision ties depend on the binary form).
+- **TV-I3 (denominations).** 3 notes of 500, 2 of 100 and 4 of 10: 1,500 + 200 + 40 = 1,740 grand total (count x denomination, summed).
+- **TV-I4 (cash refund).** Received 500, bill 463.50: change 36.5 (shown without a fixed number of decimals).
+- **TV-I5 (E-com address).** Product "Tea 250 g" with a name containing a space and price 125.00: the address contains `pname=Tea 250 g` unencoded; a name with `&` would cut the parameters (as in F.6 TV-F4).
+- **TV-I6 (AI reader gate).** In the old program the only gate is that `tbl_api_setting` has a row with `isDefault = "Yes"` and `isEnabled = "Yes"`; nothing asks per picture, nothing records which picture was sent.
+
+### I.10 What the Hub has and what to port
+
+| Extra | Hub today | Verdict |
+|---|---|---|
+| UPI QR | none (payments recorded by method) | Later, as a country-pack payment-code format shown on a customer display; not a provider (decision 13). |
+| E-Com push | storefront has its own data | Do not port; design a feed under decision 4. |
+| Gallery and second-screen display | none | Worth porting (customer display). |
+| Camera | camera barcode scan exists | Port photo capture for items and people later. |
+| Image / PDF reader | AI routing foundation exists | Port as local-first AI tasks with owner consent, after purchases can be saved as drafts. |
+| GST calculator | none (the tax engine does the same arithmetic per line) | Drop; the engine is the one source. |
+| Cash refund calculator | change is shown on the sell screen | Already covered. |
+| Denomination counter | none | Small useful tool for day close; denominations from the country pack. |
+| Calculator, keyboards | browser/OS | Drop. |
+| Head-office view | none | Decision 12 (opt-in totals only), not built. |
+
+### I.11 Not understood (topic I)
+
+- The QR text built by `UPI.Generate` and which library provides it.
+- What `DevNet.PhonePe` called (the screen is a shell around an obfuscated library).
+- Whether `frmOnlineImage` fetches images from the internet (no address was found in the code read).
+- What `frmSaleAmtCal` changes on the till line; what `frmMine` is for; what `frmKeyBord` and `frmKeyBordProduct` look like and where they open from.
+- The exact columns of the pivot tables in `frmGSTCalc` and `frmGSTCalc1` (they were read only by caption and the shape of the query).
 
 ## J. The "left over, not grouped" screens (not yet written)
 

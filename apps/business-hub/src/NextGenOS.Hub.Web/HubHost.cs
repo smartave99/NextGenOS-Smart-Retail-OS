@@ -59,7 +59,15 @@ public static class HubHost
         // The AI parts of the Hub are allowed only when the signed licence has the "ai" module (and they are all off until the owner switches them on).
         // Hub:BackupFolder is where the copy made before an update goes (a second disk is best); without it the copy is made next to the shop's file.
         var backupFolder = builder.Configuration["Hub:BackupFolder"];
-        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>())), backupFolder: backupFolder));
+        var shopFile = Path.Combine(folder, "shop.db");
+        services.AddSingleton(sp =>
+        {
+            // A copy the owner chose to put back (Settings, Backups, or the first screen of a PC with no shop) is put in place now, before the shop is opened: the running shop cannot swap its own file.
+            var restored = NextGenOS.Hub.Backups.PendingRestore.ApplyIfPending(folder, shopFile);
+            var app = HubApp.Open(shopFile, ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>())), backupFolder: backupFolder);
+            if (restored is not null) app.Audit.Log(null, restored.Done ? "restore" : "restore-failed", "backup", null, restored.Message);
+            return app;
+        });
 
         // The sign-in cookie is protected with keys kept in the data folder (and, on Windows, locked to this PC), so a restart does not sign everyone out.
         var protection = services.AddDataProtection().SetApplicationName("NextGenOS.Hub").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(folder, "keys")));

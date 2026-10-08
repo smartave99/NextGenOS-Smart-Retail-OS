@@ -89,7 +89,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked:** Local automatic with optional online backup, local automatic only, or the owner does it by hand.
 - **Answer:** "Local automatic; cloud only if owner turns it on (Recommended)".
 - **Rule:** Every night the main PC copies the data to a second place the owner chooses (a USB drive, or another PC in the store). The owner sees whether the last backup worked; restoring is a few clicks. An **encrypted online backup exists but is off until the owner turns it on**, and says in plain words what goes out and where.
-- **Today:** **Not built.** Only the copy made before an update exists.
+- **Today:** **Built for local copies on 8 October 2026** (blueprint OPS-002): *Settings → Backups* (the second place, the time, how many to keep, "Back up now"), a checked and fingerprinted copy every night, the owner told on the first screen when copies are off or failing, and "put this copy back" (also on a PC with no shop). `docs/BACKUP-AND-RESTORE.md`. **Not built:** encrypted copies, the online copy (stays off until the owner turns it on). **Not verified** on a real USB drive or share.
 
 ### 12. A client with several stores
 

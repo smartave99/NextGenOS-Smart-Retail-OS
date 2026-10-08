@@ -93,6 +93,20 @@
         </div>
         }
         <button type="button" class="btn primary wide" @onclick="ToType">Next</button>
+        <details class="muted" id="have-a-copy">
+            <summary>I already have a copy of my shop (a backup)</summary>
+            <p class="small">If this PC is new or was repaired, you can put your shop back from a copy made by the Hub's backups. Plug the drive in and type where the copy is, like <em>E:\Backups\NextGenOS-shop-....bak</em>. The copy is checked first.</p>
+            @if (restoreReady)
+            {
+                <div class="notice ok" id="copy-ready" role="status">The copy is ready. <strong>Close the program and open it again</strong>: it will start with your shop as it was.</div>
+            }
+            else
+            {
+                <label for="copy-path">Where the copy is</label>
+                <input id="copy-path" @bind="copyPath" maxlength="400" autocomplete="off" />
+                <button type="button" class="btn secondary" id="copy-check" @onclick="PrepareCopy">Check the copy</button>
+            }
+        </details>
     </div>
 }
 else if (step == 2)
@@ -165,6 +179,8 @@ else
 
 @code {
     private int step = 1;
+    private string? copyPath;
+    private bool restoreReady;
     private string? error;
     private bool busy;
 
@@ -195,6 +211,19 @@ else
         if (App.Users.Any()) Nav.NavigateTo("/login");
         SetDefaults();
         UseProfile();
+    }
+
+    /// <summary>Checks a copy made by the Hub's backups and sets it aside, to be put back the next time the program starts. Only while the shop has nobody who can sign in yet.</summary>
+    private void PrepareCopy()
+    {
+        error = null;
+        try
+        {
+            if (App.Users.Any()) throw new HubException("done", "This shop is already set up. Sign in instead.");
+            NextGenOS.Hub.Backups.PendingRestore.Stage(Path.GetDirectoryName(Path.GetFullPath(App.Db.Path))!, copyPath ?? "");
+            restoreReady = true;
+        }
+        catch (HubException ex) { error = ex.Message; }
     }
 
     /// <summary>The details NextGenOS prepared for this business (profile/setup.json), if any: they fill the first page, and the owner can change every one.</summary>

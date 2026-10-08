@@ -427,6 +427,11 @@ else if (tab == "printers")
         </div>
     }
 }
+else if (tab == "backups")
+{
+    @* The owner only: the page is [Authorize(Policy = Perm.Settings)], and the Hub checks it again itself in each action. *@
+    <BackupsPanel />
+}
 else if (tab == "users")
 {
     <section class="card">
@@ -548,6 +553,7 @@ else if (tab == "activity")
         yield return ("loyalty", "Loyalty points");
         yield return ("look", "Look");
         yield return ("printers", "Printers");
+        yield return ("backups", "Backups");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
         if (Me.Can(Perm.Settings)) yield return ("older", "Move from the older POS");

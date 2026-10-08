@@ -143,14 +143,33 @@ public sealed class HubDb
     /// </summary>
     private string? Backup(SqliteConnection connection, string label)
     {
+        var folder = _backupFolder ?? ChosenBackupFolder(connection) ?? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!;
+        return Copy(connection, folder, System.IO.Path.GetFileName(Path) + "." + label + ".bak", createFolder: true);
+    }
+
+    /// <summary>The place the owner chose for the shop's copies (Settings, Backups), if there is one: an update puts its safe copy there too. Read straight from the file, before the update runs.</summary>
+    private static string? ChosenBackupFolder(SqliteConnection connection)
+    {
+        try
+        {
+            var text = Scalar(connection, "SELECT value FROM settings WHERE key = 'backup.folder'") as string;
+            return string.IsNullOrWhiteSpace(text) || !Directory.Exists(text) ? null : text;
+        }
+        catch (SqliteException)
+        {
+            return null;   // no settings table yet: a shop this old has nothing chosen
+        }
+    }
+
+    private string? Copy(SqliteConnection connection, string folder, string fileName, bool createFolder)
+    {
         string? target = null;
         try
         {
-            var folder = _backupFolder ?? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!;
-            Directory.CreateDirectory(folder);
-            var name = System.IO.Path.GetFileName(Path) + "." + label;
-            target = System.IO.Path.Combine(folder, name + ".bak");
-            if (File.Exists(target)) target = System.IO.Path.Combine(folder, name + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture) + ".bak");
+            if (createFolder) Directory.CreateDirectory(folder);
+            else if (!Directory.Exists(folder)) return $"The folder for the copy (\"{folder}\") is not there.";
+            target = System.IO.Path.Combine(folder, fileName);
+            if (File.Exists(target)) target = System.IO.Path.Combine(folder, System.IO.Path.GetFileNameWithoutExtension(fileName) + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture) + System.IO.Path.GetExtension(fileName));
             Exec(connection, "VACUUM INTO $target", null, ("$target", target));
 
             var expectedVersion = Convert.ToInt32(Scalar(connection, "SELECT COALESCE(MAX(version), 0) FROM schema_version") ?? 0);
@@ -176,6 +195,23 @@ public sealed class HubDb
     {
         try { if (File.Exists(file)) File.Delete(file); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* a copy that cannot be removed is reported by the caller's message; it must not hide the real problem */ }
+    }
+
+    /// <summary>A copy made on request, in a folder that already exists: what, how big, and the structure it holds.</summary>
+    public sealed record CopyMade(string Path, string FileName, long SizeBytes, int SchemaVersion);
+
+    /// <summary>
+    /// A checked copy of the whole file in an existing folder (the nightly copy to the owner's second place). Unlike an update's copy, the folder is not made if it is missing: a drive that
+    /// is unplugged must not turn into a folder on the PC's own disk. Throws <see cref="HubException"/> (<c>backup</c>) with the reason in plain words when the copy cannot be made.
+    /// </summary>
+    public CopyMade CopyTo(string folder, string fileName)
+    {
+        using var connection = Open();
+        var problem = Copy(connection, folder, fileName, createFolder: false);
+        if (problem is not null || LastBackup is null) throw new HubException("backup", problem ?? "The copy could not be made.");
+        var info = new FileInfo(LastBackup);
+        var version = Convert.ToInt32(Scalar(connection, "SELECT COALESCE(MAX(version), 0) FROM schema_version") ?? 0);
+        return new CopyMade(info.FullName, info.Name, info.Length, version);
     }
 
     /// <summary>The number of the newest step of the shop database that this program knows.</summary>

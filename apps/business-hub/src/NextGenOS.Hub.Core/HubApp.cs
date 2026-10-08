@@ -2,6 +2,7 @@ using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
+using NextGenOS.Hub.Backups;
 using NextGenOS.Hub.Books;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
@@ -60,6 +61,8 @@ public sealed class HubApp
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Access);
+        // The shop's own copies, made every night to a second place the owner chose (Settings, Backups), and putting one back.
+        Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
     }
 
     public HubDb Db { get; }
@@ -91,6 +94,7 @@ public sealed class HubApp
     public EventStore Events { get; }
     public OntologyService Ontology { get; }
     public ImportService Importer { get; }
+    public BackupService Backups { get; }
 
     /// <summary>
     /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day
@@ -106,6 +110,7 @@ public sealed class HubApp
         Books.CatchUp();
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
         Retention.Prune(null);
+        Backups.RunIfDue();   // the night's copy, when it is due (a failed try is written down and shown to the owner; it never stops the till)
     }
 
     /// <summary>

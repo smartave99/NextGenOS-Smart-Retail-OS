@@ -9,8 +9,11 @@ using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Ontology;
 
-/// <summary>A thing the business map knows, as a person would describe it. <see cref="Exists"/> is false when a record the shop had has been removed since.</summary>
-public sealed record ThingView(ThingRef Ref, string Label, string Kind, string DataClass, bool Exists, bool Retired, string? AttributesJson);
+/// <summary>
+/// A thing the business map knows, as a person would describe it. <see cref="Exists"/> is false when a record the shop had has been removed since. <see cref="AsOf"/> is the moment it was read
+/// and <see cref="Origin"/> says where it came from: a record the shop already keeps ("shop record", read live, the source of truth) or something kept only in the map ("business map").
+/// </summary>
+public sealed record ThingView(ThingRef Ref, string Label, string Kind, string DataClass, bool Exists, bool Retired, string? AttributesJson, DateTimeOffset? AsOf = null, string? Origin = null);
 
 /// <summary>One connection. A derived one (<see cref="Derived"/>) is worked out from the shop's own records and has no id; a stored one has the day it began and, if it has ended, the day it did.</summary>
 public sealed record Link(long? Id, string Relation, string RelationLabel, ThingRef From, ThingRef To, bool Derived, DateTimeOffset? Since, DateTimeOffset? Until, string? AttributesJson, string? Source);
@@ -125,7 +128,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
                 ("$t", Tenant), ("$s", Site), ("$ty", type), ("$k", theKey), ("$n", words), ("$a", attributes), ("$at", Iso.Text(clock.UtcNow)), ("$u", userId));
             audit.Log(c, t, userId, "map.add", "ontology_entity", null, type + ":" + theKey + " (" + words + ")");
         });
-        return Resolve(new ThingRef(type, theKey))!;
+        return Find(new ThingRef(type, theKey))!;
     }
 
     public ThingView Rename(ThingRef thing, string name, long? userId)
@@ -141,7 +144,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
             if (changed > 0) audit.Log(c, t, userId, "map.rename", "ontology_entity", null, thing + " is now called " + words);
         });
         if (changed == 0) throw new HubException("no-thing", "That is not in the map, or it has been retired.");
-        return Resolve(thing)!;
+        return Find(thing)!;
     }
 
     /// <summary>A place or device that is gone. It stays in the map, marked, with the history of its connections; every live connection to it ends now.</summary>
@@ -161,26 +164,54 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
         });
     }
 
+    /// <summary>The things of one kind, for the person asking: nothing at all when their role may not see that kind of thing.</summary>
     public IReadOnlyList<ThingView> Things(string type, bool includeRetired = false)
     {
+        var sees = Seeing(access.Who());
+        if (!sees(type)) return [];
         var rows = db.Query("SELECT key FROM ontology_entities WHERE tenant_id = $t AND site_id = $s AND type = $ty" + (includeRetired ? "" : " AND retired_at IS NULL") + " ORDER BY name, key",
             r => r.Text("key"), ("$t", Tenant), ("$s", Site), ("$ty", type));
-        return rows.Select(k => Resolve(new ThingRef(type, k))).Where(x => x is not null).Select(x => x!).ToList();
+        return rows.Select(k => Find(new ThingRef(type, k))).Where(x => x is not null).Select(x => x!).ToList();
+    }
+
+    // ---- who may see what (ONT-010) ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A test of whether this person may see a kind of thing (<see cref="ReadPolicy"/>), remembered for the length of one question. A kind the map does not know is not seen by anyone
+    /// but the program, so a made-up kind and a hidden one look the same.
+    /// </summary>
+    private Func<string, bool> Seeing(Actor who)
+    {
+        if (who.IsSystem) return _ => true;
+        var types = EntityTypes().ToDictionary(t => t.Name, t => t.DataClass);
+        var memo = new Dictionary<string, bool>();
+        return type => memo.TryGetValue(type, out var known) ? known : memo[type] = types.TryGetValue(type, out var dataClass) && ReadPolicy.CanSee(who, type, dataClass);
     }
 
     // ---- looking a thing up -----------------------------------------------------------------------------------------------------------------
 
-    /// <summary>What a reference points at, or null when it points at nothing the map or the shop's records know.</summary>
+    /// <summary>
+    /// What a reference points at, or null when it points at nothing the person asking may see: a record that is not there, a kind the map does not know, and a kind this person's role may not
+    /// see all answer the same way, so asking never shows that something exists.
+    /// </summary>
     public ThingView? Resolve(ThingRef thing)
     {
+        var sees = Seeing(access.Who());
+        return sees(thing.Type) ? Find(thing) : null;
+    }
+
+    /// <summary>The same, with no check of who is asking: for the map's own commands (which check their own permission) and its own housekeeping. Never handed to a screen or an assistant.</summary>
+    private ThingView? Find(ThingRef thing)
+    {
         EnsureCatalogue();
+        var now = clock.UtcNow;
         var type = db.QueryOne("SELECT name, label, kind, data_class, builtin FROM ontology_entity_types WHERE tenant_id = $t AND site_id = $s AND name = $n",
             r => new EntityTypeDefinition(r.Text("name"), r.Text("label"), r.Text("kind"), r.Text("data_class"), r.Int("builtin") == 1), ("$t", Tenant), ("$s", Site), ("$n", thing.Type));
         if (type is null) return null;
         if (type.Kind == EntityKind.Native)
         {
             return db.QueryOne("SELECT name, attributes, retired_at FROM ontology_entities WHERE tenant_id = $t AND site_id = $s AND type = $ty AND key = $k",
-                r => new ThingView(thing, r.Text("name"), EntityKind.Native, type.DataClass, true, !r.IsDBNull(r.GetOrdinal("retired_at")), r.TextOrNull("attributes")),
+                r => new ThingView(thing, r.Text("name"), EntityKind.Native, type.DataClass, true, !r.IsDBNull(r.GetOrdinal("retired_at")), r.TextOrNull("attributes"), now, OriginMap),
                 ("$t", Tenant), ("$s", Site), ("$ty", thing.Type), ("$k", thing.Key));
         }
 
@@ -189,8 +220,11 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
         var label = db.Scalar(source.LabelSql, ("$id", id));
         if (label is null) return null;   // the record is gone (or was never there)
         var attributes = db.Scalar(source.AttributesSql, ("$id", id));
-        return new ThingView(thing, Convert.ToString(label, CultureInfo.InvariantCulture) ?? thing.ToString(), EntityKind.Mapped, type.DataClass, true, false, attributes is null ? null : Convert.ToString(attributes, CultureInfo.InvariantCulture));
+        return new ThingView(thing, Convert.ToString(label, CultureInfo.InvariantCulture) ?? thing.ToString(), EntityKind.Mapped, type.DataClass, true, false, attributes is null ? null : Convert.ToString(attributes, CultureInfo.InvariantCulture), now, OriginShop);
     }
+
+    public const string OriginShop = "shop record";
+    public const string OriginMap = "business map";
 
     // ---- connections ---------------------------------------------------------------------------------------------------------------------
 
@@ -206,7 +240,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
         if (from == to) throw new HubException("bad-ends", "A thing cannot be connected to itself.");
         foreach (var end in new[] { from, to })
         {
-            var view = Resolve(end);
+            var view = Find(end);
             if (view is null) throw new HubException("no-thing", end + " is not in the map or in the shop's records.");
             if (view.Retired) throw new HubException("retired-thing", end + " has been retired.");
         }
@@ -250,10 +284,16 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
 
     public Link? Stored(long id) => db.QueryOne(LinkSelect + " AND id = $id", MapLink, ("$t", Tenant), ("$s", Site), ("$id", id));
 
-    /// <summary>What a thing is connected to, in both directions unless one is asked for: the stored connections that are live (or all of them, with their days) and those worked out from the shop's records.</summary>
+    /// <summary>
+    /// What a thing is connected to, in both directions unless one is asked for: the stored connections that are live (or all of them, with their days) and those worked out from the shop's
+    /// records. For the person asking: nothing when they may not see the thing itself, and no connection whose other end they may not see (so a cashier sees who a bill was issued to, but not
+    /// which member of staff handled it).
+    /// </summary>
     public IReadOnlyList<Link> Related(ThingRef thing, string direction = Both, string? relation = null, bool includeEnded = false)
     {
         if (direction is not (Outgoing or Incoming or Both)) throw new HubException("bad-direction", "Ask for what it is connected to ('out'), what is connected to it ('in'), or both.");
+        var sees = Seeing(access.Who());
+        if (!sees(thing.Type)) return [];
         var labels = RelationTypes().ToDictionary(r => r.Name, r => r.Label);
         var links = new List<Link>();
         var sql = LinkSelect + " AND (" + (direction == Incoming ? "to_ref = $r" : direction == Outgoing ? "from_ref = $r" : "from_ref = $r OR to_ref = $r") + ")"
@@ -268,24 +308,25 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
             {
                 if (direction != Incoming && rule.FromType == thing.Type)
                     foreach (var target in db.Query(rule.OutgoingSql, r => r.GetInt64(0), ("$id", id)))
-                        links.Add(new Link(null, rule.Relation, labels.GetValueOrDefault(rule.Relation, rule.Relation), thing, new ThingRef(rule.ToType, target.ToString(CultureInfo.InvariantCulture)), true, null, null, null, null));
+                        links.Add(new Link(null, rule.Relation, labels.GetValueOrDefault(rule.Relation, rule.Relation), thing, new ThingRef(rule.ToType, target.ToString(CultureInfo.InvariantCulture)), true, null, null, null, OriginShop));
                 if (direction != Outgoing && rule.ToType == thing.Type)
                     foreach (var source in db.Query(rule.IncomingSql, r => r.GetInt64(0), ("$id", id)))
-                        links.Add(new Link(null, rule.Relation, labels.GetValueOrDefault(rule.Relation, rule.Relation), new ThingRef(rule.FromType, source.ToString(CultureInfo.InvariantCulture)), thing, true, null, null, null, null));
+                        links.Add(new Link(null, rule.Relation, labels.GetValueOrDefault(rule.Relation, rule.Relation), new ThingRef(rule.FromType, source.ToString(CultureInfo.InvariantCulture)), thing, true, null, null, null, OriginShop));
             }
         }
 
-        return links.Select(l => l with { RelationLabel = labels.GetValueOrDefault(l.Relation, l.Relation) }).ToList();
+        return links.Where(l => sees(l.From.Type) && sees(l.To.Type)).Select(l => l with { RelationLabel = labels.GetValueOrDefault(l.Relation, l.Relation) }).ToList();
     }
 
     /// <summary>Everything the map holds that is no longer right: a live connection to a thing that has gone from the shop's records, or been retired.</summary>
     public IReadOnlyList<MapProblem> Check()
     {
+        access.Require(Perm.Ai);
         var problems = new List<MapProblem>();
         foreach (var link in db.Query(LinkSelect + " AND valid_to IS NULL ORDER BY id", MapLink, ("$t", Tenant), ("$s", Site)))
             foreach (var end in new[] { link.From, link.To })
             {
-                var view = Resolve(end);
+                var view = Find(end);
                 if (view is null) problems.Add(new MapProblem(end + " is in a connection (" + link.From + " " + link.Relation + " " + link.To + ") but is no longer there.", link.Id));
                 else if (view.Retired) problems.Add(new MapProblem(end + " was retired but is still in a connection (" + link.From + " " + link.Relation + " " + link.To + ").", link.Id));
             }

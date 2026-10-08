@@ -75,6 +75,9 @@ public sealed class AiFixture : IDisposable
     /// <summary>The same shop file opened again with the same licence, safe and services, as after the program was stopped and started.</summary>
     public HubApp Reopen() => HubApp.OpenTrusted(App.Db.Path, Shop.Clock, null, _options);
 
+    /// <summary>The same shop file opened the way people use it, where a command or a read with nobody named is refused (the shop is prepared with <see cref="App"/>).</summary>
+    public HubApp OpenStrict() => HubApp.Open(App.Db.Path, Shop.Clock, null, _options);
+
     /// <summary>Connects a stand-in service, switched on, at an address that fits its place.</summary>
     public FakeService Connect(string id, string location, bool on = true, string[]? tasks = null, ProviderLimits? limits = null, long? priceIn = null, long? priceOut = null)
     {

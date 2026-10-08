@@ -189,11 +189,11 @@ else if (!App.Ontology.Writable)
     private string Name(ThingRef thing)
     {
         if (names.TryGetValue(thing, out var known)) return known;
-        var view = App.Ontology.Resolve(thing);
+        var view = AsMe(() => App.Ontology.Resolve(thing));
         return names[thing] = view is null ? thing + " (no longer there)" : view.Label + (view.Retired ? " (removed)" : "");
     }
 
-    private string Where(ThingRef thing) => string.Join(" › ", App.Ontology.Ancestors(thing).Select(a => a.Label));
+    private string Where(ThingRef thing) => string.Join(" › ", AsMe(() => App.Ontology.Ancestors(thing)).Select(a => a.Label));
 
     private async Task Add()
     {

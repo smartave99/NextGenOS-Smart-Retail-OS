@@ -49,7 +49,7 @@ export async function render(ctx) {
     const nodes = [];
 
     nodes.push(h('div', { class: 'card', id: 'site-service' }, h('h2', {}, 'The Android app, and the other way to get a website'),
-      h('p', { class: 'lead' }, `${c.name}'s Android app has ${c.name}'s own name, colours and settings built into it, and making it needs program files that never come to this PC. So the Studio asks the build service (on GitHub) to make it, watches it, and brings the finished file back into this customer's folder. The build service can make the website as well, but you do not need it for that: the website package above is made on this PC. Closing the Studio does not stop a build: open this step again and the Studio picks it up.`),
+      h('p', { class: 'lead' }, `${c.name}'s Android app has ${c.name}'s own name, colours and settings built into it, and making it needs program files that never come to this PC. So the Studio asks the build service (a private place away from this PC) to make it, watches it, and brings the finished file back into this customer's folder. The build service can make the website as well, but you do not need it for that: the website package above is made on this PC. Closing the Studio does not stop a build: open this step again and the Studio picks it up.`),
       !s.service.ready ? h('div', { class: 'notice warn', id: 'site-not-connected' }, icon('warn'), h('div', {}, s.service.why, ctx.can.settings ? [' ', h('a', { href: '#/settings', id: 'open-connect' }, 'Open Settings')] : ' Ask an administrator.')) : null,
       s.blockers.map((t) => h('div', { class: 'notice warn mt-s', 'data-blocker': '' }, icon('warn'), t)),
       (s.notes ?? []).map((t) => h('div', { class: 'notice mt-s', 'data-note': '' }, icon('info'), t))));

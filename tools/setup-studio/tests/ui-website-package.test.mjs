@@ -189,3 +189,13 @@ test('the words about a licence file, a file chosen on this PC, and what is stil
   assert.deepEqual(siteMissing(customer([{ kind: 'website-app', release: 2, parts: [{ id: 'website-linux', status: 'success' }, { id: 'website-windows', status: 'success' }, { id: 'android', status: 'success' }] }])), { website: false, android: false });
   assert.deepEqual(siteMissing(customer([], { website: { wanted: false, domain: '' }, android: { wanted: false } })), { website: false, android: false });
 });
+
+test('the part speaks plain words: no technical name in anything it says to a person', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'ui', 'js', 'views', 'website-package.js'), 'utf8').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const said = [...source.matchAll(/(['`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((m) => m[2]).filter((t) => /[A-Za-z]+ [A-Za-z]+/.test(t) && !/^[a-z0-9-]+( [a-z0-9-]+)*$/.test(t));
+  assert.ok(said.length > 20, `its words were found (${said.length})`);
+  for (const line of said) assert.doesNotMatch(line, /\b(token|workflow|dispatch|runner|pipeline|commit|branch|json|api|stack|exception|null|undefined)\b/i, line);
+});

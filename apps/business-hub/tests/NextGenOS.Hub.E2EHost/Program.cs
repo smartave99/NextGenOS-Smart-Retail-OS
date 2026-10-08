@@ -6,7 +6,10 @@ using NextGenOS.Licensing.AspNetCore;
 // dotnet run -- --Hub:DataFolder=/tmp/shop --urls=http://127.0.0.1:5291 [--E2E:Licensed=false]
 var builder = HubHost.CreateBuilder(args);
 builder.WebHost.UseStaticWebAssets();
-HubHost.AddHub(builder);
+// --E2E:Updates=true: where the Hub looks for updates is a stand-in in memory (see StandInUpdates); otherwise, as in the shipped program, nothing is looked for (this test build carries no update settings).
+var standIn = builder.Configuration.GetValue("E2E:Updates", false) ? new NextGenOS.Hub.E2EHost.StandInUpdates(HubHost.DataFolder(builder.Configuration)) : null;
+HubHost.AddHub(builder, standIn?.Options);
+if (standIn is not null) builder.Services.AddSingleton(standIn);
 var licensed = builder.Configuration.GetValue("E2E:Licensed", true);
 var white = builder.Configuration["E2E:White"];          // none, theme or full: how much of the look the licence lets the owner change
 var modules = (builder.Configuration["E2E:Modules"] ?? "hub").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);   // the parts of the program the licence includes
@@ -92,6 +95,13 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
     }).AllowAnonymous().DisableAntiforgery();
 
     // One request through a fixed reason for sending something to an AI service, with no service connected: it is refused, and the screen shows that nothing was sent.
+    // Puts a version into the stand-in update folder (needs --E2E:Updates=true as well).
+    app.MapPost("/__e2e/publish-update", (NextGenOS.Hub.E2EHost.StandInUpdates folder, string version, string? notes) =>
+    {
+        folder.Publish(version, notes ?? "");
+        return Results.Ok(new { version });
+    }).AllowAnonymous().DisableAntiforgery();
+
     app.MapPost("/__e2e/seed-egress", async (NextGenOS.Hub.HubApp hub) =>
     {
         using var asTheProgram = hub.Access.AsSystem();

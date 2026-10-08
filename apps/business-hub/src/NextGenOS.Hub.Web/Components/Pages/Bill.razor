@@ -30,6 +30,7 @@ else
             @if (d.BalanceMinor > 0 && Me.Can(Perm.Sell)) { <button type="button" class="btn secondary" id="take-payment" @onclick="() => Toggle(PayPanel)">Take payment (@Money(d.BalanceMinor) owed)</button> }
             @if (d is { Type: DocTypes.Quote, Status: DocStatus.Issued, ProjectId: null } && !d.Meta.ContainsKey("billedAs") && Me.Can(Perm.Sell)) { <a class="btn secondary" id="make-bill" href="sell?estimate=@d.Id">Make a bill from this quote</a> }
             @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn">Take something back</button> }
+            @if (CanSendBack()) { <button type="button" class="btn secondary" id="send-back" @onclick="OpenSendBack">Send goods back</button> }
             @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)">Cancel this bill</button> }
         </div>
 
@@ -66,6 +67,28 @@ else
                 </div>
             </div>
         }
+        @if (panel == SendBackPanel)
+        {
+            <div class="card" id="send-back-panel">
+                <h2>Send goods back to the supplier</h2>
+                <p class="muted small">The goods leave the stock at what they cost, the tax paid on them is taken back, and what you owe @(view.Party?.Name ?? "the supplier") goes down by the total. The credit is put against what is still unpaid on this purchase first.</p>
+                <table class="tbl">
+                    <thead><tr><th>Item</th><th class="num">Received</th><th class="num">Sending back</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in view.Lines)
+                    {
+                        <tr><td>@l.Description</td><td class="num">@Qty(l.QtyMilli)</td><td class="num"><input class="qty" inputmode="decimal" aria-label="Sending back: @l.Description" @bind="returns[l.Id]" /></td></tr>
+                    }
+                    </tbody>
+                </table>
+                <div class="inline-form">
+                    <div><label for="sb-why">Why</label><input id="sb-why" @bind="reason" maxlength="120" /></div>
+                    <div><label for="sb-kind">What is paid for them</label><select id="sb-kind" @bind="supplierPaysBack"><option value="@false">stays as credit with the supplier</option><option value="@true">the supplier pays back now, for what is already paid</option></select></div>
+                    @if (supplierPaysBack) { <div><label for="sb-how">Paid back by</label><select id="sb-how" @bind="refundMethod">@foreach (var m in Shop.PaymentMethods) { <option value="@m">@m</option> }</select></div> }
+                    <button type="button" class="btn primary" id="save-send-back" @onclick="SaveSendBack">Send them back</button>
+                </div>
+            </div>
+        }
         @if (panel == VoidPanel)
         {
             <div class="card">
@@ -84,7 +107,7 @@ else
     @if (credits.Count > 0)
     {
         <div class="card no-print">
-            <h2>Credit notes for this bill</h2>
+            <h2>@(view.Document.Type == DocTypes.Purchase ? "Goods sent back for this purchase" : "Credit notes for this bill")</h2>
             @foreach (var c in credits) { <div><a href="documents/@c.Id">@c.Number</a> · @When(c.IssuedAt ?? c.CreatedAt) · @Money(c.TotalMinor)</div> }
         </div>
     }
@@ -136,7 +159,8 @@ else
         if (view is null) return Task.CompletedTask;
         payMethod = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
         refundMethod = payMethod;
-        credits = view.Document.Type == DocTypes.Invoice ? App.Documents.List(new DocumentFilter { Type = DocTypes.CreditNote, Limit = 200 }).Where(c => c.RefDocumentId == Id).ToList() : Array.Empty<Document>();
+        credits = view.Document.Type == DocTypes.Invoice ? App.Documents.List(new DocumentFilter { Type = DocTypes.CreditNote, Limit = 200 }).Where(c => c.RefDocumentId == Id).ToList()
+            : view.Document.Type == DocTypes.Purchase ? App.Documents.List(new DocumentFilter { Type = DocTypes.DebitNote, Limit = 200 }).Where(c => c.RefDocumentId == Id).ToList() : Array.Empty<Document>();
         returns.Clear();
         foreach (var l in view.Lines) returns.TryAdd(l.Id, "");
         return Task.CompletedTask;
@@ -144,10 +168,12 @@ else
 
     private string Kind() => view!.Document.Type switch
     {
-        DocTypes.Invoice => Shop.Singular("invoice"), DocTypes.CreditNote => "Credit note", DocTypes.Quote => "Quote", DocTypes.Order => "Order", DocTypes.Purchase => "Purchase", DocTypes.ProgressBill => "Progress bill", _ => "Bill",
+        DocTypes.Invoice => Shop.Singular("invoice"), DocTypes.CreditNote => "Credit note", DocTypes.DebitNote => "Debit note", DocTypes.Quote => "Quote", DocTypes.Order => "Order", DocTypes.Purchase => "Purchase", DocTypes.ProgressBill => "Progress bill", _ => "Bill",
     };
 
     private bool CanReturn() => view!.Document is { Type: DocTypes.Invoice, Status: DocStatus.Issued } && Me.Can(Perm.Sell);
+
+    private bool CanSendBack() => view!.Document is { Type: DocTypes.Purchase, Status: DocStatus.Issued } && Me.Can(Perm.Purchases);
 
     private bool CanVoid() => view!.Document is { Status: DocStatus.Issued } && view.Document.Type is DocTypes.Invoice && Me.Can(Perm.Void);
 
@@ -160,10 +186,11 @@ else
     });
 
     private bool keepAsCredit;
+    private bool supplierPaysBack;
 
     private NextGenOS.Hub.Loyalty.LoyaltyService.Summary? Points() => view?.Party is { } p && App.Loyalty.Enabled ? App.Loyalty.ForDocument(Id, p.Id) : null;
 
-    private const string PayPanel = "pay", ReturnPanel = "return", VoidPanel = "void";
+    private const string PayPanel = "pay", ReturnPanel = "return", VoidPanel = "void", SendBackPanel = "send-back";
 
     private void Toggle(string name) => panel = panel == name ? null : name;
 
@@ -172,6 +199,29 @@ else
         Toggle(ReturnPanel);
         reason = "";
     }
+
+    private void OpenSendBack()
+    {
+        Toggle(SendBackPanel);
+        reason = "";
+        supplierPaysBack = false;
+    }
+
+    private Task SaveSendBack() => Run(() =>
+    {
+        var back = new List<(long LineId, long QtyMilli)>();
+        foreach (var l in view!.Lines)
+        {
+            var text = returns[l.Id].Trim();
+            if (text.Length == 0) continue;
+            long milli;
+            try { milli = ShopContext.QtyMilli(text); } catch (FormatException) { throw new HubException("qty", $"Please type a number for {l.Description}."); }
+            if (milli > 0) back.Add((l.Id, milli));
+        }
+        if (back.Count == 0) throw new HubException("nothing", "Type how many of each are going back.");
+        var note = App.Documents.CreateDebitNote(Id, back, string.IsNullOrWhiteSpace(reason) ? "Sent back" : reason.Trim(), supplierPaysBack ? refundMethod : null, Me.Id);
+        Nav.NavigateTo("/documents/" + note.Document.Id);
+    });
 
     private Task SavePayment() => Run(() =>
     {

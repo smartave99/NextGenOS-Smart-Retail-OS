@@ -4,6 +4,19 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Goods sent back to a supplier
+- **A received purchase has a new button, *Send goods back*.** Type how many of each go back and why. The goods leave the stock at what they cost, the tax paid on them is taken back, and what you owe the supplier goes down by the total of the new **debit note** (numbered `DN-...`, printed and listed like the other documents). The credit is first put against what is still unpaid on that purchase; if the purchase was already paid, you choose whether the supplier **pays the money back now** or it **stays as credit with the supplier**.
+- You cannot send back more than you received (counting what already went back), and a shop that does not allow negative stock cannot send back what it no longer has. A purchase that was sent back cannot be cancelled, and a return cannot be cancelled.
+- The *Buying* report takes the goods sent back off, the tax summary takes them off, and the tax registers have a **Goods sent back** tab (with its spreadsheet file).
+- Worked from the older POS's own example (send back 1 of 12 units at 33.33 with 5% off and 9% + 9% tax: 31.66 + 2.85 + 2.85 = 37.36). Not yet: serial numbers, reverse charge, returning to a lot.
+
+### New versions of the program, through the main PC
+- **The main PC looks, about once a day, for a newer version** (when this copy was built to, and the owner has not switched it off): *Settings, Updates* says where things stand, and the first screen reminds the owner when a version is ready. It sends only the program's name and version and a time stamp: nothing about the shop.
+- **A new version is trusted only when the makers' own release made it.** GitHub signs a statement that this repository's release workflow, started by a version tag, made this very file; it is checked before anything is downloaded, and the file's size and fingerprint are checked when it is kept and again when the owner approves. Nobody has to keep an update-signing key.
+- **Nothing is installed until the owner says so.** *Approve, and copy the shop first* copies the shop (to the second place when there is one; if the copy cannot be made, nothing is approved) and then names the checked file and the last step in plain words. *Not now* stops the reminder for that version.
+- **Not yet:** the install itself is the owner's last step (a Windows service cannot install a program or ask the owner); a new look for a client; a quiet hour. The online folder is set up by the owner (`docs/UPDATES.md`).
+- **Found and fixed on the way:** the Help button's support file printed the licence state from a name the shipped program hides (it showed a letter); it is now written in plain words. And a release started by pushing a tag was always built as version 1.0.0; it now carries the tag's version.
+
 ### The Hub itself now keeps reports, registers, books and exports to the people who may see them
 - **Reading the shop's numbers is checked inside the Hub, as changing them already was.** The reports, the tax registers and return lists, the books (trial balance, profit, position) and the spreadsheet files (*/export/...*) now refuse a person whose role does not allow reports. A new screen, a counter PC or an assistant cannot see more than the role shows. The first screen's total for the day stays for everyone who sells; stock value for those who manage stock; what a customer or supplier owes for the people who work with accounts, bills, orders, buying and bookings. The *Owed* total on the first screen is now left out for a person who may not read reports.
 - Found by the new tests on the way: the day's total on the first screen would have been refused to a cashier by the first version of this change; fixed before it went out.

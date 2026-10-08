@@ -108,6 +108,24 @@ public sealed class SupportService(HubApp app)
             net.Problem is { } p ? "Problem: " + Clean(p) : "No problem reported.",
         ]));
 
+        // Updates: which version, whether it looks, and how the last look went (no address of the online folder; nothing about the shop is sent by looking).
+        var update = app.Updates.View();
+        var updates = new List<string>
+        {
+            update.Built ? "Looks for new versions: " + (update.Looking ? "yes" : "switched off") : "This copy was not made to look for new versions.",
+            "Last look: " + (update.CheckedAt is { } looked ? looked.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC" : "never"),
+            "Where it stands: " + (update.State switch
+            {
+                "up-to-date" => "the newest version is running",
+                "ready" => "version " + update.Version + " is ready and waiting for the owner",
+                "approved" => "version " + update.Version + " is approved and waiting to be run",
+                "failed" => "the last look did not work",
+                _ => "not looked yet",
+            }) + ".",
+        };
+        if (update.Problem is { } updateProblem) updates.Add("Problem: " + Clean(updateProblem));
+        sections.Add(new SupportSection("New versions of the program", updates));
+
         // AI helpers, queue, actions.
         var ai = new List<string>();
         ai.Add("AI part in the licence: " + (app.Ai.Flags.Licensed ? "yes" : "no"));

@@ -64,6 +64,7 @@ public class AccessTests : IDisposable
         yield return new("Documents.ReceiveOnAccount", new[] { Perm.Sell }, a => a.Documents.ReceiveOnAccount(partyId, 100, "cash"));
         yield return new("Documents.Void", new[] { Perm.Void }, a => a.Documents.Void(0, "no reason", null));
         yield return new("Documents.CreateCreditNote", new[] { Perm.Sell }, a => a.Documents.CreateCreditNote(0, Array.Empty<(long, long)>(), "returned", "cash", null));
+        yield return new("Documents.CreateDebitNote", new[] { Perm.Purchases }, a => a.Documents.CreateDebitNote(0, Array.Empty<(long, long)>(), "sent back", null, null));
 
         yield return new("Catalog.Create", new[] { Perm.Catalog }, a => a.Catalog.Create(new ItemInput()));
         yield return new("Catalog.Update", new[] { Perm.Catalog }, a => a.Catalog.Update(itemId, new ItemInput()));
@@ -171,6 +172,11 @@ public class AccessTests : IDisposable
         yield return new("Actions.Decline", new[] { Perm.Sell, Perm.Orders, Perm.Catalog, Perm.Stock, Perm.Purchases }, a => a.Actions.Decline(0, null, null));
         yield return new("Insights.SaveSettings", new[] { Perm.Settings }, a => a.Insights.SaveSettings(new NextGenOS.Hub.Insights.LowStockSettings(), null));
         yield return new("Outbox.RetryFailed", new[] { Perm.Ai }, a => a.Outbox.RetryFailed(null));
+        yield return new("Updates.View", new[] { Perm.Settings }, a => a.Updates.View());
+        yield return new("Updates.SetLooking", new[] { Perm.Settings }, a => a.Updates.SetLooking(true, null));
+        yield return new("Updates.LookNow", new[] { Perm.Settings }, a => a.Updates.LookNowAsync(null).GetAwaiter().GetResult());
+        yield return new("Updates.Approve", new[] { Perm.Settings }, a => a.Updates.Approve(null));
+        yield return new("Updates.Skip", new[] { Perm.Settings }, a => a.Updates.Skip(null));
         yield return new("Outbox.Replay", new[] { Perm.Ai }, a => a.Outbox.Replay(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, null));
 
         // Reading the shop's numbers (blueprint SEC-004, reads): the same Hub-side check, so a new screen or a counter PC cannot see more than the role allows.

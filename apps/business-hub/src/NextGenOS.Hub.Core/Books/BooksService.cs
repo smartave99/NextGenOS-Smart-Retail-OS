@@ -92,10 +92,10 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
 
     private static string KindName(string type) => type switch
     {
-        "invoice" => "Bill", "progress-bill" => "Progress bill", "credit-note" => "Credit note", "purchase" => "Purchase", _ => type,
+        "invoice" => "Bill", "progress-bill" => "Progress bill", "credit-note" => "Credit note", "purchase" => "Purchase", "debit-note" => "Debit note", _ => type,
     };
 
-    private static bool IsPosted(string type) => type is "invoice" or "progress-bill" or "credit-note" or "purchase";
+    private static bool IsPosted(string type) => type is "invoice" or "progress-bill" or "credit-note" or "purchase" or "debit-note";
 
     private bool Exists(SqliteConnection c, SqliteTransaction t, string source, long sourceId) =>
         HubDb.Scalar(c, "SELECT 1 FROM journal_entries WHERE tenant_id = $t AND site_id = $s AND source = $src AND source_id = $id", t, ("$t", Tenant), ("$s", Site), ("$src", source), ("$id", sourceId)) is not null;
@@ -140,10 +140,8 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
     {
         var lines = SaleLines(doc, result);
         if (doc.Type == "invoice" || doc.Type == "progress-bill") return lines;
-        // a credit note turns every line round; a purchase too, and then speaks of the supplier and what was bought
-        var turned = lines.Select(l => new Line(l.Role, l.Ref, l.Party, l.Credit, l.Debit)).ToList();
-        if (doc.Type == "credit-note") return turned;
-        return turned.Select(l => l.Role switch
+        // a debit note (goods sent back to a supplier) says what a sale says, about the supplier and what was bought: we owe less, the purchase is undone, the tax paid on it is taken back
+        static List<Line> Supplier(List<Line> from) => from.Select(l => l.Role switch
         {
             "receivable" => l with { Role = "payable" },
             "sales" => l with { Role = "purchases" },
@@ -152,6 +150,11 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
             "customer-advances" => l with { Role = "supplier-advances" },
             _ => l,
         }).ToList();
+        if (doc.Type == "debit-note") return Supplier(lines);
+        // a credit note turns every line round; a purchase too, and then speaks of the supplier and what was bought
+        var turned = lines.Select(l => new Line(l.Role, l.Ref, l.Party, l.Credit, l.Debit)).ToList();
+        if (doc.Type == "credit-note") return turned;
+        return Supplier(turned);
     }
 
     /// <summary>Writes an entry. Zero lines are left out; lines that do not add up are made to by a line on "Needs checking" (and that is noted in the memo).</summary>
@@ -216,8 +219,8 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
     /// </summary>
     private void PostStockCost(SqliteConnection c, SqliteTransaction t, DocRow doc, long? userId)
     {
-        var counter = doc.Type == "purchase" ? "purchases" : "cogs";
-        foreach (var reason in new[] { "sale", "return", "purchase", "void" })
+        var counter = doc.Type is "purchase" or "debit-note" ? "purchases" : "cogs";
+        foreach (var reason in new[] { "sale", "return", "purchase", "purchase-return", "void" })
         {
             var source = "stock-" + reason;
             if (Exists(c, t, source, doc.Id)) continue;
@@ -229,6 +232,7 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
                 "sale" => $"Cost of {doc.Number}",
                 "return" => $"Cost of goods back from {doc.Number}",
                 "purchase" => $"Stock bought, {doc.Number}",
+                "purchase-return" => $"Stock sent back, {doc.Number}",
                 _ => $"Stock of {doc.Number} undone",
             };
             Post(c, t, at, source, doc.Id, memo, userId, StockLines(counter, moved.Value));
@@ -285,7 +289,7 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         var money = Math.Abs(p.Amount);
         var party = p.Party ?? doc?.PartyId;
         // the other side: what the money settles
-        var other = doc is null ? ("customer-advances", p.Kind == "advance" ? party : null) : doc.Type == "purchase" ? ("payable", party) : ("receivable", party);
+        var other = doc is null ? ("customer-advances", p.Kind == "advance" ? party : null) : doc.Type is "purchase" or "debit-note" ? ("payable", party) : ("receivable", party);
         var moneyIn = p.Amount > 0;
         // a purchase paid is money out; a refund (negative) turns it round
         var cashDebit = doc?.Type == "purchase" ? !moneyIn : moneyIn;

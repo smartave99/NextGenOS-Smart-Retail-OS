@@ -22,6 +22,7 @@ using NextGenOS.Hub.Restaurant;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
 using NextGenOS.Hub.Diagnostics;
+using NextGenOS.Hub.Updates;
 
 namespace NextGenOS.Hub;
 
@@ -31,7 +32,7 @@ namespace NextGenOS.Hub;
 /// </summary>
 public sealed class HubApp
 {
-    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, bool trusted, NetworkOptions? network)
+    private HubApp(HubDb db, IClock clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, bool trusted, NetworkOptions? network, UpdateOptions? updates)
     {
         Db = db;
         Clock = clock;
@@ -74,6 +75,8 @@ public sealed class HubApp
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         // The shop's own copies, made every night to a second place the owner chose (Settings, Backups), and putting one back.
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
+        // Updates through the main PC: looks for a signed newer version, keeps it checked on this PC, and waits for the owner's yes. Nothing is installed by it. A copy built without a place to look never looks.
+        Updates = new UpdateService(db, SettingsStore, clock, Audit, Backups, Access, updates);
         // A store with one main PC and many counter PCs on the shop's own network: switched off unless the owner chose it (and the Hub was started again since). Nothing leaves the shop.
         Network = new StoreNetwork(db, clock, Audit, Access, Path.GetDirectoryName(Path.GetFullPath(db.Path)) ?? ".", network);
         // The Help button's support file: facts about how the shop is set up and how it is doing, never what it sold or to whom.
@@ -114,6 +117,7 @@ public sealed class HubApp
     public OntologyService Ontology { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
+    public UpdateService Updates { get; }
     public StoreNetwork Network { get; }
     public SupportService Support { get; }
 
@@ -138,25 +142,37 @@ public sealed class HubApp
     }
 
     /// <summary>
+    /// The part of the upkeep that needs the internet, called by the background worker on its own schedule: looks for a newer version of the program when it is due (<see cref="UpdateService"/>).
+    /// A problem with the internet is written down by the service and never thrown; nothing is installed.
+    /// </summary>
+    public async Task UpkeepOnlineAsync(CancellationToken ct = default)
+    {
+        var settings = Shop.Settings;
+        if (string.IsNullOrEmpty(settings.Country) || !settings.SetupDone) return;
+        using var asTheProgram = Access.AsSystem();
+        await Updates.LookIfDueAsync(ct);
+    }
+
+    /// <summary>
     /// Opens (and, if needed, creates or brings up to date) the shop database at a path. An update of a shop that has data first makes a checked copy, in <paramref name="backupFolder"/>
     /// (next to the file when null); if the copy cannot be made this throws and the shop's data is untouched (<see cref="HubDb.Migrate()"/>).
     /// </summary>
-    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null, NetworkOptions? network = null) =>
-        Open(path, clock, print, ai, backupFolder, trusted: false, network);
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null, NetworkOptions? network = null, UpdateOptions? updates = null) =>
+        Open(path, clock, print, ai, backupFolder, trusted: false, network, updates);
 
     /// <summary>
     /// A shop in which a command with nobody named is allowed: for the tests and for filling the sample company, where the program acts on its own. Not reachable from the program
     /// (internal): the shop that people use is opened with <see cref="Open(string, IClock?, NextGenOS.Devices.Printing.PrintService?, AiOptions?, string?)"/>, where a command with
     /// nobody named is refused (see <see cref="Security.Access"/>).
     /// </summary>
-    internal static HubApp OpenTrusted(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null, NetworkOptions? network = null) =>
-        Open(path, clock, print, ai, backupFolder, trusted: true, network);
+    internal static HubApp OpenTrusted(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null, NetworkOptions? network = null, UpdateOptions? updates = null) =>
+        Open(path, clock, print, ai, backupFolder, trusted: true, network, updates);
 
-    private static HubApp Open(string path, IClock? clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, string? backupFolder, bool trusted, NetworkOptions? network)
+    private static HubApp Open(string path, IClock? clock, NextGenOS.Devices.Printing.PrintService? print, AiOptions? ai, string? backupFolder, bool trusted, NetworkOptions? network, UpdateOptions? updates)
     {
         var db = new HubDb(path, backupFolder);
         db.Migrate();
-        var app = new HubApp(db, clock ?? new SystemClock(), print, ai, trusted, network);
+        var app = new HubApp(db, clock ?? new SystemClock(), print, ai, trusted, network, updates);
         // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
         app.Books.CatchUp();
         // What a stopped program left in the outbox is delivered now (once: the event history keeps one event for one message).

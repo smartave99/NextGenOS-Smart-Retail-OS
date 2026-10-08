@@ -51,7 +51,8 @@ public static class HubHost
 
     public const string ServiceName = "NextGenOSHub";
 
-    public static void AddHub(WebApplicationBuilder builder)
+    /// <param name="updates">Only for the browser tests: where to look for updates and whom to trust. The program passes nothing: it takes what its build kept (<see cref="NextGenOS.Hub.Web.Updates.UpdateHost"/>).</param>
+    public static void AddHub(WebApplicationBuilder builder, NextGenOS.Hub.Updates.UpdateOptions? updates = null)
     {
         var folder = DataFolder(builder.Configuration);
         Directory.CreateDirectory(folder);
@@ -70,7 +71,8 @@ public static class HubHost
             // The licence's number of PCs limits the counter PCs (the main PC counts as one); like the modules it is handed over as a function.
             var licence = sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>();
             var app = HubApp.Open(shopFile, ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(licence)), backupFolder: backupFolder,
-                network: new NextGenOS.Hub.Counters.NetworkOptions(network, LicenceEntitlements.DeviceLimit(licence)));
+                network: new NextGenOS.Hub.Counters.NetworkOptions(network, LicenceEntitlements.DeviceLimit(licence)),
+                updates: updates ?? NextGenOS.Hub.Web.Updates.UpdateHost.FromBuild(folder));
             StoreNetworkHost.Connect(app, sp.GetRequiredService<ConnectionTracker>());
             if (restored is not null) app.Audit.Log(null, restored.Done ? "restore" : "restore-failed", "backup", null, restored.Message);
             return app;

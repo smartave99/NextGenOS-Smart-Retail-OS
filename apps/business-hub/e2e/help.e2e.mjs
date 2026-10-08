@@ -34,7 +34,7 @@ try {
   await page.locator('#support-text').waitFor();
   const text = await page.locator('#support-text').inputValue();
   for (const part of ['SUPPORT FILE', 'Read this before you send it.', 'WHAT YOU SAID', 'The printer stopped when I pressed Pay.', 'THE PROGRAM', 'YOUR LICENCE', 'State: Valid', "YOUR SHOP'S DATA", 'File check: no problem found',
-    'COPIES OF YOUR SHOP', 'COUNTER PCS', 'AI HELPERS AND WAITING LINES', 'THE KIND OF SHOP', 'Kind of business: retail'])
+    'COPIES OF YOUR SHOP', 'COUNTER PCS', 'NEW VERSIONS OF THE PROGRAM', 'AI HELPERS AND WAITING LINES', 'THE KIND OF SHOP', 'Kind of business: retail'])
     assert.ok(text.includes(part), 'the file says: ' + part + '\n' + text.slice(0, 1500));
   step('the file is shown in full on the screen, in plain words, before anything is saved');
 

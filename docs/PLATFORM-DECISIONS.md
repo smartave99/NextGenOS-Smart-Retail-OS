@@ -61,7 +61,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked:** The main PC offers it and the owner approves, staff send a new installer each time, or silent automatic updates.
 - **Answer:** "Main PC offers it, owner approves (Recommended)".
 - **Rule:** The store's main PC asks NextGenOS whether a new **signed** version or a new look for this client exists. **It sends only the version number, never shop data.** The store owner sees a plain message and presses Update. The main PC updates the counter PCs over the shop's own network. **A backup is made first, and it can go back.** Nothing installs without the owner's approval.
-- **Today:** **Not built.** The Hub setup can update itself in place and copies the database before an update; there is no update offer, no signed update feed, and no way for the main PC to update counter PCs.
+- **Today:** **Part built (8 October 2026, `docs/UPDATES.md`).** The Hub's main PC looks about once a day in the public online folder, sends only the program's name and version, proves with GitHub's signed statement that the project's own release made the new version, keeps the checked setup, reminds the owner, and on the owner's *Approve* copies the shop first (refused if it cannot) and names the file and the last step. **Not built:** the install itself (a Windows service cannot install a program or ask the owner; the owner runs the checked file), a new look for a client, and anything for counter PCs (they are browsers and need nothing). The online folder and its settings are the owner's step.
 
 ### 8. Who puts the website online
 

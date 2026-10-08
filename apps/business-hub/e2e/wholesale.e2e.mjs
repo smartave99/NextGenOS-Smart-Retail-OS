@@ -71,6 +71,44 @@ try {
   await page.getByRole('button', { name: 'Goods arrived' }).first().click();
   await page.getByText('Stock is updated.').waitFor();
   step('an order to a supplier is placed and received: stock goes up');
+
+  // Sending some of it back (merge wave 2: purchase returns)
+  // The list is filtered by the Hub after the choice is made, so wait until every row on it is of the kind chosen before reading it (reading at once may see the whole list).
+  const showOnly = async (kind, word) => {
+    await page.getByLabel('Kind').selectOption(kind);
+    await page.waitForFunction((w) => {
+      const rows = [...document.querySelectorAll('main table tbody tr')];
+      return rows.length > 0 && rows.every((r) => r.innerText.includes(w));
+    }, word);
+  };
+  await page.goto(hub.url + '/documents');
+  await showOnly('purchase', 'Purchase');
+  await page.locator('main table tbody tr a').first().click();
+  await page.locator('#send-back').click();
+  assert.match(await page.locator('#send-back-panel').innerText(), /taken back|put against what is still unpaid/);
+  await page.getByLabel('Sending back: Rice 25 kg').fill('3');
+  await page.locator('#sb-why').fill('torn bags');
+  await page.locator('#save-send-back').click();
+  await page.getByRole('heading', { name: /^Debit note DN-/ }).waitFor();
+  assert.match(await page.locator('main').innerText(), /Debit note/);
+  await shot(page, '2-sent-back');
+  await page.goto(hub.url + '/documents');
+  await showOnly('debit-note', 'Debit note');
+  assert.strictEqual(await page.locator('main table tbody tr').count(), 1);
+  await page.locator('main table tbody tr a').first().click();
+  await page.getByRole('heading', { name: /^Debit note DN-/ }).waitFor();
+  await page.goto(hub.url + '/documents');
+  await showOnly('purchase', 'Purchase');
+  await page.locator('main table tbody tr a').first().click();
+  await page.getByRole('heading', { name: 'Goods sent back for this purchase' }).waitFor();
+  step('goods can be sent back to the supplier: a debit note is made, it is listed, and the purchase shows it');
+
+  await page.goto(hub.url + '/registers');
+  await page.getByRole('tab', { name: 'Goods sent back' }).click();
+  await page.getByRole('heading', { name: 'Goods sent back to suppliers' }).waitFor();
+  await page.locator('main table tbody tr', { hasText: /DN-\d{4}-000001/ }).waitFor();
+  assert.strictEqual(await page.locator('main table tbody tr').count(), 1);
+  step('the tax registers list the goods sent back');
 } finally {
   await browser.close();
   if (problems.length) console.log('browser problems:', problems);

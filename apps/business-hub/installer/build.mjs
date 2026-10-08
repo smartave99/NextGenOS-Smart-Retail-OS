@@ -2,6 +2,7 @@
 /**
  * Makes the Windows setup for the Business Hub, the way a customer receives it:
  *   node apps/business-hub/installer/build.mjs --version 1.0.0 [--out dist] [--rid win-x64] [--allow-no-key]
+ *        [--update-feed https://.../hub/ --release-repository-id N --release-owner-id N [--release-workflow .github/workflows/release.yml]]   (where it looks for updates)
  *
  *   1. publishes the Hub as one self-contained folder (no .NET needed on the customer's PC),
  *   2. hides the names in our programs (scripts/protect-dotnet.mjs) and deletes symbols and maps,
@@ -15,7 +16,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { here, repo, flags, run, say, checkKeys, prerequisitesFor, OUR_PROGRAMS, NAMES_FROM } from './common.mjs';
+import { here, repo, flags, run, say, checkKeys, prerequisitesFor, updateProperties, OUR_PROGRAMS, NAMES_FROM } from './common.mjs';
 import { addZipLauncher } from './zip-launcher.mjs';
 
 const { flag, has } = flags(process.argv.slice(2));
@@ -24,6 +25,7 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) { console.error('Say the version as three 
 const rid = flag('--rid', 'win-x64');
 const dist = resolve(flag('--out', join(repo, 'dist')));
 const allowNoKey = has('--allow-no-key');
+const updates = updateProperties(flag);   // where this Hub looks for updates and whom it trusts: nothing unless the release workflow gives it (blueprint REL-016)
 
 // 0. Keys.
 checkKeys(allowNoKey);
@@ -34,7 +36,7 @@ const out = join(work, 'hub');
 try {
   say(`Publishing the Business Hub (${rid}, self-contained)`);
   run('dotnet', ['publish', join(repo, 'apps', 'business-hub', 'src', 'NextGenOS.Hub.Web'), '-c', 'Release', '-r', rid, '--self-contained', 'true', '-o', out,
-    `-p:Version=${version}`, '-p:DebugType=none', '-p:DebugSymbols=false', '--nologo', '-v', 'q']);
+    `-p:Version=${version}`, ...updates, '-p:DebugType=none', '-p:DebugSymbols=false', '--nologo', '-v', 'q']);
   if (!existsSync(join(out, rid.startsWith('win') ? 'NextGenOS.Hub.exe' : 'NextGenOS.Hub'))) throw new Error('the program file is missing after publishing');
 
   // 2. Hide.

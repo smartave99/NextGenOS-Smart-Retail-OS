@@ -88,6 +88,9 @@ public sealed class SupportFileTests : IDisposable
         Assert.Contains("Nightly copies: off; place not chosen", text);
         Assert.Contains("Last good copy: none", text);
         Assert.Contains("COUNTER PCS", text);
+        Assert.Contains("NEW VERSIONS OF THE PROGRAM", text);
+        Assert.Contains("This copy was not made to look for new versions.", text);
+        Assert.Contains("Where it stands: not looked yet.", text);
         Assert.Contains("Counter PCs: chosen off, listening no, 0 paired PC(s).", text);
         Assert.Contains("AI HELPERS AND WAITING LINES", text);
         Assert.Contains("AI part in the licence: no", text);

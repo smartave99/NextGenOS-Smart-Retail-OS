@@ -2,6 +2,7 @@
 @attribute [Authorize(Policy = Perm.Purchases)]
 @inherits HubPage
 @using NextGenOS.Hub.Purchasing
+@using NextGenOS.Hub.Insights
 
 <PageTitle>Buying</PageTitle>
 <h1>Buying</h1>
@@ -18,6 +19,60 @@
     <span class="spacer"></span>
     <button type="button" class="btn primary" id="new-order" @onclick="NewOrder">New order</button>
 </div>
+
+@if (actionsOn && waiting.Count > 0)
+{
+    <section class="card" id="approvals">
+        <h2>Waiting for approval</h2>
+        <p class="muted small">Things that have been asked for and are not done until a person who may buy says yes. Nothing is bought or paid by approving: it makes a draft order that you receive and pay for as usual.</p>
+        @foreach (var a in waiting)
+        {
+            <div class="approval-row" id="approval-@a.Id">
+                <p>@a.Summary</p>
+                <p class="muted small">Asked for by @(a.ProposedByName ?? "the program") on @When(a.ProposedAt). It runs out on @When(a.ExpiresAt).</p>
+                <div class="row">
+                    <button type="button" class="btn primary small" id="approve-@a.Id" @onclick="() => ApproveAction(a)">Approve and draft the order</button>
+                    <button type="button" class="btn ghost small" id="decline-@a.Id" @onclick="() => DeclineAction(a)">Decline</button>
+                </div>
+            </div>
+        }
+    </section>
+}
+
+@if (insightsOn)
+{
+    <section class="card" id="low-stock">
+        <h2>Running low</h2>
+        <p class="muted small">Goods that will run out before a new delivery could arrive, at the pace they have been selling lately. These are suggestions, not orders: read the reasons and decide.</p>
+        @if (lowRun is null)
+        {
+            <p class="muted" id="low-never">Not checked yet.</p>
+        }
+        else
+        {
+            <p class="muted small" id="low-summary">Checked @When(lowRun.Run.CreatedAt): @lowRun.Judged item(s) judged@(lowRun.NoTerms > 0 ? ", " + lowRun.NoTerms + " with no delivery time yet" : "")@(lowRun.ShortHistory > 0 ? ", " + lowRun.ShortHistory + " too new to tell" : "")@(lowRun.NoSales > 0 ? ", " + lowRun.NoSales + " not selling" : "").</p>
+        }
+        <div class="row">
+            <button type="button" class="btn secondary" id="low-check" @onclick="CheckNow">Check now</button>
+            <button type="button" class="btn secondary" id="terms-open" @onclick="OpenTerms">Delivery times</button>
+        </div>
+        @if (lowRun is not null && findings.Count == 0) { <div class="empty" id="low-none">Nothing is running low.</div> }
+        @foreach (var f in findings)
+        {
+            <div class="low-row" id="low-@f.Id" data-item="@f.ItemId">
+                <p><strong>@f.Detail.Name</strong> <span class="muted">@(f.Status == "covered" ? "— already on order" : "")</span></p>
+                <p class="low-explain">@f.Detail.Explanation</p>
+                <details><summary>Why might this be wrong?</summary><p class="muted small">@f.Detail.WhyWrong</p>
+                    <p class="muted small">Worked out on @Day(f.Detail.AsOf) from @(f.Detail.SaleDocuments.Count == 0 ? "the stock records" : "bills " + string.Join(", ", f.Detail.SaleDocuments.Take(5)) + (f.Detail.SaleDocuments.Count > 5 ? " and others" : "")).</p></details>
+                <div class="row">
+                    @if (f.Status == "order") { <button type="button" class="btn primary small" id="low-order-@f.Id" @onclick="() => StartOrder(f)">Start an order for @Qty(f.Detail.ProposedMilli) @f.Detail.Unit</button> }
+                    @if (f.Status == "order" && actionsOn) { <button type="button" class="btn secondary small" id="low-ask-@f.Id" @onclick="() => AskFor(f)">Ask for approval</button> }
+                    <button type="button" class="btn ghost small" id="low-dismiss-@f.Id" @onclick="() => SetAside(f)">Set aside</button>
+                </div>
+            </div>
+        }
+    </section>
+}
 
 <div class="card tbl-wrap">
     @if (rows.Count == 0) { <div class="empty">Nothing here.</div> }
@@ -70,6 +125,54 @@
     </div>
 }
 
+@if (termsSheet)
+{
+    <div class="sheet-back" @onclick="() => termsSheet = false">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Delivery times" @onclick:stopPropagation="true">
+            <h2>Delivery times</h2>
+            <p class="muted small">For each thing you keep in stock: who supplies it, how many days they take to deliver, and how many spare days you want. Running low is judged only for goods that have these.</p>
+            <Notice Error="@formError" />
+            <label for="terms-item">What</label>
+            <select id="terms-item" @bind="termItem" @bind:after="PickTermItem"><option value="">Choose…</option>@foreach (var i in stocked) { <option value="@i.Id">@i.Name@(termsByItem.ContainsKey(i.Id) ? " ✓" : "")</option> }</select>
+            <label for="terms-supplier">Supplier</label>
+            <select id="terms-supplier" @bind="termSupplier"><option value="">Choose…</option>@foreach (var s in suppliers) { <option value="@s.Id">@s.Name</option> }</select>
+            @if (suppliers.Count == 0) { <p class="muted small">Add a supplier under People first.</p> }
+            <div class="inline-form">
+                <div><label for="terms-lead">Days to deliver</label><input id="terms-lead" class="qty" inputmode="numeric" @bind="termLead" /></div>
+                <div><label for="terms-safety">Spare days</label><input id="terms-safety" class="qty" inputmode="numeric" @bind="termSafety" /></div>
+            </div>
+            <div class="inline-form">
+                <div><label for="terms-pack">Comes in packs of</label><input id="terms-pack" class="qty" inputmode="decimal" @bind="termPack" /></div>
+                <div><label for="terms-min">Least they send</label><input id="terms-min" class="qty" inputmode="decimal" @bind="termMin" /></div>
+            </div>
+            <div class="row">
+                <button type="button" class="btn primary grow" id="terms-save" @onclick="SaveTerms">Save</button>
+                @if (termItem != "" && termsByItem.ContainsKey(long.Parse(termItem))) { <button type="button" class="btn ghost" id="terms-clear" @onclick="ClearTerms">Take away</button> }
+            </div>
+            @if (termsByItem.Count > 0)
+            {
+                <table class="tbl" id="terms-table"><thead><tr><th>Item</th><th>Supplier</th><th class="num">Days</th><th class="num">Spare</th></tr></thead><tbody>
+                @foreach (var t in termsByItem.Values.OrderBy(x => x.ItemId))
+                {
+                    <tr><td>@(stocked.FirstOrDefault(i => i.Id == t.ItemId)?.Name)</td><td>@(suppliers.FirstOrDefault(x => x.Id == t.SupplierId)?.Name)</td><td class="num">@t.LeadDays</td><td class="num">@t.SafetyDays</td></tr>
+                }
+                </tbody></table>
+            }
+            @if (Me.Can(Perm.Settings))
+            {
+                <h3>How it decides</h3>
+                <div class="inline-form">
+                    <div><label for="set-window">Days of selling to look at</label><input id="set-window" class="qty" inputmode="numeric" @bind="setWindow" /></div>
+                    <div><label for="set-review">Days an order should cover beyond delivery</label><input id="set-review" class="qty" inputmode="numeric" @bind="setReview" /></div>
+                    <div><label for="set-snooze">Days to stay quiet after “Set aside”</label><input id="set-snooze" class="qty" inputmode="numeric" @bind="setSnooze" /></div>
+                </div>
+                <div class="row"><button type="button" class="btn secondary" id="set-save" @onclick="SaveSettings">Save these</button></div>
+            }
+            <div class="row"><button type="button" class="btn secondary" @onclick="() => termsSheet = false">Close</button></div>
+        </div>
+    </div>
+}
+
 @if (paying is not null)
 {
     <div class="sheet-back" @onclick="() => paying = null">
@@ -99,8 +202,138 @@
     protected override Task LoadAsync()
     {
         Read();
+        ReadInsights();
         return Task.CompletedTask;
     }
+
+    // ---- running low (stock forecasts) ----------------------------------------------------------------------------------------------------
+    private bool insightsOn, actionsOn, termsSheet;
+    private IReadOnlyList<NextGenOS.Hub.Actions.ActionView> waiting = Array.Empty<NextGenOS.Hub.Actions.ActionView>();
+    private RunSummary? lowRun;
+    private IReadOnlyList<StoredFinding> findings = Array.Empty<StoredFinding>();
+    private IReadOnlyList<Item> stocked = Array.Empty<Item>();
+    private Dictionary<long, SupplyTerms> termsByItem = new();
+    private string termItem = "", termSupplier = "", termLead = "5", termSafety = "2", termPack = "1", termMin = "0";
+    private string setWindow = "28", setReview = "7", setSnooze = "7";
+
+    private void ReadInsights()
+    {
+        actionsOn = App.Actions.On;
+        waiting = actionsOn ? App.Actions.List([NextGenOS.Hub.Actions.ActionStatus.AwaitingApproval]) : [];
+        insightsOn = App.Insights.On;
+        if (!insightsOn) return;
+        lowRun = App.Insights.Latest();
+        findings = App.Insights.Open();
+    }
+
+    /// <summary>Asks for the order a warning proposes, to be approved by someone who may buy. Asking twice for the same warning is the same request.</summary>
+    private Task AskFor(StoredFinding f) => Run(() =>
+    {
+        var cost = App.Catalog.Get(f.ItemId)?.CostMinor ?? 0;
+        var input = System.Text.Json.JsonSerializer.Serialize(new NextGenOS.Hub.Actions.CreatePurchaseOrderInput(f.Detail.SupplierId, [new NextGenOS.Hub.Actions.OrderLineInput(f.ItemId, f.Detail.ProposedMilli, cost)]));
+        App.Actions.Propose("CreatePurchaseOrder", 1, input, "finding", f.Id, "finding:" + f.Id, Me.Id);
+        ReadInsights();
+    }, "Asked for. It waits for approval above.");
+
+    private Task ApproveAction(NextGenOS.Hub.Actions.ActionView a) => Run(() =>
+    {
+        App.Actions.Approve(a.Id, null, Me.Id);
+        Read();
+        ReadInsights();
+    }, "Approved. The order is drafted: you will find it under “To receive”.");
+
+    private Task DeclineAction(NextGenOS.Hub.Actions.ActionView a) => Run(() =>
+    {
+        App.Actions.Decline(a.Id, null, Me.Id);
+        ReadInsights();
+    }, "Declined. Nothing was done.");
+
+    private Task CheckNow() => Run(() =>
+    {
+        App.Insights.Run(Me.Id);
+        ReadInsights();
+    }, "Checked.");
+
+    private Task SetAside(StoredFinding f) => Run(() =>
+    {
+        App.Insights.Dismiss(f.Id, null, Me.Id);
+        ReadInsights();
+    }, "Set aside. It stays quiet for a few days, and the record is kept.");
+
+    private void StartOrder(StoredFinding f)
+    {
+        NewOrder();
+        supplierId = f.Detail.SupplierId.ToString();
+        itemId = f.ItemId.ToString();
+        qty = Qty(f.Detail.ProposedMilli);
+        PickItem();
+        AddLine();
+    }
+
+    private void OpenTerms()
+    {
+        stocked = App.Catalog.Search(null, null, null, 500).Where(i => i.TrackStock && i.Kind is not ("service" or "title")).ToList();
+        suppliers = App.Parties.Search("supplier", null, 300);
+        termsByItem = App.Supply.All().ToDictionary(t => t.ItemId);
+        var settings = App.Insights.Settings();
+        (setWindow, setReview, setSnooze) = (settings.WindowDays.ToString(), settings.ReviewDays.ToString(), settings.SnoozeDays.ToString());
+        termItem = termSupplier = formError = "";
+        (termLead, termSafety, termPack, termMin) = ("5", "2", "1", "0");
+        termsSheet = true;
+    }
+
+    private void PickTermItem()
+    {
+        if (long.TryParse(termItem, out var id) && termsByItem.TryGetValue(id, out var t))
+            (termSupplier, termLead, termSafety, termPack, termMin) = (t.SupplierId.ToString(), t.LeadDays.ToString(), t.SafetyDays.ToString(), Qty(t.PackMilli), Qty(t.MinOrderMilli));
+    }
+
+    private void SaveTerms()
+    {
+        formError = "";
+        try
+        {
+            if (!long.TryParse(termItem, out var item)) throw new HubException("item", "Please choose what it is.");
+            if (!long.TryParse(termSupplier, out var supplier)) throw new HubException("supplier", "Please choose the supplier.");
+            if (!int.TryParse(termLead.Trim(), out var lead)) throw new HubException("lead", "Please type the days they take to deliver, like 5.");
+            if (!int.TryParse(termSafety.Trim(), out var safety)) throw new HubException("safety", "Please type the spare days you want, like 2 (or 0).");
+            long pack, min;
+            try { pack = ShopContext.QtyMilli(termPack.Trim()); min = termMin.Trim().Length == 0 ? 0 : ShopContext.QtyMilli(termMin.Trim()); }
+            catch (FormatException) { throw new HubException("qty", "Please type the pack size and the least they send as numbers, like 12 and 24."); }
+            App.Supply.Set(item, supplier, lead, safety, pack, min, Me.Id);
+            termsByItem = App.Supply.All().ToDictionary(t => t.ItemId);
+            Info = "Saved. The next check will use it.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void ClearTerms()
+    {
+        formError = "";
+        try
+        {
+            if (long.TryParse(termItem, out var item)) App.Supply.Clear(item, Me.Id);
+            termsByItem = App.Supply.All().ToDictionary(t => t.ItemId);
+            termItem = "";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void SaveSettings()
+    {
+        formError = "";
+        try
+        {
+            if (!int.TryParse(setWindow.Trim(), out var window) || !int.TryParse(setReview.Trim(), out var review) || !int.TryParse(setSnooze.Trim(), out var snooze))
+                throw new HubException("number", "Please type whole numbers of days.");
+            var current = App.Insights.Settings();
+            App.Insights.SaveSettings(current with { WindowDays = window, ReviewDays = review, SnoozeDays = snooze }, Me.Id);
+            Info = "Saved. The next check will use it.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+
 
     private void OpenTab(string key)
     {

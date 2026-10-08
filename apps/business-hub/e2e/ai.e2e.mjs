@@ -60,7 +60,7 @@ try {
 
   assert.strictEqual(await page.locator('#ai-unlicensed').count(), 0);
   assert.match(await page.locator('#ai-computer').innerText(), /This computer[\s\S]*Memory:/);
-  for (const key of ['ai_assistant', 'camera_analytics', 'local_embeddings', 'remote_ai', 'business_ontology', 'event_engine', 'predictive_inventory', 'advanced_rules'])
+  for (const key of ['ai_assistant', 'camera_analytics', 'local_embeddings', 'remote_ai', 'business_ontology', 'event_engine', 'predictive_inventory', 'advanced_rules', 'suggested_actions'])
     assert.strictEqual(await page.locator(`#flag-${key}`).isChecked(), false, key + ' starts off');
   assert.match(await page.locator('#ai-services').innerText(), /No AI service is connected/);
   await shot(page, '2-licensed');

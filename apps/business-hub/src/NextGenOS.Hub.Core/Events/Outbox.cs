@@ -90,6 +90,23 @@ public sealed class OutboxService(HubDb db, IClock clock, FeatureFlagService fla
         return delivered;
     }
 
+    /// <summary>
+    /// Delivers the messages that are due, batch after batch, until none is due or <paramref name="maxBatches"/> batches have been done (so that a very busy day cannot keep the upkeep here for ever;
+    /// what is left waits for the next time). Returns how many were delivered.
+    /// </summary>
+    public int DispatchAll(int maxBatches = 20)
+    {
+        var total = 0;
+        for (var i = 0; i < maxBatches; i++)
+        {
+            var n = Dispatch();
+            total += n;
+            if (n < BatchSize) break;
+        }
+
+        return total;
+    }
+
     /// <summary>Takes a lease on the messages that are due, in one step that no other dispatcher can interleave with (the write transaction is exclusive).</summary>
     private IReadOnlyList<OutboxMessage> TakeDue(int limit)
     {

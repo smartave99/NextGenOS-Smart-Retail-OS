@@ -161,6 +161,14 @@ public class AccessTests : IDisposable
         yield return new("Retention.Prune", new[] { Perm.Ai }, a => a.Retention.Prune(null));
         yield return new("Events.SetStatus", new[] { Perm.Ai }, a => a.Events.SetStatus(0, "verified", null));
         yield return new("Ontology.Check", new[] { Perm.Ai }, a => a.Ontology.Check());
+        yield return new("Supply.Set", new[] { Perm.Purchases }, a => a.Supply.Set(itemId, supplierId, 5, 2, 1_000, 0, null));
+        yield return new("Supply.Clear", new[] { Perm.Purchases }, a => a.Supply.Clear(itemId, null));
+        yield return new("Insights.Run", new[] { Perm.Stock, Perm.Purchases }, a => a.Insights.Run(null));
+        yield return new("Insights.Dismiss", new[] { Perm.Stock, Perm.Purchases }, a => a.Insights.Dismiss(0, null, null));
+        yield return new("Actions.Propose", new[] { Perm.Sell, Perm.Orders, Perm.Catalog, Perm.Stock, Perm.Purchases }, a => a.Actions.Propose("CreatePurchaseOrder", 1, "{}", null, null, null, null));
+        yield return new("Actions.Approve", new[] { Perm.Purchases }, a => a.Actions.Approve(0, null, null));
+        yield return new("Actions.Decline", new[] { Perm.Sell, Perm.Orders, Perm.Catalog, Perm.Stock, Perm.Purchases }, a => a.Actions.Decline(0, null, null));
+        yield return new("Insights.SaveSettings", new[] { Perm.Settings }, a => a.Insights.SaveSettings(new NextGenOS.Hub.Insights.LowStockSettings(), null));
         yield return new("Outbox.RetryFailed", new[] { Perm.Ai }, a => a.Outbox.RetryFailed(null));
         yield return new("Outbox.Replay", new[] { Perm.Ai }, a => a.Outbox.Replay(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, null));
     }

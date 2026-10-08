@@ -264,7 +264,7 @@
 
     private async Task SetConsent(string id, string cls, bool allow)
     {
-        await Run(() => { if (allow) App.Ai.Providers.Grant(id, cls, null, Me.Id); else App.Ai.Providers.Revoke(id, cls, Me.Id); });
+        await Run(() => { if (allow) App.Ai.Providers.Grant(id, cls, null, Me.Id); else App.Ai.Providers.Revoke(id, cls, Me.Id); }, allow ? "Allowed." : "Not allowed any more.");
         await Reload();
     }
 

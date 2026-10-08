@@ -105,6 +105,7 @@ try {
   assert.strictEqual(await page.locator('#allow-online-helper-PAYMENT_SENSITIVE').count(), 0, 'there is no box to allow card details');
   assert.strictEqual(await page.locator('#allow-online-helper-PERSONAL').isChecked(), false);
   await page.locator('#allow-online-helper-PERSONAL').check();
+  await page.locator('.notice.ok', { hasText: 'Allowed.' }).waitFor();   // the Hub has kept the choice (a reload before that could cut it off on a slow machine)
   await page.reload();
   await page.locator('#allow-online-helper-PERSONAL').waitFor();
   assert.strictEqual(await page.locator('#allow-online-helper-PERSONAL').isChecked(), true);

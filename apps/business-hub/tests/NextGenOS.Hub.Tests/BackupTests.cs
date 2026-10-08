@@ -117,6 +117,20 @@ public class BackupTests : IDisposable
     }
 
     [Fact]
+    public void A_failed_try_in_the_very_same_second_as_a_good_copy_is_still_shown_as_the_latest()
+    {
+        SwitchOn();
+        var good = f.App.Backups.RunNow(BackupKinds.Manual);
+        Directory.Delete(Place, recursive: true);                                   // the clock has not moved: both tries have the same time
+        var failed = f.App.Backups.RunNow(BackupKinds.Manual);
+
+        Assert.Equal(good.At, failed.At);
+        var status = f.App.Backups.Status();
+        Assert.Equal(failed.Id, status.LastFailed!.Id);
+        Assert.Contains("did not work", status.Summary);
+    }
+
+    [Fact]
     public void No_good_copy_for_a_day_and_a_half_is_overdue_and_says_so()
     {
         SwitchOn();

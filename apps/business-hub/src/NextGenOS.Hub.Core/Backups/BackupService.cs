@@ -237,7 +237,7 @@ public sealed class BackupService(HubDb db, ShopContextProvider shop, SettingsSt
         var settings = Settings();
         var now = clock.UtcNow;
         var good = Latest(any: false);
-        var failedSince = Latest(any: true) is { Good: false } f && (good is null || f.At > good.At) ? f : null;
+        var failedSince = Latest(any: true) is { Good: false } f && (good is null || f.Id > good.Id) ? f : null;   // by order of the tries, not by the clock: a good try and a failed one can fall in the same second
         var overdue = settings.Enabled && (good is null || now - good.At > OverdueAfter);
         DateTimeOffset? next = null;
         if (settings.Enabled && !string.IsNullOrWhiteSpace(settings.Folder))

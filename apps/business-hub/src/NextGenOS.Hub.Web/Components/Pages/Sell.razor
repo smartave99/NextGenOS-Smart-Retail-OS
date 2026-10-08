@@ -200,6 +200,8 @@
     private IReadOnlyList<Item> results = Array.Empty<Item>();
     private IReadOnlyList<string> categories = Array.Empty<string>();
     private DocumentView? cart;
+    /// <summary>Names this till's sale to the main PC: pressing Pay twice, or a retry after a dropped connection, gives back the bill already made instead of making a second one.</summary>
+    private readonly string saleKey = Guid.NewGuid().ToString("N");
     private Party? customer;
     private string customerQuery = "";
     private string method = "cash";
@@ -466,7 +468,7 @@
             if (cart is null) return;
             if (!onAccount && tender.Trim().Length > 0) AddPayment();
             if (!onAccount && payments.All(p => p.Method == DocumentService.AccountCredit) && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });   // nothing typed (or only the customer's credit): the rest is taken in the way chosen
-            var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount });
+            var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount, RequestKey = saleKey });
             finished = true;
             Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");
         });

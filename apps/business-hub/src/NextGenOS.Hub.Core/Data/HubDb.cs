@@ -204,7 +204,10 @@ public sealed class HubDb
     public T InTransaction<T>(Func<SqliteConnection, SqliteTransaction, T> work)
     {
         using var connection = Open();
-        using var transaction = connection.BeginTransaction();
+        // BEGIN IMMEDIATE, on purpose (it is also the default of the driver): a writer takes its place in the queue at once and waits its turn, then reads the shop as the one before it
+        // left it. A deferred transaction reads first and asks for the write later, and when someone else has written in between it fails at once with "database is locked" (two
+        // counters selling the last unit; ConcurrencyAndRetryTests fail if this is changed).
+        using var transaction = connection.BeginTransaction(deferred: false);
         try
         {
             var result = work(connection, transaction);

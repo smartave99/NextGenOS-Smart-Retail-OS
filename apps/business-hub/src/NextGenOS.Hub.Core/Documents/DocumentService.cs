@@ -457,6 +457,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         var context = shop.Current;
         var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", documentId)).SingleOrDefault()
             ?? throw new HubException("not-found", "That document was not found.");
+        var requestKey = CleanRequestKey(options.RequestKey);
+        if (IdForRequestKey(c, t, requestKey) is { } already) return already;   // this request was already done: that bill is the answer, and nothing is done twice
         if (header.Status != DocStatus.Open) throw new HubException("not-open", "That document is already final.");
         var lines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", documentId));
         var adjustments = JsonSerializer.Deserialize<List<TaxAdjustmentInput>>(HubDb.Scalar(c, "SELECT adjustments FROM documents WHERE id = $id", t, ("$id", documentId)) as string ?? "[]", Json) ?? new();
@@ -519,8 +521,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         }
 
         HubDb.Exec(c,
-            "UPDATE documents SET type = $type, number = $number, status = 'issued', issued_at = $at, due_at = $due, meta = $meta, user_id = COALESCE($user, user_id) WHERE id = $id", t,
-            ("$type", type), ("$number", number), ("$at", Iso.Text(now)), ("$due", due is { } dv ? Iso.Text(dv) : null), ("$meta", JsonSerializer.Serialize(meta)), ("$user", options.UserId), ("$id", documentId));
+            "UPDATE documents SET type = $type, number = $number, status = 'issued', issued_at = $at, due_at = $due, meta = $meta, user_id = COALESCE($user, user_id), request_key = $key WHERE id = $id", t,
+            ("$type", type), ("$number", number), ("$at", Iso.Text(now)), ("$due", due is { } dv ? Iso.Text(dv) : null), ("$meta", JsonSerializer.Serialize(meta)), ("$user", options.UserId), ("$key", requestKey), ("$id", documentId));
 
         foreach (var p in tendered) InsertPayment(c, t, documentId, header.PartyId, header.ProjectId, p, options.UserId, "payment", now);
         HubDb.Exec(c, "UPDATE documents SET paid_minor = $paid WHERE id = $id", t, ("$paid", tendered.Sum(p => p.AmountMinor)), ("$id", documentId));
@@ -591,16 +593,32 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     /// <summary>Builds and finishes a counter sale in one step: the lines, the adjustments (service charge ...) and the payments.</summary>
     public DocumentView Checkout(CheckoutRequest request)
     {
+        var key = CleanRequestKey(request.RequestKey);
         var id = db.InTransaction((c, t) =>
         {
+            if (IdForRequestKey(c, t, key) is { } made) return made;   // the same request again: the bill it made the first time is the answer
             var draftId = CreateDraft(c, t, new DraftOptions
             {
                 Type = request.Type, PartyId = request.PartyId, UserId = request.UserId, Notes = request.Notes, Lines = request.Lines, Adjustments = request.Adjustments,
                 BillDiscountMinor = request.BillDiscountMinor, BillDiscountPctMilli = request.BillDiscountPctMilli,
             });
-            return Issue(c, t, draftId, new IssueOptions { Payments = request.Payments, UserId = request.UserId, OnCredit = request.OnCredit });
+            return Issue(c, t, draftId, new IssueOptions { Payments = request.Payments, UserId = request.UserId, OnCredit = request.OnCredit, RequestKey = key });
         });
         return Get(id)!;
+    }
+
+    /// <summary>The bill made for a request key, if there is one.</summary>
+    private static long? IdForRequestKey(SqliteConnection c, SqliteTransaction t, string? key) =>
+        key is null ? null : HubDb.Scalar(c, "SELECT id FROM documents WHERE request_key = $k", t, ("$k", key)) is { } found ? Convert.ToInt64(found, CultureInfo.InvariantCulture) : null;
+
+    /// <summary>A request key as kept: trimmed, letters, digits and . _ : - only, at most 80 characters. Empty is none.</summary>
+    internal static string? CleanRequestKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+        key = key.Trim();
+        if (key.Length > 80 || !key.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '_' or ':' or '-'))
+            throw new HubException("request-key", "The request key may have letters, digits and . _ : - only, up to 80 characters.");
+        return key;
     }
 
     /// <summary>Throws away a sale that was started and never finished. Only an open invoice or quote with nothing sent to a kitchen can go; anything else is voided or cancelled by its own screen.</summary>

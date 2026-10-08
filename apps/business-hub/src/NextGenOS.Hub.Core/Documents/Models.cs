@@ -123,6 +123,11 @@ public sealed class IssueOptions
     /// <summary>Bill on account: due after the customer's terms (or the pack's), with no credit limit check. For work billed to a client on agreed terms (progress bills).</summary>
     public bool OnAccount { get; set; }
     public int? TermsDays { get; set; }
+    /// <summary>
+    /// Names this request (a new random text for each sale the person starts). Asking again with the same key gives back the bill the first call made and does nothing else: no second
+    /// payment, no second stock move, no second number. It is what makes a double tap, or a retry after the network dropped, safe. Null: the call is not protected.
+    /// </summary>
+    public string? RequestKey { get; set; }
 }
 
 public sealed class CheckoutRequest
@@ -137,6 +142,8 @@ public sealed class CheckoutRequest
     public long BillDiscountMinor { get; set; }
     public long BillDiscountPctMilli { get; set; }
     public string Type { get; set; } = DocTypes.Invoice;
+    /// <summary>See <see cref="IssueOptions.RequestKey"/>.</summary>
+    public string? RequestKey { get; set; }
 }
 
 public sealed class DocumentFilter

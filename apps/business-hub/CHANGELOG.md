@@ -4,6 +4,10 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### One sale per request
+- **A sale is made once, however often it is asked for.** A bill can now carry a request key (database step 12, a unique index; the till sends one for each sale). Asking again with the same key (Pay pressed twice, or a retry after the answer was lost on the network) gives back the bill made the first time and does nothing more: no second payment, no second stock move, no second number, no second entry in the books. Without a key everything works as it did.
+- **Proved under load:** 25 sales at the same moment each get their own number (no gap, no repeat) and each is whole (payment, stock, books); ten requests with the same key at the same moment make one sale; two counters selling the last unit at the same moment sell it once, and the other is told "Only 0 left" when the shop does not allow stock below zero. The transaction that writes a sale now says "wait for your turn" on purpose; the tests fail if it is changed.
+
 ### Safer updates
 - **An update of a shop that has data no longer starts without a safe copy.** The Hub copies the whole shop file first and **checks the copy** (SQLite's own integrity check, the same structure number, the same tables). If the copy cannot be made or fails the check, the update does not start, nothing in the shop is changed, and the owner sees a plain page ("The update has not started") that says what to check. Before, a failed copy was only noted and the update went ahead.
 - **An update is all or nothing.** All the steps run in one transaction: if one fails, the shop stays exactly as it was (before, the steps before the bad one stayed).

@@ -61,6 +61,27 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
             "VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM outbox), 'payment.recorded', 'payment', 999, $now, $now, 'FINANCIAL', '{}', 'failed', 8, $now, 'The business event history was busy.')", t, ("$now", now)));
         return Results.Ok(new { waiting = hub.Outbox.Stats().Waiting, failed = hub.Outbox.Stats().Failed });
     }).AllowAnonymous().DisableAntiforgery();
+
+    // Stock forecasts, switched on, with a shop that has sold 3 kg of rice a day for four weeks (bills made now, their stock moves dated back) and a supplier who takes 5 days.
+    app.MapPost("/__e2e/seed-stock", (NextGenOS.Hub.HubApp hub) =>
+    {
+        using var asTheProgram = hub.Access.AsSystem();
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.PredictiveInventory, true, null);
+        var supplier = hub.Parties.Create(new NextGenOS.Hub.Catalog.PartyInput { Kind = "supplier", Name = "National Foods" });
+        var rice = hub.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Basmati rice", Unit = "kg", PriceMinor = 20_000, CostMinor = 10_000, TaxClass = "zero", TrackStock = true });
+        hub.Purchasing.Receive(hub.Purchasing.CreateOrder(supplier.Id, [new NextGenOS.Hub.Purchasing.PurchaseLine { ItemId = rice.Id, QtyMilli = 100_000, CostMinor = 10_000 }]).Document.Id);
+        for (var day = 1; day <= 28; day++)
+            hub.Documents.Checkout(new NextGenOS.Hub.Documents.CheckoutRequest
+            {
+                Lines = { new NextGenOS.Hub.Documents.LineInput { ItemId = rice.Id, QtyMilli = 3_000 } },
+                Payments = { new NextGenOS.Hub.Documents.PaymentInput { Method = "cash", AmountMinor = 100_000_000 } },
+            });
+        // The purchase 29 days ago, the first sale 28 days ago (less an hour), the last one a day ago: moves 1 to 29.
+        hub.Db.InTransaction((c, t) => NextGenOS.Hub.Data.HubDb.Exec(c,
+            "UPDATE stock_moves SET at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', printf('-%d days', 30 - id), '+1 hours') WHERE item_id = $i", t, ("$i", rice.Id)));
+        hub.Supply.Set(rice.Id, supplier.Id, 5, 2, 1_000, 0, null);
+        return Results.Ok(new { item = rice.Id, supplier = supplier.Id });
+    }).AllowAnonymous().DisableAntiforgery();
 }
 
 app.Run();

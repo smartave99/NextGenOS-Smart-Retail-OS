@@ -144,7 +144,7 @@ public static class FlagKey
         RemoteAi => "Allows an online AI service to be used at all. Even then, only the kinds of data you allowed for that service leave this computer.",
         BusinessOntology => "Keeps a map of the business: products, shelves, devices, people and how they connect.",
         EventEngine => "Keeps a history of what happened in the business, with the reason the system believes it.",
-        PredictiveInventory => "Forecasts which products will run out. Needs the event history.",
+        PredictiveInventory => "Warns which goods will run out before a new delivery could arrive, from your own sales and the delivery times you type in (Buying, Delivery times). Plain arithmetic on this computer; no AI service is used.",
         AdvancedRules => "Automatic rules such as 'if a shelf is nearly empty and the back room is full, create a task'.",
         _ => "",
     };

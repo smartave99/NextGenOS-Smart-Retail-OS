@@ -47,3 +47,10 @@ Install a program that runs AI models on your PC and speaks the common web proto
 ## What to tell us
 
 Anything that is wrong, unclear or in words you would not use, with a screenshot. The list of what is **not** done is in `docs/OPEN-WORK.md`; the exact limits of each part are in `docs/V2-ARCHITECTURE-ASSESSMENT.md`, sections 6 to 8.
+
+## Try running low (stock forecasts)
+1. Switch on **Stock forecasts** under Settings, AI helpers (the licence must include the AI part).
+2. Open **Buying**, press **Delivery times**, choose a thing you keep in stock and type who supplies it and how many days they take (for example 5, with 2 spare days).
+3. Press **Check now**. A thing that sells fast and has little on the shelf is listed with the reasons; open *Why might this be wrong?*; press **Start an order** to fill in the order form (you still place it yourself) or **Set aside** to keep the warning quiet.
+4. Nothing is judged without a delivery time, and a thing that has been in stock for less than a week is not judged.
+

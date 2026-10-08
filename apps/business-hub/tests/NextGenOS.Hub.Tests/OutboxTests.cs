@@ -172,6 +172,23 @@ public class OutboxTests
     }
 
     [Fact]
+    public void A_busy_day_leaves_more_than_one_batch_and_the_upkeep_delivers_them_all_up_to_a_limit()
+    {
+        using var f = Shop();
+        var item = Haircut(f);
+        for (var i = 0; i < 60; i++) Sell(f, item);                          // 120 messages: a sale and a payment each, more than the 50 of one batch
+        Assert.Equal(120, Rows(f, status: "pending"));
+        Assert.Equal(50, f.App.Outbox.Dispatch());                           // one batch is 50
+        Assert.Equal(70, f.App.Outbox.DispatchAll());                        // the rest, batch after batch
+        Assert.Equal(0, Rows(f, status: "pending"));
+        Assert.Equal(120, EventRows(f));
+
+        for (var i = 0; i < 30; i++) Sell(f, item);                          // 60 more
+        Assert.Equal(50, f.App.Outbox.DispatchAll(maxBatches: 1));           // a limit on the batches stops it there; the rest wait for next time
+        Assert.Equal(10, f.App.Outbox.DispatchAll());
+    }
+
+    [Fact]
     public void A_message_delivered_again_changes_nothing_whether_it_is_replayed_or_the_note_of_what_was_done_is_lost()
     {
         using var f = Shop();
@@ -386,7 +403,7 @@ public class OutboxTests
         }
 
         var sales = Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents WHERE number IS NOT NULL"));
-        f.App.Db.Rollback(HubDb.LatestVersion - 1);
+        f.App.Db.Rollback(15);   // the step before the outbox (later steps are undone with it)
         Assert.Empty(f.App.Db.Query("SELECT name FROM sqlite_master WHERE name LIKE 'outbox%'", r => r.GetString(0)));
         Assert.Equal(sales, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents WHERE number IS NOT NULL")));
         Assert.Equal(2, EventRows(f));                                        // what the history already kept stays

@@ -8,6 +8,7 @@ using NextGenOS.Hub.Books;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
+using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Loyalty;
 using NextGenOS.Hub.Offers;
@@ -56,6 +57,9 @@ public sealed class HubApp
         Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit, Books, Access);
         Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents, Access);
         Purchasing = new PurchaseService(Documents, Catalog, Parties, Access);
+        // Running low against the supplier's delivery time: plain arithmetic on the shop's own figures, off until the owner switches on stock forecasts.
+        Supply = new SupplyService(db, clock, Audit, Access);
+        Insights = new InsightService(db, clock, Audit, Ai.Flags, Outbox, Supply, Access);
         Reports = new ReportService(db, Shop, clock, Catalog);
         TaxRegisters = new TaxRegisterService(db, Shop);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
@@ -91,6 +95,8 @@ public sealed class HubApp
     public ProjectService Projects { get; }
     public AppointmentService Appointments { get; }
     public PurchaseService Purchasing { get; }
+    public SupplyService Supply { get; }
+    public InsightService Insights { get; }
     public ReportService Reports { get; }
     public TaxRegisterService TaxRegisters { get; }
     public PrinterStore PrinterProfiles { get; }
@@ -115,7 +121,8 @@ public sealed class HubApp
         using var asTheProgram = Access.AsSystem();
         Documents.DiscardStaleDrafts();
         Books.CatchUp();
-        Outbox.Dispatch();   // messages left by sales and stock changes since the last time are handed to the event history (nothing happens while it is switched off)
+        try { Insights.RunIfDue(); } catch (HubException) { /* a forecast that cannot be made today is made tomorrow; it never stops the rest of the upkeep */ }
+        Outbox.DispatchAll();   // messages left by sales and stock changes since the last time are handed to the event history (nothing happens while it is switched off)
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
         Retention.Prune(null);
         Backups.RunIfDue();   // the night's copy, when it is due (a failed try is written down and shown to the owner; it never stops the till)
@@ -144,7 +151,7 @@ public sealed class HubApp
         // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
         app.Books.CatchUp();
         // What a stopped program left in the outbox is delivered now (once: the event history keeps one event for one message).
-        using (app.Access.AsSystem()) app.Outbox.Dispatch();
+        using (app.Access.AsSystem()) app.Outbox.DispatchAll();
         return app;
     }
 }

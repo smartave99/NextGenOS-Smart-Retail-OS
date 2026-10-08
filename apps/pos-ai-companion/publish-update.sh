@@ -12,7 +12,10 @@
 #      first and latest.json last, so the app never sees a description of files that are not there yet, then checks from the
 #      outside that the public folder shows them; and removes the files of versions older than the last two.
 #
-#   publish-update.sh --version 2.9.0 --setup SmartRetailAI/dist/SmartRetailAI-Setup.exe [--notes "What is new."]
+#   publish-update.sh --version 2.9.0 --setup SmartRetailAI/dist/SmartRetailAI-Setup.exe [--notes "What is new."] [--product ai|hub]
+#
+# --product ai (the default) is the AI add-on: SmartRetailAI-Setup-<version>.exe, described by latest.json. --product hub is the Business Hub (blueprint REL-016):
+# SmartRetailHub-Setup-<version>.exe, described by hub-latest.json, with its own audience word so that a statement made for one can never pass for the other.
 #
 # From the environment (the workflow sets them): UPDATE_FEED_URL, the public folder, e.g.
 #   https://<project>.supabase.co/storage/v1/object/public/app-updates/
@@ -22,17 +25,23 @@
 set -euo pipefail
 
 fail() { echo "publish-update: $1" >&2; exit 1; }
-usage() { echo "Usage: publish-update.sh --version 2.9.0 --setup <SmartRetailAI-Setup.exe> [--notes 'What is new.']" >&2; exit 2; }
+usage() { echo "Usage: publish-update.sh --version 2.9.0 --setup <setup.exe> [--notes 'What is new.'] [--product ai|hub]" >&2; exit 2; }
 
-version="" setup="" notes=""
+version="" setup="" notes="" product="ai"
 while [ $# -gt 0 ]; do
   case "$1" in
     --version) version="${2:-}"; shift 2 ;;
     --setup) setup="${2:-}"; shift 2 ;;
     --notes) notes="${2:-}"; shift 2 ;;
+    --product) product="${2:-}"; shift 2 ;;
     *) usage ;;
   esac
 done
+case "$product" in
+  ai)  prefix="SmartRetailAI-Setup";  manifest_name="latest.json";     audience_word="smartretail-update" ;;
+  hub) prefix="SmartRetailHub-Setup"; manifest_name="hub-latest.json"; audience_word="smartretail-hub-update" ;;
+  *) fail "the product must be ai or hub" ;;
+esac
 [[ "$version" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || fail "the version must be three numbers, like 2.9.0"
 [ -f "$setup" ] || fail "the setup file $setup is not there"
 notes="${notes:0:300}"
@@ -52,7 +61,7 @@ part_bytes="${UPDATE_PART_BYTES:-33554432}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-name="SmartRetailAI-Setup-$version.exe"
+name="$prefix-$version.exe"
 cp "$setup" "$work/$name"
 size="$(stat -c %s "$work/$name")"
 [ "$size" -gt 0 ] && [ "$size" -le "$max_size" ] || fail "the setup's size ($size bytes) is not one the app accepts"
@@ -73,7 +82,7 @@ else
 fi
 
 # GitHub's signed statement that this project's own release made this setup: its audience is the version and the SHA-256.
-audience="smartretail-update:$version:$sha"
+audience="$audience_word:$version:$sha"
 [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] \
   || fail "no signed statement can be asked for: the job needs 'permissions: id-token: write'"
 encoded="$(jq -rn --arg a "$audience" '$a | @uri')"
@@ -82,12 +91,12 @@ statement="$(curl -sS --fail --retry 3 -H "Authorization: bearer $ACTIONS_ID_TOK
 [[ "$statement" =~ ^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$ ]] || fail "GitHub did not give a signed statement"
 
 jq -n --arg v "$version" --arg f "$name" --arg s "$sha" --argjson size "$size" --argjson partSize "$part_size" --arg notes "$notes" --arg st "$statement" \
-  '{Version: $v, File: $f, Sha256: $s, Size: $size, PartSize: $partSize, Notes: $notes, Statement: $st}' > "$work/latest.json"
+  '{Version: $v, File: $f, Sha256: $s, Size: $size, PartSize: $partSize, Notes: $notes, Statement: $st}' > "$work/$manifest_name"
 
 if [ -n "${UPDATE_DRY_RUN_DIR:-}" ]; then
   mkdir -p "$UPDATE_DRY_RUN_DIR"
-  cp "${files[@]}" "$work/latest.json" "$UPDATE_DRY_RUN_DIR/"
-  echo "Version $version written to $UPDATE_DRY_RUN_DIR (${#files[@]} file(s) and latest.json), nothing uploaded."
+  cp "${files[@]}" "$work/$manifest_name" "$UPDATE_DRY_RUN_DIR/"
+  echo "Version $version written to $UPDATE_DRY_RUN_DIR (${#files[@]} file(s) and $manifest_name), nothing uploaded."
   exit 0
 fi
 
@@ -108,10 +117,10 @@ upload() { # file, name in the folder, content type
 for file in "${files[@]}"; do
   upload "$file" "$(basename "$file")" application/octet-stream
 done
-upload "$work/latest.json" latest.json application/json
+upload "$work/$manifest_name" "$manifest_name" application/json
 
 # From the outside, as the app sees it: the description and every piece, with the right size.
-seen="$(curl -sS --fail --retry 3 "${feed}latest.json?check=$(date +%s)" | jq -r '.Sha256 // empty')" || seen=""
+seen="$(curl -sS --fail --retry 3 "${feed}${manifest_name}?check=$(date +%s)" | jq -r '.Sha256 // empty')" || seen=""
 [ "$seen" = "$sha" ] || fail "the public folder does not show the new latest.json: is the folder '$bucket' public?"
 for file in "${files[@]}"; do
   got="$(curl -sS --fail --retry 3 -o /dev/null -w '%{size_download}' "${feed}$(basename "$file")")" || got=""
@@ -123,13 +132,13 @@ remove_old() {
   local listing name number keep=() old=() versions
   listing="$(jq -n '{prefix: "", limit: 1000, offset: 0}' \
     | curl -sS --fail -X POST "$host/storage/v1/object/list/$bucket" -H "Authorization: Bearer $token" -H "apikey: $UPDATE_ANON_KEY" -H "Content-Type: application/json" --data-binary @-)" || return 0
-  versions="$(printf '%s' "$listing" | jq -r '.[].name | select(test("^SmartRetailAI-Setup-[0-9]+\\.[0-9]+\\.[0-9]+\\.exe"))' \
-    | sed -E 's/^SmartRetailAI-Setup-([0-9]+\.[0-9]+\.[0-9]+)\.exe.*/\1/' | sort -Vu | sort -Vr | head -n 2)"
+  versions="$(printf '%s' "$listing" | jq -r --arg p "$prefix" '.[].name | select(test("^" + $p + "-[0-9]+\\.[0-9]+\\.[0-9]+\\.exe"))' \
+    | sed -E "s/^${prefix}-([0-9]+\.[0-9]+\.[0-9]+)\.exe.*/\1/" | sort -Vu | sort -Vr | head -n 2)"
   while read -r name; do
-    number="${name#SmartRetailAI-Setup-}"
+    number="${name#"$prefix"-}"
     number="${number%%.exe*}"
     if printf '%s\n' "$versions" | grep -qx -- "$number"; then keep+=("$name"); else old+=("$name"); fi
-  done < <(printf '%s' "$listing" | jq -r '.[].name | select(test("^SmartRetailAI-Setup-[0-9]+\\.[0-9]+\\.[0-9]+\\.exe"))')
+  done < <(printf '%s' "$listing" | jq -r --arg p "$prefix" '.[].name | select(test("^" + $p + "-[0-9]+\\.[0-9]+\\.[0-9]+\\.exe"))')
   [ "${#old[@]}" -gt 0 ] || return 0
   printf '%s\n' "${old[@]}" | jq -R . | jq -s '{prefixes: .}' \
     | curl -sS --fail -X DELETE "$api" -H "Authorization: Bearer $token" -H "apikey: $UPDATE_ANON_KEY" -H "Content-Type: application/json" --data-binary @- > /dev/null || return 0
@@ -137,4 +146,4 @@ remove_old() {
 }
 remove_old || echo "Older versions could not be removed from the update folder; they stay until next time."
 
-echo "Version $version is in the update folder: ${#files[@]} file(s) and latest.json."
+echo "Version $version is in the update folder: ${#files[@]} file(s) and $manifest_name."

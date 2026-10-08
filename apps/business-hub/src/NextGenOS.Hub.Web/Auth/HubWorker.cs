@@ -16,7 +16,13 @@ public sealed class HubWorker(IServiceProvider services, ILogger<HubWorker> log)
         {
             try
             {
-                services.GetRequiredService<HubApp>().Upkeep();   // does nothing until set-up has finished (a sample company is still being made until then)
+                var app = services.GetRequiredService<HubApp>();
+                app.Upkeep();   // does nothing until set-up has finished (a sample company is still being made until then)
+                await app.UpkeepOnlineAsync(stoppingToken);   // looks for a newer version about once a day (when this copy was built to, and the owner has not switched it off)
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception ex)
             {

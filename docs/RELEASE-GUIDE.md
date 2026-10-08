@@ -21,7 +21,7 @@ git tag v1.0.0-rc1
 git push origin v1.0.0-rc1
 ```
 
-or run the *Release* workflow by hand (*Actions → Release → Run workflow*) and choose the brand kit and version. A tag with `-rc`, `-beta` or `-alpha` in it becomes a **pre-release**.
+or run the *Release* workflow by hand (*Actions → Release → Run workflow*) and choose the brand kit and version. (A pushed tag carries its own version: `v1.2.0` and `v1.2.0-rc1` both build 1.2.0; before 8 October 2026 a pushed tag was always built as 1.0.0.) For a real version tag (no `-rc`, no `-trial`), once the update folder is set up, the workflow also builds the folder into the Hub and publishes the new Hub to it so that shops are offered it (`docs/UPDATES.md`). A tag with `-rc`, `-beta` or `-alpha` in it becomes a **pre-release**.
 
 The workflow does, in order:
 

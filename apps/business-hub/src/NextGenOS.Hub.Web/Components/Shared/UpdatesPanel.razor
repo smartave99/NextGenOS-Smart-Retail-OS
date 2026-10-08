@@ -1,0 +1,102 @@
+@* Settings, "Updates": new versions of the program, through the main PC. The program looks about once a day for a newer version, checks that it was made by the program's own release, keeps it
+   on this PC, and waits. For the owner only (the Hub checks it again itself). Nothing here installs anything: the owner runs the checked file at the end. *@
+@inherits HubPage
+@using NextGenOS.Hub.Updates
+
+<section class="card" id="updates">
+    <h2>Updates</h2>
+    <Notice Error="@Error" Info="@Info" />
+    @if (view is not null)
+    {
+        <div class="notice @(view.State == UpdateStates.Failed ? "error" : "ok")" id="update-status" role="status">@view.Summary</div>
+        <p class="muted">About once a day the program looks for a newer version of itself. It asks for a public file and says only that it is the Smart Retail POS and which version it is: <strong>nothing about your shop is sent</strong>. A new version is kept only if the makers' own release made it, and it is checked again before you are asked. <strong>Nothing is installed until you say so.</strong> The other counters in the shop are only browsers: they need nothing, and show the new version as soon as this PC has it.</p>
+        @if (view.Built)
+        {
+            <div class="row">
+                <label class="check"><input type="checkbox" id="update-look" checked="@view.Looking" @onchange="e => SetLooking(e.Value is true)" /> Look for new versions</label>
+                <button type="button" class="btn secondary" id="update-now" disabled="@busy" @onclick="LookNow">Look now</button>
+            </div>
+        }
+    }
+</section>
+
+@if (view is { Version: not null } && (view.State == UpdateStates.Ready || view.State == UpdateStates.Approved))
+{
+    <section class="card" id="update-new">
+        <h2>Version @view.Version is here</h2>
+        <p class="muted small">You have version @view.Current.</p>
+        @if (!string.IsNullOrWhiteSpace(view.Notes))
+        {
+            <p id="update-notes">@view.Notes</p>
+        }
+        @if (view.State == UpdateStates.Ready)
+        {
+            <p>When you approve, the shop is copied first@(CopyPlace): if the copy cannot be made, nothing is approved. Approving installs nothing yet: you are then shown the last step.</p>
+            <div class="row">
+                <button type="button" class="btn primary" id="update-approve" disabled="@busy" @onclick="Approve">Approve, and copy the shop first</button>
+                <button type="button" class="btn ghost" id="update-skip" @onclick="Skip">Not now</button>
+            </div>
+        }
+        else
+        {
+            <p id="update-note">@view.Note</p>
+            <h3>The last step</h3>
+            <ol id="update-steps">
+                <li>Finish any sale that is open. The program restarts for a minute, and the other counters wait.</li>
+                <li>Press the <strong>Windows key and R</strong> together, paste this address, and press Enter:
+                    <input type="text" readonly id="update-path" value="@view.StagedPath" aria-label="Where the checked update is" onfocus="this.select()" /></li>
+                <li>Windows asks if you want to allow the program to make changes: press <strong>Yes</strong>. The setup updates the program, keeps all the shop's data, and starts it again.</li>
+                <li>Open this page again. It says you have the newest version.</li>
+            </ol>
+            <p class="muted small">The file was checked when it was kept and again just now. If anything looks wrong, do not run it: tell your supplier.</p>
+        }
+    </section>
+}
+
+@code {
+    private UpdateView? view;
+    private bool busy;
+
+    protected override Task LoadAsync()
+    {
+        view = App.Updates.View();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Where the copy will go, in the words of the page.</summary>
+    private string CopyPlace => App.Backups.Settings() is { Folder: { Length: > 0 } place } ? $" to {place}" : " to a folder on this PC (choose a place for copies under Backups for a safer one)";
+
+    private Task SetLooking(bool on) => Run(async () =>
+    {
+        App.Updates.SetLooking(on, Me.Id);
+        await Reload();
+    }, on ? "It will look for new versions." : "It will not look for new versions.");
+
+    private async Task LookNow()
+    {
+        busy = true;
+        await Run(async () =>
+        {
+            await App.Updates.LookNowAsync(Me.Id);
+            await Reload();
+        }, "Looked.");
+        busy = false;
+    }
+
+    private async Task Approve()
+    {
+        busy = true;
+        await Run(async () =>
+        {
+            await Task.Run(() => App.Updates.Approve(Me.Id));
+            await Reload();
+        }, "Approved. The shop was copied first.");
+        busy = false;
+    }
+
+    private Task Skip() => Run(async () =>
+    {
+        App.Updates.Skip(Me.Id);
+        await Reload();
+    }, "The first screen will not remind you about this version. It stays here.");
+}

@@ -27,6 +27,14 @@
   <ItemGroup>
     <RuntimeHostConfigurationOption Include="System.Globalization.AppLocalIcu" Value="72.1.0.3" />
   </ItemGroup>
+  <!-- Where this copy looks for updates, and whose signed statement it trusts (the repository, its owner and the release workflow, by GitHub's own numbers). The release build writes them
+       into the program (installer/build.mjs); they are never read from a setting or a file on the PC. Without all four a copy never looks for updates. -->
+  <ItemGroup Condition="'$(UpdateFeed)' != '' And '$(ReleaseRepositoryId)' != '' And '$(ReleaseOwnerId)' != '' And '$(ReleaseWorkflow)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute"><_Parameter1>UpdateFeed</_Parameter1><_Parameter2>$(UpdateFeed)</_Parameter2></AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute"><_Parameter1>ReleaseRepositoryId</_Parameter1><_Parameter2>$(ReleaseRepositoryId)</_Parameter2></AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute"><_Parameter1>ReleaseOwnerId</_Parameter1><_Parameter2>$(ReleaseOwnerId)</_Parameter2></AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute"><_Parameter1>ReleaseWorkflow</_Parameter1><_Parameter2>$(ReleaseWorkflow)</_Parameter2></AssemblyAttribute>
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
     <PackageReference Include="Microsoft.ICU.ICU4C.Runtime" Version="72.1.0.3" />

@@ -10,6 +10,10 @@
 {
     <div class="notice @(b.Settings.Enabled ? "error" : "ok")" id="backup-banner" role="status">@b.Summary <a href="settings">Settings, Backups</a></div>
 }
+@if (update is { Built: true } u && ((u.State == NextGenOS.Hub.Updates.UpdateStates.Ready && !u.Skipped) || u.State == NextGenOS.Hub.Updates.UpdateStates.Approved))
+{
+    <div class="notice ok" id="update-banner" role="status">@(u.State == NextGenOS.Hub.Updates.UpdateStates.Ready ? $"A new version ({u.Version}) is ready. Nothing changes until you say so." : $"Version {u.Version} is approved and waiting for you to run it.") <a href="settings?tab=updates">Settings, Updates</a></div>
+}
 
 <div class="grid">
     @if (Me.Can(Perm.Reports) || Me.Can(Perm.Sell))
@@ -110,6 +114,7 @@
 @code {
     private SalesSummary? today;
     private NextGenOS.Hub.Backups.BackupStatus? backup;
+    private NextGenOS.Hub.Updates.UpdateView? update;
     private IReadOnlyList<Restaurant.FloorTable> floor = Array.Empty<Restaurant.FloorTable>();
     private int tickets, overdue, openLoans, projects, bookings;
     private long owed;
@@ -119,6 +124,7 @@
     {
         var f = Shop.Features;
         if (Me.Can(Perm.Settings)) backup = App.Backups.Status();   // the owner is told when copies are not being made, or the last one did not work
+        if (Me.Can(Perm.Settings)) update = App.Updates.View();   // the owner is told when a new version is ready (nothing is installed by it)
         if (Me.Can(Perm.Reports) || Me.Can(Perm.Sell)) today = App.Reports.Summary(Today, Today);
         if (f.Tables) floor = App.Restaurant.Floor();
         if (f.Kitchen) tickets = App.Restaurant.Tickets().Count(t => t.Status != "served");

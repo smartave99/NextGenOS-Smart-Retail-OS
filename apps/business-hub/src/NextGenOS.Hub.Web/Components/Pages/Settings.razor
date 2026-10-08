@@ -432,6 +432,11 @@ else if (tab == "backups")
     @* The owner only: the page is [Authorize(Policy = Perm.Settings)], and the Hub checks it again itself in each action. *@
     <BackupsPanel />
 }
+else if (tab == "updates")
+{
+    @* The owner only: the page is [Authorize(Policy = Perm.Settings)], and the Hub checks it again itself in each action. *@
+    <UpdatesPanel />
+}
 else if (tab == "users")
 {
     <section class="card">
@@ -554,6 +559,7 @@ else if (tab == "activity")
         yield return ("look", "Look");
         yield return ("printers", "Printers");
         yield return ("backups", "Backups");
+        yield return ("updates", "Updates");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         if (Me.Can(Perm.Network)) yield return ("network", "Store network");
         if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
@@ -567,6 +573,8 @@ else if (tab == "activity")
         if (TabName is "look" && !shownTab) { tab = "look"; shownTab = true; if (Saved == "1") Info = "Saved. It shows on every screen."; }
         // A link from another screen (for example "What people did", from the counter PCs) opens the Activity tab.
         else if (TabName is "activity" && !shownTab) { tab = "activity"; shownTab = true; }
+        // The reminder on the first screen about a new version opens the Updates tab.
+        else if (TabName is "updates" && !shownTab) { tab = "updates"; shownTab = true; }
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
         layout = Themes.Current;

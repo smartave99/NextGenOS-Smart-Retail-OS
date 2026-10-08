@@ -95,6 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
+      version: ${{ steps.draft.outputs.version }}
       release_id: ${{ steps.draft.outputs.release_id }}
       tag: ${{ steps.draft.outputs.tag }}
       tag_made: ${{ steps.draft.outputs.tag_made }}
@@ -113,6 +114,15 @@ jobs:
           PUBLISH_TRIAL: ${{ inputs.publish_trial }}
         run: |
           set -euo pipefail
+          # The version the files carry: the one typed for a run started by hand, or the one in a tag the owner pushed (v1.2.0, or v1.2.0-rc1 to try it first, which carries 1.2.0).
+          # Before this, a pushed tag built version 1.0.0 whatever its name; a Hub that updates itself must carry the version of its tag (docs/UPDATES.md).
+          VERSION="${VERSION_NAME}"
+          if [ "${REF_TYPE}" = "tag" ]; then
+            case "${REF_NAME}" in
+              v[0-9]*.[0-9]*.[0-9]*) VERSION="$(printf '%s' "${REF_NAME#v}" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')" ;;
+            esac
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           # A tag the owner pushed names the release (it exists already). A trial started from a branch makes its own tag, at the commit that is being built.
           # A run started by hand keeps a draft that nobody but people who can write to the repository can see.
           MAKE=""
@@ -153,6 +163,8 @@ jobs:
     name: Android app (APK and AAB)
     needs: [gate, prepare]
     if: ${{ !startsWith(github.ref_name, 'studio-v') }}
+    env:
+      VERSION_NAME: ${{ needs.prepare.outputs.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -253,6 +265,8 @@ jobs:
     name: Windows setup for the Business Hub (built)
     needs: [gate, prepare]
     if: ${{ !startsWith(github.ref_name, 'studio-v') }}
+    env:
+      VERSION_NAME: ${{ needs.prepare.outputs.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -285,6 +299,12 @@ jobs:
         env:
           # A tag with -trial in its name (v1.0.0-trial1) does the same as the manual tick: a setup with no keys, to try installing only.
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
+          # Where this Hub looks for updates (the public online folder: repository variable UPDATE_FEED_URL) and whom it trusts (this repository and this workflow, by GitHub's own numbers).
+          # Only for a real release, a tag such as v1.2.3 (never v1.2.3-rc1, a trial or a run by hand), and only once the owner has set the folder. Without it the Hub never looks (docs/UPDATES.md).
+          NGOS_UPDATE_FEED: ${{ (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.UPDATE_FEED_URL) || '' }}
+          NGOS_RELEASE_REPOSITORY_ID: ${{ github.repository_id }}
+          NGOS_RELEASE_OWNER_ID: ${{ github.repository_owner_id }}
+          NGOS_RELEASE_WORKFLOW: .github/workflows/release.yml
         run: |
           set -euo pipefail
           EXTRA=""
@@ -388,6 +408,8 @@ jobs:
     name: Linux package for the Business Hub
     needs: [gate, prepare]
     if: ${{ !startsWith(github.ref_name, 'studio-v') }}
+    env:
+      VERSION_NAME: ${{ needs.prepare.outputs.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -436,6 +458,8 @@ jobs:
     name: Website, the same for every customer (${{ matrix.os }})
     needs: [gate, prepare]
     if: ${{ !startsWith(github.ref_name, 'studio-v') }}
+    env:
+      VERSION_NAME: ${{ needs.prepare.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -690,6 +714,8 @@ jobs:
     # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
     if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
+    env:
+      VERSION_NAME: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -761,3 +787,40 @@ jobs:
           node scripts/release-assets.mjs upload --release "${RELEASE_ID}" "${LAST[@]}"
           node scripts/release-assets.mjs publish --release "${RELEASE_ID}" --notes-file "${RUNNER_TEMP}/notes.md"
           echo "Release ${TAG} is published."
+
+  publish-update:
+    # The last step, after the release is public: the new Business Hub is put in the online update folder, where shops that look for updates find it (docs/UPDATES.md). Only for a real release
+    # (a tag such as v1.2.3), only when the Windows setup was built and tried on a Windows PC, and only once the owner has set the folder (repository variable UPDATE_FEED_URL, the same one the AI add-on uses) and the sign-in of
+    # the one account that may write to it (variable UPDATE_ANON_KEY, secrets UPDATE_UPLOAD_EMAIL and UPDATE_UPLOAD_PASSWORD). The job asks GitHub for a signed statement that this very workflow, started by
+    # this very tag, made this very file: a shop installs nothing else, so even someone who can write to the online folder cannot make a shop install something of their own.
+    name: Offer the new Business Hub to shops that look for updates
+    needs: [prepare, windows-build, windows, publish]
+    if: ${{ always() && needs.publish.result == 'success' && needs.windows-build.result == 'success' && needs.windows.result == 'success' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.UPDATE_FEED_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION_NAME: ${{ needs.prepare.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Take the setup from the release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: node scripts/release-assets.mjs download --release "${RELEASE_ID}" --out dist --match '^SmartRetailPOS-Hub-Setup-'
+      - name: Put it in the update folder
+        env:
+          UPDATE_FEED_URL: ${{ vars.UPDATE_FEED_URL }}
+          UPDATE_ANON_KEY: ${{ vars.UPDATE_ANON_KEY }}
+          UPDATE_UPLOAD_EMAIL: ${{ secrets.UPDATE_UPLOAD_EMAIL }}
+          UPDATE_UPLOAD_PASSWORD: ${{ secrets.UPDATE_UPLOAD_PASSWORD }}
+        run: |
+          set -euo pipefail
+          SETUP="dist/SmartRetailPOS-Hub-Setup-${VERSION_NAME}.exe"
+          test -f "${SETUP}" || { echo "The setup ${SETUP} is not on the release."; exit 1; }
+          bash apps/pos-ai-companion/publish-update.sh --product hub --version "${VERSION_NAME}" --setup "${SETUP}" --notes "Smart Retail POS ${VERSION_NAME}. The release page lists what is new."

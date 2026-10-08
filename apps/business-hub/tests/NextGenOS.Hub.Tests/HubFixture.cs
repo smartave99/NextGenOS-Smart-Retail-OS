@@ -11,7 +11,7 @@ public sealed class HubFixture : IDisposable
     public HubFixture(string country = "IN", string industry = "retail", Action<ShopSettings>? configure = null, DateTimeOffset? now = null, NextGenOS.Devices.Transport.IPrinterTransport? printer = null, NextGenOS.Hub.Ai.AiOptions? ai = null)
     {
         Clock = new FixedClock(now ?? new DateTimeOffset(2026, 10, 5, 6, 30, 0, TimeSpan.Zero)); // 12:00 in India
-        App = HubApp.Open(_path, Clock, printer is null ? null : new NextGenOS.Devices.Printing.PrintService(_ => printer), ai);
+        App = HubApp.OpenTrusted(_path, Clock, printer is null ? null : new NextGenOS.Devices.Printing.PrintService(_ => printer), ai);
         var settings = new ShopSettings { Name = "Test Shop", Country = country, Industry = industry, SetupDone = true };
         if (country == "IN") settings.Region = "27";
         configure?.Invoke(settings);

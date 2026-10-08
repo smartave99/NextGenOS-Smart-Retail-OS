@@ -21,7 +21,8 @@ function configDir() {
   const base = process.platform === 'win32'
     ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'NextGenOS Website')
     : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'nextgenos-website');
-  return path.join(base, /^[a-z0-9][a-z0-9-]*$/.test(String(info.customer)) ? String(info.customer) : 'website');
+  // THE website is the same for every customer and names none in PACKAGE-INFO.json: its folder is then "website" (it was once "undefined", which the Windows check of the release workflow found).
+  return path.join(base, typeof info.customer === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(info.customer) ? info.customer : 'website');
 }
 
 function openWithSystem(target) {

@@ -67,6 +67,7 @@ try {
   step('with the AI part in the licence every switch starts off, no service is connected, and the computer is described in plain words');
 
   await page.locator('#flag-ai_assistant').check();
+  await page.locator('.notice.ok', { hasText: 'Switched on.' }).waitFor();      // the Hub has kept the choice (a reload before that could cut it off on a slow machine)
   await page.reload();
   await page.locator('#flag-ai_assistant').waitFor();
   assert.strictEqual(await page.locator('#flag-ai_assistant').isChecked(), true);
@@ -88,6 +89,7 @@ try {
   await page.locator('#svc-local-helper .notice.ok').waitFor();
   assert.match(await page.locator('#svc-local-helper .notice.ok').innerText(), /answers and has 2 models/);
   await page.locator('#on-local-helper').check();
+  await page.locator('.notice.ok', { hasText: 'Switched on.' }).waitFor();
   await page.reload();
   await page.locator('#on-local-helper').waitFor();
   assert.strictEqual(await page.locator('#on-local-helper').isChecked(), true);
@@ -105,6 +107,7 @@ try {
   assert.strictEqual(await page.locator('#allow-online-helper-PAYMENT_SENSITIVE').count(), 0, 'there is no box to allow card details');
   assert.strictEqual(await page.locator('#allow-online-helper-PERSONAL').isChecked(), false);
   await page.locator('#allow-online-helper-PERSONAL').check();
+  await page.locator('.notice.ok', { hasText: 'Allowed.' }).waitFor();   // the Hub has kept the choice (a reload before that could cut it off on a slow machine)
   await page.reload();
   await page.locator('#allow-online-helper-PERSONAL').waitFor();
   assert.strictEqual(await page.locator('#allow-online-helper-PERSONAL').isChecked(), true);

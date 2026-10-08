@@ -40,7 +40,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked:** One main PC with counters connecting to it, a main PC with a standby, every PC with its own copy that syncs, or a small store server box.
 - **Answer:** "1 and since in every store there is one mother aka main pc and other daughter aka subordinate pc".
 - **Rule:** **One main PC per store holds the store's data** (the owner calls it the "mother"). The other counters, tablets and phones (the "daughters"; in screens and guides they are called **counter PCs**) connect to the main PC over the **shop's own network**, paired with that store. **Nothing goes to the cloud, and no data leaves the shop, unless the owner explicitly allows it, in plain words, for that purpose.** There is one true copy, so stock and bill numbers cannot clash. A standby copy of the main PC is a later step, not the first.
-- **Today:** **Not built.** The Business Hub runs on one PC and listens only on that PC (`127.0.0.1`), so a store with more than one counter does not work yet. Needs: secure connections inside the shop (the shop's own certificates, not an outside service), pairing a counter PC with the store, which user may sign in where, and what a counter PC does when the main PC is off.
+- **Today:** **Built for the first step (8 October 2026), with the browser as the first counter** (`docs/STORE-NETWORK.md`). The owner switches counter PCs on in Settings → Store network and restarts the Hub once; the Hub then also listens on the shop's network with the shop's own certificate (made on the main PC, nothing fetched from outside); a counter PC is paired with a one-time code made on the main PC; a computer that is not paired gets one plain refusal; removing a counter PC or switching off cuts it at once; the licence's number of PCs limits the counter PCs. **Not built:** what a counter PC shows when the main PC is off, the firewall rule in setup, a restart button, certificate trust steps for tablets and phones, a counter that is a program of its own, a standby main PC. **Not verified:** a second real PC, a real router, Windows Firewall.
 
 ### 5. What the AI may change
 
@@ -89,7 +89,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked:** Local automatic with optional online backup, local automatic only, or the owner does it by hand.
 - **Answer:** "Local automatic; cloud only if owner turns it on (Recommended)".
 - **Rule:** Every night the main PC copies the data to a second place the owner chooses (a USB drive, or another PC in the store). The owner sees whether the last backup worked; restoring is a few clicks. An **encrypted online backup exists but is off until the owner turns it on**, and says in plain words what goes out and where.
-- **Today:** **Not built.** Only the copy made before an update exists.
+- **Today:** **Built for local copies on 8 October 2026** (blueprint OPS-002): *Settings → Backups* (the second place, the time, how many to keep, "Back up now"), a checked and fingerprinted copy every night, the owner told on the first screen when copies are off or failing, and "put this copy back" (also on a PC with no shop). `docs/BACKUP-AND-RESTORE.md`. **Not built:** encrypted copies, the online copy (stays off until the owner turns it on). **Not verified** on a real USB drive or share.
 
 ### 12. A client with several stores
 
@@ -263,6 +263,13 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Answer (the owner chose):** "Show the tax, so the bill matches (Recommended)".
 - **Rule:** An estimate (quotation) for a shop sale is worked out **exactly like a bill, with the same tax**; turning it into a bill gives the same total unless prices changed. Estimates for shop sales are new in the Hub (today it has quotes for construction projects only).
 - **Today:** **Built (8 October 2026).** `DocumentService.SaveAsEstimate` and `BillFromEstimate`, the *Keep as a quote* button at the till, *Make a bill from this quote* on the quote, tested by `EstimateTests` and `e2e/estimates.e2e.mjs`. **Not done:** an expiry date on a quote, sending it to the customer, service-job estimates, and quotations with terms (the older program's separate quotation screen).
+
+### 36. Stock cost: the average cost of what was paid
+
+- **Asked (8 October 2026):** When the shop sells an item, what cost should the books use for it (this decides profit, and the value of the stock on the shelves)? Average cost, oldest first (FIFO), or average with lot-by-lot cost for items tracked by batch.
+- **Answer (the owner chose):** "Average cost (Recommended)".
+- **Rule:** Each item has **one cost: the average of what was paid for the units on hand, worked out again at every purchase** (the old stock's cost times its quantity, plus the new purchase's cost times its quantity, divided by the new quantity on hand). A sale, a return of goods sold and a stock-out use the cost the item has at that moment; the **cost of goods sold** is booked with the sale, and the **stock value** is the quantity on hand times the average cost. Stock brought across from an older system, or counted at the start, is entered once as an **opening entry** (its value comes into the books as an opening balance, as decision 32 says). Items tracked by batch or expiry use the same average for now; lot-by-lot cost is not built.
+- **Today:** **Built (8 October 2026, blueprint ticket FIN-003; database step 15, `Catalog/StockCost.cs`, `Books/BooksService.cs`, `StockCostTests`).** Every stock move carries its value; a purchase brings stock in at the lines' cost without tax and after discounts, and the books move it from *Purchases* onto *Stock on the shelves*; a sale books *Cost of goods sold* at the average; a return, a cancelled sale and a cancelled purchase turn the value round; a count or damage is a loss or gain at the average, a delivery with no order comes in at the last cost price; stock already on the shelves when costs began is given its value once, as an opening entry; the stock report and the books show the same figure. **Not built:** lot-by-lot cost, closing a period, a stock-value-by-date report, the cost on the printed bill line, and the tax on a purchase is still treated as recoverable (it is not added to the cost).
 
 ## Still to ask, and open items
 

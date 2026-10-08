@@ -265,7 +265,7 @@ public class NoFixedMarketTests
         var path = Path.Combine(Path.GetTempPath(), "hub-nomarket-" + Guid.NewGuid().ToString("N") + ".db");
         try
         {
-            var app = HubApp.Open(path);
+            var app = HubApp.OpenTrusted(path);
             var ex = Assert.Throws<HubException>(() => app.Shop.Current);
             Assert.Equal("not-set-up", ex.Code);
             Assert.Contains("not set up yet", ex.Message);

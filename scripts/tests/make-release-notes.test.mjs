@@ -169,8 +169,10 @@ test('a Studio release page speaks only of the Studio: its steps, what it needs,
     assert.match(out, /closing the window|close its window/i);
     assert.match(out, /This release holds only the Studio/, 'it says where the programs for a customer come from');
     assert.match(out, /full release/);
+    // (The change log, folded away at the top, is the Studio's own list of changes and may name anything it changed; the page around it must not.)
+    const page = out.replace(/<details>\n<summary>Open the list<\/summary>[\s\S]*?<\/details>/, '');
     for (const other of [/The shop program on/, /The online shop \(website\)/, /The Android app/, /Download `SmartRetailPOS/, /sudo apt install/, /HOW-TO-TRY/, /licence key from the NextGenOS Licence Studio\. Nothing in this release works/]) {
-      assert.doesNotMatch(out, other, String(other));
+      assert.doesNotMatch(page, other, String(other));
     }
     assert.doesNotMatch(out, /### Not in this release/, 'the other parts are not expected in a Studio release, so they are not listed as missing');
     assert.doesNotMatch(out, /TRIAL BUILD/);
@@ -253,4 +255,16 @@ test('THE website (the same for every customer) is described as such: what it sh
     assert.match(out, /The website for Windows\.\*\* Status: Website for the customer/);
     assert.doesNotMatch(out, /#### The online shop \(website\)/);
   } finally { rmSync(none, { recursive: true, force: true }); }
+});
+
+test('the change log on the release page is the whole newest entry (folded away), not only its first heading', () => {
+  const dir = folder(FULL, { 'BUILD-STATUS.txt': STATUS });
+  try {
+    const { status, out } = notes(dir);
+    assert.equal(status, 0);
+    const log = /### What changed in this version \(Change log\)([\s\S]*?)### Start here/.exec(out)?.[1] ?? '';
+    assert.match(log, /<details>[\s\S]*<summary>Open the list<\/summary>/);
+    assert.match(log, /\n- /, 'the list holds real entries, not only a heading');
+    assert.ok(log.trim().endsWith('</details>'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -37,7 +37,7 @@ public class ImportLogTests
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
         f.App.Parties.Create(new NextGenOS.Hub.Catalog.PartyInput { Kind = "customer", Name = "Asha" });
-        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines", "loyalty_ledger" }).ToArray();
+        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines", "loyalty_ledger", "offers", "vouchers", "document_offers", "party_discounts", "backup_runs", "network_devices", "network_pairing_codes" }).ToArray();
 
         f.App.Db.Rollback(5);
 
@@ -47,7 +47,7 @@ public class ImportLogTests
         Assert.Equal("Asha", f.App.Db.Scalar("SELECT name FROM parties"));
         Assert.True(File.Exists(f.App.Db.LastBackup));
 
-        var again = HubApp.Open(f.App.Db.Path, f.Clock);
+        var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), ImportTables.ToHashSet());
         Assert.Equal(Enumerable.Range(1, NextGenOS.Hub.Data.HubDb.LatestVersion).Select(v => (long)v).ToArray(), again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
         Assert.Equal("Rice", again.Db.Scalar("SELECT name FROM items"));

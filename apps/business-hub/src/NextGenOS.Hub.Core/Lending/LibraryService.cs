@@ -5,6 +5,7 @@ using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Shop;
 using NextGenOS.Tax;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Lending;
 
@@ -30,7 +31,7 @@ public sealed record ReservationRow(Reservation Reservation, string Title, strin
 public sealed record PopularTitle(long ItemId, string Title, int Loans, int Copies);
 
 /// <summary>Members, copies of titles, lending and returning, due dates, renewals, reservations and fines, by the rules of the industry pack.</summary>
-public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog, PartyService parties, DocumentService documents, AuditService audit)
+public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog, PartyService parties, DocumentService documents, AuditService audit, Access access)
 {
     // ---- member types ----------------------------------------------------------------------------------------------------------
 
@@ -50,6 +51,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Adds a title to the catalogue. An ISBN, when given, must have a correct check digit.</summary>
     public Item AddTitle(string name, string? author = null, string? isbn = null, string? category = null, long priceMinor = 0, string? publisher = null, string? year = null)
     {
+        access.Require(Perm.Catalog);
         var attrs = new Dictionary<string, string>();
         if (!string.IsNullOrWhiteSpace(author)) attrs["author"] = author.Trim();
         if (!string.IsNullOrWhiteSpace(publisher)) attrs["publisher"] = publisher.Trim();
@@ -65,6 +67,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Adds physical copies of a title, each with a barcode of its own (C-{title}-{number}).</summary>
     public IReadOnlyList<Copy> AddCopies(long itemId, int count, string? note = null)
     {
+        access.Require(Perm.Catalog);
         if (count is < 1 or > 500) throw new HubException("count", "Add between 1 and 500 copies at a time.");
         var item = catalog.Get(itemId) ?? throw new HubException("not-found", "That title was not found.");
         if (item.Kind != "title") throw new HubException("not-title", "Copies belong to titles.");
@@ -94,6 +97,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
 
     public void WithdrawCopy(long copyId, string reason, long? userId)
     {
+        access.Require(Perm.Catalog);
         var copy = CopyById(copyId) ?? throw new HubException("not-found", "That copy was not found.");
         if (copy.Status == "on-loan") throw new HubException("on-loan", "That copy is on loan. Take it back first.");
         db.InTransaction((c, t) =>
@@ -115,6 +119,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Lends a copy to a member. Says in plain words why not when it cannot.</summary>
     public Loan Issue(long memberId, string copyBarcode, long? userId = null)
     {
+        access.Require(Perm.Loans);
         var context = shop.Current;
         ProcessHolds();
         var member = parties.Get(memberId) ?? throw new HubException("member-not-found", "That member was not found.");
@@ -159,6 +164,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Takes a copy back. Works out the fine for late days, and keeps the copy for the next member waiting for it, if there is one.</summary>
     public ReturnResult Return(string copyBarcode, long? userId = null)
     {
+        access.Require(Perm.Loans);
         var context = shop.Current;
         var copy = FindCopy(copyBarcode) ?? throw new HubException("copy-not-found", $"No copy has the barcode {copyBarcode.Trim()}.");
         var loan = db.QueryOne("SELECT id, copy_id, party_id, issued_at, due_at, returned_at, renewals FROM loans WHERE copy_id = $c AND returned_at IS NULL", MapLoan, ("$c", copy.Id))
@@ -199,6 +205,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Gives the member more time with an item: not when the limit of renewals is reached, the item is overdue, or someone is waiting for it.</summary>
     public Loan Renew(long loanId, long? userId = null)
     {
+        access.Require(Perm.Loans);
         var context = shop.Current;
         var loan = LoanById(loanId) ?? throw new HubException("not-found", "That loan was not found.");
         if (loan.ReturnedAt is not null) throw new HubException("returned", "That item was already returned.");
@@ -219,6 +226,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Puts a member in the queue for a title whose copies are all out.</summary>
     public Reservation Reserve(long itemId, long memberId)
     {
+        access.Require(Perm.Loans);
         var title = catalog.Get(itemId) ?? throw new HubException("not-found", "That title was not found.");
         var member = parties.Get(memberId) ?? throw new HubException("member-not-found", "That member was not found.");
         if (CopiesOf(itemId).All(c => c.Status is "lost" or "withdrawn")) throw new HubException("no-copies", $"The library has no copies of {title.Name} to reserve.");
@@ -233,6 +241,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
 
     public void CancelReservation(long reservationId)
     {
+        access.Require(Perm.Loans);
         var r = ReservationById(reservationId) ?? throw new HubException("not-found", "That reservation was not found.");
         db.InTransaction((c, t) =>
         {
@@ -315,6 +324,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Charges a member (a copy lost or damaged, a membership fee) as an unpaid fine.</summary>
     public Fine Charge(long memberId, long amountMinor, string reason, long? userId)
     {
+        access.Require(Perm.Loans);
         if (amountMinor <= 0) throw new HubException("amount", "The amount must be more than zero.");
         if (string.IsNullOrWhiteSpace(reason)) throw new HubException("reason", "Please say what it is for.");
         _ = parties.Get(memberId) ?? throw new HubException("member-not-found", "That member was not found.");
@@ -327,6 +337,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>A lost copy: it is marked lost, the loan ends, and the member is charged the lost-item fee (the title's price times the fee factor).</summary>
     public Fine MarkLost(long loanId, long? userId)
     {
+        access.Require(Perm.Loans);
         var context = shop.Current;
         var loan = LoanById(loanId) ?? throw new HubException("not-found", "That loan was not found.");
         if (loan.ReturnedAt is not null) throw new HubException("returned", "That item was already returned.");
@@ -349,6 +360,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
 
     public void Waive(long fineId, string reason, long? userId)
     {
+        access.Require(Perm.Loans);
         if (string.IsNullOrWhiteSpace(reason)) throw new HubException("reason", "Please say why.");
         var changed = db.InTransaction((c, t) =>
         {
@@ -362,6 +374,7 @@ public sealed class LibraryService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>The member pays all their fines: a receipt is made (the fines as fees on it) and the fines are marked paid.</summary>
     public DocumentView PayFines(long memberId, IEnumerable<PaymentInput> payments, long? userId)
     {
+        access.Require(Perm.Loans);
         var fines = UnpaidFines(memberId);
         if (fines.Count == 0) throw new HubException("no-fines", "This member has no unpaid fines.");
         var adjustments = fines.Select(f => new TaxAdjustmentInput { Code = "FINE", Kind = "fee", Label = f.Reason, Amount = shop.Current.Text(f.AmountMinor) }).ToList();

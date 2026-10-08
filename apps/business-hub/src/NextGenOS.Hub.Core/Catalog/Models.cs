@@ -22,6 +22,15 @@ public sealed class PartyInput
     public string? Notes { get; set; }
 }
 
+/// <summary>The loose attributes of an item that the Hub itself reads (the rest are the shop's own notes).</summary>
+public static class ItemAttrs
+{
+    /// <summary>The code of the goods or service sold, under the country's own name for it (the pack says what it is called; a country without one shows no such field).</summary>
+    public const string Code = "item-code";
+    /// <summary>A further tax on top of the main one, as a percent ("12" or "2.5"), under the country's own name for it.</summary>
+    public const string ExtraTax = "extra-tax-percent";
+}
+
 public sealed record Item(
     long Id, string Kind, string? Sku, string? Barcode, string Name, string? Category, string Unit, long PriceMinor, long? TradePriceMinor, long CostMinor,
     string TaxCode, bool TrackStock, long ReorderMilli, string? Station, int? DurationMin, IReadOnlyDictionary<string, string> Attrs, bool Active)
@@ -51,4 +60,5 @@ public sealed class ItemInput
     public Dictionary<string, string> Attrs { get; set; } = new();
 }
 
-public sealed record StockRow(long ItemId, string Name, string? Category, string Unit, long OnHandMilli, long ReorderMilli, long CostMinor);
+/// <summary>One tracked item's stock. <paramref name="CostMinor"/> is the average cost of what is on the shelf (the last cost price when there is no average); <paramref name="ValueMinor"/> is what the stock on the shelf is worth in money, from its moves.</summary>
+public sealed record StockRow(long ItemId, string Name, string? Category, string Unit, long OnHandMilli, long ReorderMilli, long CostMinor, long ValueMinor = 0);

@@ -90,6 +90,47 @@ export function validatePack(pack, fileName) {
   }
   if (t.businessId && !t.businessId.label) bad('businessId needs a label');
   if (t.businessId?.pattern) { try { new RegExp(t.businessId.pattern); } catch { bad('businessId "pattern" is not a valid pattern'); } }
+  for (const part of ['itemCode', 'extraTax']) {
+    if (t[part] === undefined) continue;
+    if (!isObj(t[part]) || typeof t[part].label !== 'string' || !t[part].label.trim()) bad(`${part} needs a label (the words the programs show for it)`);
+    else if (t[part].help !== undefined && typeof t[part].help !== 'string') bad(`${part} "help" must be text`);
+  }
+  if (t.returns !== undefined) {
+    const r = t.returns;
+    if (!isObj(r) || typeof r.title !== 'string' || !r.title.trim() || !Array.isArray(r.lists) || r.lists.length === 0) bad('"returns" needs a title and a list of lists');
+    else {
+      const ids = new Set();
+      for (const l of r.lists) {
+        if (!isObj(l) || !/^[a-z0-9-]{1,24}$/.test(l.id ?? '') || typeof l.label !== 'string' || !l.label.trim()) { bad('every return list needs an id (lower case letters, digits, dashes) and a label'); continue; }
+        if (ids.has(l.id)) bad(`return list "${l.id}" is there twice`);
+        ids.add(l.id);
+        if (!['bill', 'credit'].includes(l.kind)) bad(`return list "${l.id}": kind must be bill or credit`);
+        const w = l.when ?? {};
+        if (!isObj(w)) { bad(`return list "${l.id}": "when" must be an object`); continue; }
+        for (const k of Object.keys(w)) if (!['partyHasTaxId', 'betweenRegions', 'totalOver'].includes(k)) bad(`return list "${l.id}": "${k}" is not a rule the programs know`);
+        for (const k of ['partyHasTaxId', 'betweenRegions']) if (w[k] !== undefined && typeof w[k] !== 'boolean') bad(`return list "${l.id}": ${k} must be true or false`);
+        if (w.totalOver !== undefined && !decimal(w.totalOver, c?.decimals ?? 3)) bad(`return list "${l.id}": totalOver must be an amount like 100000`);
+      }
+    }
+  }
+  if (t.summary !== undefined) {
+    const sm = t.summary;
+    if (!isObj(sm) || typeof sm.title !== 'string' || !sm.title.trim() || !Array.isArray(sm.blocks) || sm.blocks.length === 0) bad('"summary" needs a title and a list of blocks');
+    else {
+      const ids = new Set();
+      for (const b of sm.blocks) {
+        if (!isObj(b) || !/^[a-z0-9-]{1,24}$/.test(b.id ?? '') || typeof b.label !== 'string' || !b.label.trim()) { bad('every summary block needs an id (lower case letters, digits, dashes) and a label'); continue; }
+        if (ids.has(b.id)) bad(`summary block "${b.id}" is there twice`);
+        ids.add(b.id);
+        if (!['outward', 'inward'].includes(b.side)) bad(`summary block "${b.id}": side must be outward or inward`);
+        const w = b.when ?? {};
+        if (!isObj(w)) { bad(`summary block "${b.id}": "when" must be an object`); continue; }
+        for (const k of Object.keys(w)) if (!['rate', 'partyHasTaxId', 'betweenRegions'].includes(k)) bad(`summary block "${b.id}": "${k}" is not a rule the programs know`);
+        if (w.rate !== undefined && !['taxed', 'zero', 'exempt'].includes(w.rate)) bad(`summary block "${b.id}": rate must be taxed, zero or exempt`);
+        for (const k of ['partyHasTaxId', 'betweenRegions']) if (w[k] !== undefined && typeof w[k] !== 'boolean') bad(`summary block "${b.id}": ${k} must be true or false`);
+      }
+    }
+  }
   const inv = pack.invoice;
   if (!isObj(inv) || !inv.title || !Array.isArray(inv.requiredFields)) bad('"invoice" needs a title and requiredFields');
   if (!Array.isArray(pack.notes)) bad('"notes" must be a list');

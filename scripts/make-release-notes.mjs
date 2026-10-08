@@ -28,9 +28,11 @@ function readChangelog(repo, only = '') {
   const target = existsSync(file) ? file : existsSync(fallback) ? fallback : null;
   if (!target) return '';
   const text = readFileSync(target, 'utf8');
-  const m = /^##\s+[^\r\n]+[\r\n]+([\s\S]*?)(?=^##\s+|$)/m.exec(text);
+  // The newest entry is everything from the first "## " heading to the next one (or the end of the file). ("$" with the m flag stops at the end of the first line, which cut the list to its first heading.)
+  const m = /^##\s+[^\r\n]+[\r\n]+([\s\S]*?)(?=^##\s+|(?![\s\S]))/m.exec(text);
   if (!m) return '';
-  return `### What changed in this version (Change log)\n\n${m[0].trim()}\n\n`;
+  // Folded away, so that the table of what to download stays near the top of the page.
+  return `### What changed in this version (Change log)\n\n<details>\n<summary>Open the list</summary>\n\n${m[0].trim()}\n\n</details>\n\n`;
 }
 
 /** What each file that is not a program is, by its exact name. */

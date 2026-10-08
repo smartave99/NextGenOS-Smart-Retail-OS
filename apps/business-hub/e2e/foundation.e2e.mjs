@@ -121,6 +121,7 @@ try {
 
   // Switching the cashier off ends their session
   await page.getByRole('button', { name: 'Switch off' }).last().click();
+  await page.getByRole('button', { name: 'Switch on' }).waitFor();    // the Hub has done it (the click alone only sends the request), so the cashier's next move meets it
   await cashier.goto(hub.url + '/');
   await cashier.waitForURL(/\/login/);
   step('a person switched off is signed out at their next move');

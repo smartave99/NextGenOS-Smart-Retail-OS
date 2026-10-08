@@ -16,7 +16,7 @@ public class CoreTests
     {
         using var f = new HubFixture();
         Assert.NotNull(f.App.Db.Scalar("SELECT name FROM sqlite_master WHERE name = 'documents'"));
-        var again = HubApp.Open(f.App.Db.Path, f.Clock);
+        var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         // Every step of the database once, and only once: opening it again does not run a step twice.
         Assert.Equal(Enumerable.Range(1, HubDb.LatestVersion).Select(v => (long)v).ToArray(), again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
     }

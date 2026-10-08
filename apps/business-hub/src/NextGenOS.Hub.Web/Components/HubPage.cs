@@ -6,7 +6,7 @@ using NextGenOS.Hub.Web.Auth;
 namespace NextGenOS.Hub.Web.Components;
 
 /// <summary>What every screen needs: the shop, who is signed in, money and time as this country writes them, and one way to turn a refused action into a plain message.</summary>
-public abstract class HubPage : ComponentBase
+public abstract class HubPage : ComponentBase, IHandleEvent
 {
     [Inject] protected HubApp App { get; set; } = default!;
     [Inject] protected Session Sess { get; set; } = default!;
@@ -19,10 +19,46 @@ public abstract class HubPage : ComponentBase
 
     protected ShopContext Shop => App.Shop.Current;
 
+    /// <summary>
+    /// The screen opens, and everything it does while it starts (including reading and, for a few screens, a command such as making a bill from a quote) is done as the person signed
+    /// in. Who that is becomes known a moment later, so the scope asks <see cref="Me"/> each time.
+    /// </summary>
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        using var scope = App.Access.As(() => Me?.Id);
+        await base.SetParametersAsync(parameters);
+    }
+
     protected override async Task OnInitializedAsync()
     {
         Me = await Sess.GetAsync();
         await Reload();
+    }
+
+    /// <summary>
+    /// Every tap, click and key press on a screen is done on behalf of the person signed in here: the commands it starts are checked against that person's role by the Hub itself
+    /// (<see cref="NextGenOS.Hub.Security.Access"/>), not only by what the screen chooses to show. This does what the base class does for an event (draw the screen again after it),
+    /// with the person named for the time it runs.
+    /// </summary>
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem callback, object? arg)
+    {
+        using var scope = App.Access.As(() => Me?.Id);
+        var task = callback.InvokeAsync(arg);
+        var shouldAwait = task.Status != TaskStatus.RanToCompletion && task.Status != TaskStatus.Canceled;
+        StateHasChanged();
+        return shouldAwait ? DrawAgainWhenDone(task) : Task.CompletedTask;
+    }
+
+    private async Task DrawAgainWhenDone(Task task)
+    {
+        try { await task; }
+        catch
+        {
+            if (task.IsCanceled) return;
+            throw;
+        }
+
+        StateHasChanged();
     }
 
     /// <summary>Reads what the screen shows. Called once when it opens, and again by <see cref="Reload"/>.</summary>

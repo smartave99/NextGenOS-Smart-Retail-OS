@@ -842,6 +842,8 @@ Hub code read: `apps/business-hub/src/NextGenOS.Hub.Core/Documents/DocumentServi
 | T9 | Negative stock allowed with a warning switch | Allowed by default; refused when turned off | Similar. |
 | T10 | `StockMovement` can miss rows (2.3 step 6) | Every move is one row | Hub is right. |
 
+**What the Hub does about cost (8 October 2026, decision 36, `StockCostTests`).** The owner chose **average cost per item**, so the Hub values stock without lots: every move of stock carries its value (`stock_moves.value_minor`), the average is value divided by quantity, a sale takes its quantity at the average of that moment (the last unit takes what is left), goods brought back return at the cost they left at (T3, T7, and the cost meaning of H3 are settled this way: the old cost per lot becomes the item's average; stock value in the report is the sum of the moves). Lots, batches and expiry (T1, T2) are still a gap and are not built; the cost of a lot-tracked item uses the same average for now. Worked examples used as the Hub's tests: 10 at 100.00 then 10 at 120.00 hold 2,200.00 for 20 (average 110.00); selling 5 costs 550.00; 7 at 10.00 then 2 at 10.01 hold 90.02 for 9, selling 4 costs 40.01 (half-up of 40.0088) and the last 5 take the 50.01 that is left.
+
 **Test vectors for the Hub** after T1 is decided: S1, S2, S4 to S6, S10 to S14, S15 to S17. Before T1: S2 (`Adjust` -12 on 10 gives -2), S11 (a movement report over `stock_moves`), S12 with `cost_minor`.
 
 ## 8. Porting notes (order and traps)

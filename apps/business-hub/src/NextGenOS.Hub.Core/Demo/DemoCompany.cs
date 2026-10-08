@@ -36,7 +36,7 @@ public static class DemoCompany
     {
         var real = now ?? DateTimeOffset.UtcNow;
         var clock = new FixedClock(real.AddDays(-Math.Max(1, options.Days)));
-        var app = HubApp.Open(dbPath, clock);
+        var app = HubApp.OpenTrusted(dbPath, clock);
         return new Builder(app, clock, options, real).Run();
     }
 

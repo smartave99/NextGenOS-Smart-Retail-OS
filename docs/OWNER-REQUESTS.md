@@ -204,3 +204,19 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 > Show the tax, so the bill matches (Recommended)
 
 (Question: whether an estimate shows the tax. Decision 35.)
+
+### 2026-10-08 (about; sent with the file `NextGenOS_Developer_Engineering_Blueprint.pdf` attached, which is saved as `docs/NextGenOS_Developer_Engineering_Blueprint.pdf`; the working copy is `docs/ENGINEERING-BLUEPRINT.md`)
+
+> continue start from where stopped and read and save the attach file and execute it as and when best
+
+### 2026-10-08 (about; sent while the assistant was working on the blueprint tickets)
+
+> I hit my usage limit while you were working, but it has reset now. Please continue from where you left off.
+
+### 2026-10-08 (about; the owner's answer to the question "When the shop sells an item, what cost should the books use for it (this decides profit, and the value of the stock on the shelves)?", chosen from three readings. Decision 36)
+
+> Average cost (Recommended)
+
+### 2026-10-08 (about; sent again while the assistant was working)
+
+> I hit my usage limit while you were working, but it has reset now. Please continue from where you left off.

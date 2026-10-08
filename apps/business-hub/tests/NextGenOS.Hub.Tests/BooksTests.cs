@@ -103,7 +103,8 @@ public class BooksTests
         var received = f.App.Purchasing.Receive(po.Document.Id);
         var owed = received.Document.PayableMinor;
         Assert.Equal(owed, f.App.Books.SupplierBalance(supplier.Id));
-        Assert.Equal(1_000_000, Balance(f, "Purchases"));
+        Assert.Equal(1_000_000, Balance(f, "Stock on the shelves"));       // what was bought is on the shelf (decision 36) ...
+        Assert.Equal(0, Balance(f, "Purchases"));                          // ... and is a cost only when it is sold
         f.App.Purchasing.Pay(po.Document.Id, 400_000, "bank");
         Assert.Equal(owed - 400_000, f.App.Books.SupplierBalance(supplier.Id));
         Assert.Equal(-400_000, Balance(f, "Received by Bank"));           // money out of the bank
@@ -174,7 +175,7 @@ public class BooksTests
         var shopPath = f.App.Db.Path;
         f.App.Db.Rollback(6);                    // the books step (and the newer ones) is undone: the bills and payments stay
         Assert.Empty(f.App.Db.Query("SELECT name FROM sqlite_master WHERE name = 'journal_entries'", r => r.GetString(0)));
-        var again = HubApp.Open(shopPath, f.Clock);                     // forward again: opening the shop posts what was not posted
+        var again = HubApp.OpenTrusted(shopPath, f.Clock);                     // forward again: opening the shop posts what was not posted
         Assert.Equal(0, again.Books.CatchUp());
         Assert.Equal(before, again.Books.TrialBalance().Select(r => (r.Code, r.Name, r.DebitMinor, r.CreditMinor)).ToList());
         Assert.Equal(balanceBefore, again.Books.CustomerBalance(buyer.Id));
@@ -326,14 +327,15 @@ public class BooksTests
         f.App.Purchasing.Receive(po.Document.Id);
         f.App.Purchasing.Pay(po.Document.Id, 50_000, "bank");
         var buyer = f.App.Parties.Create(new PartyInput { Kind = "customer", Name = "Sharma Store", CreditLimitMinor = 10_000_000 });
-        f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, OnCredit = true, Lines = { Line("Rice", 20_000, 3000) }, Payments = { new PaymentInput { Method = "cash", AmountMinor = 30_000 } } });
+        f.App.Documents.Checkout(new CheckoutRequest { PartyId = buyer.Id, OnCredit = true, Lines = { new LineInput { ItemId = rice.Id, QtyMilli = 3000 } }, Payments = { new PaymentInput { Method = "cash", AmountMinor = 30_000 } } });
         var profit = f.App.Books.Profit(null, null);
         Assert.Equal(60_000, profit.IncomeMinor);                    // 3 x 200.00 sold, before tax
-        Assert.Equal(100_000, profit.CostsMinor);                    // 10 x 100.00 bought, before tax
-        Assert.Equal(-40_000, profit.NetMinor);                      // the stock still on the shelf is not counted yet, so this is a loss on paper
+        Assert.Equal(30_000, profit.CostsMinor);                     // the 3 sold cost 3 x 100.00; the other 7 are on the shelf, not a cost yet
+        Assert.Equal(30_000, profit.NetMinor);
         var position = f.App.Books.Position(null);
         Assert.Equal(position.AssetsMinor, position.LiabilitiesMinor + position.EquityMinor);
-        Assert.Equal(-40_000, position.ProfitSoFarMinor);
+        Assert.Equal(30_000, position.ProfitSoFarMinor);
+        Assert.Equal(70_000, position.Assets.Single(a => a.Name == "Stock on the shelves").AmountMinor);       // the other 7, at 100.00 each
         // a period that has nothing in it
         var none = f.App.Books.Profit(f.Clock.UtcNow.AddDays(10), f.Clock.UtcNow.AddDays(11));
         Assert.Equal(0, none.NetMinor);

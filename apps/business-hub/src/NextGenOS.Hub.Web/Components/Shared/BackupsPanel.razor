@@ -1,0 +1,144 @@
+@* Settings, "Backups": the shop's own copies, made every night to a second place the owner chooses (a USB drive, or another PC in the shop). For the owner only (the Hub checks it again itself).
+   Nothing here sends anything out of the shop. *@
+@inherits HubPage
+@using NextGenOS.Hub.Backups
+
+<section class="card" id="backups">
+    <h2>Backups</h2>
+    <Notice Error="@Error" Info="@Info" />
+    <p class="muted">Every night the shop copies all its data to a second place, so that it can be put back if this PC is lost, broken or its disk fails. Use a USB drive that stays plugged in, or a folder on another PC in the shop.</p>
+    <div class="notice @(status!.Overdue || status.LastFailed is not null ? "error" : "ok")" id="backup-status" role="status">@status.Summary</div>
+    @if (restoreNote is not null)
+    {
+        <div class="notice @(restoreNote.Done ? "ok" : "error")" id="restore-note" role="status">@restoreNote.Message@(restoreNote.KeptAs is null ? "" : " The shop as it was before is kept in: " + restoreNote.KeptAs)</div>
+    }
+    @if (pendingRestore)
+    {
+        <div class="notice error" id="restore-pending" role="status">A copy is ready to be put back. <strong>Close the program and open it again</strong> to finish. Until then nothing has changed.
+            <button type="button" class="btn ghost small" id="restore-cancel" @onclick="CancelRestore">Do not put it back</button></div>
+    }
+
+    <div class="stack">
+        <div class="field-row">
+            <div class="grow"><label for="backup-place">Where the copies go</label><input id="backup-place" @bind="folder" maxlength="400" placeholder="For example E:\Backups, or \\OTHER-PC\Backups" autocomplete="off" /></div>
+            <div><label for="backup-time">Time each night</label><input id="backup-time" type="time" value="@time" @onchange="e => time = e.Value?.ToString() ?? time" /></div>
+            <div><label for="backup-keep">Copies to keep</label><input id="backup-keep" type="number" min="1" max="365" @bind="keep" /></div>
+        </div>
+        <label class="check"><input type="checkbox" id="backup-on" @bind="enabled" /> Make a copy every night</label>
+        <div class="row">
+            <button type="button" class="btn primary" id="backup-save" @onclick="Save">Save</button>
+            <button type="button" class="btn secondary" id="backup-now" @onclick="BackUpNow" disabled="@busy">Back up now</button>
+        </div>
+        <p class="muted small">A copy holds everything in the shop, including customers' details. It is not scrambled yet, so keep the drive somewhere safe. Nothing is sent over the internet.</p>
+    </div>
+</section>
+
+<section class="card" id="backup-copies">
+    <h2>Copies in that place</h2>
+    @if (copies.Count == 0) { <div class="empty">There are no copies there yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl">
+            <thead><tr><th>Copy</th><th>Made</th><th class="num">Size</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var c in copies)
+            {
+                <tr>
+                    <td>@c.FileName</td><td>@When(c.Modified)</td><td class="num">@Size(c.SizeBytes)</td>
+                    <td class="right"><button type="button" class="btn ghost small" data-copy="@c.FileName" @onclick="() => Choose(c)">Put this copy back</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</section>
+
+@if (chosen is not null)
+{
+    <div class="sheet-back" @onclick="() => chosen = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Put a copy back" @onclick:stopPropagation="true">
+            <h2>Put this copy back?</h2>
+            <p>The shop will go back to how it was when <strong>@chosen.FileName</strong> was made (@When(chosen.Modified)). Anything sold or changed since then will not be in it.</p>
+            <p class="muted small">Nothing is thrown away: the shop as it is now is kept in a folder of its own, next to the shop's data. It happens the next time the program starts, after the copy has been checked again.</p>
+            <label class="check"><input type="checkbox" id="restore-understood" @bind="understood" /> I understand</label>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => chosen = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="restore-confirm" disabled="@(!understood)" @onclick="Stage">Get it ready</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private BackupStatus? status;
+    private IReadOnlyList<BackupFileInfo> copies = Array.Empty<BackupFileInfo>();
+    private RestoreOutcome? restoreNote;
+    private bool pendingRestore;
+    private string folder = "";
+    private string time = "02:00";
+    private int keep = 14;
+    private bool enabled;
+    private bool busy;
+    private bool understood;
+    private BackupFileInfo? chosen;
+
+    private string DataFolder => Path.GetDirectoryName(Path.GetFullPath(App.Db.Path))!;
+
+    protected override Task LoadAsync()
+    {
+        status = App.Backups.Status();
+        var settings = status.Settings;
+        folder = settings.Folder ?? "";
+        time = settings.TimeLocal;
+        keep = settings.Keep;
+        enabled = settings.Enabled;
+        copies = App.Backups.Copies();
+        restoreNote = PendingRestore.Last(DataFolder);
+        pendingRestore = PendingRestore.IsPending(DataFolder);
+        return Task.CompletedTask;
+    }
+
+    private string When(DateTimeOffset utc) => Shop.Time.ToLocal(utc).ToString("d MMM yyyy, HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Size(long bytes) => bytes >= 1_048_576 ? (bytes / 1_048_576d).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " MB" : Math.Max(1, bytes / 1024) + " KB";
+
+    private Task Save() => Run(async () =>
+    {
+        App.Backups.Save(new BackupSettings(enabled, folder, time, keep), Me.Id);
+        await Reload();
+    }, "Saved.");
+
+    private async Task BackUpNow()
+    {
+        busy = true;
+        await Run(async () =>
+        {
+            var run = await Task.Run(() => App.Backups.RunNow(BackupKinds.Manual, Me.Id));
+            await Reload();
+            if (!run.Good) throw new HubException("backup", run.Error ?? "The copy did not work.");
+        }, "A copy was made.");
+        busy = false;
+    }
+
+    private void Choose(BackupFileInfo copy)
+    {
+        chosen = copy;
+        understood = false;
+    }
+
+    private Task Stage() => Run(async () =>
+    {
+        if (chosen is null) return;
+        App.Backups.StageRestore(chosen.Path, Me.Id);
+        chosen = null;
+        await Reload();
+    }, "The copy is ready. Close the program and open it again to finish.");
+
+    private Task CancelRestore() => Run(async () =>
+    {
+        App.Backups.CancelRestore(Me.Id);
+        await Reload();
+    }, "Nothing will be put back.");
+}

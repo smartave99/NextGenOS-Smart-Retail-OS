@@ -41,9 +41,45 @@ public static class ExportEndpoint
                     app.Reports.TopCustomers(start, end, 1000).Select(c => (IReadOnlyList<object?>)new object?[] { c.Name, c.Documents, M(c.TotalMinor) }));
                 break;
             case "stock":
-                text = Csv.Build(new[] { "Item", "On hand", "Cost each", "Value" },
+                text = Csv.Build(new[] { "Item", "On hand", "Average cost each", "Value" },
                     app.Reports.StockValues().Select(s => (IReadOnlyList<object?>)new object?[] { s.Name, ShopContext.Qty(s.OnHandMilli), M(s.CostMinor), M(s.ValueMinor) }));
                 break;
+            case "register-sales" or "register-credits" or "register-purchases":
+            {
+                var kind = report["register-".Length..];
+                text = Csv.Build(new[] { "Number", "Date", "Name", shop.Country.Tax.BusinessId?.Label ?? "Tax number", shop.Country.Tax.Regions?.Label ?? "Place", "Before tax", "Tax parts", "Extra tax", "Tax", "Other", "Total" },
+                    app.TaxRegisters.Register(kind, start, end).Select(r => (IReadOnlyList<object?>)new object?[]
+                    {
+                        r.Number, r.Day.ToString("yyyy-MM-dd"), r.PartyName, r.PartyTaxId, r.PartyRegion, M(r.TaxableMinor), string.Join("; ", r.Parts.Select(p => p.Name + " " + M(p.AmountMinor))), M(r.ExtraTaxMinor), M(r.TaxMinor), M(r.OtherMinor), M(r.TotalMinor),
+                    }));
+                break;
+            }
+            case var list when list.StartsWith("list-", StringComparison.Ordinal):
+            {
+                var found = app.TaxRegisters.ReturnLists(start, end).FirstOrDefault(l => l.Id == list["list-".Length..]);
+                if (found is null) return Results.NotFound();
+                text = Csv.Build(new[] { "Number", "Date", "Name", shop.Country.Tax.BusinessId?.Label ?? "Tax number", shop.Country.Tax.Regions?.Label ?? "Place", "Before tax", "Tax parts", "Extra tax", "Tax", "Other", "Total" },
+                    found.Rows.Select(r => (IReadOnlyList<object?>)new object?[]
+                    {
+                        r.Number, r.Day.ToString("yyyy-MM-dd"), r.PartyName, r.PartyTaxId, r.PartyRegion, M(r.TaxableMinor), string.Join("; ", r.Parts.Select(p => p.Name + " " + M(p.AmountMinor))), M(r.ExtraTaxMinor), M(r.TaxMinor), M(r.OtherMinor), M(r.TotalMinor),
+                    }));
+                break;
+            }
+            case "summary":
+            {
+                var sum = app.TaxRegisters.SupplySummary(start, end);
+                text = Csv.Build(new[] { "Side", "Block", "Lines", "Before tax", "Tax parts", "Extra tax", "Tax" },
+                    sum.Blocks.Select(b => (IReadOnlyList<object?>)new object?[] { b.Side, b.Label, b.Lines, M(b.ValueMinor), string.Join("; ", b.Parts.Select(p => p.Name + " " + M(p.AmountMinor))), M(b.ExtraTaxMinor), M(b.TaxMinor) }));
+                break;
+            }
+            case "codes":
+            {
+                var codes = app.TaxRegisters.CodesSold(start, end);
+                var label = shop.Country.Tax.ItemCode?.Label ?? "Code";
+                text = Csv.Build(new[] { label, "Rate", "Quantity", "Before tax", "Tax parts", "Extra tax", "Tax" },
+                    codes.Rows.Select(r => (IReadOnlyList<object?>)new object?[] { r.Code, r.TaxLabel, ShopContext.Qty(r.QtyMilli), M(r.TaxableMinor), string.Join("; ", r.Parts.Select(p => p.Name + " " + M(p.AmountMinor))), M(r.ExtraTaxMinor), M(r.TaxMinor) }));
+                break;
+            }
             default:
                 return Results.NotFound();
         }

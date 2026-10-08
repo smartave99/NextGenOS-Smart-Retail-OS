@@ -404,6 +404,6 @@ public class OntologyMigrationTests
         Assert.Contains("ai_providers", tables);
         Assert.Equal(new long[] { 1, 2, 3 }, f.App.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
         Assert.Equal("Rice", f.App.Db.Scalar("SELECT name FROM items"));
-        Assert.Subset(Tables(HubApp.Open(f.App.Db.Path, f.Clock)).ToHashSet(), MapTables.ToHashSet());
+        Assert.Subset(Tables(HubApp.OpenTrusted(f.App.Db.Path, f.Clock)).ToHashSet(), MapTables.ToHashSet());
     }
 }

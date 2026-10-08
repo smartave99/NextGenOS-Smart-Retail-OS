@@ -14,12 +14,12 @@ const skip = process.platform === 'win32' ? 'a Linux test' : false;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** A package folder with a stand-in website: it answers 503 like a website with no licence, on the port it is given. */
-function pack(root) {
+function pack(root, info = { customer: 'luzon-fresh-mart', name: 'Luzon Fresh Mart', version: '1.2.3' }) {
   const dir = join(root, 'pkg');
   mkdirSync(join(dir, 'app'), { recursive: true });
   writeFileSync(join(dir, 'start-website.js'), LAUNCHER);
   copyFileSync(join(repo, 'scripts', 'lib', 'app-window.mjs'), join(dir, 'app-window.mjs'));
-  writeFileSync(join(dir, 'PACKAGE-INFO.json'), JSON.stringify({ customer: 'luzon-fresh-mart', name: 'Luzon Fresh Mart', version: '1.2.3' }));
+  writeFileSync(join(dir, 'PACKAGE-INFO.json'), JSON.stringify(info));
   writeFileSync(join(dir, 'app', 'server.js'), "require('http').createServer((req, res) => { res.statusCode = 503; res.end('not available ' + req.url); }).listen(Number(process.env.PORT), process.env.HOSTNAME);\n");
   return dir;
 }
@@ -74,6 +74,22 @@ test('as a program: the window is the browser it is told to use, opened at the w
     // the window is closed (the stand-in browser ends after seven seconds): the website stops
     assert.equal(await Promise.race([first.exited, wait(30_000).then(() => 'still running')]), 0, 'closing the window stops the website');
     assert.equal(existsSync(join(configOf(root), 'running.json')), false);
+  } finally { first.child.kill(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('THE website (the same for every customer, no customer in its package note) keeps its note in a folder called "website", not "undefined"', { skip, timeout: 60_000 }, async () => {
+  const root = mkdtempSync(join(tmpdir(), 'website-app-'));
+  const dir = pack(root, { generic: true, version: '1.2.3' });
+  const b = browser(root, `echo "$@" > "${join(root, 'asked.txt')}"\nsleep 5`);
+  const env = { NEXTGENOS_APP_BROWSER: b.file, PATH: `${b.bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
+  const first = start(dir, root, ['--app', '8198'], env);
+  try {
+    for (let i = 0; i < 100 && !existsSync(join(root, 'asked.txt')); i += 1) await wait(150);
+    const note = join(root, 'cfg', 'nextgenos-website', 'website', 'running.json');
+    assert.ok(existsSync(note), 'the note that it is running is in the folder "website" (the Windows check of the release workflow looks there)');
+    assert.equal(existsSync(join(root, 'cfg', 'nextgenos-website', 'undefined')), false);
+    assert.equal(JSON.parse(readFileSync(note, 'utf8')).pid, first.child.pid);
+    assert.equal(await Promise.race([first.exited, wait(30_000).then(() => 'still running')]), 0);
   } finally { first.child.kill(); rmSync(root, { recursive: true, force: true }); }
 });
 

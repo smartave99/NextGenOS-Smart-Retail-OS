@@ -60,6 +60,14 @@ namespace NextGenOS.Tax
         [JsonProperty("classes")] public Dictionary<string, string> Classes { get; set; }
         [JsonProperty("regions")] public RegionList Regions { get; set; }
         [JsonProperty("businessId")] public BusinessIdRule BusinessId { get; set; }
+        /// <summary>The code a line may carry for the goods or service sold, under the country's own name for it. Null: the country has none.</summary>
+        [JsonProperty("itemCode")] public NamedTaxField ItemCode { get; set; }
+        /// <summary>A further tax some items carry on top of the main one, as a percent set on the item, under the country's own name for it. Null: the country has none.</summary>
+        [JsonProperty("extraTax")] public NamedTaxField ExtraTax { get; set; }
+        /// <summary>The lists this country's tax returns are made from (which bills go in which list). Null: the country has none.</summary>
+        [JsonProperty("returns")] public ReturnRules Returns { get; set; }
+        /// <summary>The blocks of the summary of supplies a country's periodic return asks for (what was sold and bought, line by line). Null: the country has none.</summary>
+        [JsonProperty("summary")] public SummaryRules Summary { get; set; }
         [JsonProperty("customerDiscounts")] public List<CustomerDiscount> CustomerDiscounts { get; set; }
         [JsonProperty("rounding")] public RoundingRule Rounding { get; set; }
     }
@@ -94,6 +102,65 @@ namespace NextGenOS.Tax
         [JsonProperty("name")] public string Name { get; set; }
         [JsonProperty("percent")] public string Percent { get; set; }
         [JsonProperty("editable")] public bool Editable { get; set; }
+    }
+
+    /// <summary>The lists a country's tax returns are made from: each bill or credit note goes into the first list whose rule it meets.</summary>
+    public sealed class ReturnRules
+    {
+        [JsonProperty("title")] public string Title { get; set; }
+        [JsonProperty("lists")] public List<ReturnList> Lists { get; set; }
+    }
+
+    /// <summary>The blocks of a summary of supplies: each line of a bill, credit note or purchase goes in the first block of its side whose rule it meets.</summary>
+    public sealed class SummaryRules
+    {
+        [JsonProperty("title")] public string Title { get; set; }
+        [JsonProperty("blocks")] public List<SummaryBlock> Blocks { get; set; }
+    }
+
+    public sealed class SummaryBlock
+    {
+        [JsonProperty("id")] public string Id { get; set; }
+        [JsonProperty("label")] public string Label { get; set; }
+        /// <summary>"outward" (sales; credit notes are taken off) or "inward" (purchases).</summary>
+        [JsonProperty("side")] public string Side { get; set; }
+        [JsonProperty("when")] public SummaryWhen When { get; set; }
+    }
+
+    /// <summary>What a line must meet to go in a block. Everything named must be true; what is not named does not matter.</summary>
+    public sealed class SummaryWhen
+    {
+        /// <summary>"taxed" (the line has a rate above nothing), "zero" (taxable at nothing) or "exempt" (outside the tax).</summary>
+        [JsonProperty("rate")] public string Rate { get; set; }
+        [JsonProperty("partyHasTaxId")] public bool? PartyHasTaxId { get; set; }
+        [JsonProperty("betweenRegions")] public bool? BetweenRegions { get; set; }
+    }
+
+    public sealed class ReturnList
+    {
+        [JsonProperty("id")] public string Id { get; set; }
+        [JsonProperty("label")] public string Label { get; set; }
+        /// <summary>"bill" (a sale made out to the buyer) or "credit" (a credit note given to the buyer).</summary>
+        [JsonProperty("kind")] public string Kind { get; set; }
+        [JsonProperty("when")] public ReturnWhen When { get; set; }
+    }
+
+    /// <summary>What a document must meet to go in a list. Everything named must be true; what is not named does not matter.</summary>
+    public sealed class ReturnWhen
+    {
+        /// <summary>True: the buyer has a tax number on the bill. False: the buyer has none.</summary>
+        [JsonProperty("partyHasTaxId")] public bool? PartyHasTaxId { get; set; }
+        /// <summary>True: the buyer's place is not the seller's (an empty place counts as the seller's). False: it is the same.</summary>
+        [JsonProperty("betweenRegions")] public bool? BetweenRegions { get; set; }
+        /// <summary>The bill's total is more than this amount (a decimal in the currency, like "100000").</summary>
+        [JsonProperty("totalOver")] public string TotalOver { get; set; }
+    }
+
+    /// <summary>A field the country's tax asks for on an item or a line: the words for it, and a line of help.</summary>
+    public sealed class NamedTaxField
+    {
+        [JsonProperty("label")] public string Label { get; set; }
+        [JsonProperty("help")] public string Help { get; set; }
     }
 
     public sealed class BusinessIdRule

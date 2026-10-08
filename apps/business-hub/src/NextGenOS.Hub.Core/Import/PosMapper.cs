@@ -17,7 +17,7 @@ public sealed record ExistingState(
 public sealed record PlannedItem(string OldKey, ItemInput Input, bool Active, long StockMilli, bool MovesStock);
 
 /// <summary>A customer or supplier to add, with what they owed the shop on the day (negative: what the shop owed them).</summary>
-public sealed record PlannedParty(string Entity, string OldKey, PartyInput Input, long BalanceMinor);
+public sealed record PlannedParty(string Entity, string OldKey, PartyInput Input, long BalanceMinor, long DiscountPctMilli = 0);
 
 public sealed class ImportPlan
 {
@@ -113,7 +113,7 @@ public static class PosMapper
 
                 var attrs = new Dictionary<string, string>();
                 if (subById.TryGetValue(p.SubCategoryId ?? -1, out var sub) && T(sub.Name).Length > 0) attrs["subCategory"] = T(sub.Name);
-                if (T(p.HsnCode).Length > 0) attrs["hsn"] = T(p.HsnCode);
+                if (T(p.HsnCode).Length > 0) attrs[ItemAttrs.Code] = T(p.HsnCode);
                 var mrp = lot is not null && lot.Mrp > 0 ? lot.Mrp : p.Mrp;
                 if (mrp > 0 && TryScale(mrp, decimals, out var mrpMinor)) attrs["mrp"] = shop.Text(mrpMinor);
                 if (lot is not null) { if (T(lot.Size).Length > 0) attrs["size"] = T(lot.Size); if (T(lot.Colour).Length > 0) attrs["colour"] = T(lot.Colour); if (T(lot.Batch).Length > 0) attrs["batch"] = T(lot.Batch); }
@@ -128,7 +128,15 @@ public static class PosMapper
                 if (itemName.Length > 160) { notes.Add(FindingLevels.Look, "name-long", "{n} item name(s) were longer than the Hub allows and were cut short.", itemName); itemName = itemName[..160]; }
 
                 var taxClass = TaxClassFor(p, shop, notes, T(p.Name));
-                if (p.Cess > 0) notes.Add(FindingLevels.Look, "cess", "{n} item(s) carry an extra tax (cess) in the older program. The Hub does not keep it yet, so it was not moved.", name);
+                if (p.Cess > 0)
+                {
+                    if (shop.Country.Tax.ExtraTax is { } extra && p.Cess <= 100)
+                    {
+                        attrs[ItemAttrs.ExtraTax] = p.Cess.ToString("0.###", CultureInfo.InvariantCulture);
+                        notes.Add(FindingLevels.Info, "cess", "{n} item(s) carry an extra tax (" + extra.Label + ") in the older program. It was kept as the item's own extra tax.", name);
+                    }
+                    else notes.Add(FindingLevels.Look, "cess", "{n} item(s) carry an extra tax in the older program that this shop's country does not use (or that is above 100 percent), so it was not moved.", name);
+                }
                 CheckTaxMode(p, shop, notes, name);
                 if (lot is not null && ((lot.SPrice > 0 && lot.SPrice != p.SellingPrice) || (lot.WPrice > 0 && p.ReorderPoint > 0 && lot.WPrice != p.ReorderPoint)))
                     notes.Add(FindingLevels.Info, "price-differs", "{n} item(s) have a different price in the stock row than on the product. The stock row's price (the one the till used) was moved.", name);
@@ -209,8 +217,13 @@ public static class PosMapper
                 party.Notes = JoinNotes(party.Notes, "Credit limit: not enforced in the older program, so " + shop.Money(noLimitCeiling) + " was set here to keep credit sales working. Change it if you want a limit.");
                 notes.Add(FindingLevels.Look, "no-limit", "{n} customer(s) had no credit limit in the older program (they could owe any amount). The Hub has no \"no limit\" setting, so each was given a very high limit (" + shop.Money(noLimitCeiling) + "), and a note says so. Change it on the person's record if you want a real limit.", name);
             }
+            // The older program's fixed percent for a customer counts only when its switch says Yes; the Hub keeps it as the customer's own discount, given on every line.
+            long discountMilli = 0;
             if (T(c.DiscountSwitch).Equals("Yes", StringComparison.OrdinalIgnoreCase) && decimal.TryParse(T(c.DiscountPercent), NumberStyles.Number, CultureInfo.InvariantCulture, out var discount) && discount > 0)
-                notes.Add(FindingLevels.Look, "customer-discount", "{n} customer(s) had a fixed discount in the older program. The Hub has no customer discount yet, so it was not moved.", name);
+            {
+                if (discount <= 100) { discountMilli = (long)Math.Round(discount * 1000m, MidpointRounding.AwayFromZero); notes.Add(FindingLevels.Look, "customer-discount", "{n} customer(s) had a fixed discount in the older program. It was kept as the customer's own discount (People), given on every line.", name); }
+                else notes.Add(FindingLevels.Look, "customer-discount", "{n} customer(s) had a fixed discount above 100 percent in the older program. It does not make sense, so it was not moved.", name);
+            }
             var card = Real(c.CardNo);
             if (card is not null && !cards.Add(card)) { notes.Add(FindingLevels.Look, "card-twice", "{n} loyalty card number(s) were used twice. Only the first person kept it.", name + " (" + card + ")"); card = null; }
             party.CardBarcode = card;
@@ -224,7 +237,7 @@ public static class PosMapper
                 if (c.OpeningBalance != 0 && ledger.OpeningRows == 0) notes.Add(FindingLevels.Look, "opening-missing", "{n} person(s) have a typed opening balance that is not in the ledger. The ledger's total was moved, as the older program counts it.", name);
             }
             else if (c.OpeningBalance != 0) notes.Add(FindingLevels.Look, "opening-missing", "{n} person(s) have a typed opening balance that is not in the ledger. The ledger's total was moved, as the older program counts it.", name);
-            plan.Parties.Add(new PlannedParty("customer", key, party, balance));
+            plan.Parties.Add(new PlannedParty("customer", key, party, balance, discountMilli));
             addedCustomers++;
         }
 
@@ -422,7 +435,7 @@ public static class PosMapper
         foreach (var l in plan.Report.Lines) sb.Append(l.Key).Append('|').Append(l.Old).Append('|').Append(l.Added).Append('|').Append(l.Before).Append('|').Append(l.Skipped).Append('|').Append(l.Unexplained).Append('\n');
         foreach (var f in plan.Report.Findings) sb.Append(f.Level).Append('|').Append(f.Code).Append('|').Append(f.Count).Append('\n');
         foreach (var i in plan.Items) sb.Append("i|").Append(i.OldKey).Append('|').Append(i.Input.Name).Append('|').Append(i.Input.PriceMinor).Append('|').Append(i.StockMilli).Append('\n');
-        foreach (var p in plan.Parties) sb.Append("p|").Append(p.OldKey).Append('|').Append(p.Input.Name).Append('|').Append(p.BalanceMinor).Append('|').Append(p.Input.CreditLimitMinor).Append('\n');
+        foreach (var p in plan.Parties) sb.Append("p|").Append(p.OldKey).Append('|').Append(p.Input.Name).Append('|').Append(p.BalanceMinor).Append('|').Append(p.Input.CreditLimitMinor).Append('|').Append(p.DiscountPctMilli).Append('\n');
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())))[..24];
     }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Ai;
 
@@ -130,15 +131,15 @@ public sealed class AiGateway(ProviderService providers, FeatureFlagService flag
 /// </summary>
 public sealed class AiFoundation
 {
-    public AiFoundation(HubDb db, IClock clock, AuditService audit, string dataFolder, AiOptions? options = null)
+    public AiFoundation(HubDb db, IClock clock, AuditService audit, string dataFolder, Access access, AiOptions? options = null)
     {
         options ??= new AiOptions();
         Entitlements = options.Entitlements ?? new NoEntitlements();
         Secrets = options.Secrets ?? Ai.Secrets.Open(dataFolder);
         var factory = options.Factory ?? new ProviderFactory(Secrets);
-        Flags = new FeatureFlagService(db, clock, audit, Entitlements);
-        Providers = new ProviderService(db, clock, audit, Secrets, factory);
-        Models = new ModelRegistry(db, clock, audit);
+        Flags = new FeatureFlagService(db, clock, audit, Entitlements, access);
+        Providers = new ProviderService(db, clock, audit, Secrets, factory, access);
+        Models = new ModelRegistry(db, clock, audit, access);
         Usage = new UsageService(db, clock);
         Hardware = new HardwareService(options.Probe ?? new SystemHardwareProbe(), dataFolder, clock);
         Gateway = new AiGateway(Providers, Flags, Usage, factory);

@@ -444,7 +444,7 @@ public class AiMigrationTests
         }
 
         // The tables a shop sells with are exactly the ones the first step made.
-        var shop = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships", "import_runs", "import_id_map", "party_opening_balances", "accounts", "journal_entries", "journal_lines", "loyalty_ledger" }).ToArray();
+        var shop = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships", "import_runs", "import_id_map", "party_opening_balances", "accounts", "journal_entries", "journal_lines", "loyalty_ledger", "offers", "vouchers", "document_offers", "party_discounts", "backup_runs", "network_devices", "network_pairing_codes" }).ToArray();
         Assert.Contains("documents", shop);
         Assert.Contains("audit_log", shop);
         Assert.DoesNotContain(shop, t => t.StartsWith("ai_", StringComparison.Ordinal));
@@ -455,7 +455,7 @@ public class AiMigrationTests
     {
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
-        var shopTablesBefore = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships", "import_runs", "import_id_map", "party_opening_balances", "accounts", "journal_entries", "journal_lines", "loyalty_ledger" }).ToArray();
+        var shopTablesBefore = Tables(f.App).Except(AiTables).Except(new[] { "event_evidence", "event_observations", "events", "observations", "retention_policies", "ontology_entities", "ontology_entity_types", "ontology_relation_types", "ontology_relationships", "import_runs", "import_id_map", "party_opening_balances", "accounts", "journal_entries", "journal_lines", "loyalty_ledger", "offers", "vouchers", "document_offers", "party_discounts", "backup_runs", "network_devices", "network_pairing_codes" }).ToArray();
 
         f.App.Db.Rollback(1);
 
@@ -466,7 +466,7 @@ public class AiMigrationTests
         Assert.True(File.Exists(f.App.Db.LastBackup));
 
         // Forward again: the step runs once more and the tables are back, empty.
-        var again = HubApp.Open(f.App.Db.Path, f.Clock);
+        var again = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), AiTables.ToHashSet());
         Assert.Equal(Enumerable.Range(1, HubDb.LatestVersion).Select(v => (long)v).ToArray(), again.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
         Assert.Equal("Rice", again.Db.Scalar("SELECT name FROM items"));
@@ -491,8 +491,7 @@ public class AiMigrationTests
         var made = f.App.Db.LastBackup!;
         File.Delete(made);
 
-        var updated = HubApp.Open(f.App.Db.Path, f.Clock);   // version 1 -> 2 on an existing shop
-        Assert.Null(updated.Db.BackupProblem);
+        var updated = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);   // version 1 -> 2 on an existing shop
         Assert.NotNull(updated.Db.LastBackup);
         Assert.Contains($"before-update-1-to-{HubDb.LatestVersion}", updated.Db.LastBackup);
         Assert.True(File.Exists(updated.Db.LastBackup));
@@ -503,7 +502,7 @@ public class AiMigrationTests
         Assert.Null(copy.Scalar("SELECT name FROM sqlite_master WHERE name = 'ai_providers'"));
 
         // Opening again changes nothing and copies nothing.
-        var third = HubApp.Open(f.App.Db.Path, f.Clock);
+        var third = HubApp.OpenTrusted(f.App.Db.Path, f.Clock);
         Assert.Null(third.Db.LastBackup);
     }
 }

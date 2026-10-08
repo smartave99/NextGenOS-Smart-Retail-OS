@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Events;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Ontology;
 
@@ -23,7 +24,7 @@ public sealed record MapProblem(string What, long? RelationshipId);
 /// Connections that the shop's records already imply (a payment settles a bill, a bill has a line for a product) are worked out when asked and never stored twice.
 /// Reading needs nothing; adding needs the owner's switch "Business map" and the licence's "ai" part.
 /// </summary>
-public sealed partial class OntologyService(HubDb db, IClock clock, AuditService audit, FeatureFlagService flags)
+public sealed partial class OntologyService(HubDb db, IClock clock, AuditService audit, FeatureFlagService flags, Access access)
 {
     private const string Tenant = FeatureFlagService.Tenant;
     private const string Site = FeatureFlagService.Site;
@@ -62,6 +63,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
     /// <summary>A new kind of thing that exists only in the business map (a "loading bay", a "fridge").</summary>
     public EntityTypeDefinition AddEntityType(string name, string label, string dataClass, long? userId)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         EnsureCatalogue();
         var key = (name ?? "").Trim();
@@ -82,6 +84,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
     /// <summary>A new kind of connection between kinds of thing. It is stored (never worked out from the shop's records).</summary>
     public RelationTypeDefinition AddRelationType(string name, string label, IEnumerable<string> fromTypes, IEnumerable<string> toTypes, long? userId)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         var key = (name ?? "").Trim();
         if (!NamePattern().IsMatch(key)) throw new HubException("bad-type", "A kind of connection is a short lower-case word or two, such as 'faces' or 'next_to'.");
@@ -106,6 +109,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
     /// <summary>Adds a place or a device. The key is a short plain name; when none is given it is made from the name.</summary>
     public ThingView CreateThing(string type, string? key, string name, string? attributesJson, long? userId)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         var definition = EntityTypes().FirstOrDefault(x => x.Name == type) ?? throw new HubException("bad-type", "The map does not know a kind of thing called '" + type + "'.");
         if (definition.Kind != EntityKind.Native) throw new HubException("mapped-type", "A " + definition.Label.ToLowerInvariant() + " is a record the shop already has; it cannot be added here.");
@@ -126,6 +130,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
 
     public ThingView Rename(ThingRef thing, string name, long? userId)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         var words = EventRules.Words(name, 80, "name") ?? throw new HubException("bad-name", "Give it a name.");
         var changed = 0;
@@ -142,6 +147,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
     /// <summary>A place or device that is gone. It stays in the map, marked, with the history of its connections; every live connection to it ends now.</summary>
     public void Retire(ThingRef thing, long? userId)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         var now = Iso.Text(clock.UtcNow);
         db.InTransaction((c, t) =>
@@ -190,6 +196,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
 
     public Link Relate(string relation, ThingRef from, ThingRef to, long? userId, string? attributesJson = null, string source = "person")
     {
+        access.Require(Perm.Ai);
         RequireOn();
         if (source is not ("person" or "rule" or "system" or "import")) throw new HubException("bad-source", "Say who made the connection: a person, a rule, the program or an import.");
         var type = RelationTypes().FirstOrDefault(r => r.Name == relation) ?? throw new HubException("bad-type", "The map does not know a kind of connection called '" + relation + "'.");
@@ -228,6 +235,7 @@ public sealed partial class OntologyService(HubDb db, IClock clock, AuditService
     /// <summary>Ends a connection. It stays in the history, with the day it ended.</summary>
     public void Unrelate(long id, long? userId)
     {
+        access.Require(Perm.Ai);
         RequireOn();
         db.InTransaction((c, t) =>
         {

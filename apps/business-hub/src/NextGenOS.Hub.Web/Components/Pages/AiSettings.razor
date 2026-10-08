@@ -258,13 +258,13 @@
 
     private async Task Recheck() => await Run(async () => { caps = await Task.Run(() => App.Ai.Hardware.Refresh()); });
 
-    private async Task SetFlag(string key, bool on) { await Run(() => App.Ai.Flags.Set(key, on, Me.Id)); await Reload(); }
+    private async Task SetFlag(string key, bool on) { await Run(() => App.Ai.Flags.Set(key, on, Me.Id), on ? "Switched on." : "Switched off."); await Reload(); }
 
-    private async Task SetOn(string id, bool on) { await Run(() => App.Ai.Providers.SetEnabled(id, on, Me.Id)); await Reload(); }
+    private async Task SetOn(string id, bool on) { await Run(() => App.Ai.Providers.SetEnabled(id, on, Me.Id), on ? "Switched on." : "Switched off."); await Reload(); }
 
     private async Task SetConsent(string id, string cls, bool allow)
     {
-        await Run(() => { if (allow) App.Ai.Providers.Grant(id, cls, null, Me.Id); else App.Ai.Providers.Revoke(id, cls, Me.Id); });
+        await Run(() => { if (allow) App.Ai.Providers.Grant(id, cls, null, Me.Id); else App.Ai.Providers.Revoke(id, cls, Me.Id); }, allow ? "Allowed." : "Not allowed any more.");
         await Reload();
     }
 

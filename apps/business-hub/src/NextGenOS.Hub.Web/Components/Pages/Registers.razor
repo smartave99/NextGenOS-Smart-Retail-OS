@@ -1,0 +1,204 @@
+@page "/registers"
+@attribute [Authorize(Policy = Perm.Reports)]
+@inherits HubPage
+@using NextGenOS.Hub.Reports
+
+<PageTitle>@Shop.Country.Tax.Name registers</PageTitle>
+<h1>@Shop.Country.Tax.Name registers</h1>
+<p class="sub">Every bill, credit note and purchase as the tax books want it, read from what was stored when it was made. Cancelled bills are left out.@(Shop.Country.IsReviewed ? "" : " The tax rules of this country have not been checked by a local adviser: confirm the lists with your accountant.")</p>
+<Notice Error="@Error" />
+
+<div class="toolbar">
+    <div class="seg" role="group" aria-label="Period">
+        @foreach (var (key, label) in Presets)
+        {
+            <button type="button" class="@(preset == key ? "on" : "")" aria-pressed="@(preset == key)" @onclick="() => Pick(key)">@label</button>
+        }
+    </div>
+    <label class="sr" for="g-from">From</label>
+    <input id="g-from" class="date" type="date" value="@from.ToString("yyyy-MM-dd")" @onchange="e => SetFrom(e.Value?.ToString())" />
+    <label class="sr" for="g-to">To</label>
+    <input id="g-to" class="date" type="date" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" />
+</div>
+
+<div class="tabs" role="tablist" id="register-tabs">
+    <button type="button" role="tab" class="@(tab == "sales" ? "on" : "")" aria-selected="@(tab == "sales")" @onclick='() => Open("sales")'>Sales</button>
+    <button type="button" role="tab" class="@(tab == "credits" ? "on" : "")" aria-selected="@(tab == "credits")" @onclick='() => Open("credits")'>Credit notes</button>
+    @if (Shop.Features.Purchases)
+    {
+        <button type="button" role="tab" class="@(tab == "purchases" ? "on" : "")" aria-selected="@(tab == "purchases")" @onclick='() => Open("purchases")'>Purchases</button>
+    }
+    @foreach (var l in lists)
+    {
+        <button type="button" role="tab" class="@(tab == "list-" + l.Id ? "on" : "")" aria-selected="@(tab == "list-" + l.Id)" @onclick='() => Open("list-" + l.Id)'>@ShortName(l) <span class="chip">@l.Rows.Count</span></button>
+    }
+    @if (App.TaxRegisters.HasSupplySummary)
+    {
+        <button type="button" role="tab" class="@(tab == "summary" ? "on" : "")" aria-selected="@(tab == "summary")" @onclick='() => Open("summary")'>Summary</button>
+    }
+    @if (Shop.Country.Tax.ItemCode is { } codeRule)
+    {
+        <button type="button" role="tab" class="@(tab == "codes" ? "on" : "")" aria-selected="@(tab == "codes")" @onclick='() => Open("codes")'>@codeRule.Label</button>
+    }
+</div>
+
+@if (tab == "summary")
+{
+    <section class="card" id="register-summary">
+        <div class="head"><h2>@Shop.Country.Tax.Summary!.Title</h2><a class="btn ghost small" href="export/summary.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        <p class="muted small">Worked line by line from what was stored. Credit notes are taken off. Cancelled bills are left out.</p>
+        @if (summary.UnplacedLines > 0)
+        {
+            <div class="notice error" id="summary-unplaced">@summary.UnplacedLines @(summary.UnplacedLines == 1 ? "line fits" : "lines fit") none of the blocks below, so @(summary.UnplacedLines == 1 ? "it is" : "they are") not counted. Ask your accountant which block @(summary.UnplacedLines == 1 ? "it belongs" : "they belong") in.</div>
+        }
+        @foreach (var side in new[] { "outward", "inward" })
+        {
+            var blocks = summary.Blocks.Where(b => b.Side == side).ToList();
+            if (blocks.Count == 0) { continue; }
+            <h3>@(side == "outward" ? "Sales" : "Purchases")</h3>
+            <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>Block</th><th class="num">Lines</th><th class="num">Before tax</th><th>Tax parts</th><th class="num">Tax</th></tr></thead>
+                <tbody>
+                @foreach (var b in blocks)
+                {
+                    <tr data-block="@b.Id"><td>@b.Label</td><td class="num">@b.Lines</td><td class="num">@Money(b.ValueMinor)</td><td>@PartsText(b.Parts, b.ExtraTaxMinor)</td><td class="num">@Money(b.TaxMinor)</td></tr>
+                }
+                </tbody>
+                <tfoot><tr><th>Together</th><th class="num">@blocks.Sum(b => b.Lines)</th><th class="num">@Money(blocks.Sum(b => b.ValueMinor))</th><th></th><th class="num">@Money(blocks.Sum(b => b.TaxMinor))</th></tr></tfoot>
+            </table>
+            </div>
+        }
+    </section>
+}
+else if (tab == "codes")
+{
+    <section class="card" id="register-codes">
+        <div class="head"><h2>What was sold, by @(Shop.Country.Tax.ItemCode?.Label ?? "code") and rate</h2><a class="btn ghost small" href="export/codes.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        <p class="muted small">One row for the whole period. Credit notes are taken off.</p>
+        @if (codes.LinesWithoutCode > 0)
+        {
+            <div class="notice error" id="codes-missing">@codes.LinesWithoutCode @(codes.LinesWithoutCode == 1 ? "line has" : "lines have") no @(Shop.Country.Tax.ItemCode?.Label ?? "code"), so @(codes.LinesWithoutCode == 1 ? "it is" : "they are") not in this list. Put the code on the @Shop.Plural("item").ToLowerInvariant().</div>
+        }
+        @if (codes.Rows.Count == 0) { <div class="empty">Nothing with a code was sold in these days.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>@Shop.Country.Tax.ItemCode!.Label</th><th>Rate</th><th class="num">Quantity</th><th class="num">Before tax</th><th>Tax parts</th><th class="num">Tax</th></tr></thead>
+                <tbody>
+                @foreach (var r in codes.Rows)
+                {
+                    <tr><td>@r.Code</td><td>@r.TaxLabel</td><td class="num">@Qty(r.QtyMilli)</td><td class="num">@Money(r.TaxableMinor)</td><td>@PartsText(r.Parts, r.ExtraTaxMinor)</td><td class="num">@Money(r.TaxMinor)</td></tr>
+                }
+                </tbody></table>
+            </div>
+        }
+    </section>
+}
+else
+{
+    <section class="card" id="register-table">
+        <div class="head"><h2>@Heading</h2><a class="btn ghost small" href="export/@(tab.StartsWith("list-") ? tab : "register-" + tab).csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        @if (rows.Count == 0) { <div class="empty">Nothing in these days.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Number</th><th>Date</th><th>Name</th><th>@(Shop.Country.Tax.BusinessId?.Label ?? "Tax number")</th>
+                        <th class="num">Before tax</th><th>Tax parts</th><th class="num">Tax</th><th class="num" title="Round-off, fees and anything else in the total that is not goods or tax">Other</th><th class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td>@r.Number</td><td>@r.Day.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</td><td>@r.PartyName</td><td>@r.PartyTaxId</td>
+                        <td class="num">@Money(r.TaxableMinor)</td><td>@PartsText(r.Parts, r.ExtraTaxMinor)</td><td class="num">@Money(r.TaxMinor)</td><td class="num">@(r.OtherMinor == 0 ? "" : Money(r.OtherMinor))</td><td class="num">@Money(r.TotalMinor)</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="4">@rows.Count @(rows.Count == 1 ? "document" : "documents")</th><th class="num">@Money(rows.Sum(r => r.TaxableMinor))</th><th></th><th class="num">@Money(rows.Sum(r => r.TaxMinor))</th><th class="num">@Money(rows.Sum(r => r.OtherMinor))</th><th class="num">@Money(rows.Sum(r => r.TotalMinor))</th></tr>
+                </tfoot>
+            </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Presets = { ("month", "This month"), ("lastmonth", "Last month"), ("year", "This financial year") };
+
+    private string preset = "month";
+    private string tab = "sales";
+    private DateOnly from, to;
+    private IReadOnlyList<RegisterRow> rows = Array.Empty<RegisterRow>();
+    private IReadOnlyList<ReturnListResult> lists = Array.Empty<ReturnListResult>();
+    private CodeSummary codes = new(Array.Empty<CodeSummaryRow>(), 0);
+    private SupplySummary summary = new(Array.Empty<SummaryBlockResult>(), 0);
+
+    private string Heading => tab switch
+    {
+        "sales" => "Bills to customers",
+        "credits" => "Credit notes given",
+        "purchases" => "Purchases",
+        _ => lists.FirstOrDefault(l => "list-" + l.Id == tab)?.Label ?? "",
+    };
+
+    /// <summary>The first words of a list's label, up to the colon ("B2B: bills to ..." is shown as "B2B").</summary>
+    private static string ShortName(ReturnListResult l) => l.Label.Contains(':') ? l.Label[..l.Label.IndexOf(':')] : l.Label;
+
+    private string PartsText(IReadOnlyList<(string Name, long AmountMinor)> parts, long extra) =>
+        string.Join(", ", parts.Select(p => p.Name + " " + Money(p.AmountMinor)).Concat(extra != 0 ? new[] { (Shop.Country.Tax.ExtraTax?.Label ?? "Extra tax") + " " + Money(extra) } : Array.Empty<string>()));
+
+    protected override Task LoadAsync()
+    {
+        Pick(preset);
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string key)
+    {
+        preset = key;
+        var firstOfMonth = new DateOnly(Today.Year, Today.Month, 1);
+        (from, to) = key switch
+        {
+            "lastmonth" => (firstOfMonth.AddMonths(-1), firstOfMonth.AddDays(-1)),
+            "year" => (Shop.YearStart(Today), Today),
+            _ => (firstOfMonth, Today),
+        };
+        Read();
+    }
+
+    private void SetFrom(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { from = d; if (to < from) to = from; preset = ""; Read(); }
+    }
+
+    private void SetTo(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Read(); }
+    }
+
+    private void Open(string next)
+    {
+        tab = next;
+        Read();
+    }
+
+    private void Read()
+    {
+        var r = App.TaxRegisters;
+        lists = r.HasReturnLists ? r.ReturnLists(from, to) : Array.Empty<ReturnListResult>();
+        if (tab.StartsWith("list-", StringComparison.Ordinal) && lists.All(l => "list-" + l.Id != tab)) tab = "sales";
+        if (tab == "summary" && !r.HasSupplySummary) tab = "sales";
+        if (tab == "summary") summary = r.SupplySummary(from, to);
+        else if (tab == "codes") codes = r.CodesSold(from, to);
+        else rows = tab switch
+        {
+            "sales" or "credits" or "purchases" => r.Register(tab, from, to),
+            _ => lists.First(l => "list-" + l.Id == tab).Rows,
+        };
+    }
+}

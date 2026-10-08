@@ -44,7 +44,7 @@ try {
   await page.locator('.item-btn', { hasText: 'Cappuccino' }).click();
   await page.locator('.item-btn', { hasText: 'Cappuccino' }).click();
   await page.locator('.item-btn', { hasText: 'Butter croissant' }).click();
-  await page.locator('.line', { hasText: 'Cappuccino' }).waitFor();
+  await page.locator('.line', { hasText: '2 × Cappuccino' }).waitFor();    // each tap is a round trip to the Hub: wait until the second one shows, do not read the line straight after the click
   assert.match(await page.locator('.line', { hasText: 'Cappuccino' }).innerText(), /2 × Cappuccino/);
   await page.getByLabel('Note for Espresso').fill('Extra hot');
   await page.getByLabel('Note for Espresso').press('Tab');

@@ -6,6 +6,10 @@
 <h1>Today</h1>
 <p class="sub">@Shop.Time.ToLocal(App.Clock.UtcNow).ToString("dddd d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) · @Shop.Settings.Name</p>
 <Notice Error="@Error" />
+@if (backup is { } b && (b.Overdue || b.LastFailed is not null || !b.Settings.Enabled))
+{
+    <div class="notice @(b.Settings.Enabled ? "error" : "ok")" id="backup-banner" role="status">@b.Summary <a href="settings">Settings, Backups</a></div>
+}
 
 <div class="grid">
     @if (Me.Can(Perm.Reports) || Me.Can(Perm.Sell))
@@ -105,6 +109,7 @@
 
 @code {
     private SalesSummary? today;
+    private NextGenOS.Hub.Backups.BackupStatus? backup;
     private IReadOnlyList<Restaurant.FloorTable> floor = Array.Empty<Restaurant.FloorTable>();
     private int tickets, overdue, openLoans, projects, bookings;
     private long owed;
@@ -113,6 +118,7 @@
     protected override Task LoadAsync()
     {
         var f = Shop.Features;
+        if (Me.Can(Perm.Settings)) backup = App.Backups.Status();   // the owner is told when copies are not being made, or the last one did not work
         if (Me.Can(Perm.Reports) || Me.Can(Perm.Sell)) today = App.Reports.Summary(Today, Today);
         if (f.Tables) floor = App.Restaurant.Floor();
         if (f.Kitchen) tickets = App.Restaurant.Tickets().Count(t => t.Status != "served");

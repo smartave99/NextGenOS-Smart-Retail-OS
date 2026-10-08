@@ -124,7 +124,10 @@ function checkNames() {
 
 function runCmd(name, cmd, cmdArgs, opts = {}) {
   const r = sh(cmd, cmdArgs, opts);
-  return r.status === 0 ? { status: 'PASS', detail: tail(r, 3), out: `${r.stdout}${r.stderr}` } : { status: 'FAIL', detail: tail(r, 30), out: `${r.stdout}${r.stderr}` };
+  const out = `${r.stdout}${r.stderr}`;
+  if (r.status === 0) return { status: 'PASS', detail: tail(r, 3), out };
+  const failed = failedTests(out);
+  return { status: 'FAIL', detail: (failed.length ? failed.join('\n') + '\n--- the end of the output ---\n' : '') + tail(r, 30), out };
 }
 
 const needs = (tool, fn) => (has(tool) ? fn() : { status: 'SKIP', detail: `${tool} is not installed here` });
@@ -173,6 +176,7 @@ const checks = [
 
 // Registered by other parts of the repository as they are added (kept in scripts/checks/*.mjs).
 import { readdirSync } from 'node:fs';
+import { failedTests } from './lib/failed-tests.mjs';
 const extraDir = join(root, 'scripts', 'checks');
 if (existsSync(extraDir)) {
   for (const f of readdirSync(extraDir).filter((x) => x.endsWith('.mjs')).sort()) {

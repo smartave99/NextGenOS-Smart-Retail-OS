@@ -219,7 +219,7 @@ public class LoyaltyTests
         void Run(string sql) { using var c = f.App.Db.Open(); HubDb.Exec(c, sql); }
         Assert.ThrowsAny<Exception>(() => Run("UPDATE loyalty_ledger SET points_cent = 99999"));
         Assert.ThrowsAny<Exception>(() => Run("DELETE FROM loyalty_ledger"));
-        f.App.Db.Rollback(HubDb.LatestVersion - 1);
+        f.App.Db.Rollback(7);                     // the points step (008) and the newer ones are undone
         Assert.Empty(f.App.Db.Query("SELECT name FROM sqlite_master WHERE name = 'loyalty_ledger'", r => r.GetString(0)));
         Assert.DoesNotContain("loyalty_discount_minor", f.App.Db.Query("SELECT name FROM pragma_table_info('documents')", r => r.GetString(0)));
         Assert.NotEqual(0L, Convert.ToInt64(f.App.Db.Scalar("SELECT COUNT(*) FROM documents")));

@@ -8,6 +8,7 @@ using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Web.Auth;
 using NextGenOS.Hub.Web.Components;
+using NextGenOS.Hub.Web.Counters;
 using NextGenOS.Licensing.AspNetCore;
 
 namespace NextGenOS.Hub.Web;
@@ -57,7 +58,23 @@ public static class HubHost
         var services = builder.Services;
 
         // The AI parts of the Hub are allowed only when the signed licence has the "ai" module (and they are all off until the owner switches them on).
-        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>()))));
+        // Hub:BackupFolder is where the copy made before an update goes (a second disk is best); without it the copy is made next to the shop's file.
+        var backupFolder = builder.Configuration["Hub:BackupFolder"];
+        var shopFile = Path.Combine(folder, "shop.db");
+        // Counter PCs on the shop's own network: off unless the owner chose it. Off, nothing is added and the Hub listens on this PC only, as it always did.
+        var network = StoreNetworkHost.Add(builder, folder);
+        services.AddSingleton(sp =>
+        {
+            // A copy the owner chose to put back (Settings, Backups, or the first screen of a PC with no shop) is put in place now, before the shop is opened: the running shop cannot swap its own file.
+            var restored = NextGenOS.Hub.Backups.PendingRestore.ApplyIfPending(folder, shopFile);
+            // The licence's number of PCs limits the counter PCs (the main PC counts as one); like the modules it is handed over as a function.
+            var licence = sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>();
+            var app = HubApp.Open(shopFile, ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(licence)), backupFolder: backupFolder,
+                network: new NextGenOS.Hub.Counters.NetworkOptions(network, LicenceEntitlements.DeviceLimit(licence)));
+            StoreNetworkHost.Connect(app, sp.GetRequiredService<ConnectionTracker>());
+            if (restored is not null) app.Audit.Log(null, restored.Done ? "restore" : "restore-failed", "backup", null, restored.Message);
+            return app;
+        });
 
         // The sign-in cookie is protected with keys kept in the data folder (and, on Windows, locked to this PC), so a restart does not sign everyone out.
         var protection = services.AddDataProtection().SetApplicationName("NextGenOS.Hub").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(folder, "keys")));
@@ -124,16 +141,21 @@ public static class HubHost
 
     public static void UseHub(WebApplication app)
     {
-        // First of all: nothing is served, not even a static file, without a usable licence.
+        // Before even the licence page: a computer on the shop's network that was not paired with this shop gets one plain refusal and nothing else (it must not see the licence
+        // page, or be able to type a licence key). Requests from this PC itself pass straight through, untouched.
+        app.UseStoreNetworkGate();
+        // Then: nothing is served, not even a static file, without a usable licence.
         app.UseLicenceGate();
         app.Use(SecurityHeaders);
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
+        app.Use(ShopMustOpen);
         app.UseAuthentication();
         app.Use(SetupFirst);
         app.UseAuthorization();
         app.UseAntiforgery();
         app.MapStaticAssets().AllowAnonymous();
 
+        StoreNetworkEndpoints.Map(app);
         app.MapGet("/health", () => Results.Text("ok")).AllowAnonymous();
         app.MapGet("/tokens.css", (HttpContext http) =>
         {
@@ -169,6 +191,13 @@ public static class HubHost
     /// <summary>Headers on every answer: nothing from another site runs, the page cannot be framed, and nothing is guessed about file types.</summary>
     private static Task SecurityHeaders(HttpContext context, RequestDelegate next)
     {
+        ApplySecurityHeaders(context);
+        return next(context);
+    }
+
+    /// <summary>The headers above, set on one answer (also used by the pages that are answered before this step, for computers that are not paired).</summary>
+    internal static void ApplySecurityHeaders(HttpContext context)
+    {
         var h = context.Response.Headers;
         h["X-Content-Type-Options"] = "nosniff";
         h["X-Frame-Options"] = "DENY";
@@ -176,7 +205,34 @@ public static class HubHost
         h["Cross-Origin-Opener-Policy"] = "same-origin";
         h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(), payment=()";
         h.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
-        return next(context);
+    }
+
+    /// <summary>
+    /// If the shop cannot be opened because an update could not make its safe copy first, every request gets one plain page that says so and what to check (the shop's data has not been
+    /// touched). The page is built here, without the shop: the usual error page is drawn with the shop's own look and would need the shop to open, which is what failed.
+    /// </summary>
+    private static async Task ShopMustOpen(HttpContext context, RequestDelegate next)
+    {
+        try
+        {
+            _ = context.RequestServices.GetRequiredService<HubApp>();
+        }
+        catch (HubException e) when (e.Code == "backup")
+        {
+            var response = context.Response;
+            response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            response.Headers.CacheControl = "no-store";
+            response.Headers["Retry-After"] = "600";
+            response.ContentType = "text/html; charset=utf-8";
+            await response.WriteAsync(
+                "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>The update has not started</title></head>" +
+                "<body style=\"font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.5\"><h1>The update has not started</h1>" +
+                "<p id=\"update-reason\">" + System.Net.WebUtility.HtmlEncode(e.Message) + "</p>" +
+                "<p>Nothing was lost. When this is put right, open the program again.</p></body></html>");
+            return;
+        }
+
+        await next(context);
     }
 
     /// <summary>Until the shop is set up, every page goes to the setup; afterwards the setup page is closed for good.</summary>

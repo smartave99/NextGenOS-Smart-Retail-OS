@@ -110,6 +110,12 @@ label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; f
 .disc-in { width: 100%; min-height: 34px; padding: 4px 8px; }
 .discount-row { align-items: center; margin-top: 6px; }
 .discount-row .disc-in { width: 9em; }
+.free-goods .amt { color: var(--ngos-ok); }
+.offers { margin: 8px 0; }
+.offer-row .btn { margin-left: 6px; }
+.code-row { align-items: center; margin-top: 6px; }
+.code-row .disc-in { width: 12em; text-transform: uppercase; }
+.codes-made { font-variant-numeric: tabular-nums; letter-spacing: .06em; font-weight: 600; }
 .qty { width: 74px; min-height: 34px; padding: 4px 8px; text-align: center; }
 .qbtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--ngos-line-strong); background: var(--ngos-surface); color: var(--ngos-text); font: inherit; font-size: 1.1rem; cursor: pointer; }
 .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-variant-numeric: tabular-nums; }

@@ -10,7 +10,7 @@ public static class Permissions
     public static readonly IReadOnlyList<string> All = new[]
     {
         Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock,
-        Perm.Purchases, Perm.Reports, Perm.Void, Perm.Settings, Perm.Users, Perm.Ai,
+        Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount, Perm.Settings, Perm.Users, Perm.Ai, Perm.Network,
     };
 }
 

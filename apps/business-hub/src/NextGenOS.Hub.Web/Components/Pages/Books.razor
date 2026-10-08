@@ -26,7 +26,7 @@
     <div class="card stat"><span class="label">Went out</span><span class="value" id="b-costs">@Money(profit.CostsMinor)</span><span class="note">what was bought and other costs</span></div>
     <div class="card stat"><span class="label">Left over</span><span class="value" id="b-net">@Money(profit.NetMinor)</span><span class="note">@(profit.NetMinor < 0 ? "more went out than came in" : "")</span></div>
 </div>
-<p class="muted small">Things bought are counted as costs on the day they are bought. The value of what is still on the shelf is not counted yet, so "left over" is not the final word on profit.</p>
+<p class="muted small">What goods cost is counted on the day they are sold, at the average of what was paid for them. Goods bought and still on the shelf are not a cost yet: they are in "Stock on the shelves". Other things bought (not kept in stock) are counted as costs on the day they are bought.</p>
 
 <div class="cols">
     <section class="card">

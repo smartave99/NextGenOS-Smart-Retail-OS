@@ -16,7 +16,7 @@ public class ThemeTests : IDisposable
     {
         Directory.CreateDirectory(folder);
         path = Path.Combine(folder, "shop.db");
-        app = HubApp.Open(path);
+        app = HubApp.OpenTrusted(path);
     }
 
     public void Dispose()
@@ -82,7 +82,7 @@ public class ThemeTests : IDisposable
     {
         var store = LocalThemeStore.Over(app);
         store.Save(new ThemeSettings { Density = "touch", Nav = "weird", FontScale = 1.12, Shape = "pill", Cart = "left" }, null);
-        var again = LocalThemeStore.Over(HubApp.Open(path)).Current;
+        var again = LocalThemeStore.Over(HubApp.OpenTrusted(path)).Current;
         Assert.Equal("touch", again.Density);
         Assert.Null(again.Nav);                         // a value that is not in the list is not kept
         Assert.Equal(1.1, again.FontScale!.Value, 6);   // rounded

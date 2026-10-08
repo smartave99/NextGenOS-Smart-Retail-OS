@@ -1,7 +1,7 @@
 // Starts the Hub on a fresh data folder for a browser test, and gives back what the test needs. The Hub is started with a stand-in for the licence
 // (tests/NextGenOS.Hub.E2EHost); the real licence check is tested in the licensing library and the gate tests.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,12 +16,14 @@ export function build() {
   if (r.status !== 0) { console.error(r.stdout, r.stderr); process.exit(1); }
 }
 
-async function freePort() {
+export async function freePort() {
   return new Promise((res) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); });
 }
 
-export async function startHub(extraArgs = []) {
+/** `files` are put in the data folder before the Hub starts (for example network.json, which the Hub reads before it opens its doors): { 'name': 'text' }. */
+export async function startHub(extraArgs = [], { files = {} } = {}) {
   const data = mkdtempSync(join(tmpdir(), 'hub-e2e-'));
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(data, name), text);
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const dll = process.env.HUB_HOST_DLL || join(host, 'bin', 'Release', 'net10.0', 'NextGenOS.Hub.E2EHost.dll');
@@ -41,9 +43,9 @@ export async function startHub(extraArgs = []) {
   };
 }
 
-export async function launch(args = []) {
+export async function launch(args = [], options = {}) {
   const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ args });
+  const browser = await chromium.launch({ args, ...options });
   return browser;
 }
 

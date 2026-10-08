@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Shop;
 
@@ -24,6 +25,8 @@ public sealed class ShopSettings
     /// <summary>The biggest discount a cashier may give at the till, as a percent of the bill in thousandths (5000 = 5%). 0 means none; owners and managers have no limit.</summary>
     public long CashierDiscountPctMilli { get; set; }
     public string ReceiptFooter { get; set; } = "Thank you!";
+    /// <summary>The words printed on a bill that earns a gift voucher: {code}, {amount} and {valid} (the days it can be used) are filled in. The starting words say nothing about the shop.</summary>
+    public string GiftVoucherText { get; set; } = "Gift voucher {code} worth {amount}. Show this code on your next visit. Valid {valid}.";
     /// <summary>Loyalty points (decision 31). Off until the owner turns them on in Settings; the starting words and numbers below are neutral (nothing is earned until a value is set).</summary>
     public bool LoyaltyOn { get; set; }
     /// <summary>What an item earns when it has no setting of its own: "none", "per" (a percent of what the line comes to, before tax) or "point" (points for each unit sold).</summary>
@@ -49,7 +52,7 @@ public sealed class ShopSettings
 }
 
 /// <summary>Settings kept in the database as key/value rows.</summary>
-public sealed class SettingsStore(HubDb db)
+public sealed class SettingsStore(HubDb db, Access access)
 {
     private const string Key = "shop";
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = false, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -62,12 +65,16 @@ public sealed class SettingsStore(HubDb db)
 
     public void Save(ShopSettings settings)
     {
+        access.Require(Perm.Settings);
         var text = JsonSerializer.Serialize(settings, Json);
         db.InTransaction((c, t) => HubDb.Exec(c, "INSERT INTO settings(key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", t, ("$k", Key), ("$v", text)));
     }
 
     public string? GetText(string key) => db.Scalar("SELECT value FROM settings WHERE key = $k", ("$k", key)) as string;
 
-    public void SetText(string key, string value) =>
+    public void SetText(string key, string value)
+    {
+        access.Require(Perm.Settings);
         db.InTransaction((c, t) => HubDb.Exec(c, "INSERT INTO settings(key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", t, ("$k", key), ("$v", value)));
+    }
 }

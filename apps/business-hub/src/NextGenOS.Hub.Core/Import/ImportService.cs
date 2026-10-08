@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Shop;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Import;
 
@@ -15,7 +16,7 @@ namespace NextGenOS.Hub.Import;
 /// is done before the import so that the import needs no connection to the old system at all.
 /// This class does not check who is asking: the screen does (the owner only), as for every service in the Hub.
 /// </summary>
-public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, CatalogService catalog, PartyService parties)
+public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clock, AuditService audit, CatalogService catalog, PartyService parties, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Books.BooksService books, Access access)
 {
     private const string Tenant = "local";
     private const string Site = "main";
@@ -24,6 +25,7 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>Reads the old system and builds the report. Nothing is written to the Hub, and the old system is not changed.</summary>
     public ImportCheck Check(IOldSystemSource source)
     {
+        access.Require(Perm.Settings);
         var data = source.Read();
         return CheckData(source.Kind, source.SourceId, source.Describe, data);
     }
@@ -31,6 +33,7 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>The same check on data that is already read (another kind of source, or a test).</summary>
     public ImportCheck CheckData(string sourceKind, string sourceId, string describe, OldSystemData data)
     {
+        access.Require(Perm.Settings);
         var plan = Plan(sourceKind, sourceId, describe, data);
         return new ImportCheck(sourceKind, sourceId, describe, data, plan.Report);
     }
@@ -56,6 +59,7 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
     /// </summary>
     public ImportResult Import(ImportCheck check, long? userId)
     {
+        access.Require(Perm.Settings);
         var plan = Plan(check.SourceKind, check.SourceId, check.Describe, check.Data);
         if (plan.Report.Fingerprint != check.Report.Fingerprint)
             throw new HubException("import-changed", "The shop's records changed since you checked, so nothing was moved. Please check again and read the new report.");
@@ -84,8 +88,9 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
             if (!item.Active) HubDb.Exec(c, "UPDATE items SET active = 0 WHERE id = $id", t, ("$id", id));
             if (item.MovesStock)
             {
-                HubDb.Exec(c, "INSERT INTO stock_moves(item_id, qty_milli, reason, note, at, user_id) VALUES ($i, $q, $r, $n, $at, $u)", t,
-                    ("$i", id), ("$q", item.StockMilli), ("$r", "opening stock"), ("$n", "Moved from the older program"), ("$at", now), ("$u", userId));
+                // The stock comes in worth its quantity times the cost price it had (half-up, as the stock report always worked it out), and the books take it in as an opening entry (decision 32).
+                var move = StockCost.Insert(c, t, id, item.StockMilli, "opening stock", null, "Moved from the older program", clock.UtcNow, userId, StockCost.Worth(item.StockMilli, item.Input.CostMinor));
+                books.SyncStockMove(c, t, move, userId);
                 moves++; plannedStock += item.StockMilli;
             }
             Remember(c, t, check, "item", item.OldKey, id, runId);
@@ -97,6 +102,7 @@ public sealed class ImportService(HubDb db, ShopContextProvider shop, IClock clo
             long id;
             try { id = parties.Create(c, t, party.Input); }
             catch (HubException ex) { throw new HubException(ex.Code, "\"" + party.Input.Name + "\" could not be added, so nothing was moved. " + ex.Message); }
+            if (party.DiscountPctMilli > 0) offers.SetPartyDiscount(c, t, id, party.DiscountPctMilli, true, userId);
             if (party.BalanceMinor != 0)
             {
                 HubDb.Exec(c, "INSERT INTO party_opening_balances(party_id, balance_minor, as_of, run_id) VALUES ($p, $b, $at, $r)", t,

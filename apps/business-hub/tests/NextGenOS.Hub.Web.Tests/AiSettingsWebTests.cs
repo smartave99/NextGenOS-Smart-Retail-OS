@@ -152,7 +152,7 @@ public class AiSettingsWebTests
 
         // The worker's first round runs as soon as it starts.
         var log = new CapturingLog();
-        using var worker = new NextGenOS.Hub.Web.Auth.HubWorker(f.Hub, log);
+        using var worker = new NextGenOS.Hub.Web.Auth.HubWorker(f.Services, log);
         await worker.StartAsync(CancellationToken.None);
         // The first round starts by itself (on its own thread); give it a moment.
         for (var i = 0; i < 400 && f.Hub.Events.Counts().Observations > 0; i++) await Task.Delay(50);   // up to 20 seconds: a busy build machine can be slow to start the thread

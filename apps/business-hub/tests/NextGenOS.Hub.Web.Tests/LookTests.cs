@@ -12,7 +12,7 @@ public class LookTests : IDisposable
     private readonly string path = Path.Combine(Path.GetTempPath(), "hub-look-" + Guid.NewGuid().ToString("N") + ".db");
     private readonly HubApp app;
 
-    public LookTests() => app = HubApp.Open(path);
+    public LookTests() => app = HubApp.OpenTrusted(path);
 
     public void Dispose()
     {
@@ -111,7 +111,7 @@ public class LookTests : IDisposable
     {
         var first = LocalBrandStore.Over(app);
         first.Save(Chosen(), null);
-        var again = LocalBrandStore.Over(HubApp.Open(path));
+        var again = LocalBrandStore.Over(HubApp.OpenTrusted(path));
         Assert.Equal("#aa2233", again.Current?.PrimaryColor);
         Assert.Equal("Mine Mart", again.Current?.Name);
         first.Reset(null);

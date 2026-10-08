@@ -43,6 +43,8 @@
                 <select id="s-region" @bind="s.Region">@foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }</select>
             }
             <label for="s-foot">Words at the bottom of every bill</label><input id="s-foot" @bind="s.ReceiptFooter" maxlength="160" />
+            <label for="s-gift">Words printed when a bill earns a gift voucher</label><input id="s-gift" @bind="s.GiftVoucherText" maxlength="240" />
+            <p class="muted small">Use {code}, {amount} and {valid}: they are filled in for each voucher.</p>
             <label for="s-pay">Ways of paying (separated by commas)</label><input id="s-pay" @bind="payText" maxlength="200" />
             <label class="check"><input type="checkbox" @bind="s.PricesIncludeTax" /> The prices I type already include tax</label>
             <label class="check"><input type="checkbox" @bind="s.TaxRegistered" /> My business is registered for @Shop.Country.Tax.Name</label>
@@ -425,6 +427,11 @@ else if (tab == "printers")
         </div>
     }
 }
+else if (tab == "backups")
+{
+    @* The owner only: the page is [Authorize(Policy = Perm.Settings)], and the Hub checks it again itself in each action. *@
+    <BackupsPanel />
+}
 else if (tab == "users")
 {
     <section class="card">
@@ -546,7 +553,9 @@ else if (tab == "activity")
         yield return ("loyalty", "Loyalty points");
         yield return ("look", "Look");
         yield return ("printers", "Printers");
+        yield return ("backups", "Backups");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
+        if (Me.Can(Perm.Network)) yield return ("network", "Store network");
         if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
         if (Me.Can(Perm.Settings)) yield return ("older", "Move from the older POS");
         yield return ("licence", "Licence");
@@ -556,6 +565,8 @@ else if (tab == "activity")
     protected override Task LoadAsync()
     {
         if (TabName is "look" && !shownTab) { tab = "look"; shownTab = true; if (Saved == "1") Info = "Saved. It shows on every screen."; }
+        // A link from another screen (for example "What people did", from the counter PCs) opens the Activity tab.
+        else if (TabName is "activity" && !shownTab) { tab = "activity"; shownTab = true; }
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
         layout = Themes.Current;
@@ -587,6 +598,8 @@ else if (tab == "activity")
     {
         // The AI helpers have a screen of their own (they are optional, and there is a lot to it).
         if (key == "ai") { Nav.NavigateTo("settings/ai"); return; }
+        // So have the counter PCs: connecting the other PCs of the shop to this one.
+        if (key == "network") { Nav.NavigateTo("settings/network"); return; }
         tab = key;
         Error = Info = null;
         _ = Reload();

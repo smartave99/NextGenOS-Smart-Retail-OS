@@ -49,6 +49,14 @@ export interface TaxRules {
     classes?: Partial<Record<"standard" | "reduced" | "zero" | "exempt", string>>;
     regions?: { label?: string; list: Region[] };
     businessId?: { label: string; pattern?: string | null };
+    /** A code a line may carry for the goods or service it sells (the country's own name for it). Shown on the item and the bill when present. */
+    itemCode?: { label: string; help?: string };
+    /** A further tax some items carry on top of the main one, as a percent set on the item (the country's own name for it). */
+    extraTax?: { label: string; help?: string };
+    /** The lists this country's tax returns are made from: each bill or credit note goes into the first list whose rule it meets. */
+    /** The blocks of the summary of supplies the country's periodic return asks for: each line goes in the first block of its side whose rule it meets. */
+    summary?: { title: string; blocks: { id: string; label: string; side: "outward" | "inward"; when: { rate?: "taxed" | "zero" | "exempt"; partyHasTaxId?: boolean; betweenRegions?: boolean } }[] };
+    returns?: { title: string; lists: { id: string; label: string; kind: "bill" | "credit"; when: { partyHasTaxId?: boolean; betweenRegions?: boolean; totalOver?: string } }[] };
     customerDiscounts?: CustomerDiscount[];
     rounding?: { total: "nearest" | "none"; increment?: string; defaultOn?: boolean };
 }

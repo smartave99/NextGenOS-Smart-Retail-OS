@@ -8,6 +8,7 @@
 @inject NextGenOS.Hub.Web.Branding.LocalBrandStore Looks
 @inject NextGenOS.Hub.Web.Branding.LocalThemeStore LocalTheme
 @inject NextGenOS.Hub.Web.Branding.ThemeService Themes
+@inject NextGenOS.Hub.Web.Branding.ShopLookStore ShopLook
 
 <PageTitle>Settings</PageTitle>
 <h1>Settings</h1>
@@ -47,6 +48,8 @@
             <label class="check"><input type="checkbox" @bind="s.TaxRegistered" /> My business is registered for @Shop.Country.Tax.Name</label>
             <label class="check"><input type="checkbox" @bind="s.RoundTotal" /> Round every total to the nearest whole unit</label>
             <label class="check"><input type="checkbox" @bind="s.AllowNegativeStock" /> Allow selling when the count says there is none left</label>
+            <label for="s-cdisc">Biggest discount a cashier may give (percent of the bill; 0 means none)</label><input id="s-cdisc" inputmode="decimal" @bind="cashierDiscount" maxlength="7" />
+            <p class="muted small">Owners and managers can always give a discount. A cashier can give one only up to this much.</p>
         </div>
         <p class="muted small">Country: <strong>@Shop.Country.Name</strong> (@Shop.CurrencyCode). To use another country, set up a new data folder.</p>
         <div class="row"><button type="button" class="btn primary" id="save-shop" @onclick="SaveShop">Save</button></div>
@@ -114,6 +117,28 @@ else if (tab == "parts")
         <div class="row"><button type="button" class="btn primary" id="save-parts" @onclick="SaveParts">Save</button></div>
     </section>
 }
+else if (tab == "loyalty")
+{
+    <section class="card" id="loyalty-card">
+        <h2>Loyalty points</h2>
+        <p class="muted">Customers earn points on what they buy and use them on a later bill, as money off. Points belong to a named customer, so choose the customer at the till.</p>
+        <div class="stack">
+            <label class="check"><input type="checkbox" id="loy-on" @bind="s.LoyaltyOn" /> Give loyalty points</label>
+            <label for="loy-mode">What an item earns when it has no setting of its own</label>
+            <select id="loy-mode" @bind="s.LoyaltyDefaultMode">
+                <option value="none">Nothing</option>
+                <option value="per">A percent of what the customer pays (before tax)</option>
+                <option value="point">Points for each one sold</option>
+            </select>
+            <label for="loy-value">@(s.LoyaltyDefaultMode == "point" ? "Points for each one sold" : "Percent")</label>
+            <input id="loy-value" inputmode="decimal" @bind="loyaltyValueText" maxlength="10" />
+            <label for="loy-worth">What one point is worth when it is used (in @Shop.CurrencyCode)</label>
+            <input id="loy-worth" inputmode="decimal" @bind="pointWorthText" maxlength="10" placeholder="for example 0.50" />
+            <p class="muted small">Each item can have its own setting under Items. Points used on a bill come off before tax, and a customer cannot use more points than they have.</p>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="save-loyalty" @onclick="SaveLoyalty">Save</button></div>
+    </section>
+}
 else if (tab == "look")
 {
     <section class="card">
@@ -172,6 +197,25 @@ else if (tab == "look")
                 <button type="button" class="btn secondary" id="reset-look" @onclick="ResetLook">Go back to the standard look</button>
             </div>
         }
+    </section>
+    <section class="card" id="look-card">
+        <h2>The two looks</h2>
+        <p class="muted">The <strong>list look</strong> is for a PC or laptop. The <strong>counter look</strong> is for a touch screen at the counter. Choose one for the whole shop, or let each screen decide: a touch screen gets the counter look and any other screen gets the list look.</p>
+        <div class="look-choices" role="group" aria-label="The look of the shop">
+            @foreach (var (id, name, text) in LookChoices)
+            {
+                <button type="button" class="look-card" id="look-@id" aria-pressed="@(shopLook == id ? "true" : "false")" @onclick="() => ChooseShopLook(id)">
+                    <strong>@name</strong><span>@text</span>
+                </button>
+            }
+        </div>
+        <h3>On this computer only</h3>
+        <p class="muted">This computer can use its own look whatever the shop chose. It is kept in this browser.</p>
+        <div class="row">
+            <button type="button" class="btn secondary" id="here-shop" data-set-look="">Same as the shop</button>
+            <button type="button" class="btn secondary" id="here-list" data-set-look="list">List look</button>
+            <button type="button" class="btn secondary" id="here-counter" data-set-look="counter">Counter look</button>
+        </div>
     </section>
     <section class="card" id="layout-card">
         <h2>Screen and layout</h2>
@@ -432,6 +476,11 @@ else if (tab == "users")
         </div>
     }
 }
+else if (tab == "older")
+{
+    @* The owner only: the tab is listed only for Perm.Settings, the page is [Authorize(Policy = Perm.Settings)], and the component checks again in each action. *@
+    <MoveFromOlderPos />
+}
 else if (tab == "licence")
 {
     var state = Licence.State;
@@ -477,6 +526,8 @@ else if (tab == "activity")
     [SupplyParameterFromQuery(Name = "saved")] public string? Saved { get; set; }
     private ShopSettings s = new();
     private string payText = "";
+    private string cashierDiscount = "0";
+    private string loyaltyValueText = "", pointWorthText = "";
     private readonly Dictionary<string, string> rates = new();
     private readonly Dictionary<string, string> parts = new();
     private readonly Dictionary<string, bool> features = new();
@@ -492,10 +543,12 @@ else if (tab == "activity")
         yield return ("shop", "Business");
         yield return ("tax", "Tax");
         yield return ("parts", "Parts and words");
+        yield return ("loyalty", "Loyalty points");
         yield return ("look", "Look");
         yield return ("printers", "Printers");
         if (Me.Can(Perm.Users)) yield return ("users", "People");
         if (Me.Can(Perm.Ai)) yield return ("ai", "AI helpers");
+        if (Me.Can(Perm.Settings)) yield return ("older", "Move from the older POS");
         yield return ("licence", "Licence");
         yield return ("activity", "Activity");
     }
@@ -506,9 +559,13 @@ else if (tab == "activity")
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
         layout = Themes.Current;
+        shopLook = ShopLook.Current;
         scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
+        cashierDiscount = ShopContext.Qty(s.CashierDiscountPctMilli).TrimEnd('0').TrimEnd('.');
+        loyaltyValueText = ShopContext.Qty(s.LoyaltyDefaultValueMilli).TrimEnd('0').TrimEnd('.');
+        pointWorthText = ShopContext.Qty(s.LoyaltyPointValueMilli).TrimEnd('0').TrimEnd('.');
         rates.Clear();
         foreach (var kv in s.RateOverrides) rates[kv.Key] = kv.Value;
         parts.Clear();
@@ -574,6 +631,30 @@ else if (tab == "activity")
         Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
     });
 
+    private string shopLook = "standard";
+
+    private static readonly (string Id, string Name, string Text)[] LookChoices =
+    [
+        ("standard", "As it was", "The layout you set below, the same on every screen."),
+        ("auto", "Each screen decides", "A touch screen gets the counter look, any other screen gets the list look."),
+        (NextGenOS.Hub.Web.Branding.ShopLooks.List.Id, NextGenOS.Hub.Web.Branding.ShopLooks.List.Name, NextGenOS.Hub.Web.Branding.ShopLooks.List.Text),
+        (NextGenOS.Hub.Web.Branding.ShopLooks.Counter.Id, NextGenOS.Hub.Web.Branding.ShopLooks.Counter.Name, NextGenOS.Hub.Web.Branding.ShopLooks.Counter.Text),
+    ];
+
+    /// <summary>The owner picks the look of the whole shop. A look is a bundle of the layout settings below, so they are filled in and saved with it; "each screen decides" and "as it was" leave them alone (or put them back to standard).</summary>
+    private Task ChooseShopLook(string id) => Run(() =>
+    {
+        if (NextGenOS.Hub.Web.Branding.ShopLooks.Get(id) is { } preset)
+        {
+            layout.Density = preset.Density; layout.Nav = preset.Nav; layout.NavLabels = preset.NavLabels; layout.Cart = preset.Cart; layout.FontScale = preset.FontScale;
+            if (!Themes.IdentityAllowed) { layout.Mode = layout.Surface = layout.Shape = layout.Font = layout.Depth = null; }
+            LocalTheme.Save(layout, Me.Id);
+        }
+        else if (id == "standard") LocalTheme.Reset(Me.Id);
+        ShopLook.Save(id, Me.Id);
+        Nav.NavigateTo("/settings?tab=look&saved=1", forceLoad: true);
+    });
+
     private Task ResetLayout() => Run(() =>
     {
         LocalTheme.Reset(Me.Id);
@@ -622,8 +703,23 @@ else if (tab == "activity")
         if (methods.Count == 0) throw new HubException("pay", "Please give at least one way of paying.");
         if (methods.Any(m => m.Length > 20 || m.Any(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '-'))) throw new HubException("pay", "Ways of paying should be short words, like cash, card, upi.");
         s.PaymentMethods = methods;
+        try { s.CashierDiscountPctMilli = string.IsNullOrWhiteSpace(cashierDiscount) ? 0 : ShopContext.QtyMilli(cashierDiscount.Trim()); }
+        catch (FormatException) { throw new HubException("cashier-discount", "Please type the cashier's discount limit as a number, like 5 or 2.5."); }
+        if (s.CashierDiscountPctMilli is < 0 or > 100_000) throw new HubException("cashier-discount", "The cashier's discount limit must be between 0 and 100 percent.");
         App.Shop.Save(s);
         App.Audit.Log(Me.Id, "settings", "shop", null, "business details");
+    }, "Saved.");
+
+    private Task SaveLoyalty() => Run(() =>
+    {
+        if (s.LoyaltyDefaultMode is not ("none" or "per" or "point")) s.LoyaltyDefaultMode = "none";
+        s.LoyaltyDefaultValueMilli = s.LoyaltyDefaultMode == "none" ? 0 : NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(loyaltyValueText);
+        if (s.LoyaltyDefaultMode != "none" && s.LoyaltyDefaultValueMilli <= 0) throw new HubException("loyalty", "Please type the percent or the points as a number above nothing, like 5 or 2.5.");
+        if (s.LoyaltyDefaultMode == "per" && s.LoyaltyDefaultValueMilli > 100_000) throw new HubException("loyalty", "A percent cannot be more than 100.");
+        s.LoyaltyPointValueMilli = NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(pointWorthText);
+        if (s.LoyaltyOn && s.LoyaltyPointValueMilli <= 0) throw new HubException("loyalty", "Please say what one point is worth, like 0.50, so that points can be used.");
+        App.Shop.Save(s);
+        App.Audit.Log(Me.Id, "settings", "loyalty", null, s.LoyaltyOn ? "loyalty points on" : "loyalty points off");
     }, "Saved.");
 
     // ---- tax ----------------------------------------------------------------------------------------------------------------------

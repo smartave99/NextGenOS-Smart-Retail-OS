@@ -96,18 +96,36 @@ test('with a window: it is the browser it is told to use, and closing it stops t
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });
 
-test('a browser that ends at once hands the page to the usual browser, and the Brand Studio keeps running', { skip, timeout: 60_000 }, async () => {
+test('a browser that ends at once and whose page never appears: the page goes to the usual browser, and the Brand Studio keeps running', { skip, timeout: 60_000 }, async () => {
   const home = mkdtempSync(join(tmpdir(), 'brand-handoff-'));
   const bin = join(home, 'bin'); mkdirSync(bin);
   const standIn = join(bin, 'stand-in-browser'); writeFileSync(standIn, '#!/bin/sh\nexit 0\n'); chmodSync(standIn, 0o755);
   const opener = join(bin, 'xdg-open'); writeFileSync(opener, `#!/bin/sh\necho "$1" > "${join(home, 'opened.txt')}"\n`); chmodSync(opener, 0o755);
   mkdirSync(join(home, 'root'), { recursive: true });
-  const env = { BRAND_STUDIO_HOME: join(home, 'cfg'), BRAND_STUDIO_ROOT: join(home, 'root'), NEXTGENOS_APP_BROWSER: standIn, PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
+  const env = { BRAND_STUDIO_HOME: join(home, 'cfg'), BRAND_STUDIO_ROOT: join(home, 'root'), NEXTGENOS_APP_BROWSER: standIn, NEXTGENOS_WINDOW_WAIT_MS: '1500', PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
   const run = start(['serve', '--app'], env);
   try {
     const url = await run.url;
-    for (let i = 0; i < 50 && !existsSync(join(home, 'opened.txt')); i += 1) await wait(100);
+    for (let i = 0; i < 80 && !existsSync(join(home, 'opened.txt')); i += 1) await wait(100);
     assert.equal(readFileSync(join(home, 'opened.txt'), 'utf8').trim(), url);
+    assert.equal(run.child.exitCode, null, 'still running');
+  } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
+});
+
+test('a browser that ends at once but whose page appears (it handed the page to a copy of itself that was already running): the usual browser is NOT opened as well', { skip, timeout: 60_000 }, async () => {
+  const home = mkdtempSync(join(tmpdir(), 'brand-handedoff-'));
+  const bin = join(home, 'bin'); mkdirSync(bin);
+  const standIn = join(bin, 'stand-in-browser');
+  // ends at once; a second later "the page" says it is there
+  writeFileSync(standIn, `#!/bin/sh\nurl="\${1#--app=}"\nkey="\${url#*k=}"\norigin="$(echo "$url" | sed 's#/?k=.*##')"\n( sleep 1; "${process.execPath}" -e "fetch(process.argv[1] + '/api/alive', { headers: { 'X-Brand-Studio': process.argv[2] } }).catch(() => {})" "$origin" "$key" ) >/dev/null 2>&1 &\nexit 0\n`); chmodSync(standIn, 0o755);
+  const opener = join(bin, 'xdg-open'); writeFileSync(opener, `#!/bin/sh\necho "$1" > "${join(home, 'opened.txt')}"\n`); chmodSync(opener, 0o755);
+  mkdirSync(join(home, 'root'), { recursive: true });
+  const env = { BRAND_STUDIO_HOME: join(home, 'cfg'), BRAND_STUDIO_ROOT: join(home, 'root'), NEXTGENOS_APP_BROWSER: standIn, NEXTGENOS_WINDOW_WAIT_MS: '3000', PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` };
+  const run = start(['serve', '--app'], env);
+  try {
+    await run.url;
+    await wait(7000);
+    assert.equal(existsSync(join(home, 'opened.txt')), false, 'the page was not opened a second time in the usual browser');
     assert.equal(run.child.exitCode, null, 'still running');
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });

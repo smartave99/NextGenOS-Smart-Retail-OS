@@ -10,7 +10,7 @@ Audit date: 5 October 2026. Method: a read-through of the whole repository (stru
 
 **Not ready to sell yet.** Three things block a sale, and they come before any feature work:
 
-1. **Ownership (section 2.1).** The Windows POS in `apps/pos-desktop` is decompiler output from compiled programs, including libraries that a vendor had protected with a commercial obfuscator. A decompiled copy does not give you the right to relicense or resell it. You need proof that NextGenOS owns, or is licensed to resell, the original.
+1. **Ownership (section 2.1): settled by the owner.** The Windows POS in `apps/pos-desktop` is recovered source, and **the owner states that it is theirs** (7 October 2026, `docs/PLATFORM-DECISIONS.md` decision 27). It is not asked about again. (The third-party licences of the libraries inside it are a separate matter and stay in the list below.)
 2. **Nothing enforces a licence (section 2.2).** The licence check is switched off in code, a keygen script ships in the repository, and the installer runs it for every customer. Today anyone can copy and resell the POS.
 3. **Secrets and shared backends are in the code (sections 2.3 and 2.4).** Live credentials are committed, and every installed copy talks to the same Firebase projects with an admin secret.
 
@@ -27,7 +27,7 @@ The audit below was written first; this table says where each finding stands tod
 | Licence not enforced; keygen; fixed AES key; installer runs an activation script (2.2) | **Fixed in the code.** Signed (ECDSA) licences tied to the PC, revocable, with grace and offline activation, enforced in the Windows POS, AI add-on, dashboard, website and the Business Hub. The keygen and activation scripts are gone, and tripwires fail the gate if one comes back. | `licensing/`, checks `bypass`, `enforcement`, `hub-enforcement`, `dotnet-live`, `hub-release` |
 | Secrets in the files (2.3) | **Removed from the files; a scan fails the gate if one returns.** The back-door super-admin e-mail is removed. | check `secrets` |
 | Secrets in the git **history** (2.3) | **Open.** The OpenAI key, the Neon password, the Firebase secrets and the SQL Server `sa` password are still readable in the history. **Rotate every one**, or start a fresh repository from the cleaned tree. | you |
-| Who owns the decompiled Windows POS (2.1) | **Open. Needs a lawyer and the original paperwork.** Not a coding task. | you, counsel |
+| Who owns the recovered Windows POS (2.1) | **Settled: the owner states it is theirs** (decision 27). Not asked again. | the owner |
 | Third-party licences for the old POS (2.1) | **Open** for `apps/pos-desktop`. The Business Hub's own packages are checked and noticed (`THIRD-PARTY-NOTICES.md`; the gate refuses GPL-type licences in the new work). | check `nuget-audit`, `npm-audit` |
 | Shared Firebase backends of the old POS (2.4) | **Open** for `apps/pos-desktop`. The Business Hub has no shared backend: each shop's data is on its own PC. | |
 | White-label (3.1) | **Done:** the brand rides inside the licence; the Brand Studio makes brand kits; the Hub's *Look* page lets an owner change colours and logo within the licence's white-label level (one rule, shared test vectors in .NET and TypeScript). **Open:** fonts and a light/dark default are allowed but not applied; no way yet to make a Windows setup under a customer's own file name. | `docs/BRAND-STUDIO.md`, checks `brand-studio`, `brand-studio-wizard`, `hub-e2e`, `dotnet-live` |
@@ -65,6 +65,8 @@ Not changed on purpose (needs your decision, see section 2): the licence check, 
 ## 2. Stop-ship blockers (P0)
 
 ### 2.1 Who owns the Windows POS?
+
+**Settled by the owner on 7 October 2026: the recovered software is theirs, and they have said not to ask again** (`docs/PLATFORM-DECISIONS.md`, decision 27). What follows is the background that was written before that, kept for the third-party library licences it lists.
 
 What the repository shows:
 
@@ -230,7 +232,7 @@ The existing updater is a good start (a public feed plus a check that GitHub sig
 
 ## 7. Legal and commercial checklist (*for counsel*)
 
-- Proof of ownership of the POS and of every library (section 2.1); IP assignments from all developers and contractors.
+- IP assignments from all developers and contractors. (The owner states that the recovered Windows POS is theirs; that is settled, decision 27.)
 - The EULA reviewed for each country you sell in; a **reseller and white-label agreement**; a privacy policy and a data-processing agreement; terms for any hosted service.
 - Trademark search and registration for "NextGenOS" and "Smart Retail POS" in your target countries (check for clashes first).
 - Open-source compliance for the LGPL and MPL parts; notices for the desktop POS and storefront added to `THIRD-PARTY-NOTICES.md`.

@@ -47,10 +47,10 @@ on:
         type: boolean
         default: false
       website_customer:
-        description: "Website for a customer who is NOT in brand-kits/: their short name (small letters, digits, hyphens), for example luzon-fresh-mart. Leave empty to make the website of the brand kit above."
+        description: "Also make the website of ONE customer, from the program this run makes (nothing is built again): their short name (small letters, digits, hyphens), for example luzon-fresh-mart. With no settings below, the brand kit above gives the settings. Leave empty to make only THE website, the same for every customer."
         default: ""
       website_settings:
-        description: "Website for that customer: their public settings on ONE line, separated by semicolons, for example NEXT_PUBLIC_SITE_NAME=Luzon Fresh Mart;NEXT_PUBLIC_COUNTRY=PH (the Setup Studio's pack shows the line). No password or key."
+        description: "For that customer: their public settings on ONE line, separated by semicolons, for example NEXT_PUBLIC_SITE_NAME=Luzon Fresh Mart;NEXT_PUBLIC_COUNTRY=PH (the Setup Studio's pack shows the line). No password or key."
         default: ""
 
 permissions:
@@ -430,10 +430,10 @@ jobs:
         run: node scripts/release-assets.mjs upload --release "${RELEASE_ID}" dist/*
 
   website:
-    # One website for ONE customer, built on the system it is for (the database engine and the picture library are different files for each system).
-    # The customer is the brand kit above, or (website_customer + website_settings) a customer who is not in the repository. The package carries its own Node.js and is checked
-    # (no source, no secret, nothing a factory-new computer lacks), started from its zip, and must refuse to work without a licence. The licence keys are built in like the Hub's.
-    name: Website for the customer (${{ matrix.os }})
+    # THE website, the one program every customer gets, built once per release on the system it is for (the database engine and the picture library are different files for each
+    # system). No customer's settings are built in: the Setup Studio puts each customer's folder and licence beside it (docs/CUSTOMER-BUILDS.md). The package carries its own Node.js and
+    # is checked (no source, no secret, no customer, nothing a factory-new computer lacks), started from its zip, and must refuse to work without a licence. The licence keys are built in like the Hub's.
+    name: Website, the same for every customer (${{ matrix.os }})
     needs: [gate, prepare]
     if: ${{ !startsWith(github.ref_name, 'studio-v') }}
     strategy:
@@ -474,67 +474,47 @@ jobs:
         env:
           OS: ${{ matrix.os }}
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
-          WEBSITE_CUSTOMER: ${{ inputs.website_customer }}
-          WEBSITE_SETTINGS: ${{ inputs.website_settings }}
         run: |
           set -euo pipefail
           EXTRA=""
           if [ "${TRIAL_WITHOUT_KEYS}" = "true" ]; then EXTRA="--allow-no-key"; fi
-          OUT="${RUNNER_TEMP}/website-out"
-          if [ -n "${WEBSITE_SETTINGS}" ]; then
-            test -n "${WEBSITE_CUSTOMER}" || { echo "Type the customer's short name too (Website customer)."; exit 1; }
-            CUSTOMER="${WEBSITE_CUSTOMER}"
-            # One line becomes one setting per line. The script refuses anything that is not a public setting.
-            printf '%s' "${WEBSITE_SETTINGS}" | tr ';' '\n' > "${RUNNER_TEMP}/website-settings.env"
-            node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --customer "${CUSTOMER}" --settings "${RUNNER_TEMP}/website-settings.env" --download-node 22.22.0 --out "${OUT}" ${EXTRA}
-          else
-            CUSTOMER="${KIT}"
-            node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --kit "${KIT}" --download-node 22.22.0 --out "${OUT}" ${EXTRA}
-          fi
-          echo "customer=${CUSTOMER}" >> "$GITHUB_OUTPUT"
+          node scripts/make-website-package.mjs --os "${OS}" --version "${VERSION_NAME}" --download-node 22.22.0 --out "${RUNNER_TEMP}/website-out" ${EXTRA}
       - name: Run the two audits again on the folder and the zip
         shell: bash
         env:
           OS: ${{ matrix.os }}
-          CUSTOMER: ${{ steps.build.outputs.customer }}
         run: |
           set -euo pipefail
           OUT="${RUNNER_TEMP}/website-out"
-          node scripts/audit-package.mjs "${OUT}/website-${CUSTOMER}-${OS}" "${OUT}/website-${CUSTOMER}-${OS}.zip" --node-app
-          node scripts/audit-prerequisites.mjs "${OUT}/website-${CUSTOMER}-${OS}" --os "${OS}"
+          node scripts/audit-package.mjs "${OUT}/website-${OS}" "${OUT}/website-${OS}.zip" --node-app
+          node scripts/audit-prerequisites.mjs "${OUT}/website-${OS}" --os "${OS}"
       - name: Start the website from the zip and check it refuses to work without a licence (Linux)
         if: matrix.os == 'linux'
         shell: bash
-        env:
-          CUSTOMER: ${{ steps.build.outputs.customer }}
         run: |
           set -euo pipefail
           mkdir "${RUNNER_TEMP}/website-zip"
-          unzip -q "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-linux.zip" -d "${RUNNER_TEMP}/website-zip"
-          node scripts/smoke-website.mjs "${RUNNER_TEMP}/website-zip/website-${CUSTOMER}-linux" --os linux
+          unzip -q "${RUNNER_TEMP}/website-out/website-linux.zip" -d "${RUNNER_TEMP}/website-zip"
+          node scripts/smoke-website.mjs "${RUNNER_TEMP}/website-zip/website-linux" --os linux
       - name: Start the website from the zip and check it refuses to work without a licence (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
-        env:
-          CUSTOMER: ${{ steps.build.outputs.customer }}
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'website-zip'
           New-Item -ItemType Directory -Path $dir | Out-Null
-          & "$env:SystemRoot\System32\tar.exe" -xf (Join-Path $env:RUNNER_TEMP "website-out\website-$($env:CUSTOMER)-windows.zip") -C $dir
+          & "$env:SystemRoot\System32\tar.exe" -xf (Join-Path $env:RUNNER_TEMP "website-out\website-windows.zip") -C $dir
           if ($LASTEXITCODE -ne 0) { throw 'The zip could not be opened.' }
-          node scripts/smoke-website.mjs (Join-Path $dir "website-$($env:CUSTOMER)-windows") --os windows
+          node scripts/smoke-website.mjs (Join-Path $dir "website-windows") --os windows
           if ($LASTEXITCODE -ne 0) { throw 'The website package did not behave.' }
       - name: Open Start Website.exe the way a person does (double-click), check the window, open it again, close the window (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
-        env:
-          CUSTOMER: ${{ steps.build.outputs.customer }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $pkg = Join-Path (Join-Path $env:RUNNER_TEMP 'website-zip') "website-$($env:CUSTOMER)-windows"
+          $pkg = Join-Path (Join-Path $env:RUNNER_TEMP 'website-zip') "website-windows"
           $exe = Join-Path $pkg 'Start Website.exe'
           if (-not (Test-Path $exe)) { throw 'Start Website.exe is not in the package.' }
-          $note = Join-Path (Join-Path (Join-Path $env:APPDATA 'NextGenOS Website') $env:CUSTOMER) 'running.json'
+          $note = Join-Path (Join-Path (Join-Path $env:APPDATA 'NextGenOS Website') 'website') 'running.json'
           Remove-Item $note -ErrorAction SilentlyContinue
 
           # 1. Opened like a double-click: it must start and answer (a website with no licence answers "not available").
@@ -574,11 +554,29 @@ jobs:
         shell: bash
         env:
           OS: ${{ matrix.os }}
-          CUSTOMER: ${{ steps.build.outputs.customer }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp "${RUNNER_TEMP}/website-out/website-${CUSTOMER}-${OS}.zip" dist/
+          cp "${RUNNER_TEMP}/website-out/website-${OS}.zip" dist/
+      - name: Also put one customer's settings beside it (only when a customer was named; nothing is built again)
+        if: inputs.website_customer != ''
+        shell: bash
+        env:
+          OS: ${{ matrix.os }}
+          WEBSITE_CUSTOMER: ${{ inputs.website_customer }}
+          WEBSITE_SETTINGS: ${{ inputs.website_settings }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/website-out"
+          if [ -n "${WEBSITE_SETTINGS}" ]; then
+            # One line becomes one setting per line. The script refuses anything that is not a public setting.
+            printf '%s' "${WEBSITE_SETTINGS}" | tr ';' '\n' > "${RUNNER_TEMP}/website-settings.env"
+            node scripts/assemble-website.mjs --program "${OUT}/website-${OS}.zip" --settings "${RUNNER_TEMP}/website-settings.env" --customer "${WEBSITE_CUSTOMER}" --no-licence --person "the release workflow" --out "${RUNNER_TEMP}/website-customer" --audit
+          else
+            node scripts/assemble-website.mjs --program "${OUT}/website-${OS}.zip" --kit "${KIT}" --customer "${WEBSITE_CUSTOMER}" --no-licence --person "the release workflow" --out "${RUNNER_TEMP}/website-customer" --audit
+          fi
+          mkdir -p dist
+          cp "${RUNNER_TEMP}/website-customer/website-${WEBSITE_CUSTOMER}-${OS}.zip" dist/
       - name: Put the files on the draft release
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -734,7 +732,7 @@ jobs:
               echo "Android app: ${ANDROID}"
               echo "Setup Studio for staff: ${STUDIO}"
               echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
-              echo "Website for the customer (Linux and Windows): ${WEBSITE}"
+              echo "Website, the same for every customer (Linux and Windows): ${WEBSITE}"
             } > dist/BUILD-STATUS.txt
             cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
           fi

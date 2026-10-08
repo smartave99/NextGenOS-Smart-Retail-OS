@@ -6,7 +6,7 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site-url";
 import { SHOP_NAME } from "@/lib/shop-name";
-import { CURRENCY } from "@/lib/region/lite";
+import { COUNTRY, CURRENCY } from "@/lib/region/lite";
 
 export const revalidate = 3600;
 
@@ -47,7 +47,7 @@ async function AboutPageContentLoader() {
         "address": {
             "@type": "PostalAddress",
             "streetAddress": siteConfig.contact.address,
-            "addressCountry": siteConfig.seo.jsonLd.addressCountry || "IN"
+            "addressCountry": siteConfig.seo.jsonLd.addressCountry || COUNTRY
         },
         "priceRange": siteConfig.seo.jsonLd.priceRange || CURRENCY.symbol.repeat(2)
     };

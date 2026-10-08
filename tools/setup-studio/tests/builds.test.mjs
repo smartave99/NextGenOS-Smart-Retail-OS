@@ -232,6 +232,40 @@ test('when every part fails, nothing is kept and the page says so; a build that 
   } finally { await w.done(); }
 });
 
+test('when GitHub gives the build no machine, or the build cannot take the customer\'s settings, the Studio says what really happened and who can fix it, and never blames the settings', async () => {
+  const w = await world();
+  try {
+    // GitHub never started it: the account's build time or spending limit used up. Every step fails in a moment with no machine and no steps.
+    w.gh.options.outcome = 'never-started';
+    await w.svc.start(w.rita, w.id);
+    const none = await finish(w);
+    assert.equal(none.state, 'failed');
+    assert.equal(none.code, 'build-stopped');
+    assert.match(none.problem, /GitHub gave it no machine to build on, so nothing was built/);
+    assert.match(none.problem, /Billing and plans/);
+    assert.match(none.problem, /Ask the owner/);
+    assert.doesNotMatch(none.problem, /This step did not work|Check the settings/, 'it is not the settings that were wrong');
+    assert.ok(!existsSync(join(w.ws.siteBuildsFolder(w.id), '1')));
+
+    // The first step ran but could not read the settings from the results place: the results key is missing or wrong.
+    w.gh.options.outcome = 'settings-not-taken';
+    await w.svc.start(w.rita, w.id);
+    const key = await finish(w);
+    assert.equal(key.n, 2);
+    assert.equal(key.state, 'failed');
+    assert.match(key.problem, /key that lets it read the results place is missing, has run out, or is for the wrong place/);
+    assert.match(key.problem, /docs\/CUSTOMER-BUILDS\.md, steps 3 to 5/);
+    assert.doesNotMatch(key.problem, /Check the settings you sent/);
+
+    // A run that fails for another reason keeps its old words.
+    w.gh.options.outcome = 'run-fails';
+    await w.svc.start(w.rita, w.id);
+    const other = await finish(w);
+    assert.match(other.problem, /This step did not work: Checking the settings that were sent/);
+    assert.equal(w.ws.get(w.id).builds.length, 3, 'all three are written in the customer\'s record');
+  } finally { await w.done(); }
+});
+
 test('a wrong access code is explained in plain words, in "Test the connection" and when a build is started, and the code is never in the words', async () => {
   const w = await world();
   try {

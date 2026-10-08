@@ -195,7 +195,6 @@ const NOT_VERIFIED = [
   'Several shops in one database, and sync between PCs (not built); fonts and a light/dark default from a brand kit (allowed by the licence, not applied by the Hub).',
   'A penetration test by an independent security firm. The secrets that were committed before this work are still in the repository history and must be rotated.',
   'Legal review of EULA.txt, the reseller agreement and your company details (counsel); the legal name and governing-law placeholders in EULA.txt.',
-  'Ownership of the decompiled Windows POS source (apps/pos-desktop): proof that NextGenOS may resell it.',
 ];
 
 // ---------------------------------------------------------------------------------------------------------------------

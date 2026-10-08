@@ -118,8 +118,8 @@ try {
     'The first time, make the administrator account. To stop the Studio, close its window or press the Quit button (the power icon, bottom left).',
     os === 'windows' ? 'If Windows says "Windows protected your PC" (the program is not signed yet): click "More info", then "Run anyway". If something goes wrong, open "Setup Studio (with a window, for problems)" and read what it says.' : 'If something goes wrong, run ./setup-studio.sh --show and read what it says.', '',
     'It keeps its files in Documents/NextGenOS Setup Studio. Back them up from Settings.',
-    'To make a customer\'s pack you also need the released programs: Settings, "The programs folder".',
-    'A customer\'s website and Android app are made for them by the build service: an administrator connects it once (Settings, "Connect the build service"), then a reviewer presses one button in the customer\'s step "Website and app".', '',
+    'To make a customer\'s pack you need the released programs. If this Studio came with a folder called "kit" (inside tools/setup-studio), they are already there and nobody has to choose anything; if not, an administrator tells the Studio where the files of a release are: Settings, "The programs folder".',
+    'A customer\'s website package is made on this PC, with no internet and no GitHub, in the customer\'s step "Website and app" ("Make the website package"). The customer\'s licence file is put in place there too once you have it from the Licence Studio. A customer\'s Android app is made by the build service: an administrator connects it once (Settings, "Connect the build service"), then a reviewer presses one button in that step.', '',
   ].join('\r\n'));
 
   say('Checking what is inside');

@@ -17,14 +17,15 @@
     <hr />
     @foreach (var line in View.Lines)
     {
-        var r = View.Result?.Lines.ElementAtOrDefault(line.LineNo - 1);
+        var r = View.ResultFor(line);
         <div>@line.Description</div>
-        <div class="r"><span>@Qty(line.QtyMilli) × @Shop.Money(line.UnitPriceMinor)@(line.DiscountPctMilli > 0 ? $" (−{Qty(line.DiscountPctMilli)}%)" : "")</span><span>@(r is null ? "" : Shop.Money(Shop.Minor(r.LineTotal)))</span></div>
+        <div class="r"><span>@Qty(line.QtyMilli) × @Shop.Money(line.UnitPriceMinor)@(line.DiscountPctMilli > 0 ? $" (−{Qty(line.DiscountPctMilli)}%)" : line.DiscountAmountMinor > 0 ? $" (−{Shop.Money(line.DiscountAmountMinor)})" : "")</span><span>@(r is null ? "" : Shop.Money(Shop.Minor(r.LineTotal)))</span></div>
     }
     <hr />
     @if (View.Result is { } result)
     {
         var t = result.Totals;
+        if (Shop.Minor(t.Discount) > 0) { <div class="r"><span>Discount given</span><span>−@Shop.Money(Shop.Minor(t.Discount))</span></div> }
         <div class="r"><span>@(Shop.Settings.PricesIncludeTax ? "Before tax" : "Subtotal")</span><span>@Shop.Money(Shop.Minor(t.Taxable))</span></div>
         @foreach (var c in t.Components ?? new List<Component>())
         {
@@ -41,11 +42,18 @@
     }
     @foreach (var p in View.Payments.Where(p => p.Kind == "payment"))
     {
-        <div class="r"><span>@(char.ToUpperInvariant(p.Method[0]) + p.Method[1..])</span><span>@Shop.Money(p.AmountMinor)</span></div>
+        <div class="r"><span>@(p.Method == DocumentService.AccountCredit ? "Credit on account" : char.ToUpperInvariant(p.Method[0]) + p.Method[1..])</span><span>@Shop.Money(p.AmountMinor)</span></div>
     }
     @if (View.Document.Meta.TryGetValue("changeGiven", out var change) && long.TryParse(change, out var given) && given > 0)
     {
         <div class="r"><span>Change</span><span>@Shop.Money(given)</span></div>
+    }
+    @if (Points is { } pts)
+    {
+        <hr />
+        @if (pts.UsedCent > 0) { <div class="r"><span>Points used</span><span>@P(pts.UsedCent)</span></div> }
+        @if (pts.EarnedCent > 0) { <div class="r"><span>Points earned</span><span>@P(pts.EarnedCent)</span></div> }
+        <div class="r"><span>Points now</span><span>@P(pts.BalanceCent)</span></div>
     }
     @if (View.Document.BalanceMinor > 0)
     {
@@ -58,6 +66,10 @@
 @code {
     [Parameter, EditorRequired] public DocumentView View { get; set; } = default!;
     [Parameter, EditorRequired] public ShopContext Shop { get; set; } = default!;
+    /// <summary>Loyalty points this bill earned and used, and the customer's balance; null when there is nothing to say.</summary>
+    [Parameter] public NextGenOS.Hub.Loyalty.LoyaltyService.Summary? Points { get; set; }
+
+    private static string P(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     private string Title => View.Document.Type switch
     {

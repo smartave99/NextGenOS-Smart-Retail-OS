@@ -1,0 +1,200 @@
+@* Settings, "Move from the older POS": for the owner only. Two separate steps. "Check" reads the older program's database and shows a report; it saves nothing.
+   "Move it" saves, all or nothing, after a copy of the Business Hub's data has been made. The password is typed here each time, used for the check, and dropped: it is never saved or shown. *@
+@inherits HubPage
+@implements IDisposable
+@using NextGenOS.Hub.Import
+
+<section class="card" id="older-pos">
+    <h2>Move from the older POS</h2>
+    <p class="muted">If your shop used the older Windows POS, this brings its items, stock, customers, suppliers and what each of them owes into the Business Hub.
+        It only <strong>reads</strong> the older program's data: the older program is never changed. Nothing is saved here until you press the second button, and you can read a full report first.</p>
+    <p class="muted small">Close the older program on its computer first, so that its numbers stand still while you check. This step moves items, stock, people and balances. It does not move the history of sales, purchases or payments.</p>
+
+    @if (!Allowed)
+    {
+        <p class="muted" id="older-not-allowed">Only the owner can move data from an older program.</p>
+    }
+    else
+    {
+        <Notice Error="@Error" Info="@Info" />
+        <div class="stack">
+            <label for="op-server">Server name</label>
+            <input id="op-server" @bind="server" maxlength="120" autocomplete="off" placeholder="The name the older program shows under its database settings" />
+            <label for="op-db">Database name</label>
+            <input id="op-db" @bind="database" maxlength="120" autocomplete="off" />
+            <label class="check"><input id="op-win" type="checkbox" @bind="windowsLogin" /> Sign in with the Windows account this program runs under (no user name or password)</label>
+            @if (!windowsLogin)
+            {
+                <div class="field-row">
+                    <div><label for="op-user">User name</label><input id="op-user" @bind="user" maxlength="120" autocomplete="off" /></div>
+                    <div><label for="op-pass">Password</label><input id="op-pass" type="password" @bind="password" maxlength="200" autocomplete="new-password" /></div>
+                </div>
+                <p class="muted small">The password is used for the check only. It is not saved anywhere, and it is cleared as soon as the check has finished. Please use a database user who can only read.</p>
+            }
+            <label class="check"><input id="op-trust" type="checkbox" @bind="trustCertificate" /> Trust this server's security certificate (tick it if the check says the certificate is not trusted, and the server is your own)</label>
+        </div>
+        <div class="row"><button type="button" class="btn primary" id="op-check" disabled="@busy" @onclick="CheckNow">@(busy ? "Please wait..." : "Check")</button></div>
+    }
+</section>
+
+@if (Allowed && report is { } r)
+{
+    <section class="card" id="older-report">
+        <h2>The report</h2>
+        <p class="muted">Read from @r.Source. Nothing has been saved yet.</p>
+        <div class="tbl-wrap">
+            <table class="tbl">
+                <thead><tr><th>What</th><th class="num">In the older program</th><th class="num">In the Business Hub after the move</th><th class="num">Left out</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var l in r.Lines)
+                {
+                    <tr>
+                        <td>@l.Label</td>
+                        <td class="num">@Show(l, l.Old)</td>
+                        <td class="num">@Show(l, l.Hub)</td>
+                        <td class="num">@Show(l, l.Skipped)</td>
+                        <td>@if (l.Matches) { <span class="chip ok">Adds up</span> } else { <span class="chip bad">Does not add up</span> }</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (r.Lines.Any(l => l.Before > 0))
+        {
+            <p class="muted small">Rows that an earlier move already brought across are counted in the Business Hub column and are not added again.</p>
+        }
+
+        @foreach (var level in new[] { FindingLevels.Blocking, FindingLevels.Look, FindingLevels.Info })
+        {
+            var group = r.Findings.Where(f => f.Level == level).ToList();
+            if (group.Count == 0) continue;
+            <h3>@(level == FindingLevels.Blocking ? "These stop the move" : level == FindingLevels.Look ? "Please look at these" : "Good to know")</h3>
+            <ul class="findings">
+                @foreach (var f in group)
+                {
+                    <li>
+                        <span class="chip @(level == FindingLevels.Blocking ? "bad" : level == FindingLevels.Look ? "warn" : "")">@(level == FindingLevels.Blocking ? "Stops the move" : level == FindingLevels.Look ? "Look" : "Note")</span>
+                        @f.Text
+                        @if (f.Examples.Count > 0) { <span class="muted small"> For example: @string.Join("; ", f.Examples)</span> }
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (r.Skipped.Count > 0)
+        {
+            <h3>Rows left out (@r.Skipped.Count@(r.Skipped.Count >= 500 ? " or more" : ""))</h3>
+            <div class="tbl-wrap">
+                <table class="tbl">
+                    <thead><tr><th>What</th><th>Name</th><th>Why</th></tr></thead>
+                    <tbody>@foreach (var s in r.Skipped.Take(50)) { <tr><td>@s.Entity</td><td>@s.Name</td><td>@s.Reason</td></tr> }</tbody>
+                </table>
+            </div>
+            @if (r.Skipped.Count > 50) { <p class="muted small">The first 50 are shown here.</p> }
+        }
+
+        <h3>The move</h3>
+        @if (r.NothingToAdd)
+        {
+            <p class="muted" id="older-nothing">Everything from the older program is already in the Business Hub. There is nothing new to move.</p>
+        }
+        else
+        {
+            <p>It would add <strong>@r.ItemsToAdd</strong> item(s), <strong>@r.CustomersToAdd</strong> customer(s), <strong>@r.SuppliersToAdd</strong> supplier(s), <strong>@r.StockMovesToAdd</strong> stock count(s) and <strong>@r.BalancesToAdd</strong> balance(s) owed.
+                A copy of the Business Hub's data is made first, and either everything is saved or nothing is.</p>
+            @if (r.HasBlocking)
+            {
+                <p class="muted" id="older-blocked">The move is not possible while the report has notes that stop it.</p>
+            }
+            <label class="check"><input id="op-read" type="checkbox" @bind="haveRead" disabled="@(!r.CanImport)" /> I have read the report</label>
+            <div class="row"><button type="button" class="btn primary" id="op-import" disabled="@(!r.CanImport || !haveRead || busy)" @onclick="MoveNow">Move it into the Business Hub</button></div>
+        }
+    </section>
+}
+
+@if (Allowed && done is { } d)
+{
+    <section class="card" id="older-done">
+        <h2>Moved</h2>
+        <p>@d.Items item(s), @d.Customers customer(s) and @d.Suppliers supplier(s) were added, with @d.StockMoves stock count(s) and @d.Balances balance(s) owed.</p>
+        <p class="muted small">A copy of the Business Hub's data from just before is kept as <strong>@System.IO.Path.GetFileName(d.BackupPath)</strong>, next to the Business Hub's data file. To go back, ask your installer to put that copy back.</p>
+    </section>
+}
+
+@if (Allowed && runs.Count > 0)
+{
+    <section class="card" id="older-runs">
+        <h2>Earlier moves</h2>
+        <div class="tbl-wrap">
+            <table class="tbl">
+                <thead><tr><th>When</th><th>Who</th><th>From</th><th class="num">Items</th><th class="num">Customers</th><th class="num">Suppliers</th><th class="num">Balances</th></tr></thead>
+                <tbody>@foreach (var x in runs) { <tr><td class="nowrap">@When(x.At)</td><td>@(x.Who ?? "")</td><td>@x.Source</td><td class="num">@x.Items</td><td class="num">@x.Customers</td><td class="num">@x.Suppliers</td><td class="num">@x.Balances</td></tr> }</tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private string server = "", database = "", user = "", password = "";
+    private bool windowsLogin, trustCertificate, haveRead, busy;
+    private ImportCheck? checkResult;
+    private MatchReport? report => checkResult?.Report;
+    private ImportResult? done;
+    private IReadOnlyList<ImportRun> runs = Array.Empty<ImportRun>();
+
+    /// <summary>The owner only. Checked here and again in each action, because a service does not check who is asking.</summary>
+    private bool Allowed => Me is not null && Me.Can(Perm.Settings);
+
+    protected override Task LoadAsync()
+    {
+        runs = Allowed ? App.Importer.Runs(10) : Array.Empty<ImportRun>();
+        return Task.CompletedTask;
+    }
+
+    private async Task CheckNow()
+    {
+        if (!Allowed) return;
+        busy = true;
+        done = null;
+        checkResult = null;
+        haveRead = false;
+        StateHasChanged();
+        await Run(async () =>
+        {
+            using var source = new PosSqlServerSource(server, database, user, password, windowsLogin, trustCertificate);
+            try { checkResult = await Task.Run(() => App.Importer.Check(source)); }
+            finally { password = ""; }   // the password is dropped as soon as the check has finished, whatever its result
+        });
+        password = "";
+        busy = false;
+    }
+
+    private async Task MoveNow()
+    {
+        if (!Allowed || checkResult is null || !haveRead) return;
+        busy = true;
+        StateHasChanged();
+        var current = checkResult;
+        await Run(async () =>
+        {
+            done = await Task.Run(() => App.Importer.Import(current, Me.Id));
+            checkResult = null;
+            haveRead = false;
+            await Reload();
+        });
+        busy = false;
+    }
+
+    private string Show(ReportLine line, long value) => line.Unit switch
+    {
+        LineUnits.Money => Money(value),
+        LineUnits.Quantity => Qty(value),
+        _ => value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    public void Dispose()
+    {
+        password = "";
+        checkResult = null;
+    }
+}

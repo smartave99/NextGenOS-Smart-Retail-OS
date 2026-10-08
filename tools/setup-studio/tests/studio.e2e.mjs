@@ -30,7 +30,7 @@ process.env.PATH = tools + delimiter + oldPath;
 process.env.ANTHROPIC_API_KEY = 'sk-ant-test-123456';
 
 const github = await standInGitHub({ stepMs: 80 });
-const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, build: { api: github.url, pollMs: 100, ceilingMs: 60_000, requestTimeoutMs: 3000 } });
+const studio = await startStudio({ folder: join(root, 'ws'), env: process.env, kitFolder: join(root, 'no-built-in-kit'), build: { api: github.url, pollMs: 100, ceilingMs: 60_000, requestTimeoutMs: 3000 } });
 const browser = await chromium.launch();
 const problems = [];
 const step = (s) => console.log('✓ ' + s);
@@ -69,7 +69,7 @@ try {
   assert.ok(!page.url().includes('k='), 'the secret is not left in the address bar');
   step('the first person makes the administrator account; a mistyped password is explained, and the secret leaves the address bar');
   await page.getByRole('heading', { name: 'Customers', exact: true }).waitFor();
-  assert.ok(await page.getByText('No customers yet').isVisible());
+  assert.ok(await page.getByRole('heading', { name: 'No customers yet' }).isVisible());
   await shot(page, '02-empty');
 
   // ---- the team ---------------------------------------------------------------------------------------------------------------------------

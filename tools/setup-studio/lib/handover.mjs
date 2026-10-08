@@ -10,8 +10,9 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 /**
  * The sheet as plain data: { title, subtitle, sections: [{ heading, text?, bullets?, steps? }], fingerprint }.
  *   intake: the release's details, info: the release's record, company: { name, supportPhone, supportEmail, website }, pack: what is in the customer pack (optional)
+ *   websites: the website packages made for this customer on the Studio's PC, [{ os, name, sha256, licenceIncluded }] (optional): named with their fingerprints, so the file can be checked
  */
-export function handoverFor({ intake: i, info, company = {}, pack = null }) {
+export function handoverFor({ intake: i, info, company = {}, pack = null, websites = [] }) {
   const country = countryPack(i.business.country);
   const industry = industryPack(i.business.industry);
   const device = OPTIONS.deviceKinds.find((d) => d.id === i.device.kind);
@@ -43,9 +44,17 @@ export function handoverFor({ intake: i, info, company = {}, pack = null }) {
   if (pack?.ai) steps.push('Then, for the AI assistant, open the folder "2 - AI assistant (Windows)" and double-click its setup file. Keep the folder called "profile" next to it: it holds your own settings for the photos and posters.');
 
   const contact = [company.supportPhone, company.supportEmail, company.website].filter(Boolean);
+  const sites = [...websites].sort((a, b) => String(a.os).localeCompare(String(b.os)));
   const sections = [
     { heading: 'What you are getting', bullets: what },
     { heading: 'Putting it in place', steps },
+    ...(sites.length ? [{
+      heading: 'Your website package',
+      bullets: [
+        ...sites.map((w) => `${w.name} (for ${w.os === 'windows' ? 'Windows' : 'Linux'}). Fingerprint, to check the file is whole (SHA-256): ${w.sha256}`),
+        ...(sites.some((w) => !w.licenceIncluded) ? ['The licence file for the website is not inside yet. Put the licence file you were given into the folder "licence" inside the website, named licence.ngos. Until then the website shows a page that says it is not available.'] : []),
+      ],
+    }] : []),
     { heading: 'What your licence allows', text: `${level?.label ?? ''}: ${level?.hint ?? ''}${i.licence.seats > 1 ? ` Up to ${i.licence.seats} computers.` : ''}` },
     { heading: 'Need help?', text: contact.join(' · ') },
   ];

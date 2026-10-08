@@ -40,7 +40,7 @@ else
             @if (view.Lines.Count == 0) { <div class="empty">Tap a dish to add it.</div> }
             @foreach (var line in view.Lines)
             {
-                var result = view.Result?.Lines.ElementAtOrDefault(line.LineNo - 1);
+                var result = view.ResultFor(line);
                 <div class="line">
                     <span class="nm">@Qty(line.QtyMilli) × @line.Description@if (line.Fired) { <span class="chip ok">Sent</span> }</span>
                     <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>

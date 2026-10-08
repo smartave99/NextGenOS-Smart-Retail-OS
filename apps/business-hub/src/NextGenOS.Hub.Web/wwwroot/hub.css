@@ -107,6 +107,9 @@ label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; f
 .line .nm { font-weight: 600; }
 .line .amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .line .ctl { display: flex; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.disc-in { width: 100%; min-height: 34px; padding: 4px 8px; }
+.discount-row { align-items: center; margin-top: 6px; }
+.discount-row .disc-in { width: 9em; }
 .qty { width: 74px; min-height: 34px; padding: 4px 8px; text-align: center; }
 .qbtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--ngos-line-strong); background: var(--ngos-surface); color: var(--ngos-text); font: inherit; font-size: 1.1rem; cursor: pointer; }
 .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-variant-numeric: tabular-nums; }
@@ -331,3 +334,17 @@ html[data-density="touch"] .btn:hover, html[data-density="touch"] .stat.link:hov
 /* Icons only: the words stay for people who need them read out, and show as a hint */
 html[data-nav-labels="icons"] .side a span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 html[data-nav-labels="icons"] .side a { justify-content: center; }
+
+/* The two looks (decision 30). List look: items as rows you scroll down. Counter look: everything in view, the bill beside the items. The other settings of each look (button size, menu place, bill place) are the ordinary theme settings above. */
+html[data-look="list"] .items { display: flex; flex-direction: column; gap: 6px; }
+html[data-look="list"] .item-btn { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--ngos-tap); padding: 8px 14px; }
+html[data-look="list"] .item-btn .nm { flex: 1; }
+html[data-look="list"] .item-btn .pr { white-space: nowrap; }
+html[data-look="counter"] main#content { max-width: none; }
+@media (min-width: 981px) { html[data-look="counter"][data-cart="right"] .pos { grid-template-columns: minmax(0, 1fr) 440px; } }
+.look-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 10px 0; }
+.look-card { display: flex; flex-direction: column; gap: 4px; text-align: left; min-height: var(--ngos-tap); padding: 12px 14px; border: 1px solid var(--ngos-line-strong); border-radius: var(--ngos-radius, 10px); background: var(--ngos-surface); color: var(--ngos-text); font: inherit; cursor: pointer; }
+.look-card span { color: var(--ngos-text-2); font-size: .88rem; }
+.look-card[aria-pressed="true"] { border-color: var(--ngos-accent); box-shadow: 0 0 0 2px var(--ngos-accent); }
+.findings { padding-left: 1.1rem; margin: 6px 0 14px; }
+.findings li { margin: 6px 0; }

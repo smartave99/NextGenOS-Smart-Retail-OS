@@ -1,3 +1,4 @@
+using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Events;
 
@@ -502,7 +503,7 @@ public class EventMigrationTests
             Assert.Contains("site_id", columns);
         }
 
-        Assert.Equal(new long[] { 1, 2, 3, 4 }, f.App.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
+        Assert.Equal(Enumerable.Range(1, HubDb.LatestVersion).Select(v => (long)v).ToArray(), f.App.Db.Query("SELECT version FROM schema_version ORDER BY version", r => r.GetInt64(0)).ToArray());
     }
 
     [Fact]
@@ -529,6 +530,6 @@ public class EventMigrationTests
         Assert.Empty(Tables(f.App).Intersect(EventTables.Concat(AiTables)));
         var again = HubApp.Open(f.App.Db.Path, f.Clock);
         Assert.Subset(Tables(again).ToHashSet(), EventTables.Concat(AiTables).ToHashSet());
-        Assert.Contains("before-update-1-to-4", again.Db.LastBackup);
+        Assert.Contains($"before-update-1-to-{HubDb.LatestVersion}", again.Db.LastBackup);
     }
 }

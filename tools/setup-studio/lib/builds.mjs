@@ -523,7 +523,7 @@ export function createBuildService({ ws, env = process.env, studioVersion = '', 
       const run = await get('start', `/repos/${s.sourceRepo}/actions/runs/${rec.runId}`, 'looking at the build');
       const jobs = (await get('start', `/repos/${s.sourceRepo}/actions/runs/${rec.runId}/jobs?per_page=100`, 'looking at the build'))?.jobs ?? [];
       ended = run.status === 'completed';
-      rec = patch(id, n, { jobs: jobs.slice(0, 60).map((j) => ({ name: clean(j.name, 100), status: j.status, conclusion: j.conclusion ?? null })), runEnded: ended, runConclusion: run.conclusion ?? null });
+      rec = patch(id, n, { jobs: jobs.slice(0, 60).map(jobRecord), runEnded: ended, runConclusion: run.conclusion ?? null });
     }
     const release = await get('results', `/repos/${s.resultsRepo}/releases/${rec.releaseId}`, 'looking for the results');
     if (release?.draft === false) { await fetchResults(actor, id, n, release, s); return true; }
@@ -536,9 +536,25 @@ export function createBuildService({ ws, env = process.env, studioVersion = '', 
     return false;
   }
 
+  /** What the Studio keeps of one step of the build: its name, how it stands, whether GitHub ever gave it a machine, and the small step that failed. */
+  function jobRecord(j) {
+    // GitHub always says which machine ran a job; a job that never got one has none and no steps. A stand-in or an older answer that says nothing is taken as "it ran".
+    const neverRan = 'runner_id' in j && (j.runner_id === null || j.runner_id === 0) && !(Array.isArray(j.steps) && j.steps.length);
+    const stopAt = (Array.isArray(j.steps) ? j.steps : []).find((x) => x && x.conclusion === 'failure')?.name;
+    return { name: clean(j.name, 100), status: j.status, conclusion: j.conclusion ?? null, ran: !neverRan, ...(stopAt ? { stopAt: clean(stopAt, 120) } : {}) };
+  }
+
   function describeStop(rec) {
     const failed = (rec.jobs ?? []).filter((j) => j.conclusion && !['success', 'skipped', 'neutral'].includes(j.conclusion));
     if (rec.runConclusion === 'cancelled') return 'The build was cancelled before it finished.';
+    // GitHub gave the build no machine at all (the account's build time or spending limit used up, or the account on hold): nothing was built, and nobody can fix it from the Studio.
+    if (rec.runConclusion === 'startup_failure' || (failed.length && failed.every((j) => j.ran === false))) {
+      return 'The build service could not start the build: GitHub gave it no machine to build on, so nothing was built. This is usually because the company\'s GitHub build time or spending limit has run out. Ask the owner (whoever looks after the GitHub account) to look at GitHub, Settings, Billing and plans, and then try again.';
+    }
+    // The first step that reads this customer's settings could not: the key that lets the build read the results place is missing, has run out, or is for another place.
+    if (failed.some((j) => /take the settings/i.test(j.stopAt ?? ''))) {
+      return 'The build service could not take this customer\'s settings: the key that lets it read the results place is missing, has run out, or is for the wrong place. Ask the owner to set the build service up again (docs/CUSTOMER-BUILDS.md, steps 3 to 5), and then try again. Nothing came back.';
+    }
     if (failed.length) return `The build stopped before it finished. This step did not work: ${[...new Set(failed.map((j) => jobWords(j.name)))].join('; ')}. Nothing came back. Check the settings you sent, then try again.`;
     return 'The build stopped before it finished, and nothing came back. Try again; if it happens again, ask NextGenOS.';
   }

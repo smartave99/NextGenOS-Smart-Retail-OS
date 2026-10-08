@@ -2,9 +2,12 @@ using NextGenOS.Hub.Ai;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Appointments;
+using NextGenOS.Hub.Books;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
+using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Lending;
+using NextGenOS.Hub.Loyalty;
 using NextGenOS.Hub.Ontology;
 using NextGenOS.Hub.Printing;
 using NextGenOS.Hub.Projects;
@@ -32,11 +35,13 @@ public sealed class HubApp
         Numbering = new Numbering(Shop);
         Parties = new PartyService(db, Shop, clock);
         Catalog = new CatalogService(db, Shop, clock);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit);
+        Books = new BooksService(db, clock);
+        Loyalty = new LoyaltyService(db, Shop, clock);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty);
         Users = new UserService(db, clock, Audit);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
-        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit);
+        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit, Books);
         Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
         Purchasing = new PurchaseService(Documents, Catalog, Parties);
         Reports = new ReportService(db, Shop, clock, Catalog);
@@ -49,6 +54,8 @@ public sealed class HubApp
         Events = new EventStore(db, clock, Audit, Ai.Flags, Retention);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags);
+        // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
+        Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties);
     }
 
     public HubDb Db { get; }
@@ -59,6 +66,8 @@ public sealed class HubApp
     public Numbering Numbering { get; }
     public PartyService Parties { get; }
     public CatalogService Catalog { get; }
+    public BooksService Books { get; }
+    public LoyaltyService Loyalty { get; }
     public DocumentService Documents { get; }
     public UserService Users { get; }
     public RestaurantService Restaurant { get; }
@@ -73,12 +82,31 @@ public sealed class HubApp
     public RetentionService Retention { get; }
     public EventStore Events { get; }
     public OntologyService Ontology { get; }
+    public ImportService Importer { get; }
+
+    /// <summary>
+    /// The shop's tidying that nobody has to ask for: clears sales left open for more than a day, lets library holds run out, and forgets business-event records that are past their day
+    /// (whatever the switches say: forgetting never waits for one). It does nothing until the set-up has finished: before that the shop is still being made, and the sample company's open
+    /// sales are dated days back, so they would look like sales that were forgotten.
+    /// </summary>
+    public void Upkeep()
+    {
+        var settings = Shop.Settings;
+        if (string.IsNullOrEmpty(settings.Country) || !settings.SetupDone) return;
+        Documents.DiscardStaleDrafts();
+        Books.CatchUp();
+        if (Shop.Current.Features.Lending) Library.ProcessHolds();
+        Retention.Prune(null);
+    }
 
     /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
     public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null)
     {
         var db = new HubDb(path);
         db.Migrate();
-        return new HubApp(db, clock ?? new SystemClock(), print, ai);
+        var app = new HubApp(db, clock ?? new SystemClock(), print, ai);
+        // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).
+        app.Books.CatchUp();
+        return app;
     }
 }

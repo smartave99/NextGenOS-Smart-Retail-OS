@@ -7,9 +7,11 @@ import { Loader2, Images } from "lucide-react";
 import CloudinaryWidget from "@/components/admin/CloudinaryWidget";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { getSettings } from "@/lib/customer/settings";
 
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "";
-const CLOUDINARY_API_KEY = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY ?? "";
+// The public parts of the customer's own Cloudinary account: their settings (the customer folder, read when the website starts).
+const CLOUDINARY_CLOUD_NAME = getSettings().cloudinary.cloudName;
+const CLOUDINARY_API_KEY = getSettings().cloudinary.apiKey;
 
 export default function MediaLibraryPage() {
     const { user, loading: authLoading } = useAuth();

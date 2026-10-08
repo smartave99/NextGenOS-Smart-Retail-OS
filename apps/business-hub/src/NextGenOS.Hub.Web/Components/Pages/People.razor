@@ -35,9 +35,9 @@
                 <tr>
                     <td><strong>@r.Party.Name</strong>@if (!r.Party.Active) { <span class="chip">Off</span> }@if (r.Party.MemberType is { } mt) { <span class="chip">@mt</span> }</td>
                     <td>@r.Party.Phone</td>
-                    @if (showOwed) { <td class="num">@(r.Owed > 0 ? Money(r.Owed) : "")</td> }
+                    @if (showOwed) { <td class="num">@(r.Owed > 0 ? Money(r.Owed) : r.Owed < 0 ? "Credit " + Money(-r.Owed) : "")</td> }
                     @if (kind == "member") { <td class="muted small">@r.Party.CardBarcode</td> }
-                    <td class="right"><button type="button" class="btn ghost small" @onclick="() => Edit(r.Party)">Edit</button></td>
+                    <td class="right">@if (r.Party.Kind is "customer" or "client" or "supplier") { <a class="btn ghost small" href="account/@r.Party.Id" aria-label="Account of @r.Party.Name">Account</a> }<button type="button" class="btn ghost small" @onclick="() => Edit(r.Party)">Edit</button></td>
                 </tr>
             }
             </tbody>
@@ -152,7 +152,7 @@
     private void SearchKey(KeyboardEventArgs e) => Find();
 
     private void Find() =>
-        rows = App.Parties.Search(kind, string.IsNullOrWhiteSpace(text) ? null : text, 300, true).Select(p => new Row(p, showOwed ? App.Documents.Outstanding(p.Id) : 0)).ToList();
+        rows = App.Parties.Search(kind, string.IsNullOrWhiteSpace(text) ? null : text, 300, true).Select(p => new Row(p, showOwed ? App.Books.CustomerBalance(p.Id) : 0)).ToList();
 
     private void NewPerson()
     {

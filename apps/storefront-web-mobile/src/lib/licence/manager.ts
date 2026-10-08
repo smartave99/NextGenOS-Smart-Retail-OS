@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { TRUSTED_KEYS, LICENCE_SERVER_URL } from "./defaults";
 import { evaluate, verifyToken, isUsable, type LicenceState, type BrandProfile, type LicenceClaims } from "./evaluate";
+import { getSettings } from "@/lib/customer/settings";
 
 // How often the revocation list is fetched. Only the frequency can be changed by setting; the list itself must verify.
 const crlRefreshMs = () => Math.max(1, Number(process.env.NGOS_CRL_REFRESH_SECONDS) || 6 * 3600) * 1000;
@@ -59,10 +60,10 @@ export function readLicenceToken(): string | null {
     return (process.env.NGOS_LICENCE || "").trim() || readFile("licence.ngos");
 }
 
-/** The site's own address as configured (NGOS_SITE_HOST, or NEXT_PUBLIC_SITE_URL), for places with no request. */
+/** The site's own address as configured (NGOS_SITE_HOST, or the customer's web address setting), for places with no request. */
 export function configuredHost(): string | null {
     if (process.env.NGOS_SITE_HOST) return process.env.NGOS_SITE_HOST;
-    const url = process.env.NEXT_PUBLIC_SITE_URL;
+    const url = getSettings().siteUrl;
     return url ? url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null;
 }
 

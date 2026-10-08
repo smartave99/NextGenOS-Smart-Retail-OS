@@ -15,6 +15,8 @@ public static class Perm
     public const string Purchases = "purchases";
     public const string Reports = "reports";
     public const string Void = "void";
+    /// <summary>Giving any discount at the till. A cashier without it may still give a small one, up to the limit the owner sets in Settings.</summary>
+    public const string Discount = "discount";
     public const string Settings = "settings";
     public const string Users = "users";
     /// <summary>Connecting AI services, choosing what they may receive, and reading what they cost. The owner only.</summary>
@@ -33,8 +35,8 @@ public static class Roles
 
     private static readonly Dictionary<string, HashSet<string>> Grants = new()
     {
-        [Owner] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Settings, Perm.Users, Perm.Ai }),
-        [Manager] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void }),
+        [Owner] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount, Perm.Settings, Perm.Users, Perm.Ai }),
+        [Manager] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount }),
         [Cashier] = new(new[] { Perm.Sell, Perm.Orders, Perm.Loans, Perm.Appointments, Perm.Parties }),
         [Kitchen] = new(new[] { Perm.Kitchen }),
         [Librarian] = new(new[] { Perm.Loans, Perm.Parties, Perm.Catalog }),

@@ -19,7 +19,9 @@ export const RULES = [
   [/^SmartRetailPOS-Hub-(\d+\.\d+\.\d+)-win-x64\.zip$/, 'hub-windows-zip', () => ({ os: 'windows', arch: 'x64' })],
   [/^smart-retail-pos-hub_(\d+\.\d+\.\d+)-\d+_(amd64|arm64)\.deb$/, 'hub-linux-deb', (m) => ({ os: 'linux', arch: m[2] === 'amd64' ? 'x64' : 'arm64' })],
   [/^SmartRetailAI-Setup(?:-(\d+\.\d+\.\d+))?\.exe$/, 'ai-addon-windows', () => ({ os: 'windows', arch: 'x64' })],
-  // A website is built for one customer (its public settings are compiled in): the file says whose and for which system. The version is inside it (PACKAGE-INFO.json), not in the name.
+  // THE website, the one program every customer gets: made once per release with no customer's settings inside. The Setup Studio puts a customer's folder and licence beside it (assemble).
+  [/^website-(windows|linux)\.zip$/, 'website-generic', (m) => ({ os: m[1], arch: 'x64' })],
+  // A website made for one customer (the build service's older way: the customer's folder is already beside the program): the file says whose and for which system. The version is inside it (PACKAGE-INFO.json), not in the name.
   [/^website-([a-z0-9][a-z0-9-]{1,40})-(windows|linux)\.zip$/, 'website', (m) => ({ os: m[2], arch: 'x64', kit: m[1] })],
   [/^SmartRetailPOS-([a-z0-9][a-z0-9-]{1,40})-(\d+\.\d+\.\d+)\.apk$/, 'android-apk', (m) => ({ os: 'android', kit: m[1] })],
   [/^SmartRetailPOS-([a-z0-9][a-z0-9-]{1,40})-(\d+\.\d+\.\d+)\.aab$/, 'android-aab', (m) => ({ os: 'android', kit: m[1] })],
@@ -45,7 +47,7 @@ export async function makeBaseKit(folder, { version = null, now = new Date() } =
       const m = pattern.exec(name);
       if (!m) continue;
       matched = true;
-      const v = role === 'website' ? null : role.startsWith('android') ? m[2] : m[1];
+      const v = role.startsWith('website') ? null : role.startsWith('android') ? m[2] : m[1];
       if (v) versions.add(v);
       files.push({ name, role, ...extra(m), bytes: statSync(path).size, sha256: await sha256File(path) });
       break;

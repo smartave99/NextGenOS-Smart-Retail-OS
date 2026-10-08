@@ -36,7 +36,7 @@ public sealed record ProjectStatus(
     long ProfitSoFarMinor, long PercentCompleteMilli, IReadOnlyList<BoqProgress> Items);
 
 /// <summary>Contract work: projects for clients, a bill of quantities, quotes, progress bills that hold back retention and recover advances, costs and variations.</summary>
-public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock clock, DocumentService documents, PartyService parties, AuditService audit)
+public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock clock, DocumentService documents, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books)
 {
     private const string ProjectColumns = "id, code, name, party_id, site, status, retention_pct_milli, advance_minor, advance_recovered_minor, start_on, end_on, notes";
 
@@ -130,8 +130,9 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
         if (!shop.Current.PaymentMethods.Contains(method)) throw new HubException("method", $"\"{method}\" is not a way of paying here.");
         db.InTransaction((c, t) =>
         {
-            HubDb.Exec(c, "INSERT INTO payments(project_id, party_id, method, amount_minor, reference, at, user_id, kind) VALUES ($p, $party, $m, $a, $r, $at, $u, 'advance')", t,
+            var paymentId = HubDb.Insert(c, "INSERT INTO payments(project_id, party_id, method, amount_minor, reference, at, user_id, kind) VALUES ($p, $party, $m, $a, $r, $at, $u, 'advance')", t,
                 ("$p", projectId), ("$party", project.PartyId), ("$m", method), ("$a", amountMinor), ("$r", reference), ("$at", Iso.Text(clock.UtcNow)), ("$u", userId));
+            books.SyncPayment(c, t, paymentId, userId);
             HubDb.Exec(c, "UPDATE projects SET advance_minor = advance_minor + $a, status = CASE WHEN status = 'quoted' THEN 'active' ELSE status END WHERE id = $id", t, ("$a", amountMinor), ("$id", projectId));
             audit.Log(c, t, userId, "advance", "project", projectId, shop.Current.Money(amountMinor));
         });

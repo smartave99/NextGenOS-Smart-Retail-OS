@@ -54,7 +54,6 @@
    "apps/pos-desktop/Source/Libraries/DevNetSR/DevNetSR/Languages.cs": 1,
    "apps/pos-desktop/Source/Libraries/DevNetTRLN/DevNetTRLN/Transliterator.cs": 1,
    "apps/pos-desktop/Source/SmartAvenue99_POS_VB/SmartAvenue99 POS/BillPoint/frmConvert_Language.vb": 1,
-   "apps/storefront-web-mobile/src/app/actions/ai-settings-actions.ts": 1,
    "apps/storefront-web-mobile/src/lib/ai-config.ts": 1
   },
   "currency-inr": {
@@ -244,17 +243,10 @@
    "apps/pos-desktop/Source/SmartAvenue99_POS_VB/SmartAvenue99 POS/SmartAvenue99 POS.vbproj": 2
   },
   "festival": {
-   "apps/pos-dashboard-service/design/build.js": 1,
-   "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Components/Pages/AssistantMemory.razor": 1,
-   "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Components/Pages/Creative.razor": 1,
-   "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Components/Pages/PastChats.razor": 1
+   "apps/pos-dashboard-service/design/build.js": 1
   },
   "company-name": {
    "apps/pos-desktop/Source/SmartAvenue99_POS_VB/SmartAvenue99 POS/SmartAvenue99 POS.vbproj": 2
-  },
-  "country-default": {
-   "apps/storefront-web-mobile/src/app/about/page.tsx": 1,
-   "apps/storefront-web-mobile/src/lib/region/lite.ts": 1
   }
  }
 }

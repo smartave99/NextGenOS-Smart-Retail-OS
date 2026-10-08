@@ -13,6 +13,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <!-- The SQLite engine itself: newer than the one Microsoft.Data.Sqlite pulls in, which has a known vulnerability. -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
+    <!-- Reads the older POS's SQL Server database (Import/, read-only). MIT; the version the dashboard already uses. Its notice is in THIRD-PARTY-NOTICES.md. -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
     <ProjectReference Include="..\..\..\..\libs\dotnet\NextGenOS.Tax\NextGenOS.Tax.csproj" />
     <ProjectReference Include="..\..\..\..\libs\dotnet\NextGenOS.Devices\NextGenOS.Devices.csproj" />
   </ItemGroup>

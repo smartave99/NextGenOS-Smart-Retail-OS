@@ -36,6 +36,11 @@ public static class HubHost
     /// </summary>
     public static WebApplicationBuilder CreateBuilder(string[] args)
     {
+        // Numbers, dates and text are written the same on every PC, whatever language the PC is set to: the shop's own settings (country pack) decide how money and dates look.
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
         // On a shop PC the Hub runs as a Windows service, so it is there when the PC starts, before anyone signs in. Started by hand (or on another
         // system) this does nothing.
@@ -104,6 +109,7 @@ public static class HubHost
         // The look the owner chose on this PC; the licence's white-label level decides how much of it shows (BrandService).
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ProfileStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalThemeStore>();
+        services.AddSingleton<NextGenOS.Hub.Web.Branding.ShopLookStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ThemeService>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.LocalBrandStore>();
         services.AddSingleton<NextGenOS.Hub.Web.Branding.ProfiledBrand>();

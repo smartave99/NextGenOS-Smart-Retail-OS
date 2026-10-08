@@ -249,7 +249,8 @@ test('the website: with no website built for this customer, the pack keeps the p
     const site = join(r.dir, '3 - Website');
     assert.deepEqual(readdirSync(site).sort(), ['READ ME FIRST.txt', 'website-settings.env']);
     const readme = readFileSync(join(site, 'READ ME FIRST.txt'), 'utf8');
-    assert.match(readme, /has not been built yet/);
+    assert.match(readme, /has not been made yet/);
+    assert.match(readme, /press "Make the website package"/, 'it points to the Studio\'s own way first');
     assert.match(readme, /Actions, "Release", Run workflow/);
     assert.match(readme, /Website customer/);
     assert.match(readme, /Website settings/);

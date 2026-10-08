@@ -8,7 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <Deterministic>true</Deterministic>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Language data is ON (the Business Hub carries its own copy, see NextGenOS.Hub.Web.csproj), because the SQL Server client used to move a shop across from an older system refuses to run without it.
+         The programs still use the neutral ("invariant") culture for every number and date they write (HubHost.CreateBuilder), so nothing depends on the PC's own settings. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 </Project>

@@ -118,6 +118,9 @@ export function auditPrerequisites(folder, { os, arch = 'x64' }) {
       if (r.arch !== arch) problems.push(`${rel}: made for another processor (${r.arch}), not ${arch}`);
       for (const lib of r.needed) {
         if (present.has(lib.toLowerCase()) || LINUX_SYSTEM.has(lib) || (LINUX_OPENSSL.has(lib) && declared.includes('openssl-3'))) continue;
+        // The language data (ICU) the program carries is loaded by .NET under its full name (libicuuc.so.72.1.0.3); the libraries that need it ask for the short name (libicuuc.so.72),
+        // which the loader satisfies from the copy already loaded. So a file named "<short name>.<more>" in the package counts as the short name.
+        if (/^libicu(uc|i18n|data)\.so\.\d+$/.test(lib) && [...present].some((name) => name.startsWith(lib.toLowerCase() + '.'))) continue;
         problems.push(`${rel}: needs ${lib}, which is neither in the package nor part of the base system`);
         needs.set(lib, rel);
       }

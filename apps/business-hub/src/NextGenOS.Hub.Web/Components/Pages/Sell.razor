@@ -53,7 +53,7 @@
         {
             @foreach (var line in cart.Lines)
             {
-                var result = cart.Result?.Lines[line.LineNo - 1];
+                var result = cart.ResultFor(line);
                 <div class="line">
                     <span class="nm">@line.Description</span>
                     <span class="amt">@(result is null ? "" : Shop.Money(Shop.Minor(result.LineTotal)))</span>
@@ -65,9 +65,26 @@
                         <span class="spacer"></span>
                         <button type="button" class="btn ghost small" @onclick="() => Remove(line)">Remove</button>
                     </div>
+                    @if (CanDiscount)
+                    {
+                        <div class="ctl">
+                            <input class="disc-in" inputmode="decimal" aria-label="Discount on @line.Description" placeholder="Discount (10% or an amount)" value="@LineDiscountText(line)" @onchange="e => SetLineDiscount(line, e.Value?.ToString())" />
+                        </div>
+                    }
                 </div>
             }
 
+            @if (CanDiscount)
+            {
+                <div class="row discount-row">
+                    <label for="bill-discount" class="grow">Discount on the whole bill</label>
+                    <input id="bill-discount" class="disc-in" inputmode="decimal" placeholder="10% or an amount" value="@BillDiscountText()" @onchange="e => SetBillDiscount(e.Value?.ToString())" />
+                </div>
+            }
+            @if (cart.Result is { } given && Shop.Minor(given.Totals.Discount) > 0)
+            {
+                <div class="total-row muted"><span>Discount given</span><span id="discount-given">−@Shop.Money(Shop.Minor(given.Totals.Discount))</span></div>
+            }
             <div class="total-row"><span>Subtotal</span><span>@Money(cart.Document.SubtotalMinor)</span></div>
             @foreach (var part in TaxParts())
             {
@@ -98,6 +115,18 @@
                 }
             }
 
+            @if (App.Loyalty.Enabled && customer is not null)
+            {
+                var balance = App.Loyalty.Balance(customer.Id);
+                <div class="row wrap loyalty-row" id="loyalty-row">
+                    <span>Points: <strong id="points">@PointsText(balance)</strong> (worth @Money(App.Loyalty.ValueOf(balance)))</span>
+                    @if (balance > 0)
+                    {
+                        <input id="use-points" class="disc-in" inputmode="decimal" aria-label="Points to use" placeholder="Points to use" value="@(cart.Document.LoyaltyPointsUsedCent > 0 ? PointsText(cart.Document.LoyaltyPointsUsedCent) : "")" @onchange="e => UsePoints(e.Value?.ToString())" />
+                    }
+                </div>
+            }
+
             <h3>Payment</h3>
             <div class="pay-methods" role="group" aria-label="Way of paying">
                 @foreach (var m in Shop.PaymentMethods)
@@ -111,6 +140,10 @@
                 @if (Shop.Features.Credit && customer is { CreditLimitMinor: > 0 })
                 {
                     <button type="button" class="btn secondary" @onclick="() => Complete(true)">Put on account</button>
+                }
+                @if (AccountCredit > 0 && Remaining > 0)
+                {
+                    <button type="button" class="btn secondary" id="use-credit" @onclick="UseCredit">Use credit on account (@Money(AccountCredit))</button>
                 }
             </div>
             @foreach (var (p, i) in payments.Select((p, i) => (p, i)))
@@ -127,6 +160,7 @@
             }
             <div class="row">
                 <button type="button" class="btn primary grow" id="complete" @onclick="() => Complete(false)">Complete @Shop.Singular("sale").ToLowerInvariant()</button>
+                <button type="button" class="btn ghost" id="save-estimate" @onclick="SaveEstimate">Keep as a quote</button>
                 <button type="button" class="btn ghost" @onclick="Cancel">Cancel</button>
             </div>
         }
@@ -150,12 +184,37 @@
     private Task OpenDrawer() => Run(async () => { await App.Printing.OpenDrawerAsync(null, Me.Id); });
 
     private long Paid => payments.Sum(p => p.AmountMinor);
+
+    /// <summary>What the customer has with the shop already (an advance, or a return kept as credit), not yet counted in the payments below.</summary>
+    private long AccountCredit => customer is null ? 0 : Math.Max(0, -App.Books.CustomerBalance(customer.Id) - payments.Where(p => p.Method == DocumentService.AccountCredit).Sum(p => p.AmountMinor));
+
+    private void UseCredit() => Run(() => payments.Add(new PaymentInput { Method = DocumentService.AccountCredit, AmountMinor = Math.Min(AccountCredit, Remaining) }));
     private long Remaining => Math.Max(0, (cart?.Document.PayableMinor ?? 0) - Paid);
 
-    private static string Label(string m) => char.ToUpperInvariant(m[0]) + m[1..];
+    private static string Label(string m) => m == DocumentService.AccountCredit ? "Credit on account" : char.ToUpperInvariant(m[0]) + m[1..];
+
+    [SupplyParameterFromQuery(Name = "estimate")] public long? EstimateId { get; set; }
+
+    private void SaveEstimate() => Run(() =>
+    {
+        if (cart is null) return;
+        var quote = App.Documents.SaveAsEstimate(cart.Document.Id, Me.Id);
+        finished = true;
+        Nav.NavigateTo("/documents/" + quote.Document.Id + "?new=true");
+    });
 
     protected override Task LoadAsync()
     {
+        if (EstimateId is { } estimateId && cart is null)
+        {
+            // a bill started from a quote: the same customer and lines, ready to be paid
+            try
+            {
+                cart = App.Documents.BillFromEstimate(estimateId, Me.Id);
+                customer = cart.Party;
+            }
+            catch (HubException ex) { Error = ex.Message; }
+        }
         method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
         categories = App.Catalog.Categories();
         drawerPrinter = App.PrinterProfiles.For("receipt") is not null;
@@ -205,7 +264,7 @@
     {
         Run(() =>
         {
-            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && l.DiscountPctMilli == 0 && l.Note is null);
+            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && l.DiscountPctMilli == 0 && l.DiscountAmountMinor == 0 && l.Note is null);
             if (cart is null)
                 cart = App.Documents.CreateDraft(new DraftOptions { UserId = Me.Id, PartyId = customer?.Id, Lines = { new LineInput { ItemId = item.Id } } });
             else if (existing is not null)
@@ -239,6 +298,77 @@
 
     private void Remove(DocLine line) => Run(() => cart = App.Documents.RemoveLine(cart!.Document.Id, line.Id));
 
+    // ---- discounts: "10%" is a percent, a plain number is an amount of money -------------------------------------------------------------------
+
+    /// <summary>Owners and managers may always give a discount; a cashier may when the owner has set a limit above nothing (Settings).</summary>
+    private bool CanDiscount => Me.Can(Perm.Discount) || Shop.Settings.CashierDiscountPctMilli > 0;
+
+    private string LineDiscountText(DocLine line) =>
+        line.DiscountPctMilli > 0 ? Qty(line.DiscountPctMilli) + "%" : line.DiscountAmountMinor > 0 ? Shop.Text(line.DiscountAmountMinor) : "";
+
+    private string BillDiscountText() =>
+        cart is null ? "" : cart.Document.BillDiscountPctMilli > 0 ? Qty(cart.Document.BillDiscountPctMilli) + "%" : cart.Document.BillDiscountMinor > 0 ? Shop.Text(cart.Document.BillDiscountMinor) : "";
+
+    private void ParseDiscount(string? text, out long pctMilli, out long amountMinor)
+    {
+        pctMilli = 0;
+        amountMinor = 0;
+        var typed = (text ?? "").Trim();
+        if (typed.Length == 0) return;
+        try
+        {
+            if (typed.EndsWith('%')) pctMilli = ShopContext.QtyMilli(typed[..^1].Trim());
+            else if (!TryMoney(Shop, typed, out amountMinor)) throw new FormatException();
+        }
+        catch (FormatException) { throw new HubException("discount", "Please type a discount like 10% or 25.50."); }
+        if (pctMilli < 0 || amountMinor < 0) throw new HubException("discount", "A discount cannot be less than nothing.");
+    }
+
+    /// <summary>A cashier without the discount permission may not take off more than the owner's limit, counting every discount on the bill.</summary>
+    private void KeepWithinLimit(Action putBack)
+    {
+        if (Me.Can(Perm.Discount) || cart?.Result is not { } result) return;
+        var gross = Shop.Minor(result.Totals.Gross);
+        var off = Shop.Minor(result.Totals.Discount) - cart.Document.LoyaltyDiscountMinor;     // points are the customer's own: they do not count against a cashier's limit
+        var limit = Shop.Settings.CashierDiscountPctMilli;
+        if (gross > 0 && (decimal)off * 100_000m > (decimal)limit * gross)
+        {
+            putBack();
+            throw new HubException("discount-limit", $"A cashier may take off up to {Qty(limit)}% of a bill. Ask a manager for more.");
+        }
+    }
+
+    private void SetLineDiscount(DocLine line, string? text)
+    {
+        Run(() =>
+        {
+            ParseDiscount(text, out var pct, out var amount);
+            var (beforePct, beforeAmount) = (line.DiscountPctMilli, line.DiscountAmountMinor);
+            cart = App.Documents.UpdateLine(cart!.Document.Id, line.Id, discountPctMilli: pct, discountAmountMinor: amount);
+            KeepWithinLimit(() => cart = App.Documents.UpdateLine(cart!.Document.Id, line.Id, discountPctMilli: beforePct, discountAmountMinor: beforeAmount));
+        });
+    }
+
+    private static string PointsText(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private void UsePoints(string? text) => Run(() =>
+    {
+        var milli = NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(text);
+        if (!string.IsNullOrWhiteSpace(text) && (milli <= 0 || milli % 10 != 0)) throw new HubException("loyalty", "Please type the points as a number, like 20 or 12.5.");
+        cart = App.Documents.SetLoyaltyPoints(cart!.Document.Id, milli / 10);
+    });
+
+    private void SetBillDiscount(string? text)
+    {
+        Run(() =>
+        {
+            ParseDiscount(text, out var pct, out var amount);
+            var (beforePct, beforeAmount) = (cart!.Document.BillDiscountPctMilli, cart.Document.BillDiscountMinor);
+            cart = App.Documents.SetBillDiscount(cart.Document.Id, amount, pct);
+            KeepWithinLimit(() => cart = App.Documents.SetBillDiscount(cart!.Document.Id, beforeAmount, beforePct));
+        });
+    }
+
     private IEnumerable<NextGenOS.Tax.Component> TaxParts() => cart?.Result?.Totals.Components?.Where(c => Shop.Minor(c.Amount) != 0) ?? Enumerable.Empty<NextGenOS.Tax.Component>();
 
     private void PickCustomer(Party p)
@@ -247,6 +377,7 @@
         {
             customer = p;
             customerQuery = "";
+            payments.RemoveAll(x => x.Method == DocumentService.AccountCredit);
             if (cart is not null) cart = App.Documents.SetParty(cart.Document.Id, p.Id);
             Search();
         });
@@ -257,6 +388,7 @@
         Run(() =>
         {
             customer = null;
+            payments.RemoveAll(x => x.Method == DocumentService.AccountCredit);
             if (cart is not null) cart = App.Documents.SetParty(cart.Document.Id, null);
             Search();
         });
@@ -286,7 +418,7 @@
         {
             if (cart is null) return;
             if (!onAccount && tender.Trim().Length > 0) AddPayment();
-            if (!onAccount && payments.Count == 0 && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });
+            if (!onAccount && payments.All(p => p.Method == DocumentService.AccountCredit) && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });   // nothing typed (or only the customer's credit): the rest is taken in the way chosen
             var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount });
             finished = true;
             Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");

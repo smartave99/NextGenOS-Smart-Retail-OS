@@ -1,12 +1,14 @@
 import "server-only";
 
 import packs from "./generated/packs.json";
+import { getSettings } from "@/lib/customer/settings";
+import { NEUTRAL_PACK } from "./neutral";
 import type { CountryPack } from "./types";
 
 /**
  * What the website needs to know about the shop's country: its money, language and tax words. It comes from the country pack
- * (country-packs/ in the repository), chosen by NEXT_PUBLIC_COUNTRY, so selling to a shop in another country means setting that
- * one value, not changing code.
+ * (country-packs/ in the repository), chosen by the customer's country setting (see ../customer/settings.ts), so selling to a
+ * shop in another country means setting that one value, not changing code. With no country set the pack is neutral: no tax rule.
  */
 export interface RegionInfo {
     country: string;
@@ -25,10 +27,11 @@ export interface RegionInfo {
 }
 
 const all = packs as unknown as Record<string, CountryPack>;
-export const DEFAULT_COUNTRY = "IN";
 
-export function getPack(country: string | undefined = process.env.NEXT_PUBLIC_COUNTRY): CountryPack {
-    const code = (country || DEFAULT_COUNTRY).trim().toUpperCase();
+/** The pack of a country, or of the customer's own country (a setting) when none is given; the neutral pack when there is no country. */
+export function getPack(country: string | undefined = getSettings().country): CountryPack {
+    const code = (country || "").trim().toUpperCase();
+    if (!code) return NEUTRAL_PACK;
     const pack = all[code];
     if (!pack) {
         throw new Error(`There is no country pack for "${code}". Add one with: node country-packs/tools/cli.mjs new ${code}`);
@@ -50,8 +53,8 @@ export function getRegion(): RegionInfo {
         languages: pack.languages,
         taxName: pack.tax.name,
         pricesIncludeTax: pack.tax.pricesIncludeTaxDefault,
-        place: (process.env.NEXT_PUBLIC_SHOP_PLACE || "").trim(),
-        regionCode: (process.env.NEXT_PUBLIC_REGION_CODE || "").trim(),
+        place: getSettings().shopPlace.trim(),
+        regionCode: getSettings().regionCode.trim(),
         reviewed: pack.review !== null,
     };
 }

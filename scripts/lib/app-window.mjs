@@ -32,7 +32,8 @@ export function findAppBrowser({ platform = process.platform, env = process.env,
 
 /** What the browser is told: only the program's page in a window of its own, with its own profile (so it never touches the person's own browsing). */
 export function appWindowArgs(url, profileDir, { width = 1320, height = 880 } = {}) {
-  return [`--app=${url}`, `--user-data-dir=${profileDir}`, `--window-size=${width},${height}`, '--no-first-run', '--no-default-browser-check'];
+  // --disable-background-mode: when the window is closed the browser must end, not stay alive in the background; a copy that stays makes the next start hand its page to it and end at once.
+  return [`--app=${url}`, `--user-data-dir=${profileDir}`, `--window-size=${width},${height}`, '--no-first-run', '--no-default-browser-check', '--disable-background-mode'];
 }
 
 /** Opens the app window. Returns { child, closed, started } (closed resolves with the way it ended), or null when there is no browser for it. */
@@ -56,6 +57,35 @@ export function openAppWindow(url, { browser = findAppBrowser(), profileDir, spa
 export function windowWasClosedByPerson(ended, quickMs = 5000) {
   return !ended.error && ended.ms >= quickMs;
 }
+
+/**
+ * Waits until seen() says yes, for at most waitMs. Gives true when it was seen, false when the time ran out. (The clock and the pause can be replaced, for tests.)
+ */
+export async function waitUntil(seen, { waitMs = 40_000, pollMs = 250, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  const end = now() + waitMs;
+  while (now() < end) {
+    if (seen()) return true;
+    await sleep(pollMs);
+  }
+  return !!seen();
+}
+
+/**
+ * What to do when the window's browser program has ended.
+ *   'stop'           the person closed the window: stop the program.
+ *   'handed-off'     it ended at once, but the page itself said it is there (Edge and Chrome hand the page to a copy of themselves that is already running and end): the window is open,
+ *                    only it is not ours to watch. Leave it alone, and stop when nobody has used the page for a while. Opening the page again in the usual browser would show it twice.
+ *   'show-elsewhere' it could not start, or no page appeared in time: show the page in the PC's usual browser.
+ * pageSeen() says whether the page has said it is there since the window was opened.
+ */
+export async function whatNextAfterWindow(ended, { pageSeen, waitMs, ...timing }) {
+  if (windowWasClosedByPerson(ended)) return 'stop';
+  if (ended.error) return 'show-elsewhere';
+  return (await waitUntil(pageSeen, { waitMs, ...timing })) ? 'handed-off' : 'show-elsewhere';
+}
+
+/** How long a page that was handed to a browser we cannot watch may be silent before the program stops (a page that is hidden or minimised still says it is there about once a minute). */
+export const HANDED_OFF_IDLE_MS = 3 * 60_000;
 
 // ---- one copy at a time --------------------------------------------------------------------------------------------------------------
 

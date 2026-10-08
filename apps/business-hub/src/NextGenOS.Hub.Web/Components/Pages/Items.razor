@@ -149,6 +149,27 @@
                         </div>
                         <label class="check"><input type="checkbox" @bind="track" /> Keep count of how many I have</label>
                     }
+                    @if (App.Loyalty.Enabled && !lending)
+                    {
+                        <div class="field-row">
+                            <div>
+                                <label for="f-loy-mode">Loyalty points</label>
+                                <select id="f-loy-mode" @bind="loyaltyMode">
+                                    <option value="">Same as the shop</option>
+                                    <option value="none">None</option>
+                                    <option value="per">A percent of the price</option>
+                                    <option value="point">Points for each one sold</option>
+                                </select>
+                            </div>
+                            @if (loyaltyMode is "per" or "point")
+                            {
+                                <div>
+                                    <label for="f-loy-value">@(loyaltyMode == "per" ? "Percent" : "Points for each")</label>
+                                    <input id="f-loy-value" inputmode="decimal" @bind="loyaltyValue" />
+                                </div>
+                            }
+                        </div>
+                    }
                     @if (Kind(form.Kind)?.HasDuration == true)
                     {
                         <label for="f-dur">Takes (minutes)</label>
@@ -326,6 +347,7 @@
         form = new ItemInput { Kind = first?.Id ?? "stock", TaxClass = "standard", Unit = "pc", Station = Stations().First() };
         price = tradePrice = cost = reorder = "";
         author = isbn = "";
+        loyaltyMode = loyaltyValue = "";
         copies = 1;
         duration = first?.HasDuration == true ? 30 : null;
         track = first?.TracksStock == true && Shop.Industry.Features.StockTracking == "always";
@@ -335,7 +357,10 @@
     {
         editing = i;
         formError = null;
-        form = new ItemInput { Kind = i.Kind, Sku = i.Sku, Barcode = i.Barcode, Name = i.Name, Category = i.Category, Unit = i.Unit, TaxClass = i.TaxCode, Station = i.Station ?? Stations().First() };
+        // The item's loose attributes (loyalty, an author ...) are carried over, so that saving does not lose what this form does not show.
+        form = new ItemInput { Kind = i.Kind, Sku = i.Sku, Barcode = i.Barcode, Name = i.Name, Category = i.Category, Unit = i.Unit, TaxClass = i.TaxCode, Station = i.Station ?? Stations().First(), Attrs = new Dictionary<string, string>(i.Attrs) };
+        loyaltyMode = i.Attrs.GetValueOrDefault(NextGenOS.Hub.Loyalty.LoyaltyService.ModeKey) ?? "";
+        loyaltyValue = i.Attrs.GetValueOrDefault(NextGenOS.Hub.Loyalty.LoyaltyService.ValueKey) ?? "";
         price = Shop.Text(i.PriceMinor);
         tradePrice = i.TradePriceMinor is { } t ? Shop.Text(t) : "";
         cost = Shop.Text(i.CostMinor);
@@ -345,6 +370,8 @@
         author = i.Attrs.GetValueOrDefault("author") ?? "";
         isbn = i.Attrs.GetValueOrDefault("isbn") ?? "";
     }
+
+    private string loyaltyMode = "", loyaltyValue = "";
 
     private string TaxLabelFor(string code) => code;
 
@@ -376,6 +403,20 @@
                 form.ReorderMilli = reorder.Trim().Length > 0 ? QtyOf(reorder) : 0;
                 form.TrackStock = track;
                 form.DurationMin = Kind(form.Kind)?.HasDuration == true ? duration : null;
+                if (App.Loyalty.Enabled)
+                {
+                    if (loyaltyMode is "none" or "per" or "point")
+                    {
+                        form.Attrs[NextGenOS.Hub.Loyalty.LoyaltyService.ModeKey] = loyaltyMode;
+                        if (loyaltyMode == "none") form.Attrs.Remove(NextGenOS.Hub.Loyalty.LoyaltyService.ValueKey);
+                        else
+                        {
+                            if (NextGenOS.Hub.Loyalty.LoyaltyService.ParseMilli(loyaltyValue) <= 0) throw new HubException("loyalty", "Please type the percent or the points as a number above nothing, like 5 or 2.5.");
+                            form.Attrs[NextGenOS.Hub.Loyalty.LoyaltyService.ValueKey] = loyaltyValue.Trim();
+                        }
+                    }
+                    else { form.Attrs.Remove(NextGenOS.Hub.Loyalty.LoyaltyService.ModeKey); form.Attrs.Remove(NextGenOS.Hub.Loyalty.LoyaltyService.ValueKey); }
+                }
                 if (string.IsNullOrWhiteSpace(form.Barcode)) form.Barcode = null;
                 if (editing is null) App.Catalog.Create(form); else App.Catalog.Update(editing.Id, form);
             }

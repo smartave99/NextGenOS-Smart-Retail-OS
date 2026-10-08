@@ -1,0 +1,132 @@
+@page "/books"
+@attribute [Authorize(Policy = Perm.Reports)]
+@inherits HubPage
+@using NextGenOS.Hub.Books
+
+<PageTitle>Books</PageTitle>
+<h1>Books</h1>
+<p class="sub">The shop's money, written down twice so it always adds up: what came in, what went out, what the shop has and what it owes.</p>
+<Notice Error="@Error" />
+
+<div class="toolbar">
+    <div class="seg" role="group" aria-label="Period">
+        @foreach (var (key, label) in Presets)
+        {
+            <button type="button" class="@(preset == key ? "on" : "")" aria-pressed="@(preset == key)" @onclick="() => Pick(key)">@label</button>
+        }
+    </div>
+    <label class="sr" for="b-from">From</label>
+    <input id="b-from" class="date" type="date" value="@from.ToString("yyyy-MM-dd")" @onchange="e => SetFrom(e.Value?.ToString())" />
+    <label class="sr" for="b-to">To</label>
+    <input id="b-to" class="date" type="date" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" />
+</div>
+
+<div class="grid">
+    <div class="card stat"><span class="label">Came in</span><span class="value" id="b-income">@Money(profit.IncomeMinor)</span><span class="note">sales and other income, before tax</span></div>
+    <div class="card stat"><span class="label">Went out</span><span class="value" id="b-costs">@Money(profit.CostsMinor)</span><span class="note">what was bought and other costs</span></div>
+    <div class="card stat"><span class="label">Left over</span><span class="value" id="b-net">@Money(profit.NetMinor)</span><span class="note">@(profit.NetMinor < 0 ? "more went out than came in" : "")</span></div>
+</div>
+<p class="muted small">Things bought are counted as costs on the day they are bought. The value of what is still on the shelf is not counted yet, so "left over" is not the final word on profit.</p>
+
+<div class="cols">
+    <section class="card">
+        <h2>Came in and went out</h2>
+        @if (profit.Income.Count == 0 && profit.Costs.Count == 0) { <div class="empty">Nothing in these days.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="b-profit">
+                <tbody>
+                @foreach (var r in profit.Income) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+                @foreach (var r in profit.Costs) { <tr><td>@r.Name</td><td class="num">−@Money(r.AmountMinor)</td></tr> }
+                <tr><td><strong>Left over</strong></td><td class="num"><strong>@Money(profit.NetMinor)</strong></td></tr>
+                </tbody>
+            </table>
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <h2>What the shop has and owes, at the end of @to.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</h2>
+        <div class="tbl-wrap">
+        <table class="tbl" id="b-position">
+            <tbody>
+            <tr><th colspan="2">The shop has</th></tr>
+            @foreach (var r in position.Assets) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+            <tr><td><strong>Total</strong></td><td class="num"><strong id="b-assets">@Money(position.AssetsMinor)</strong></td></tr>
+            <tr><th colspan="2">The shop owes</th></tr>
+            @foreach (var r in position.Liabilities) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+            <tr><td><strong>Total</strong></td><td class="num"><strong id="b-liab">@Money(position.LiabilitiesMinor)</strong></td></tr>
+            <tr><th colspan="2">The shop is worth</th></tr>
+            @foreach (var r in position.Equity) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+            <tr><td>Left over since the books began</td><td class="num">@Money(position.ProfitSoFarMinor)</td></tr>
+            <tr><td><strong>Total</strong></td><td class="num"><strong id="b-worth">@Money(position.EquityMinor)</strong></td></tr>
+            </tbody>
+        </table>
+        </div>
+        <p class="muted small">What is owed plus what the shop is worth is always the same as what the shop has.</p>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Every account</h2>
+    <div class="tbl-wrap">
+    <table class="tbl" id="b-trial">
+        <thead><tr><th>Number</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+        <tbody>
+        @foreach (var r in trial) { <tr><td>@r.Code</td><td>@r.Name</td><td class="num">@(r.DebitMinor > 0 ? Money(r.DebitMinor) : "")</td><td class="num">@(r.CreditMinor > 0 ? Money(r.CreditMinor) : "")</td></tr> }
+        <tr><td></td><td><strong>Total</strong></td><td class="num"><strong id="b-debit">@Money(trial.Sum(r => r.DebitMinor))</strong></td><td class="num"><strong id="b-credit">@Money(trial.Sum(r => r.CreditMinor))</strong></td></tr>
+        </tbody>
+    </table>
+    </div>
+    <p class="muted small">Debits and credits are always equal. If they are not, something is wrong and the shop's supplier should be told.</p>
+</section>
+
+@code {
+    private static readonly (string Key, string Label)[] Presets = { ("today", "Today"), ("yesterday", "Yesterday"), ("week", "7 days"), ("month", "30 days"), ("year", "This year") };
+
+    private string preset = "month";
+    private DateOnly from, to;
+    private BooksService.ProfitAndLoss profit = new(Array.Empty<BooksService.StatementRow>(), Array.Empty<BooksService.StatementRow>());
+    private BooksService.BalanceSheet position = new(Array.Empty<BooksService.StatementRow>(), Array.Empty<BooksService.StatementRow>(), Array.Empty<BooksService.StatementRow>(), 0);
+    private IReadOnlyList<BooksService.TrialRow> trial = Array.Empty<BooksService.TrialRow>();
+
+    protected override Task LoadAsync()
+    {
+        Pick(preset);
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string key)
+    {
+        preset = key;
+        (from, to) = key switch
+        {
+            "today" => (Today, Today),
+            "yesterday" => (Today.AddDays(-1), Today.AddDays(-1)),
+            "week" => (Today.AddDays(-6), Today),
+            "year" => (new DateOnly(Today.Year, 1, 1), Today),
+            _ => (Today.AddDays(-29), Today),
+        };
+        Read();
+    }
+
+    private void SetFrom(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { from = d; if (to < from) to = from; preset = ""; Read(); }
+    }
+
+    private void SetTo(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Read(); }
+    }
+
+    private void Read()
+    {
+        var start = Shop.Time.StartOfDay(from);
+        var end = Shop.Time.StartOfNextDay(to);
+        profit = App.Books.Profit(start, end);
+        position = App.Books.Position(end);
+        trial = App.Books.TrialBalance(start, end);
+    }
+}

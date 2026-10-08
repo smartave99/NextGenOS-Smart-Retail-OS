@@ -48,7 +48,7 @@ public sealed class HubApp
         Events = new EventStore(db, clock, Audit, Ai.Flags, Retention, Access);
         // The outbox: a sale, a return, a payment, a purchase and a stock change leave a message in the very transaction that makes them (only while the event history is on); the upkeep delivers them.
         Outbox = new OutboxService(db, clock, Ai.Flags, Events, Audit, Access);
-        Books = new BooksService(db, clock);
+        Books = new BooksService(db, clock, Access);
         Catalog = new CatalogService(db, Shop, clock, Access, Books, Outbox);
         Loyalty = new LoyaltyService(db, Shop, clock);
         Offers = new OffersService(db, Shop, clock, Audit, Access);
@@ -64,8 +64,8 @@ public sealed class HubApp
         Insights = new InsightService(db, clock, Audit, Ai.Flags, Outbox, Supply, Access);
         // Requests for a closed list of things, each approved by a person before it is done (today: a draft order to a supplier). Off until the owner switches on suggested actions.
         Actions = new ActionService(db, clock, Audit, Ai.Flags, Outbox, Insights, new ActionRegistry([new CreatePurchaseOrderAction(db, Parties, Catalog, Purchasing, Shop)]), Access);
-        Reports = new ReportService(db, Shop, clock, Catalog);
-        TaxRegisters = new TaxRegisterService(db, Shop);
+        Reports = new ReportService(db, Shop, clock, Catalog, Access);
+        TaxRegisters = new TaxRegisterService(db, Shop, Access);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.

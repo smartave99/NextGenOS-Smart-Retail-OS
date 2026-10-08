@@ -233,7 +233,7 @@
     private long Paid => payments.Sum(p => p.AmountMinor);
 
     /// <summary>What the customer has with the shop already (an advance, or a return kept as credit), not yet counted in the payments below.</summary>
-    private long AccountCredit => customer is null ? 0 : Math.Max(0, -App.Books.CustomerBalance(customer.Id) - payments.Where(p => p.Method == DocumentService.AccountCredit).Sum(p => p.AmountMinor));
+    private long AccountCredit => customer is null ? 0 : Math.Max(0, -AsMe(() => App.Books.CustomerBalance(customer.Id)) - payments.Where(p => p.Method == DocumentService.AccountCredit).Sum(p => p.AmountMinor));
 
     private void UseCredit() => Run(() => payments.Add(new PaymentInput { Method = DocumentService.AccountCredit, AmountMinor = Math.Min(AccountCredit, Remaining) }));
     private long Remaining => Math.Max(0, (cart?.Document.PayableMinor ?? 0) - Paid);

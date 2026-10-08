@@ -1,5 +1,6 @@
 using System.Globalization;
 using NextGenOS.Hub.Catalog;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Shop;
@@ -31,8 +32,11 @@ public sealed record TopCustomer(long PartyId, string Name, int Documents, long 
 public sealed record StockValue(long ItemId, string Name, long OnHandMilli, long CostMinor, long ValueMinor);
 
 /// <summary>The numbers an owner looks at: sales by day, top items, tax by rate, what was paid how, who owes what, stock worth.</summary>
-public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog)
+public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog, Access access)
 {
+    /// <summary>Who may see the shop's figures (blueprint SEC-004, reads): the people who may see the reports. The Hub itself asks, not only the screen or the file download.</summary>
+    private void Allowed() => access.Require(Perm.Reports);
+
     private const string SalesTypes = "'invoice','progress-bill'";
 
     private IReadOnlyList<(Document Doc, TaxResult? Result)> Issued(DateTimeOffset from, DateTimeOffset to, string types) => db.Query(
@@ -45,6 +49,12 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
 
     /// <summary>Sales (invoices and progress bills) less credit notes, a row for each local day that had any.</summary>
     public IReadOnlyList<SalesDay> DailySales(DateOnly from, DateOnly to)
+    {
+        Allowed();
+        return Days(from, to);
+    }
+
+    private IReadOnlyList<SalesDay> Days(DateOnly from, DateOnly to)
     {
         var time = shop.Current.Time;
         var start = time.StartOfDay(from);
@@ -61,7 +71,8 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
 
     public SalesSummary Summary(DateOnly from, DateOnly to)
     {
-        var days = DailySales(from, to);
+        access.RequireAny(Perm.Reports, Perm.Sell);   // the day's totals are on the first screen of the people who sell as well
+        var days = Days(from, to);
         var documents = days.Sum(d => d.Documents);
         var total = days.Sum(d => d.TotalMinor);
         return new SalesSummary(documents, days.Sum(d => d.NetMinor), days.Sum(d => d.TaxMinor), total, days.Sum(d => d.RefundsMinor), days.Sum(d => d.TipsMinor), documents == 0 ? 0 : total / documents);
@@ -70,6 +81,7 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>Best sellers by what they earned (each line's total as the tax engine worked it out), credit notes taken off.</summary>
     public IReadOnlyList<TopItem> TopItems(DateOnly from, DateOnly to, int limit = 20)
     {
+        Allowed();
         var time = shop.Current.Time;
         return db.Query(
             "SELECT l.description AS name, SUM(CASE d.type WHEN 'credit-note' THEN -l.qty_milli ELSE l.qty_milli END) AS qty, " +
@@ -91,6 +103,7 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>Tax collected, by rate and part (CGST, SGST, VAT ...): the figures a tax return is made from.</summary>
     public IReadOnlyList<TaxSummaryRow> TaxSummary(DateOnly from, DateOnly to)
     {
+        Allowed();
         var time = shop.Current.Time;
         var decimals = shop.Current.Decimals;
         long Minor(string text) => (long)MoneyText.Parse(text, decimals);
@@ -113,6 +126,7 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>What came in by each way of paying (cash, card ...), refunds taken off.</summary>
     public IReadOnlyList<PaymentTotal> Payments(DateOnly from, DateOnly to)
     {
+        Allowed();
         var time = shop.Current.Time;
         return db.Query(
             "SELECT p.method, SUM(p.amount_minor) AS total FROM payments p LEFT JOIN documents d ON d.id = p.document_id WHERE (d.direction = 'out' OR p.document_id IS NULL) AND p.at >= $f AND p.at < $t GROUP BY p.method ORDER BY total DESC",
@@ -122,6 +136,7 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
     /// <summary>Who owes what, by how long it has been due.</summary>
     public IReadOnlyList<AgeingRow> Outstanding()
     {
+        Allowed();
         var time = shop.Current.Time;
         var today = time.LocalDate(clock.UtcNow);
         var rows = db.Query(
@@ -142,6 +157,7 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
 
     public IReadOnlyList<TopCustomer> TopCustomers(DateOnly from, DateOnly to, int limit = 20)
     {
+        Allowed();
         var time = shop.Current.Time;
         return db.Query(
             "SELECT d.party_id, p.name, COUNT(*) AS n, SUM(CASE d.type WHEN 'credit-note' THEN -d.total_minor ELSE d.total_minor END) AS total FROM documents d JOIN parties p ON p.id = d.party_id " +
@@ -150,12 +166,16 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
     }
 
     /// <summary>What the stock on the shelves is worth at cost: the value its moves have (decision 36, average cost), the same figure as "Stock on the shelves" in the books. Stock whose value is not known (moved before values were kept, with no cost price) shows nothing.</summary>
-    public IReadOnlyList<StockValue> StockValues() =>
-        catalog.StockList().Where(s => s.OnHandMilli > 0).Select(s => new StockValue(s.ItemId, s.Name, s.OnHandMilli, s.CostMinor, s.ValueMinor)).ToList();
+    public IReadOnlyList<StockValue> StockValues()
+    {
+        access.RequireAny(Perm.Reports, Perm.Stock);
+        return catalog.StockList().Where(s => s.OnHandMilli > 0).Select(s => new StockValue(s.ItemId, s.Name, s.OnHandMilli, s.CostMinor, s.ValueMinor)).ToList();
+    }
 
     /// <summary>Purchases received in the period and what is still unpaid to suppliers.</summary>
     public (long ReceivedMinor, long UnpaidMinor) Purchases(DateOnly from, DateOnly to)
     {
+        Allowed();
         var time = shop.Current.Time;
         var received = Convert.ToInt64(db.Scalar("SELECT COALESCE(SUM(total_minor), 0) FROM documents WHERE type = 'purchase' AND status = 'issued' AND issued_at >= $f AND issued_at < $t",
             ("$f", Iso.Text(time.StartOfDay(from))), ("$t", Iso.Text(time.StartOfNextDay(to)))) ?? 0L);

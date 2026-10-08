@@ -172,6 +172,31 @@ public class AccessTests : IDisposable
         yield return new("Insights.SaveSettings", new[] { Perm.Settings }, a => a.Insights.SaveSettings(new NextGenOS.Hub.Insights.LowStockSettings(), null));
         yield return new("Outbox.RetryFailed", new[] { Perm.Ai }, a => a.Outbox.RetryFailed(null));
         yield return new("Outbox.Replay", new[] { Perm.Ai }, a => a.Outbox.Replay(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, null));
+
+        // Reading the shop's numbers (blueprint SEC-004, reads): the same Hub-side check, so a new screen or a counter PC cannot see more than the role allows.
+        var from = new DateOnly(2026, 10, 1);
+        var to = new DateOnly(2026, 10, 31);
+        yield return new("Reports.Summary", new[] { Perm.Reports, Perm.Sell }, a => a.Reports.Summary(from, to));
+        yield return new("Reports.DailySales", new[] { Perm.Reports }, a => a.Reports.DailySales(from, to));
+        yield return new("Reports.TopItems", new[] { Perm.Reports }, a => a.Reports.TopItems(from, to));
+        yield return new("Reports.TaxSummary", new[] { Perm.Reports }, a => a.Reports.TaxSummary(from, to));
+        yield return new("Reports.Payments", new[] { Perm.Reports }, a => a.Reports.Payments(from, to));
+        yield return new("Reports.Outstanding", new[] { Perm.Reports }, a => a.Reports.Outstanding());
+        yield return new("Reports.TopCustomers", new[] { Perm.Reports }, a => a.Reports.TopCustomers(from, to));
+        yield return new("Reports.StockValues", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.StockValues());
+        yield return new("Reports.Purchases", new[] { Perm.Reports }, a => a.Reports.Purchases(from, to));
+        yield return new("TaxRegisters.Register", new[] { Perm.Reports }, a => a.TaxRegisters.Register("sales", from, to));
+        yield return new("TaxRegisters.ReturnLists", new[] { Perm.Reports }, a => a.TaxRegisters.ReturnLists(from, to));
+        yield return new("TaxRegisters.SupplySummary", new[] { Perm.Reports }, a => a.TaxRegisters.SupplySummary(from, to));
+        yield return new("TaxRegisters.CodesSold", new[] { Perm.Reports }, a => a.TaxRegisters.CodesSold(from, to));
+        yield return new("Books.TrialBalance", new[] { Perm.Reports }, a => a.Books.TrialBalance(null, null));
+        yield return new("Books.Profit", new[] { Perm.Reports }, a => a.Books.Profit(null, null));
+        yield return new("Books.Position", new[] { Perm.Reports }, a => a.Books.Position(null));
+        var accounts = new[] { Perm.Parties, Perm.Reports, Perm.Sell, Perm.Purchases, Perm.Orders, Perm.Loans, Perm.Projects, Perm.Appointments };
+        yield return new("Books.CustomerLedger", accounts, a => a.Books.CustomerLedger(partyId));
+        yield return new("Books.SupplierLedger", accounts, a => a.Books.SupplierLedger(supplierId));
+        yield return new("Books.CustomerBalance", accounts, a => a.Books.CustomerBalance(partyId));
+        yield return new("Books.SupplierBalance", accounts, a => a.Books.SupplierBalance(supplierId));
     }
 
     private static bool Refusal(Exception? e) => e is HubException { Code: "forbidden" or "not-signed-in" };

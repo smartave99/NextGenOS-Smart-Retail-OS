@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Tax;
 using NewtonJson = Newtonsoft.Json.JsonConvert;
@@ -18,10 +19,13 @@ namespace NextGenOS.Hub.Books;
 /// Posting never stops a sale. If a case is met that was not foreseen and the lines would not add up, the difference goes to an account called "Needs checking", which shows in
 /// the trial balance and is looked for by the tests, and the sale goes on.
 /// </summary>
-public sealed class BooksService(HubDb db, IClock clock)
+public sealed class BooksService(HubDb db, IClock clock, Access access)
 {
     private const string Tenant = "local";
     private const string Site = "main";
+
+    /// <summary>Who may read what customers and suppliers owe (blueprint SEC-004, reads): the people who work with accounts, bills, orders, buying and the reports. The statements of the books are for the reports only.</summary>
+    private static readonly string[] AccountReaders = [Perm.Parties, Perm.Reports, Perm.Sell, Perm.Purchases, Perm.Orders, Perm.Loans, Perm.Projects, Perm.Appointments];
 
     // ---- the accounts ----------------------------------------------------------------------------------------------------------
 
@@ -346,12 +350,16 @@ public sealed class BooksService(HubDb db, IClock clock)
     }
 
     /// <summary>Each account with what has been debited and credited to it in the period (from the start, to the end, when not given). The debits and the credits always come to the same.</summary>
-    public IReadOnlyList<TrialRow> TrialBalance(DateTimeOffset? from = null, DateTimeOffset? to = null) => db.Query(
+    public IReadOnlyList<TrialRow> TrialBalance(DateTimeOffset? from = null, DateTimeOffset? to = null)
+    {
+        access.Require(Perm.Reports);
+        return db.Query(
         "SELECT a.code, a.name, a.kind, COALESCE(SUM(l.debit_minor), 0), COALESCE(SUM(l.credit_minor), 0) FROM journal_lines l " +
         "JOIN journal_entries e ON e.id = l.entry_id JOIN accounts a ON a.id = l.account_id " +
         "WHERE ($from IS NULL OR e.at >= $from) AND ($to IS NULL OR e.at < $to) GROUP BY a.id ORDER BY a.code",
         r => new TrialRow(r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt64(3), r.GetInt64(4)),
         ("$from", from is { } f ? Iso.Text(f) : null), ("$to", to is { } o ? Iso.Text(o) : null));
+    }
 
     public sealed record StatementRow(string Code, string Name, long AmountMinor);
 
@@ -395,9 +403,17 @@ public sealed class BooksService(HubDb db, IClock clock)
     /// A customer's account, line by line, with what they owed after each line (positive: the customer owes the shop; negative: the shop owes the customer, for instance after a return that was kept as
     /// credit or an advance). A supplier's account is the same read the other way: use <see cref="SupplierLedger"/>.
     /// </summary>
-    public IReadOnlyList<LedgerRow> CustomerLedger(long partyId) => Ledger(partyId, new[] { "receivable", "customer-advances" }, +1);
+    public IReadOnlyList<LedgerRow> CustomerLedger(long partyId)
+    {
+        access.RequireAny(AccountReaders);
+        return Ledger(partyId, new[] { "receivable", "customer-advances" }, +1);
+    }
 
-    public IReadOnlyList<LedgerRow> SupplierLedger(long partyId) => Ledger(partyId, new[] { "payable", "supplier-advances" }, -1);
+    public IReadOnlyList<LedgerRow> SupplierLedger(long partyId)
+    {
+        access.RequireAny(AccountReaders);
+        return Ledger(partyId, new[] { "payable", "supplier-advances" }, -1);
+    }
 
     private IReadOnlyList<LedgerRow> Ledger(long partyId, string[] roles, int sign)
     {

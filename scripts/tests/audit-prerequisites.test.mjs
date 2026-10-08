@@ -120,6 +120,16 @@ test('Linux: OpenSSL 3 may be relied on only when the package says so (the websi
   assert.match(old, /needs libz\.so\.1/);
 });
 
+test('Linux: the language data (ICU) a program carries under its full name counts as the short name the other ICU files ask for; a missing one and any other library do not', () => {
+  const icu = { app: makeElf({ needed: ['libc.so.6', 'libicui18n.so.72'] }), 'libicui18n.so.72.1.0.3': makeElf({ needed: ['libicuuc.so.72', 'libicudata.so.72', 'libc.so.6'] }), 'libicuuc.so.72.1.0.3': makeElf({ needed: ['libicudata.so.72', 'libc.so.6'] }), 'libicudata.so.72.1.0.3': makeElf({ needed: ['libc.so.6'] }) };
+  assert.deepEqual(audit({ 'prerequisites.json': manifest(), ...icu }, { os: 'linux' }).problems, []);
+  const { 'libicudata.so.72.1.0.3': _gone, ...withoutData } = icu;
+  assert.match(audit({ 'prerequisites.json': manifest(), ...withoutData }, { os: 'linux' }).problems.join('\n'), /needs libicudata\.so\.72/);
+  // the same trick does not excuse some other library
+  const other = audit({ 'prerequisites.json': manifest(), app: makeElf({ needed: ['libz.so.1'] }), 'libz.so.1.2.13': makeElf({ needed: ['libc.so.6'] }) }, { os: 'linux' }).problems.join('\n');
+  assert.match(other, /needs libz\.so\.1/);
+});
+
 const winManifest = (extra = {}) => JSON.stringify({ schema: 1, os: 'windows', arch: 'x64', bundled: ['the Node.js runtime'], system: ['windows-10-22h2-or-11-x64', 'windows-system-dlls'], minimumSystem: 'Windows 10 22H2 or 11, 64-bit', ...extra });
 
 test('a 32-bit launcher is accepted only when the package names it; what it imports is still checked', () => {

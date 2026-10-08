@@ -36,6 +36,11 @@ public static class HubHost
     /// </summary>
     public static WebApplicationBuilder CreateBuilder(string[] args)
     {
+        // Numbers, dates and text are written the same on every PC, whatever language the PC is set to: the shop's own settings (country pack) decide how money and dates look.
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
         // On a shop PC the Hub runs as a Windows service, so it is there when the PC starts, before anyone signs in. Started by hand (or on another
         // system) this does nothing.

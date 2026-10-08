@@ -135,6 +135,20 @@ public class AiJobQueueTests
     }
 
     [Fact]
+    public async Task A_place_is_free_again_by_the_time_the_answer_is_given()
+    {
+        using var f = Ready(out var held);
+        using var queue = new AiJobQueue(f.Ai.Gateway, maxRunning: 1, maxWaiting: 10);
+        held.Let(1000);
+        for (var i = 0; i < 300; i++)
+        {
+            var answer = await Ask(queue, "again " + i);
+            Assert.True(answer.Ok, "request " + i + " was not answered: " + answer.Refusal);
+            Assert.True(queue.Running == 0, "request " + i + " was answered, but its place was still taken (" + queue.Running + " running)");
+        }
+    }
+
+    [Fact]
     public async Task A_request_that_is_being_answered_can_be_called_off_and_its_place_goes_to_the_next()
     {
         using var f = Ready(out var held);

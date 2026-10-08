@@ -6,6 +6,9 @@ namespace NextGenOS.Hub.Security;
 public sealed record Actor(long? UserId, string Role, string Name, bool IsSystem = false)
 {
     public static readonly Actor System = new(null, "system", "the program", true);
+
+    /// <summary>True for the program itself, or for a person whose role allows at least one of these.</summary>
+    public bool CanAny(IEnumerable<string> permissions) => IsSystem || permissions.Any(p => Roles.Can(Role, p));
 }
 
 /// <summary>
@@ -70,6 +73,26 @@ public sealed class Access
 
     /// <summary>Allowed to do this? Throws a plain <see cref="HubException"/> (<c>not-signed-in</c> or <c>forbidden</c>) when not.</summary>
     public Actor Require(string permission) => RequireAny(permission);
+
+    /// <summary>
+    /// Who is asking, for a read that shows different things to different people (the business map, one day an assistant's questions). The person is looked up again each time, so a person
+    /// who was switched off, or given another role, is judged as they are now. Nobody named in the normal shop is refused (<c>not-signed-in</c>), like a command; the program itself, and a
+    /// shop opened for tests, are the program.
+    /// </summary>
+    public Actor Who()
+    {
+        var frame = Current.Value;
+        if (frame is { System: true }) return Actor.System;
+        if (frame?.Who?.Invoke() is { } id)
+        {
+            var user = db.Query("SELECT display_name, role, active FROM users WHERE id = $id", r => (Name: r.Text("display_name"), Role: r.Text("role"), Active: r.Flag("active")), ("$id", id)).FirstOrDefault();
+            if (user.Name is null || !user.Active) throw new HubException("not-signed-in", "Please sign in again.");
+            return new Actor(id, user.Role, user.Name);
+        }
+
+        if (trusted) return Actor.System;
+        throw new HubException("not-signed-in", "Please sign in first.");
+    }
 
     /// <summary>Allowed when the person may do at least one of these.</summary>
     public Actor RequireAny(params string[] permissions)

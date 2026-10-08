@@ -320,7 +320,7 @@ else if (!App.Events.Recording)
         string text = reference;
         try
         {
-            if (Ontology.ThingRef.TryParse(reference, out var thing) && App.Ontology.Resolve(thing) is { Exists: true } view && !view.Retired) text = view.Label + " (" + reference + ")";
+            if (Ontology.ThingRef.TryParse(reference, out var thing) && AsMe(() => App.Ontology.Resolve(thing)) is { Exists: true } view && !view.Retired) text = view.Label + " (" + reference + ")";
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { /* a name that cannot be looked up is shown as the reference */ }
         return named[reference] = text;

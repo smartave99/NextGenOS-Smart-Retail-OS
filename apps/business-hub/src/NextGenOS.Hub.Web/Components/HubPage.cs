@@ -115,6 +115,16 @@ public abstract class HubPage : ComponentBase, IHandleEvent
 
     protected Task Run(Action work, string? done = null) => Run(() => { work(); return Task.CompletedTask; }, done);
 
+    /// <summary>
+    /// Reads something for the person signed in, while the screen is being drawn. Drawing happens outside the scope that a screen's start and its events run in, and a read that shows
+    /// different things to different people (the business map) must still know who is asking.
+    /// </summary>
+    protected T AsMe<T>(Func<T> read)
+    {
+        using var scope = App.Access.As(() => Me?.Id);
+        return read();
+    }
+
     protected static bool TryMoney(ShopContext shop, string? text, out long minor)
     {
         minor = 0;

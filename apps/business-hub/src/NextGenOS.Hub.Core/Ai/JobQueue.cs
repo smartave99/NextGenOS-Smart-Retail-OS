@@ -32,21 +32,32 @@ public sealed class AiJobQueue(AiGateway gateway, int maxRunning = 2, int maxWai
         public LinkedListNode<Job>? Node { get; set; }
         public CancellationTokenSource Cancel { get; init; } = null!;
         public CancellationTokenRegistration Registration { get; set; }
+
+        /// <summary>Does the work and keeps the outcome. The caller does not hear it until <see cref="Publish"/>, which is done once the place is free again.</summary>
         public abstract Task RunAsync();
+
+        /// <summary>Gives the caller the outcome of <see cref="RunAsync"/>.</summary>
+        public abstract void Publish();
+
         public abstract void Turn(string why);
         public abstract void Abandon();
     }
 
     private sealed class Job<T>(Func<CancellationToken, Task<AiAnswer<T>>> work) : Job where T : class
     {
+        private Action _publish = () => { };
+
         public TaskCompletionSource<AiAnswer<T>> Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public override async Task RunAsync()
         {
-            try { Done.TrySetResult(await work(Cancel.Token)); }
-            catch (OperationCanceledException) { Done.TrySetCanceled(Cancel.Token); }
-            catch (Exception) { Done.TrySetResult(new AiAnswer<T>(null, null, "The AI helper stopped unexpectedly. Nothing was lost.", [])); }
+            var token = Cancel.Token;   // read now: the source is disposed before the outcome is published
+            try { var answer = await work(token); _publish = () => Done.TrySetResult(answer); }
+            catch (OperationCanceledException) { _publish = () => Done.TrySetCanceled(token); }
+            catch (Exception) { _publish = () => Done.TrySetResult(new AiAnswer<T>(null, null, "The AI helper stopped unexpectedly. Nothing was lost.", [])); }
         }
+
+        public override void Publish() => _publish();
 
         public override void Turn(string why) => Done.TrySetResult(new AiAnswer<T>(null, null, why, []));
 
@@ -137,6 +148,9 @@ public sealed class AiJobQueue(AiGateway gateway, int maxRunning = 2, int maxWai
                     next.Cancel.Dispose();
                     lock (_gate) _running--;
                     Pump();
+                    // Only now does the caller hear the outcome: its place is free again and the next request has been started, so whoever asks next is never told the line is full
+                    // by a place that is only still taken because this thread had not got round to freeing it.
+                    next.Publish();
                 }
             });
         }

@@ -262,7 +262,7 @@ In plain words: one main Studio for staff. Staff make a **project** for each new
 - **Asked (7 October 2026):** In the older POS an estimate shows no tax, so the bill made from it is dearer (estimate 180.00 became bill 212.40). What should an estimate do?
 - **Answer (the owner chose):** "Show the tax, so the bill matches (Recommended)".
 - **Rule:** An estimate (quotation) for a shop sale is worked out **exactly like a bill, with the same tax**; turning it into a bill gives the same total unless prices changed. Estimates for shop sales are new in the Hub (today it has quotes for construction projects only).
-- **Today:** Not built.
+- **Today:** **Built (8 October 2026).** `DocumentService.SaveAsEstimate` and `BillFromEstimate`, the *Keep as a quote* button at the till, *Make a bill from this quote* on the quote, tested by `EstimateTests` and `e2e/estimates.e2e.mjs`. **Not done:** an expiry date on a quote, sending it to the customer, service-job estimates, and quotations with terms (the older program's separate quotation screen).
 
 ## Still to ask, and open items
 

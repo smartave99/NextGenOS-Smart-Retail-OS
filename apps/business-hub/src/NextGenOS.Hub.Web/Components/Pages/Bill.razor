@@ -19,6 +19,7 @@ else
         <p class="sub">
             @(d.IssuedAt is { } at ? When(at) : "Not finished") ·
             @if (view.Party is { } p) { <a href="account/@p.Id">@p.Name</a> }
+            @if (d.Type == DocTypes.Quote && d.Meta.TryGetValue("billedAs", out var billedAs)) { <span class="chip ok">Made into bill @billedAs</span> }
             @if (d.Status == DocStatus.Void) { <span class="chip bad">Void</span> }
             else if (d.Status == DocStatus.Issued) { <span class="chip @(d.PaymentState == "paid" ? "ok" : "warn")">@(d.PaymentState == "paid" ? "Paid" : d.PaymentState == "partial" ? "Part paid" : "Unpaid")</span> }
         </p>
@@ -27,6 +28,7 @@ else
             <button type="button" class="btn primary" id="print" @onclick="Print">Print</button>
             @if (receiptPrinter is not null) { <button type="button" class="btn secondary" id="print-receipt" @onclick="PrintReceipt">Print on @receiptPrinter.Name</button> }
             @if (d.BalanceMinor > 0 && Me.Can(Perm.Sell)) { <button type="button" class="btn secondary" id="take-payment" @onclick="() => Toggle(PayPanel)">Take payment (@Money(d.BalanceMinor) owed)</button> }
+            @if (d is { Type: DocTypes.Quote, Status: DocStatus.Issued, ProjectId: null } && !d.Meta.ContainsKey("billedAs") && Me.Can(Perm.Sell)) { <a class="btn secondary" id="make-bill" href="sell?estimate=@d.Id">Make a bill from this quote</a> }
             @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn">Take something back</button> }
             @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)">Cancel this bill</button> }
         </div>

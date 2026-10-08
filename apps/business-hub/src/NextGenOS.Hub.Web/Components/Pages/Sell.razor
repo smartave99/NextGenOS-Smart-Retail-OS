@@ -160,6 +160,7 @@
             }
             <div class="row">
                 <button type="button" class="btn primary grow" id="complete" @onclick="() => Complete(false)">Complete @Shop.Singular("sale").ToLowerInvariant()</button>
+                <button type="button" class="btn ghost" id="save-estimate" @onclick="SaveEstimate">Keep as a quote</button>
                 <button type="button" class="btn ghost" @onclick="Cancel">Cancel</button>
             </div>
         }
@@ -192,8 +193,28 @@
 
     private static string Label(string m) => m == DocumentService.AccountCredit ? "Credit on account" : char.ToUpperInvariant(m[0]) + m[1..];
 
+    [SupplyParameterFromQuery(Name = "estimate")] public long? EstimateId { get; set; }
+
+    private void SaveEstimate() => Run(() =>
+    {
+        if (cart is null) return;
+        var quote = App.Documents.SaveAsEstimate(cart.Document.Id, Me.Id);
+        finished = true;
+        Nav.NavigateTo("/documents/" + quote.Document.Id + "?new=true");
+    });
+
     protected override Task LoadAsync()
     {
+        if (EstimateId is { } estimateId && cart is null)
+        {
+            // a bill started from a quote: the same customer and lines, ready to be paid
+            try
+            {
+                cart = App.Documents.BillFromEstimate(estimateId, Me.Id);
+                customer = cart.Party;
+            }
+            catch (HubException ex) { Error = ex.Message; }
+        }
         method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
         categories = App.Catalog.Categories();
         drawerPrinter = App.PrinterProfiles.For("receipt") is not null;

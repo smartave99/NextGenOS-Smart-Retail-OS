@@ -458,10 +458,63 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
 
         if (type == DocTypes.Invoice && header.Direction == "out") MoveStock(c, t, header.Id, lines, -1, "sale", options.UserId, now);
         if (type == DocTypes.Purchase) MoveStock(c, t, header.Id, lines, +1, "purchase", options.UserId, now);
+        if (type == DocTypes.Invoice && header.RefDocumentId is { } fromQuote
+            && HubDb.Query(c, "SELECT type, meta FROM documents WHERE id = $id", r => (Type: r.GetString(0), Meta: r.GetString(1)), t, ("$id", fromQuote)).FirstOrDefault() is { Type: DocTypes.Quote } q)
+        {
+            var quoteMeta = JsonSerializer.Deserialize<Dictionary<string, string>>(q.Meta) ?? new();
+            quoteMeta["billedAs"] = number!;
+            HubDb.Exec(c, "UPDATE documents SET meta = $m WHERE id = $id", t, ("$m", JsonSerializer.Serialize(quoteMeta)), ("$id", fromQuote));
+        }
         books.Sync(c, t, documentId, options.UserId);
         loyalty.OnIssued(c, t, documentId, options.UserId);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
         return documentId;
+    }
+
+    // ---- estimates (quotes for a shop sale) ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Keeps a sale that is being built as a quote (an estimate) for the customer: numbered, worked out exactly like a bill with the same tax and discounts (decision 35), nothing
+    /// sold, no stock moved, no money taken, nothing in the books. The customer can come back and have it made into a bill.
+    /// </summary>
+    public DocumentView SaveAsEstimate(long draftId, long? userId = null)
+    {
+        var id = db.InTransaction((c, t) =>
+        {
+            var header = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", draftId)).SingleOrDefault() ?? throw new HubException("not-found", "That sale was not found.");
+            if (header.Status != DocStatus.Open || header.Type != DocTypes.Invoice || header.Number is not null) throw new HubException("not-draft", "Only a sale that is still being made can be kept as a quote.");
+            if (HubDb.Scalar(c, "SELECT 1 FROM document_lines WHERE document_id = $id LIMIT 1", t, ("$id", draftId)) is null) throw new HubException("empty", "There is nothing on this sale yet.");
+            var number = numbering.Next(c, t, DocTypes.Quote, clock.UtcNow);
+            HubDb.Exec(c, "UPDATE documents SET type = 'quote', number = $n, loyalty_points_used_cent = 0, loyalty_discount_minor = 0 WHERE id = $id", t, ("$n", number), ("$id", draftId));
+            return Issue(c, t, draftId, new IssueOptions { UserId = userId });
+        });
+        return Get(id)!;
+    }
+
+    /// <summary>
+    /// Starts a bill from a quote: the same customer, lines, prices, discounts and tax position, so the total is the same unless a price is changed afterwards. The quote is marked as billed when
+    /// the bill is made. Returns the bill still being built.
+    /// </summary>
+    public DocumentView BillFromEstimate(long quoteId, long? userId = null)
+    {
+        var id = db.InTransaction((c, t) =>
+        {
+            var quote = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", quoteId)).SingleOrDefault() ?? throw new HubException("not-found", "That quote was not found.");
+            if (quote.Type != DocTypes.Quote || quote.Status != DocStatus.Issued || quote.ProjectId is not null) throw new HubException("not-quote", "Only a finished quote can be made into a bill.");
+            if (quote.Meta.ContainsKey("billedAs")) throw new HubException("billed", $"That quote was already made into bill {quote.Meta["billedAs"]}.");
+            var lines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", quoteId));
+            return CreateDraft(c, t, new DraftOptions
+            {
+                Type = DocTypes.Invoice, PartyId = quote.PartyId, UserId = userId, RefDocumentId = quote.Id, PricesIncludeTax = quote.PricesIncludeTax, Notes = $"From quote {quote.Number}",
+                BillDiscountMinor = quote.BillDiscountMinor, BillDiscountPctMilli = quote.BillDiscountPctMilli,
+                Lines = lines.Select(l => new LineInput
+                {
+                    ItemId = l.ItemId, Description = l.Description, QtyMilli = l.QtyMilli, Unit = l.Unit, UnitPriceMinor = l.UnitPriceMinor, DiscountPctMilli = l.DiscountPctMilli,
+                    DiscountAmountMinor = l.DiscountAmountMinor, TaxCode = l.TaxCode, CustomerDiscount = l.CustomerDiscount, Note = l.Note,
+                }).ToList(),
+            });
+        });
+        return Get(id)!;
     }
 
     /// <summary>Builds and finishes a counter sale in one step: the lines, the adjustments (service charge ...) and the payments.</summary>

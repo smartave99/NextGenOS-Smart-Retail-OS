@@ -4,6 +4,7 @@ using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Shop;
 using NextGenOS.Tax;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Restaurant;
 
@@ -20,7 +21,7 @@ public sealed record KitchenLine(long LineId, string Description, long QtyMilli,
 public sealed record KitchenTicket(long Id, long DocumentId, string OrderNumber, string? TableName, string Station, string Status, DateTimeOffset FiredAt, DateTimeOffset? ReadyAt, DateTimeOffset? ServedAt, int Seq, IReadOnlyList<KitchenLine> Lines);
 
 /// <summary>Tables, open orders, the kitchen screen, service charge and tips, split bills.</summary>
-public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock clock, DocumentService documents, AuditService audit)
+public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock clock, DocumentService documents, AuditService audit, Access access)
 {
     public static readonly string[] TicketFlow = { "new", "preparing", "ready", "served" };
 
@@ -28,6 +29,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
 
     public DiningTable AddTable(string name, int seats = 2, string? zone = null)
     {
+        access.Require(Perm.Orders);
         if (string.IsNullOrWhiteSpace(name)) throw new HubException("name-missing", "Please give the table a name.");
         if (seats is < 1 or > 100) throw new HubException("seats", "Seats must be between 1 and 100.");
         try
@@ -47,6 +49,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
 
     public void RemoveTable(long tableId)
     {
+        access.Require(Perm.Orders);
         if (Convert.ToInt64(db.Scalar("SELECT COUNT(*) FROM documents WHERE table_id = $t AND status = 'open'", ("$t", tableId)) ?? 0L) > 0)
             throw new HubException("table-busy", "That table has an order open.");
         db.InTransaction((c, t) => HubDb.Exec(c, "UPDATE tables SET active = 0 WHERE id = $id", t, ("$id", tableId)));
@@ -72,6 +75,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>Seats guests at a table. If the table already has an order, that order is returned.</summary>
     public DocumentView OpenOrder(long tableId, int guests = 1, long? userId = null, long? partyId = null)
     {
+        access.Require(Perm.Orders);
         var table = Tables(true).FirstOrDefault(x => x.Id == tableId) ?? throw new HubException("table-not-found", "That table was not found.");
         if (!table.Active) throw new HubException("table-off", $"Table {table.Name} is not in use.");
         var existing = db.Query("SELECT id FROM documents WHERE type = 'order' AND status = 'open' AND table_id = $t ORDER BY id LIMIT 1", r => r.Int("id"), ("$t", tableId));
@@ -87,19 +91,24 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>An order with no table: counter or takeaway.</summary>
     public DocumentView OpenTakeaway(string? name = null, long? userId = null)
     {
+        access.Require(Perm.Orders);
         var meta = new Dictionary<string, string> { ["takeaway"] = "1" };
         if (!string.IsNullOrWhiteSpace(name)) meta["name"] = name.Trim();
         return documents.CreateDraft(new DraftOptions { Type = DocTypes.Order, UserId = userId, Meta = meta, Adjustments = new List<TaxAdjustmentInput>() });
     }
 
-    public DocumentView AddItem(long orderId, long itemId, long qtyMilli = 1000, string? note = null) =>
-        documents.AddLine(orderId, new LineInput { ItemId = itemId, QtyMilli = qtyMilli, Note = note });
+    public DocumentView AddItem(long orderId, long itemId, long qtyMilli = 1000, string? note = null)
+    {
+        access.Require(Perm.Orders);
+        return documents.AddLine(orderId, new LineInput { ItemId = itemId, QtyMilli = qtyMilli, Note = note });
+    }
 
     public IReadOnlyList<DocumentView> OpenOrders() =>
         db.Query("SELECT id FROM documents WHERE type = 'order' AND status = 'open' ORDER BY id", r => r.Int("id")).Select(id => documents.Get(id)!).ToList();
 
     public DocumentView Transfer(long orderId, long toTableId)
     {
+        access.Require(Perm.Orders);
         var order = documents.GetHeader(orderId) ?? throw new HubException("not-found", "That order was not found.");
         if (order.Status != DocStatus.Open) throw new HubException("not-open", "That order is already closed.");
         if (db.Query("SELECT id FROM documents WHERE type = 'order' AND status = 'open' AND table_id = $t", r => r.Int("id"), ("$t", toTableId)).Count > 0)
@@ -111,6 +120,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>Cancels an open order. Tickets already sent to the kitchen are marked as served (so the kitchen screen clears) and the reason is kept.</summary>
     public void CancelOrder(long orderId, string reason, long? userId)
     {
+        access.Require(Perm.Orders);
         if (string.IsNullOrWhiteSpace(reason)) throw new HubException("reason", "Please say why.");
         var order = documents.GetHeader(orderId) ?? throw new HubException("not-found", "That order was not found.");
         if (order.Status != DocStatus.Open) throw new HubException("not-open", "That order is already closed.");
@@ -127,6 +137,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>Sends the lines not yet sent to the kitchen: one ticket for each station (kitchen, bar). Returns the tickets made.</summary>
     public IReadOnlyList<KitchenTicket> Fire(long orderId, long? userId = null)
     {
+        access.Require(Perm.Orders);
         var context = shop.Current;
         var stations = context.Industry.Rules.ValueKind == JsonValueKind.Object && context.Industry.Rules.TryGetProperty("stations", out var s)
             ? s.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList() : new List<string> { "Kitchen" };
@@ -180,6 +191,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>Moves a ticket one step along: new → preparing → ready → served. Going back is not allowed; a mistake is fixed by a new ticket.</summary>
     public KitchenTicket Advance(long ticketId)
     {
+        access.Require(Perm.Kitchen);
         var ticket = Ticket(ticketId) ?? throw new HubException("not-found", "That ticket was not found.");
         var next = TicketFlow.ElementAtOrDefault(Array.IndexOf(TicketFlow, ticket.Status) + 1) ?? throw new HubException("ticket-done", "That ticket is already served.");
         db.InTransaction((c, t) => HubDb.Exec(c,
@@ -197,6 +209,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>Sets what is added to the bill: the service charge on or off (a percent may be given to change it for this bill) and a tip.</summary>
     public DocumentView SetBillOptions(long orderId, bool serviceCharge, long tipMinor = 0, string? serviceChargePercent = null)
     {
+        access.Require(Perm.Orders);
         var adjustments = new List<TaxAdjustmentInput>();
         if (serviceCharge)
         {
@@ -217,8 +230,11 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     }
 
     /// <summary>Closes the bill: the order becomes a numbered invoice, the payments are recorded, the table is free again.</summary>
-    public DocumentView Pay(long orderId, IEnumerable<PaymentInput> payments, long? userId = null) =>
-        documents.Issue(orderId, new IssueOptions { Payments = payments.ToList(), UserId = userId });
+    public DocumentView Pay(long orderId, IEnumerable<PaymentInput> payments, long? userId = null)
+    {
+        access.Require(Perm.Orders);
+        return documents.Issue(orderId, new IssueOptions { Payments = payments.ToList(), UserId = userId });
+    }
 
     /// <summary>Splits a payment equally between people: the amounts add up to exactly the total (the first people pay the odd cents).</summary>
     public static IReadOnlyList<long> EqualParts(long amountMinor, int people)
@@ -232,6 +248,7 @@ public sealed class RestaurantService(HubDb db, ShopContextProvider shop, IClock
     /// <summary>Splits by items: each group of lines becomes an order of its own at the same table, to be paid separately.</summary>
     public IReadOnlyList<DocumentView> SplitByLines(long orderId, IReadOnlyList<IReadOnlyList<long>> groups, long? userId = null)
     {
+        access.Require(Perm.Orders);
         if (groups.Count == 0 || groups.Any(g => g.Count == 0)) throw new HubException("empty-group", "Every part of the bill needs at least one item.");
         var all = groups.SelectMany(g => g).ToList();
         if (all.Distinct().Count() != all.Count) throw new HubException("line-twice", "An item can be on one part of the bill only.");

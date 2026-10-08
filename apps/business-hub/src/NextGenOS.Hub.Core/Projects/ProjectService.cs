@@ -6,6 +6,7 @@ using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Shop;
 using NextGenOS.Tax;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Projects;
 
@@ -36,7 +37,7 @@ public sealed record ProjectStatus(
     long ProfitSoFarMinor, long PercentCompleteMilli, IReadOnlyList<BoqProgress> Items);
 
 /// <summary>Contract work: projects for clients, a bill of quantities, quotes, progress bills that hold back retention and recover advances, costs and variations.</summary>
-public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock clock, DocumentService documents, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books)
+public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock clock, DocumentService documents, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, Access access)
 {
     private const string ProjectColumns = "id, code, name, party_id, site, status, retention_pct_milli, advance_minor, advance_recovered_minor, start_on, end_on, notes";
 
@@ -49,6 +50,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Project Create(string code, string name, long clientId, string? site = null, string? retentionPercent = null, DateOnly? start = null)
     {
+        access.Require(Perm.Projects);
         if (string.IsNullOrWhiteSpace(code)) throw new HubException("code-missing", "Please give the project a code.");
         if (string.IsNullOrWhiteSpace(name)) throw new HubException("name-missing", "Please give the project a name.");
         var client = parties.Get(clientId) ?? throw new HubException("party-not-found", "That client was not found.");
@@ -77,6 +79,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
 
     public void SetStatus(long id, string status)
     {
+        access.Require(Perm.Projects);
         if (status is not ("quoted" or "active" or "complete" or "closed")) throw new HubException("status", "That is not a project status.");
         db.InTransaction((c, t) => HubDb.Exec(c, "UPDATE projects SET status = $s WHERE id = $id", t, ("$s", status), ("$id", id)));
     }
@@ -85,6 +88,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
 
     public BoqItem AddBoq(long projectId, string code, string description, string unit, long qtyMilli, long rateMinor, string kind, string taxClass = "standard")
     {
+        access.Require(Perm.Projects);
         var project = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         if (project.Status == "closed") throw new HubException("closed", "That project is closed.");
         if (string.IsNullOrWhiteSpace(description)) throw new HubException("description-missing", "Please describe the item.");
@@ -109,6 +113,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>A quote (offer) for the client with the bill of quantities as its lines, tax added at the end.</summary>
     public DocumentView CreateQuote(long projectId, long? userId = null)
     {
+        access.Require(Perm.Projects);
         var project = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         var boq = Boq(projectId).Where(b => b.VariationId is null).ToList();
         if (boq.Count == 0) throw new HubException("empty", "Add items to the bill of quantities first.");
@@ -125,6 +130,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Money the client paid before work started. It is kept as a payment on account; later bills recover it bit by bit.</summary>
     public void ReceiveAdvance(long projectId, long amountMinor, string method, string? reference = null, long? userId = null)
     {
+        access.Require(Perm.Projects);
         var project = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         if (amountMinor <= 0) throw new HubException("amount", "The amount must be more than zero.");
         if (!shop.Current.PaymentMethods.Contains(method)) throw new HubException("method", $"\"{method}\" is not a way of paying here.");
@@ -153,6 +159,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
     /// </summary>
     public DocumentView CreateProgressBill(long projectId, IReadOnlyList<ProgressInput> progress, string? notes = null, long? userId = null)
     {
+        access.Require(Perm.Projects);
         var context = shop.Current;
         var project = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         if (project.Status is "closed" or "quoted") throw new HubException("not-active", project.Status == "quoted" ? "The project has not started: make it active first." : "That project is closed.");
@@ -215,8 +222,11 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
         documents.List(new DocumentFilter { ProjectId = projectId, Type = DocTypes.ProgressBill, Limit = 500 });
 
     /// <summary>Takes a payment from the client on a progress bill.</summary>
-    public DocumentView ReceivePayment(long billId, long amountMinor, string method, string? reference = null, long? userId = null) =>
-        documents.AddPayment(billId, new PaymentInput { Method = method, AmountMinor = amountMinor, Reference = reference }, userId);
+    public DocumentView ReceivePayment(long billId, long amountMinor, string method, string? reference = null, long? userId = null)
+    {
+        access.Require(Perm.Projects);
+        return documents.AddPayment(billId, new PaymentInput { Method = method, AmountMinor = amountMinor, Reference = reference }, userId);
+    }
 
     // ---- retention -------------------------------------------------------------------------------------------------------------
 
@@ -231,6 +241,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>Releases retention to be paid by the client at the end of the work (or in part): an invoice for that amount. Tax was already charged in full on the progress bills, so there is none on this one.</summary>
     public DocumentView ReleaseRetention(long projectId, long? amountMinor = null, long? userId = null)
     {
+        access.Require(Perm.Projects);
         var project = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         var held = RetentionHeld(projectId);
         var amount = amountMinor ?? held;
@@ -248,6 +259,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Cost AddCost(long projectId, string kind, string description, long amountMinor, long? supplierId = null, long? boqId = null, string? reference = null, DateTimeOffset? at = null)
     {
+        access.Require(Perm.Projects);
         _ = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         var kinds = shop.Current.Industry.Rules.TryGetProperty("costKinds", out var list) ? list.EnumerateArray().Select(x => x.GetString()!).ToList() : new List<string> { "other" };
         if (!kinds.Contains(kind)) throw new HubException("kind", $"\"{kind}\" is not a kind of cost. Choose one of: {string.Join(", ", kinds)}.");
@@ -267,6 +279,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Variation AddVariation(long projectId, string description, long amountMinor, string taxClass = "standard")
     {
+        access.Require(Perm.Projects);
         _ = Get(projectId) ?? throw new HubException("not-found", "That project was not found.");
         if (string.IsNullOrWhiteSpace(description)) throw new HubException("description-missing", "Please describe the change.");
         if (amountMinor == 0) throw new HubException("amount", "A variation needs an amount (a deduction is a negative amount).");
@@ -286,6 +299,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
     /// <summary>An approved change joins the contract: it becomes a bill-of-quantities item that can be billed like any other.</summary>
     public Variation Approve(long variationId)
     {
+        access.Require(Perm.Projects);
         var v = db.QueryOne("SELECT id, project_id, no, description, amount_minor, tax_code, status, at FROM variations WHERE id = $id", MapVariation, ("$id", variationId)) ?? throw new HubException("not-found", "That variation was not found.");
         if (v.Status != "proposed") throw new HubException("decided", "That variation was already decided.");
         db.InTransaction((c, t) =>
@@ -299,6 +313,7 @@ public sealed class ProjectService(HubDb db, ShopContextProvider shop, IClock cl
 
     public Variation Reject(long variationId)
     {
+        access.Require(Perm.Projects);
         var v = Variations(db.QueryOne("SELECT project_id FROM variations WHERE id = $id", r => new ProjectIdBox(r.Int("project_id")), ("$id", variationId))?.Id ?? throw new HubException("not-found", "That variation was not found.")).First(x => x.Id == variationId);
         if (v.Status != "proposed") throw new HubException("decided", "That variation was already decided.");
         db.InTransaction((c, t) => HubDb.Exec(c, "UPDATE variations SET status = 'rejected' WHERE id = $id", t, ("$id", variationId)));

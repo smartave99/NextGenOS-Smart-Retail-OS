@@ -94,6 +94,49 @@ public class AccessTests : IDisposable
         yield return new("Import.Check", new[] { Perm.Settings }, a => a.Importer.Check(null!));
         yield return new("Import.Import", new[] { Perm.Settings }, a => a.Importer.Import(null!, null));
 
+        yield return new("Restaurant.AddTable", new[] { Perm.Orders }, a => a.Restaurant.AddTable("T9"));
+        yield return new("Restaurant.RemoveTable", new[] { Perm.Orders }, a => a.Restaurant.RemoveTable(0));
+        yield return new("Restaurant.OpenOrder", new[] { Perm.Orders }, a => a.Restaurant.OpenOrder(0));
+        yield return new("Restaurant.OpenTakeaway", new[] { Perm.Orders }, a => a.Restaurant.OpenTakeaway());
+        yield return new("Restaurant.AddItem", new[] { Perm.Orders }, a => a.Restaurant.AddItem(0, 0));
+        yield return new("Restaurant.Transfer", new[] { Perm.Orders }, a => a.Restaurant.Transfer(0, 0));
+        yield return new("Restaurant.CancelOrder", new[] { Perm.Orders }, a => a.Restaurant.CancelOrder(0, "changed mind", null));
+        yield return new("Restaurant.Fire", new[] { Perm.Orders }, a => a.Restaurant.Fire(0));
+        yield return new("Restaurant.Advance (the kitchen)", new[] { Perm.Kitchen }, a => a.Restaurant.Advance(0));
+        yield return new("Restaurant.SetBillOptions", new[] { Perm.Orders }, a => a.Restaurant.SetBillOptions(0, false));
+        yield return new("Restaurant.Pay", new[] { Perm.Orders }, a => a.Restaurant.Pay(0, Array.Empty<PaymentInput>()));
+        yield return new("Restaurant.SplitByLines", new[] { Perm.Orders }, a => a.Restaurant.SplitByLines(0, Array.Empty<IReadOnlyList<long>>()));
+
+        yield return new("Library.AddTitle", new[] { Perm.Catalog }, a => a.Library.AddTitle("A book"));
+        yield return new("Library.AddCopies", new[] { Perm.Catalog }, a => a.Library.AddCopies(0, 1));
+        yield return new("Library.WithdrawCopy", new[] { Perm.Catalog }, a => a.Library.WithdrawCopy(0, "damaged", null));
+        yield return new("Library.Issue", new[] { Perm.Loans }, a => a.Library.Issue(0, "x"));
+        yield return new("Library.Return", new[] { Perm.Loans }, a => a.Library.Return("x"));
+        yield return new("Library.Renew", new[] { Perm.Loans }, a => a.Library.Renew(0));
+        yield return new("Library.Reserve", new[] { Perm.Loans }, a => a.Library.Reserve(0, 0));
+        yield return new("Library.CancelReservation", new[] { Perm.Loans }, a => a.Library.CancelReservation(0));
+        yield return new("Library.Charge", new[] { Perm.Loans }, a => a.Library.Charge(0, 1, "late", null));
+        yield return new("Library.MarkLost", new[] { Perm.Loans }, a => a.Library.MarkLost(0, null));
+        yield return new("Library.Waive", new[] { Perm.Loans }, a => a.Library.Waive(0, "kind", null));
+        yield return new("Library.PayFines", new[] { Perm.Loans }, a => a.Library.PayFines(0, Array.Empty<PaymentInput>(), null));
+
+        yield return new("Projects.Create", new[] { Perm.Projects }, a => a.Projects.Create("P-9", "A job", 0));
+        yield return new("Projects.SetStatus", new[] { Perm.Projects }, a => a.Projects.SetStatus(0, "active"));
+        yield return new("Projects.AddBoq", new[] { Perm.Projects }, a => a.Projects.AddBoq(0, "1", "Work", "m", 1000, 100, "item"));
+        yield return new("Projects.CreateQuote", new[] { Perm.Projects }, a => a.Projects.CreateQuote(0));
+        yield return new("Projects.ReceiveAdvance", new[] { Perm.Projects }, a => a.Projects.ReceiveAdvance(0, 1, "cash"));
+        yield return new("Projects.CreateProgressBill", new[] { Perm.Projects }, a => a.Projects.CreateProgressBill(0, Array.Empty<NextGenOS.Hub.Projects.ProgressInput>()));
+        yield return new("Projects.ReceivePayment", new[] { Perm.Projects }, a => a.Projects.ReceivePayment(0, 1, "cash"));
+        yield return new("Projects.ReleaseRetention", new[] { Perm.Projects }, a => a.Projects.ReleaseRetention(0));
+        yield return new("Projects.AddCost", new[] { Perm.Projects }, a => a.Projects.AddCost(0, "labour", "Day", 1));
+        yield return new("Projects.AddVariation", new[] { Perm.Projects }, a => a.Projects.AddVariation(0, "Extra", 1));
+        yield return new("Projects.Approve", new[] { Perm.Projects }, a => a.Projects.Approve(0));
+        yield return new("Projects.Reject", new[] { Perm.Projects }, a => a.Projects.Reject(0));
+
+        yield return new("Appointments.Book", new[] { Perm.Appointments }, a => a.Appointments.Book(null, 0, 0, new DateOnly(2026, 10, 5), new TimeOnly(10, 0)));
+        yield return new("Appointments.SetStatus", new[] { Perm.Appointments }, a => a.Appointments.SetStatus(0, "arrived"));
+        yield return new("Appointments.Invoice", new[] { Perm.Appointments }, a => a.Appointments.Invoice(0, null, Array.Empty<PaymentInput>()));
+
         yield return new("Ai.Flags.Set", new[] { Perm.Ai }, a => a.Ai.Flags.Set("nope", false, null));
         yield return new("Ai.Providers.Save", new[] { Perm.Ai }, a => a.Ai.Providers.Save(null!, null));
         yield return new("Ai.Providers.SetEnabled", new[] { Perm.Ai }, a => a.Ai.Providers.SetEnabled("x", true, null));

@@ -5,6 +5,7 @@ using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Shop;
+using NextGenOS.Hub.Security;
 
 namespace NextGenOS.Hub.Appointments;
 
@@ -15,7 +16,7 @@ public sealed record AppointmentRow(Appointment Appointment, string ClientName, 
 public sealed record StaffSales(long StaffId, string Name, int Visits, long SalesMinor);
 
 /// <summary>Bookings for staff and services: no double booking, opening hours, walk-ins, and turning a finished visit into an invoice.</summary>
-public sealed class AppointmentService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog, PartyService parties, DocumentService documents)
+public sealed class AppointmentService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog, PartyService parties, DocumentService documents, Access access)
 {
     private static Appointment Map(SqliteDataReader r) => new(r.Int("id"), r.IntOrNull("party_id"), r.Int("staff_id"), r.Int("item_id"), r.Time("start_at"), r.Time("end_at"), r.Text("status"), r.IntOrNull("document_id"), r.TextOrNull("notes"));
 
@@ -36,6 +37,7 @@ public sealed class AppointmentService(HubDb db, ShopContextProvider shop, ICloc
     /// <summary>Books a service with a staff member at a local date and time. Refuses the past, closed hours and clashes in plain words.</summary>
     public Appointment Book(long? clientId, long staffId, long serviceId, DateOnly date, TimeOnly time, string? notes = null, bool walkIn = false)
     {
+        access.Require(Perm.Appointments);
         var context = shop.Current;
         var staff = parties.Get(staffId) ?? throw new HubException("staff-not-found", "That staff member was not found.");
         if (staff.Kind != "staff" || !staff.Active) throw new HubException("staff", $"{staff.Name} cannot take bookings.");
@@ -95,6 +97,7 @@ public sealed class AppointmentService(HubDb db, ShopContextProvider shop, ICloc
 
     public Appointment SetStatus(long id, string status)
     {
+        access.Require(Perm.Appointments);
         var a = Get(id) ?? throw new HubException("not-found", "That booking was not found.");
         var allowed = a.Status switch
         {
@@ -110,6 +113,7 @@ public sealed class AppointmentService(HubDb db, ShopContextProvider shop, ICloc
     /// <summary>The visit is over: an invoice is made for the service (and anything else sold), paid at once, and the booking is marked done.</summary>
     public DocumentView Invoice(long appointmentId, IEnumerable<LineInput>? extras, IEnumerable<PaymentInput> payments, IEnumerable<Tax.TaxAdjustmentInput>? adjustments = null, long? userId = null)
     {
+        access.Require(Perm.Appointments);
         var a = Get(appointmentId) ?? throw new HubException("not-found", "That booking was not found.");
         if (a.DocumentId is not null) throw new HubException("invoiced", "This visit was already invoiced.");
         if (a.Status is "cancelled" or "no-show") throw new HubException("status", "A cancelled booking has nothing to invoice.");

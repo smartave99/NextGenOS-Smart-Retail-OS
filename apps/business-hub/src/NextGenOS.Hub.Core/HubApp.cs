@@ -43,10 +43,10 @@ public sealed class HubApp
         Offers = new OffersService(db, Shop, clock, Audit, Access);
         Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Access);
         Users = new UserService(db, clock, Audit, Access);
-        Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit);
-        Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit);
-        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit, Books);
-        Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
+        Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit, Access);
+        Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit, Access);
+        Projects = new ProjectService(db, Shop, clock, Documents, Parties, Audit, Books, Access);
+        Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents, Access);
         Purchasing = new PurchaseService(Documents, Catalog, Parties, Access);
         Reports = new ReportService(db, Shop, clock, Catalog);
         TaxRegisters = new TaxRegisterService(db, Shop);

@@ -4,6 +4,12 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Safer updates
+- **An update of a shop that has data no longer starts without a safe copy.** The Hub copies the whole shop file first and **checks the copy** (SQLite's own integrity check, the same structure number, the same tables). If the copy cannot be made or fails the check, the update does not start, nothing in the shop is changed, and the owner sees a plain page ("The update has not started") that says what to check. Before, a failed copy was only noted and the update went ahead.
+- **An update is all or nothing.** All the steps run in one transaction: if one fails, the shop stays exactly as it was (before, the steps before the bad one stayed).
+- **Where the copies go is a setting**, `Hub:BackupFolder` (a second disk or a USB drive is better than the same disk). Without it the copy is made next to the shop's file, as before.
+- **`DatabaseCheck`** looks at a shop file without changing it (damage, records that point at nothing, and that the books add up to nothing), for a restore on a clean PC.
+
 ### Fixed
 - **Goods returned from a bill that used loyalty points gave back the full price of the line.** They now give back only what was paid for them (the points' share of the line stays with the points). A test pins it.
 - **A sale thrown away at the till could leave offer rows behind** that a later sale given the same number would pick up. They are removed with the sale.

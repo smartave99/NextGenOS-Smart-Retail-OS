@@ -19,9 +19,13 @@ public sealed class HubWebFactory : WebApplicationFactory<Program>
 
     public string Folder => _folder;
 
+    /// <summary>Where the copy made before an update goes (the Hub:BackupFolder setting); null: next to the shop's file.</summary>
+    public string? BackupFolder { get; set; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Hub:DataFolder", _folder);
+        if (BackupFolder is not null) builder.UseSetting("Hub:BackupFolder", BackupFolder);
         builder.UseEnvironment("Production");
         builder.ConfigureTestServices(services =>
         {

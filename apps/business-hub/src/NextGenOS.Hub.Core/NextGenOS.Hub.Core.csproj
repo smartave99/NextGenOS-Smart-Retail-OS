@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The tests reach the update steps directly, to prove that a step that fails leaves the shop as it was. -->
+    <InternalsVisibleTo Include="NextGenOS.Hub.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="..\..\..\..\industry-packs\packs\*.json" LogicalName="NextGenOS.Hub.industries.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Data\Migrations\*.sql" LogicalName="NextGenOS.Hub.migrations.%(Filename)%(Extension)" />
     <!-- The way back from each migration, for HubDb.Rollback (a different name prefix, so that the migrations loader never sees them). -->

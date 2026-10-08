@@ -104,10 +104,13 @@ public sealed class HubApp
         Retention.Prune(null);
     }
 
-    /// <summary>Opens (and, if needed, creates or brings up to date) the shop database at a path.</summary>
-    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null)
+    /// <summary>
+    /// Opens (and, if needed, creates or brings up to date) the shop database at a path. An update of a shop that has data first makes a checked copy, in <paramref name="backupFolder"/>
+    /// (next to the file when null); if the copy cannot be made this throws and the shop's data is untouched (<see cref="HubDb.Migrate()"/>).
+    /// </summary>
+    public static HubApp Open(string path, IClock? clock = null, NextGenOS.Devices.Printing.PrintService? print = null, AiOptions? ai = null, string? backupFolder = null)
     {
-        var db = new HubDb(path);
+        var db = new HubDb(path, backupFolder);
         db.Migrate();
         var app = new HubApp(db, clock ?? new SystemClock(), print, ai);
         // Bills and payments made before the books existed are written into them now, before anything asks what a customer owes (the credit check reads the books).

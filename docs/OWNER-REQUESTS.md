@@ -204,3 +204,7 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 > Show the tax, so the bill matches (Recommended)
 
 (Question: whether an estimate shows the tax. Decision 35.)
+
+### 2026-10-08 (about; sent with the file `NextGenOS_Developer_Engineering_Blueprint.pdf` attached, which is saved as `docs/NextGenOS_Developer_Engineering_Blueprint.pdf`; the working copy is `docs/ENGINEERING-BLUEPRINT.md`)
+
+> continue start from where stopped and read and save the attach file and execute it as and when best

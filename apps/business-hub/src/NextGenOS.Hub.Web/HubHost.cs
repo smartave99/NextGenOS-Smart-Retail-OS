@@ -57,7 +57,9 @@ public static class HubHost
         var services = builder.Services;
 
         // The AI parts of the Hub are allowed only when the signed licence has the "ai" module (and they are all off until the owner switches them on).
-        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>()))));
+        // Hub:BackupFolder is where the copy made before an update goes (a second disk is best); without it the copy is made next to the shop's file.
+        var backupFolder = builder.Configuration["Hub:BackupFolder"];
+        services.AddSingleton(sp => HubApp.Open(Path.Combine(folder, "shop.db"), ai: new NextGenOS.Hub.Ai.AiOptions(LicenceEntitlements.From(sp.GetRequiredService<NextGenOS.Licensing.AspNetCore.ProductLicence>())), backupFolder: backupFolder));
 
         // The sign-in cookie is protected with keys kept in the data folder (and, on Windows, locked to this PC), so a restart does not sign everyone out.
         var protection = services.AddDataProtection().SetApplicationName("NextGenOS.Hub").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(folder, "keys")));
@@ -128,6 +130,7 @@ public static class HubHost
         app.UseLicenceGate();
         app.Use(SecurityHeaders);
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
+        app.Use(ShopMustOpen);
         app.UseAuthentication();
         app.Use(SetupFirst);
         app.UseAuthorization();
@@ -177,6 +180,34 @@ public static class HubHost
         h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(), payment=()";
         h.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
         return next(context);
+    }
+
+    /// <summary>
+    /// If the shop cannot be opened because an update could not make its safe copy first, every request gets one plain page that says so and what to check (the shop's data has not been
+    /// touched). The page is built here, without the shop: the usual error page is drawn with the shop's own look and would need the shop to open, which is what failed.
+    /// </summary>
+    private static async Task ShopMustOpen(HttpContext context, RequestDelegate next)
+    {
+        try
+        {
+            _ = context.RequestServices.GetRequiredService<HubApp>();
+        }
+        catch (HubException e) when (e.Code == "backup")
+        {
+            var response = context.Response;
+            response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            response.Headers.CacheControl = "no-store";
+            response.Headers["Retry-After"] = "600";
+            response.ContentType = "text/html; charset=utf-8";
+            await response.WriteAsync(
+                "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>The update has not started</title></head>" +
+                "<body style=\"font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.5\"><h1>The update has not started</h1>" +
+                "<p id=\"update-reason\">" + System.Net.WebUtility.HtmlEncode(e.Message) + "</p>" +
+                "<p>Nothing was lost. When this is put right, open the program again.</p></body></html>");
+            return;
+        }
+
+        await next(context);
     }
 
     /// <summary>Until the shop is set up, every page goes to the setup; afterwards the setup page is closed for good.</summary>

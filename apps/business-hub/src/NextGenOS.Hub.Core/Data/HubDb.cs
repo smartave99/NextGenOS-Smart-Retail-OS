@@ -10,10 +10,14 @@ namespace NextGenOS.Hub.Data;
 public sealed class HubDb
 {
     private readonly string _connectionString;
+    private readonly string? _backupFolder;
 
-    public HubDb(string path)
+    /// <param name="path">The shop database file.</param>
+    /// <param name="backupFolder">Where the copies made before an update (or an undo, or an import) go. Null: next to the file. A second disk or a USB drive is better than the same one.</param>
+    public HubDb(string path, string? backupFolder = null)
     {
         Path = path;
+        _backupFolder = string.IsNullOrWhiteSpace(backupFolder) ? null : backupFolder;
         var directory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
         _connectionString = new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadWriteCreate, Cache = SqliteCacheMode.Private, Pooling = false }.ToString();
@@ -35,31 +39,60 @@ public sealed class HubDb
     }
 
     /// <summary>
-    /// Brings the file up to the newest structure. Safe to run on every start; each step runs once. Before the first step of an update to an existing shop
-    /// database, the whole file is copied (see <see cref="Backup"/>), so that an update can always be undone by putting the copy back.
+    /// Brings the file up to the newest structure. Safe to run on every start. Before an update of an existing shop database, the whole file is copied (see <see cref="Backup"/>)
+    /// and the copy is checked; if it cannot be made or does not check out, the update does not start and nothing is changed (<see cref="HubException"/> "backup"). Then every step runs
+    /// in one transaction: either the shop is at the newest structure or it is exactly as it was.
     /// </summary>
-    public void Migrate()
+    public void Migrate() => Migrate(Steps(MigrationPrefix));
+
+    /// <summary>The same, with the steps given (the tests use it to prove that a step that fails leaves the shop as it was).</summary>
+    internal void Migrate(IReadOnlyList<MigrationStep> all)
     {
         using var connection = Open();
         Exec(connection, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
         var current = Convert.ToInt32(Scalar(connection, "SELECT COALESCE(MAX(version), 0) FROM schema_version") ?? 0);
-        var assembly = typeof(HubDb).Assembly;
-        var steps = assembly.GetManifestResourceNames()
-            .Where(n => n.StartsWith(MigrationPrefix, StringComparison.Ordinal) && n.EndsWith(".sql", StringComparison.Ordinal))
-            .OrderBy(n => n, StringComparer.Ordinal)
-            .Select(n => (Name: n, Version: VersionOf(n, MigrationPrefix)))
-            .Where(s => s.Version > current)
-            .ToList();
-        if (steps.Count > 0 && current > 0) BackupProblem = Backup(connection, $"before-update-{current}-to-{steps[^1].Version}");
-        foreach (var (name, version) in steps)
+        var pending = all.Where(s => s.Version > current).OrderBy(s => s.Version).ToList();
+        if (pending.Count == 0) return;
+        if (current > 0)
         {
-            using var stream = assembly.GetManifestResourceStream(name)!;
-            using var reader = new StreamReader(stream);
-            using var transaction = connection.BeginTransaction();
-            Exec(connection, reader.ReadToEnd(), transaction);
-            Exec(connection, "INSERT INTO schema_version(version) VALUES (" + version + ")", transaction);
+            var problem = Backup(connection, $"before-update-{current}-to-{pending[^1].Version}");
+            if (problem is not null)
+                throw new HubException("backup", "The shop's data was not changed. The update needs a safe copy of it first, and that copy could not be made. " + problem +
+                    " Make sure the folder for copies exists, has free space and can be written to, then start the program again.");
+        }
+
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            foreach (var step in pending)
+            {
+                Exec(connection, step.Sql, transaction);
+                Exec(connection, "INSERT INTO schema_version(version) VALUES (" + step.Version + ")", transaction);
+            }
             transaction.Commit();
         }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    internal readonly record struct MigrationStep(int Version, string Sql);
+
+    private static List<MigrationStep> Steps(string prefix)
+    {
+        var assembly = typeof(HubDb).Assembly;
+        return assembly.GetManifestResourceNames()
+            .Where(n => n.StartsWith(prefix, StringComparison.Ordinal) && n.EndsWith(".sql", StringComparison.Ordinal))
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .Select(n =>
+            {
+                using var stream = assembly.GetManifestResourceStream(n)!;
+                using var reader = new StreamReader(stream);
+                return new MigrationStep(VersionOf(n, prefix), reader.ReadToEnd());
+            })
+            .ToList();
     }
 
     /// <summary>
@@ -80,41 +113,69 @@ public sealed class HubDb
             if (!ways.ContainsKey(version)) throw new InvalidOperationException($"Step {version} of the shop database has no way back, so nothing was changed.");
         var problem = Backup(connection, $"before-undo-{current}-to-{toVersion}");
         if (problem is not null) throw new InvalidOperationException("The shop database could not be copied first, so nothing was changed. " + problem);
-        for (var version = current; version > toVersion; version--)
+        using var transaction = connection.BeginTransaction();
+        try
         {
-            using var stream = assembly.GetManifestResourceStream(ways[version])!;
-            using var reader = new StreamReader(stream);
-            using var transaction = connection.BeginTransaction();
-            Exec(connection, reader.ReadToEnd(), transaction);
-            Exec(connection, "DELETE FROM schema_version WHERE version = " + version, transaction);
+            for (var version = current; version > toVersion; version--)
+            {
+                using var stream = assembly.GetManifestResourceStream(ways[version])!;
+                using var reader = new StreamReader(stream);
+                Exec(connection, reader.ReadToEnd(), transaction);
+                Exec(connection, "DELETE FROM schema_version WHERE version = " + version, transaction);
+            }
             transaction.Commit();
         }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
-
-    /// <summary>The copy made before the last update, or why none could be made (null: all well, or nothing needed copying).</summary>
-    public string? BackupProblem { get; private set; }
 
     /// <summary>Where the copy of the last backup went (null: none was made since this object was made).</summary>
     public string? LastBackup { get; private set; }
 
     /// <summary>
-    /// A consistent copy of the whole file next to it (<c>shop.db.before-update-1-to-2.bak</c>), made with SQLite's own VACUUM INTO, which is safe while the file is in use.
-    /// Returns null when it worked, or a sentence about what went wrong (it never throws: the update itself runs in steps that are each all-or-nothing).
+    /// A consistent copy of the whole file (<c>shop.db.before-update-1-to-2.bak</c>, next to the file or in the backup folder), made with SQLite's own VACUUM INTO, which is safe while the
+    /// file is in use, and then <b>checked</b>: the copy is opened and must pass SQLite's own integrity check, be at the same structure version and have the same tables as the file it
+    /// came from. A copy that fails the check is deleted, so a bad copy is never left lying about looking like a good one.
+    /// Returns null when it worked, or a sentence about what went wrong (it never throws for a disk problem: the caller decides whether to go on).
     /// </summary>
     private string? Backup(SqliteConnection connection, string label)
     {
+        string? target = null;
         try
         {
-            var target = Path + "." + label + ".bak";
-            if (File.Exists(target)) target = Path + "." + label + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture) + ".bak";
+            var folder = _backupFolder ?? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!;
+            Directory.CreateDirectory(folder);
+            var name = System.IO.Path.GetFileName(Path) + "." + label;
+            target = System.IO.Path.Combine(folder, name + ".bak");
+            if (File.Exists(target)) target = System.IO.Path.Combine(folder, name + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture) + ".bak");
             Exec(connection, "VACUUM INTO $target", null, ("$target", target));
+
+            var expectedVersion = Convert.ToInt32(Scalar(connection, "SELECT COALESCE(MAX(version), 0) FROM schema_version") ?? 0);
+            var expectedTables = Convert.ToInt32(Scalar(connection, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'") ?? 0);
+            var report = DatabaseCheck.Inspect(target, books: false);
+            if (!report.Healthy || report.Version != expectedVersion || report.Tables != expectedTables)
+            {
+                TryDelete(target);
+                return "The copy was written but did not pass the check (" + (report.Healthy ? $"it has {report.Tables} tables at version {report.Version}, the shop has {expectedTables} at {expectedVersion}" : string.Join("; ", report.Problems)) + ").";
+            }
+
             LastBackup = target;
             return null;
         }
-        catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
         {
-            return "The copy of the shop database made before an update could not be written (" + e.Message + ").";
+            if (target is not null) TryDelete(target);
+            return "The safe copy of the shop's data could not be written (" + e.Message + ").";
         }
+    }
+
+    private static void TryDelete(string file)
+    {
+        try { if (File.Exists(file)) File.Delete(file); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* a copy that cannot be removed is reported by the caller's message; it must not hide the real problem */ }
     }
 
     /// <summary>The number of the newest step of the shop database that this program knows.</summary>

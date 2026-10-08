@@ -492,7 +492,6 @@ public class AiMigrationTests
         File.Delete(made);
 
         var updated = HubApp.Open(f.App.Db.Path, f.Clock);   // version 1 -> 2 on an existing shop
-        Assert.Null(updated.Db.BackupProblem);
         Assert.NotNull(updated.Db.LastBackup);
         Assert.Contains($"before-update-1-to-{HubDb.LatestVersion}", updated.Db.LastBackup);
         Assert.True(File.Exists(updated.Db.LastBackup));

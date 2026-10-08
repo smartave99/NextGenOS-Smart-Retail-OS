@@ -30,19 +30,30 @@ function companyCard(settings) {
 
 // ---------- the programs folder ----------
 async function programsCard() {
-  const { programs } = await get('/api/programs');
-  const input = h('input', { type: 'text', id: 'programs-folder', value: programs.folder, disabled: !ADMIN(), placeholder: 'For example C:\\Users\\you\\Downloads\\release-1.0.0', spellcheck: 'false' });
+  const first = await get('/api/programs');
+  const { programs } = first;
+  // The Studio may come with its own programs (a kit). Then nobody has to choose a folder; an administrator can still point to a newer one, and an empty box comes back to the kit.
+  const input = h('input', { type: 'text', id: 'programs-folder', value: first.source === 'chosen' ? programs.folder : '', disabled: !ADMIN(), placeholder: first.builtIn.present ? 'Leave empty to use the programs that came with the Studio' : 'For example C:\\Users\\you\\Downloads\\release-1.0.0', spellcheck: 'false' });
   const say = h('div', { id: 'programs-say' });
-  const show = (p, saved) => say.replaceChildren(
-    p.ok ? h('div', { class: 'notice ok' }, icon('check'), h('div', {}, h('b', {}, `Version ${p.version}: ${p.files.length} files checked`), h('div', { class: 'small' }, saved ? 'Saved. Every file matches its fingerprint.' : 'Every file matches its fingerprint.')))
+  const show = (p, { saved = false, source = 'chosen', builtIn = { present: false } } = {}) => say.replaceChildren(
+    p.ok ? h('div', { class: 'notice ok', id: 'programs-in-use' }, icon('check'), h('div', {},
+      h('b', {}, `Version ${p.version}: ${p.files.length} files checked`),
+      h('div', { class: 'small' }, source === 'built-in' ? 'These are the programs that came with the Studio; nobody has to choose a folder. Every file matches its fingerprint.' : saved ? 'Saved. Every file matches its fingerprint.' : 'Every file matches its fingerprint.'),
+      source === 'chosen' && builtIn.present ? h('div', { class: 'small', id: 'programs-builtin-unused' }, `The programs that came with the Studio (version ${builtIn.version ?? '?'}) are not used while a folder is chosen here. Empty the box and press "Check and save" to go back to them.`) : null))
       : p.problems?.length ? h('div', { class: 'notice warn' }, icon('warn'), h('ul', {}, p.problems.map((t) => h('li', {}, t)))) : null);
-  if (programs.folder) show(programs);
-  return h('div', { class: 'card', id: 'programs-settings' }, h('h2', {}, 'The programs folder'),
-    h('p', { class: 'lead' }, 'The Studio does not build programs. NextGenOS builds and releases them; download every file of a release into one folder (including base-kit.json) and tell the Studio where it is. The Studio checks each file, then puts a customer\'s set-up beside them.'),
-    h('div', { class: 'field' }, h('label', { for: 'programs-folder' }, 'Folder with the release files'), input), say,
+  if (programs.folder) show(programs, { source: first.source, builtIn: first.builtIn });
+  return h('div', { class: 'card', id: 'programs-settings' }, h('h2', {}, first.builtIn.present ? 'The programs' : 'The programs folder'),
+    h('p', { class: 'lead' }, first.builtIn.present
+      ? 'The Studio does not build programs. NextGenOS builds and releases them, and this Studio came with the programs of one release. The Studio checks each file, then puts a customer\'s set-up beside them. Only if you were given a newer release, type the folder where you saved its files (including base-kit.json).'
+      : 'The Studio does not build programs. NextGenOS builds and releases them; download every file of a release into one folder (including base-kit.json) and tell the Studio where it is. The Studio checks each file, then puts a customer\'s set-up beside them.'),
+    h('div', { class: 'field' }, h('label', { for: 'programs-folder' }, first.builtIn.present ? 'Another folder with release files (optional)' : 'Folder with the release files'), input), say,
     ADMIN() ? h('div', { class: 'row mt' }, h('button', { class: 'btn primary', id: 'programs-save', type: 'button', onclick: async (e) => {
       const b = e.currentTarget; b.classList.add('busy');
-      try { const r = await put('/api/programs', { folder: input.value }); show(r.programs, r.saved); if (r.saved) toast('Saved.'); } catch (x) { toast(x.message, 'bad'); } finally { b.classList.remove('busy'); }
+      try {
+        const r = await put('/api/programs', { folder: input.value });
+        if (r.programs.folder || r.programs.problems?.length) show(r.programs, { saved: r.saved, source: r.source, builtIn: r.builtIn ?? first.builtIn }); else say.replaceChildren();
+        if (r.saved) toast('Saved.'); else if (r.source === 'built-in') toast('Using the programs that came with the Studio.');
+      } catch (x) { toast(x.message, 'bad'); } finally { b.classList.remove('busy'); }
     } }, 'Check and save')) : null);
 }
 
@@ -79,7 +90,7 @@ async function buildServiceCard() {
     h('ul', { class: 'col', style: { 'list-style': 'none', padding: 0, margin: 0, gap: '6px' } }, r.checks.map((c) => h('li', { class: 'row', 'data-check': c.id, 'data-ok': String(c.ok), style: { 'align-items': 'flex-start', gap: '10px' } }, h('span', { class: c.ok === true ? 'tone-ok' : c.ok === false ? 'tone-warn' : 'muted' }, icon(c.ok === true ? 'check' : c.ok === false ? 'warn' : 'info', 's')), h('span', { class: 'grow' }, c.words)))));
 
   return h('div', { class: 'card', id: 'build-settings' }, h('h2', {}, 'Connect the build service'),
-    h('p', { class: 'lead' }, 'A customer\'s website and Android app are made by a build service, not on this PC: they carry the customer\'s own name and settings, and making them needs NextGenOS\'s program files, which never come to this PC. An administrator connects it once. The steps for making the two access codes are in the Setup Studio guide, "Connecting the build service".'),
+    h('p', { class: 'lead' }, 'A customer\'s Android app is made by a build service, not on this PC: it carries the customer\'s own name and settings, and making it needs NextGenOS\'s program files, which never come to this PC. An administrator connects it once. (The website does not need this: it is made on this PC, in the customer\'s step "Website and app".) The steps for making the two access codes are in the Setup Studio guide, "Connecting the build service".'),
     status,
     h('div', { class: 'grid2 mt' }, source, results),
     h('details', { class: 'more mt-s' }, h('summary', {}, icon('gear', 's'), 'More options'), h('div', { class: 'grid2 mt-s' }, version)),

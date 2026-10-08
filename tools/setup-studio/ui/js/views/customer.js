@@ -3,6 +3,7 @@ import { h, icon, toast, ago, confirmSheet } from '../dom.js';
 import { get, put, ApiError } from '../api.js';
 import { app, go, refreshCounts } from '../main.js';
 import { statePill } from './customers.js';
+import { siteMissing } from '../sitewords.js';
 
 export const title = (node) => node.dataset.title || 'Customer';
 
@@ -17,17 +18,6 @@ export const STEPS = [
 ];
 const MODULES = { details: () => import('./details.js'), look: () => import('./look.js'), prepare: () => import('./prepare.js'), review: () => import('./review.js'), site: () => import('./site.js'), installer: () => import('./output.js'), handover: () => import('./handover.js') };
 
-/**
- * What of the customer's website and Android app is still to be made for the latest approved release (from the customer's record of builds). The website is made for Windows
- * and for Linux; the app needs the website's name.
- */
-export function siteMissing(c) {
-  const release = c.releases.at(-1)?.n;
-  const eco = c.intake.ecosystem;
-  const made = new Set();
-  for (const b of c.builds ?? []) if (b.kind === 'website-app' && b.release === release) for (const p of b.parts ?? []) if (p.status === 'success') made.add(p.id);
-  return { website: eco.website.wanted && !(made.has('website-linux') && made.has('website-windows')), android: eco.android.wanted && !!eco.website.domain && !made.has('android') };
-}
 
 function stepInfo(c) {
   const hasRelease = c.releases.length > 0;
@@ -51,7 +41,7 @@ export function nextAction(c, can) {
   if (c.state === 'review') return can['review.decide'] ? { label: 'Review and approve', step: 'review' } : { label: 'Waiting for approval', step: 'review', quiet: true };
   if (c.state === 'approved') {
     const site = siteMissing(c);
-    return site.website || site.android ? { label: 'Build the website and app', step: 'site' } : { label: 'Make the installer', step: 'installer' };
+    return site.website || site.android ? { label: 'Make the website and app', step: 'site' } : { label: 'Make the installer', step: 'installer' };
   }
   if (c.state === 'built') return { label: 'Hand over', step: 'handover' };
   return { label: 'See the hand-over', step: 'handover', quiet: true };

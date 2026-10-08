@@ -18,7 +18,7 @@ export async function render(ctx) {
   const programs = h('div', { class: 'card', id: 'programs-card' }, h('h2', {}, 'The programs'),
     kit.folder && kit.ok
       ? h('div', { class: 'col' },
-        h('div', { class: 'notice ok', id: 'programs-ok' }, icon('check'), h('div', {}, h('b', {}, `Version ${kit.version}: ${kit.files.length} files checked`), h('div', { class: 'small' }, 'Every file matches its fingerprint, so none was damaged on the way.'))),
+        h('div', { class: 'notice ok', id: 'programs-ok' }, icon('check'), h('div', {}, h('b', {}, `Version ${kit.version}: ${kit.files.length} files checked`), h('div', { class: 'small' }, `Every file matches its fingerprint, so none was damaged on the way.${data.source === 'built-in' ? ' These are the programs that came with the Studio.' : ''}`))),
         h('div', { class: 'row wrap' }, kit.files.map((f) => h('span', { class: 'pill', title: f.name }, `${f.role === 'hub-windows-setup' ? 'Windows setup' : f.role === 'hub-linux-deb' ? 'Linux ' + f.arch : f.role === 'ai-addon-windows' ? 'AI assistant' : f.role === 'android-apk' ? 'Android app' : f.role === 'website' ? 'Website' : f.role} · ${SIZE(f.bytes)}`))),
         kit.trial ? h('div', { class: 'notice warn', id: 'trial-note' }, icon('warn'), 'These programs were built without the licence keys, only to try the installing. A customer could never activate them.') : null,
         /not signed/i.test(kit.signing.windows) ? h('div', { class: 'notice' }, icon('info'), 'The Windows setup is not signed yet, so Windows will show a warning when it is opened. The page of steps tells the customer what to click.') : null,
@@ -58,7 +58,18 @@ export async function render(ctx) {
     data.trial && !kit.trial ? h('div', { class: 'notice warn mt-s', id: 'site-trial-note' }, icon('warn'), 'The website or app in this pack was made without the licence keys, only to try. A customer could never use it.') : null,
     h('div', { class: 'row mt' }, make, !ctx.can.build ? h('span', { class: 'small muted' }, 'Your role cannot make installers.') : null), result));
 
-  // 3. What was made before.
+  // 3. The website packages made on this PC for this release (the pack takes them from here), with their fingerprints.
+  const seenSystem = new Set();
+  const sites = [...(data.builds ?? [])].reverse().filter((b) => b.kind === 'website-local' && b.release === release.n && !seenSystem.has(b.os) && seenSystem.add(b.os));
+  if (sites.length) {
+    box.append(h('div', { class: 'card', id: 'website-packages' }, h('h2', {}, 'Website packages made on this PC'),
+      h('div', { class: 'panel mt-s' }, h('table', { class: 'tbl', id: 'website-packages-table' }, h('thead', {}, h('tr', {}, ['Made', 'By', 'For', 'Size', 'Licence', 'Fingerprint'].map((t) => h('th', {}, t)))),
+        h('tbody', {}, sites.map((b) => h('tr', { 'data-website-package': b.os }, h('td', { class: 'muted', title: when(b.at), style: { 'white-space': 'nowrap' } }, ago(b.at)), h('td', {}, b.by?.name ?? ''), h('td', {}, (b.os === 'windows' ? 'Windows' : 'Linux') + (b.trial ? ' (trial)' : '')), h('td', {}, SIZE(b.bytes)),
+          h('td', {}, b.licenceIncluded ? 'Inside' : 'Not yet'), h('td', { class: 'tiny muted', title: b.sha256, style: { 'font-family': 'var(--ngos-mono)' } }, b.sha256.slice(0, 16))))))),
+      h('p', { class: 'small muted mt-s' }, `They are made in the step "Website and app" and go into the pack as they are. To make one again (a new licence file, new details), do it there, then make the pack again.`)));
+  }
+
+  // 4. What was made before.
   const packs = [...(data.builds ?? [])].filter((b) => b.kind === 'pack').reverse();
   const fetchPack = async (b) => { try { const res = await api('GET', `/api/customers/${encodeURIComponent(ctx.id)}/builds/${b.release}/pack.zip`, undefined, { raw: true }); download(await res.blob(), b.file.split('/').pop()); } catch (x) { toast(x.message, 'bad'); } };
   if (packs.length) {
@@ -72,7 +83,7 @@ export async function render(ctx) {
     result.append(h('div', { class: 'notice ok mt', id: 'last-pack' }, icon('check'), h('div', {}, h('b', {}, 'The latest pack is ready.'), h('div', { class: 'small' }, `Saved in this Studio's folder, under builds.${absent.length ? ' Not in it yet: ' + absent.join(', ') + '.' : ''}`))));
   }
   box.append(h('div', { class: 'card' }, h('h3', {}, 'Before it goes to the customer'),
-    h('ul', {}, h('li', {}, 'Make their licence key in the Licence Studio (their number of PCs, and the look level you chose). The key is never in the pack.'),
+    h('ul', {}, h('li', {}, 'Make their licence key in the Licence Studio (their number of PCs, and the look level you chose). The shop program\'s key is never in the pack. The website\'s licence file is inside the website package only if you put it in place in the step "Website and app"; otherwise the website will not start until it is added.'),
       h('li', {}, 'Open the pack\'s "START HERE" page and the page of steps for their computer, and check they say the right things.'),
       h('li', {}, 'Open the pack on a clean computer of the same kind once, if you can. The Studio cannot do that for you.'))));
   return box;

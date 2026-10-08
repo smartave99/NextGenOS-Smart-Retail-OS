@@ -8,14 +8,14 @@ export const statePill = (c) => h('span', { class: 'pill ' + (c.stale ? 'draft' 
 const FILTERS = [['all', 'All'], ['work', 'Needs work'], ['review', 'In review'], ['done', 'Approved or handed over']];
 const inFilter = (f, c) => f === 'all' || (f === 'work' && ['draft', 'proposed'].includes(c.state)) || (f === 'review' && c.state === 'review') || (f === 'done' && ['approved', 'built', 'delivered'].includes(c.state));
 
-const READY_WORD = { ready: 'Ready', trial: 'Only to try', missing: 'Not set up yet', problem: 'Needs fixing', 'not-built': 'Not in this version' };
+const READY_WORD = { ready: 'There', trial: 'Only to try', partly: 'Only one system', missing: 'Not there yet', problem: 'Needs fixing', 'not-built': 'Not in this version' };
 
 /** What the Studio still needs before it can give a customer their outputs: plain words, so nobody wonders why nothing came out. */
 function readinessCard(r) {
   if (!r || r.allReady) return null;
   return h('div', { class: 'card', id: 'readiness' },
     h('h2', {}, 'Before the Studio can give a customer their outputs'),
-    h('p', { class: 'lead' }, 'The Studio keeps each customer\'s details and look and puts their setup together. The shop program, the website and the Android app are made elsewhere and brought here. This is what is still missing.'),
+    h('p', { class: 'lead' }, 'The Studio keeps each customer\'s details and look and puts their setup together. It does not build programs. The shop program and the website program come ready-made with a NextGenOS release, and the Studio puts each customer\'s settings beside them on this PC. The Android app is made elsewhere (on GitHub) and brought here. This is what is there, and what is not.'),
     h('div', { class: 'col mt-s' }, r.items.map((i) => h('div', { class: 'row', 'data-readiness': i.id, 'data-state': i.state, style: { 'align-items': 'flex-start', 'padding': '8px 0', 'border-top': '1px solid var(--ngos-line)' } },
       h('span', { class: i.state === 'ready' ? 'tone-ok' : 'tone-warn', style: { 'margin-top': '2px' } }, icon(i.state === 'ready' ? 'check' : 'warn', 's')),
       h('div', { class: 'grow' }, h('b', {}, i.title), h('div', { class: 'small muted' }, i.text)),

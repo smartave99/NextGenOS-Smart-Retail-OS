@@ -63,6 +63,7 @@ country-packs/
     "businessId": { "label": "GSTIN", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$" },
     "itemCode": { "label": "HSN or SAC code", "help": "..." },       // optional: a code a line may carry for what it sells (section 4a)
     "extraTax": { "label": "Cess", "help": "..." },                    // optional: a further tax set per item, on top of the main one (section 4a)
+    "returns": { "title": "GST returns", "lists": [ ] },               // optional: the lists the country's tax returns are made from (section 4b)
     "customerDiscounts": [ ],            // section 6
     "rounding": { "total": "nearest", "increment": "1", "defaultOn": false }   // section 7
   },
@@ -102,6 +103,18 @@ Some countries ask for two more things on an item and its bill lines. A pack say
   and print it under the line's description. It is a record only: the engine does not read it.
 * `extraTax` – a further tax set per item as a percent of the price before tax (India: cess). The programs show an input named `label` on the item, keep the percent on the bill line, and pass it to the engine
   as the line's `cessPercent` (section 5, step 6). The engine names its amounts `cess` in every country; the programs show them under `label`.
+
+### 4b. Return lists (optional)
+
+A country whose tax returns list bills in groups can say how. `returns.lists` is an ordered list; each has an `id`, a `label` (the country's words), a `kind` (`bill`: a sale made out to a buyer; `credit`: a credit note given to a buyer) and `when`. A bill or credit note is
+put in the **first** list of its kind whose `when` it meets (so the order matters); a document that meets none is in no list. `when` may name:
+
+* `partyHasTaxId` – `true`: the buyer's tax number was on the bill; `false`: it was not.
+* `betweenRegions` – `true`: the buyer's place (state or province) is not the seller's (an empty place counts as the seller's); `false`: it is the same.
+* `totalOver` – the bill's total is more than this amount (a decimal in the currency).
+
+Everything named must be true. The programs list, for each list and a period, the bills in it with the buyer's name, tax number and place, the amount before tax, each tax part, the total and the date; nothing in program code names a list. Bills of a shop that is
+not registered for the tax (no tax charged) and cancelled bills are in no list. The pack's `review` says whether an adviser has checked the limits.
 
 ## 5. Models
 

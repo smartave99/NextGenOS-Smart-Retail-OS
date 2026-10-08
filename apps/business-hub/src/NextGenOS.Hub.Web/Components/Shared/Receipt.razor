@@ -10,7 +10,7 @@
     <div class="r"><span>No. @(View.Document.Number ?? "Draft")</span><span>@Shop.Time.ToLocal(View.Document.IssuedAt ?? View.Document.CreatedAt).ToString("d MMM yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span></div>
     @if (View.Party is { } party)
     {
-        <div>@party.Name@(string.IsNullOrWhiteSpace(party.TaxId) ? "" : " · " + party.TaxId)</div>
+        <div>@party.Name@(string.IsNullOrWhiteSpace(View.Document.PartyTaxId ?? party.TaxId) ? "" : " · " + (View.Document.PartyTaxId ?? party.TaxId))</div>
         @if (!string.IsNullOrWhiteSpace(party.Address)) { <div class="muted">@party.Address</div> }
     }
     @if (View.Document.Status == DocStatus.Void) { <div class="c"><strong>VOID</strong></div> }

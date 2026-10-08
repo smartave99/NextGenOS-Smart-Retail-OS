@@ -73,6 +73,27 @@ public class OffersWebTests
     }
 
     [Fact]
+    public async Task The_tax_registers_open_for_the_people_who_may_see_reports_and_the_downloads_need_the_same_right()
+    {
+        using var f = new HubWebFactory();
+        SetUp(f);
+        var http = Client(f);
+        Assert.Equal(HttpStatusCode.Redirect, (await Get(http, "/registers")).StatusCode);
+        foreach (var (user, password) in new[] { ("owner", "correct horse battery"), ("boss", "manager good password") })
+        {
+            var cookie = await SignIn(http, user, password);
+            Assert.Equal(HttpStatusCode.OK, (await Get(http, "/registers", cookie)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/register-sales.csv", cookie)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/codes.csv", cookie)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await Get(http, "/export/list-b2b.csv", cookie)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await Get(http, "/export/list-nothing.csv", cookie)).StatusCode);
+        }
+        var till = await SignIn(http, "till", "another good password");
+        Assert.Contains("/denied", (await Get(http, "/registers", till)).Headers.Location?.OriginalString ?? "");
+        Assert.NotEqual(HttpStatusCode.OK, (await Get(http, "/export/register-sales.csv", till)).StatusCode);
+    }
+
+    [Fact]
     public async Task Opening_the_offers_screen_changes_nothing()
     {
         using var f = new HubWebFactory();

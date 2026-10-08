@@ -47,6 +47,7 @@ public sealed class HubApp
         Appointments = new AppointmentService(db, Shop, clock, Catalog, Parties, Documents);
         Purchasing = new PurchaseService(Documents, Catalog, Parties);
         Reports = new ReportService(db, Shop, clock, Catalog);
+        TaxRegisters = new TaxRegisterService(db, Shop);
         PrinterProfiles = new PrinterStore(SettingsStore, Audit);
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
         // The optional AI services. Built here, started by nobody: nothing runs, connects or downloads until the owner switches it on (and the licence has the AI part).
@@ -79,6 +80,7 @@ public sealed class HubApp
     public AppointmentService Appointments { get; }
     public PurchaseService Purchasing { get; }
     public ReportService Reports { get; }
+    public TaxRegisterService TaxRegisters { get; }
     public PrinterStore PrinterProfiles { get; }
     public HubPrinting Printing { get; }
     public AiFoundation Ai { get; }

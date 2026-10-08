@@ -123,11 +123,16 @@ public sealed class ShopContext
     };
 
     /// <summary>The first day of the fiscal year a local date belongs to: "2026" for 5 October 2026 in India (the year starts on 1 April).</summary>
-    public string YearKey(DateOnly localDate)
+    public string YearKey(DateOnly localDate) => YearStart(localDate).Year.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The day the fiscal year that a local date belongs to began (1 April 2026 for 5 October 2026 in India).</summary>
+    public DateOnly YearStart(DateOnly localDate)
     {
         var start = Country.FiscalYearStart;
         var begins = new DateOnly(localDate.Year, start.Month, Math.Min(start.Day, DateTime.DaysInMonth(localDate.Year, start.Month)));
-        return (localDate >= begins ? localDate.Year : localDate.Year - 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (localDate >= begins) return begins;
+        var year = localDate.Year - 1;
+        return new DateOnly(year, start.Month, Math.Min(start.Day, DateTime.DaysInMonth(year, start.Month)));
     }
 
     // ---- internals -------------------------------------------------------------------------------------------------------------

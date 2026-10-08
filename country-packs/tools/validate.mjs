@@ -95,6 +95,24 @@ export function validatePack(pack, fileName) {
     if (!isObj(t[part]) || typeof t[part].label !== 'string' || !t[part].label.trim()) bad(`${part} needs a label (the words the programs show for it)`);
     else if (t[part].help !== undefined && typeof t[part].help !== 'string') bad(`${part} "help" must be text`);
   }
+  if (t.returns !== undefined) {
+    const r = t.returns;
+    if (!isObj(r) || typeof r.title !== 'string' || !r.title.trim() || !Array.isArray(r.lists) || r.lists.length === 0) bad('"returns" needs a title and a list of lists');
+    else {
+      const ids = new Set();
+      for (const l of r.lists) {
+        if (!isObj(l) || !/^[a-z0-9-]{1,24}$/.test(l.id ?? '') || typeof l.label !== 'string' || !l.label.trim()) { bad('every return list needs an id (lower case letters, digits, dashes) and a label'); continue; }
+        if (ids.has(l.id)) bad(`return list "${l.id}" is there twice`);
+        ids.add(l.id);
+        if (!['bill', 'credit'].includes(l.kind)) bad(`return list "${l.id}": kind must be bill or credit`);
+        const w = l.when ?? {};
+        if (!isObj(w)) { bad(`return list "${l.id}": "when" must be an object`); continue; }
+        for (const k of Object.keys(w)) if (!['partyHasTaxId', 'betweenRegions', 'totalOver'].includes(k)) bad(`return list "${l.id}": "${k}" is not a rule the programs know`);
+        for (const k of ['partyHasTaxId', 'betweenRegions']) if (w[k] !== undefined && typeof w[k] !== 'boolean') bad(`return list "${l.id}": ${k} must be true or false`);
+        if (w.totalOver !== undefined && !decimal(w.totalOver, c?.decimals ?? 3)) bad(`return list "${l.id}": totalOver must be an amount like 100000`);
+      }
+    }
+  }
   const inv = pack.invoice;
   if (!isObj(inv) || !inv.title || !Array.isArray(inv.requiredFields)) bad('"invoice" needs a title and requiredFields');
   if (!Array.isArray(pack.notes)) bad('"notes" must be a list');

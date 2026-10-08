@@ -22,7 +22,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
     private const string DocColumns =
         "id, type, number, status, direction, party_id, issued_at, created_at, due_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
         "subtotal_minor, tax_minor, total_minor, payable_minor, paid_minor, tips_minor, retention_minor, advance_minor, table_id, project_id, ref_document_id, user_id, notes, meta, " +
-        "bill_discount_minor, bill_discount_pct_milli, loyalty_points_used_cent, loyalty_discount_minor, offer_discount_minor";
+        "bill_discount_minor, bill_discount_pct_milli, loyalty_points_used_cent, loyalty_discount_minor, offer_discount_minor, party_tax_id";
 
     private const string LineColumns = "id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, tax_code, customer_discount, fired, note, station, boq_id, discount_amount_minor, ref_line_id, discount_source, free_for_line_id, item_code, extra_tax_pct_milli";
 
@@ -36,7 +36,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         r.Flag("registered"), r.Int("subtotal_minor"), r.Int("tax_minor"), r.Int("total_minor"), r.Int("payable_minor"), r.Int("paid_minor"), r.Int("tips_minor"),
         r.Int("retention_minor"), r.Int("advance_minor"), r.IntOrNull("table_id"), r.IntOrNull("project_id"), r.IntOrNull("ref_document_id"), r.IntOrNull("user_id"),
         r.TextOrNull("notes"), JsonSerializer.Deserialize<Dictionary<string, string>>(r.Text("meta")) ?? new Dictionary<string, string>(),
-        r.Int("bill_discount_minor"), r.Int("bill_discount_pct_milli"), r.Int("loyalty_points_used_cent"), r.Int("loyalty_discount_minor"), r.Int("offer_discount_minor"));
+        r.Int("bill_discount_minor"), r.Int("bill_discount_pct_milli"), r.Int("loyalty_points_used_cent"), r.Int("loyalty_discount_minor"), r.Int("offer_discount_minor"), r.TextOrNull("party_tax_id"));
 
     private static DocLine MapLine(SqliteDataReader r) => new(
         r.Int("id"), (int)r.Int("line_no"), r.IntOrNull("item_id"), r.Text("description"), r.Int("qty_milli"), r.TextOrNull("unit"), r.Int("unit_price_minor"),
@@ -98,14 +98,14 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         var meta = new Dictionary<string, string>(options.Meta);
         var id = HubDb.Insert(c,
             "INSERT INTO documents(type, number, status, direction, party_id, created_at, currency_decimals, prices_include_tax, seller_region, buyer_region, round_total, registered, " +
-            "adjustments, table_id, project_id, ref_document_id, user_id, notes, meta, bill_discount_minor, bill_discount_pct_milli) " +
-            "VALUES ($type, $number, 'open', $dir, $party, $at, $dec, $incl, $seller, $buyer, $round, $reg, $adj, $table, $project, $ref, $user, $notes, $meta, $bda, $bdp)", t,
+            "adjustments, table_id, project_id, ref_document_id, user_id, notes, meta, bill_discount_minor, bill_discount_pct_milli, party_tax_id) " +
+            "VALUES ($type, $number, 'open', $dir, $party, $at, $dec, $incl, $seller, $buyer, $round, $reg, $adj, $table, $project, $ref, $user, $notes, $meta, $bda, $bdp, $ptax)", t,
             ("$type", options.Type), ("$number", number), ("$dir", options.Direction), ("$party", options.PartyId), ("$at", Iso.Text(now)), ("$dec", context.Decimals),
             ("$incl", (options.PricesIncludeTax ?? context.Settings.PricesIncludeTax) ? 1 : 0), ("$seller", Blank(context.Settings.Region)), ("$buyer", Blank(party?.Region)),
             ("$round", context.Settings.RoundTotal ? 1 : 0), ("$reg", context.Settings.TaxRegistered ? 1 : 0),
             ("$adj", JsonSerializer.Serialize(options.Adjustments, Json)), ("$table", options.TableId), ("$project", options.ProjectId), ("$ref", options.RefDocumentId),
             ("$user", options.UserId), ("$notes", options.Notes), ("$meta", JsonSerializer.Serialize(meta)),
-            ("$bda", options.BillDiscountMinor), ("$bdp", options.BillDiscountPctMilli));
+            ("$bda", options.BillDiscountMinor), ("$bdp", options.BillDiscountPctMilli), ("$ptax", Blank(party?.TaxId)));
         foreach (var line in options.Lines) AddLine(c, t, id, line, party);
         Recalculate(c, t, id);
         return id;
@@ -282,7 +282,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             RequireOpen(c, t, documentId);
             var party = partyId is { } p ? parties.Get(p) ?? throw new HubException("party-not-found", "That customer was not found.") : null;
             // Points belong to a customer: a different customer starts without points used.
-            HubDb.Exec(c, "UPDATE documents SET party_id = $p, buyer_region = $r, loyalty_points_used_cent = 0, loyalty_discount_minor = 0 WHERE id = $id", t, ("$p", partyId), ("$r", Blank(party?.Region)), ("$id", documentId));
+            HubDb.Exec(c, "UPDATE documents SET party_id = $p, buyer_region = $r, party_tax_id = $tax, loyalty_points_used_cent = 0, loyalty_discount_minor = 0 WHERE id = $id", t, ("$p", partyId), ("$r", Blank(party?.Region)), ("$tax", Blank(party?.TaxId)), ("$id", documentId));
             // Prices follow the customer's price level: lines taken from an item are priced again for the new customer.
             if (party is not null)
             {
@@ -774,6 +774,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             }
             if (noteLines.Count == 0) throw new HubException("empty", "Choose what is being returned.");
             var noteId = CreateDraft(c, t, new DraftOptions { Type = DocTypes.CreditNote, PartyId = invoice.PartyId, RefDocumentId = invoiceId, UserId = userId, Notes = reason.Trim(), Lines = noteLines, PricesIncludeTax = invoice.PricesIncludeTax });
+            // A credit note carries the buyer's number and place as the bill had them, not as the customer has them now.
+            HubDb.Exec(c, "UPDATE documents SET party_tax_id = $tax, buyer_region = $br WHERE id = $id", t, ("$tax", invoice.PartyTaxId), ("$br", invoice.BuyerRegion), ("$id", noteId));
             // The credit note is worked out like the invoice: same tax position, same rounding of the original (a credit note never rounds).
             var note = HubDb.Query(c, $"SELECT {DocColumns} FROM documents WHERE id = $id", MapDoc, t, ("$id", noteId)).Single();
             var noteDocLines = HubDb.Query(c, $"SELECT {LineColumns} FROM document_lines WHERE document_id = $id ORDER BY line_no", MapLine, t, ("$id", noteId));

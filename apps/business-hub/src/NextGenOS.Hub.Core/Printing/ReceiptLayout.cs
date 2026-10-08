@@ -30,7 +30,7 @@ public static class ReceiptLayout
         doc.Split("No. " + (view.Document.Number ?? "Draft"), when);
         if (view.Party is { } party)
         {
-            doc.Text(party.Name + (string.IsNullOrWhiteSpace(party.TaxId) ? "" : " " + party.TaxId));
+            doc.Text(party.Name + (string.IsNullOrWhiteSpace(view.Document.PartyTaxId ?? party.TaxId) ? "" : " " + (view.Document.PartyTaxId ?? party.TaxId)));
             if (!string.IsNullOrWhiteSpace(party.Address)) doc.Text(party.Address);
         }
         if (view.Document.Status == DocStatus.Void) doc.Text("VOID", Align.Center, true, 2);

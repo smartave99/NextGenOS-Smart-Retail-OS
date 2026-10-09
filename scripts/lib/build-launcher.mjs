@@ -39,7 +39,8 @@ export function checkOpenAddress(url) {
  * The makensis -D settings for one launcher, after checking every value (nothing with a quote or a line break in it can reach the script). `program` is the program to start and
  * `check` a file that must be there, both relative to where the launcher will sit; `workdir` is where it runs (also relative); `args` is what it is given (may be empty).
  * `open: { url, waitSeconds, profile, helper }` makes it a launcher of a background program shown in a window (see the top of this file). Add `waitOnly: true` (and `startingText`) when Windows
- * starts the program itself (a service): the launcher then never starts it, it shows a small "starting" window until the program answers. Add `kiosk: true` to open it full screen.
+ * starts the program itself (a service): the launcher then never starts it, it shows a small "starting" window until the program answers. Add `service: 'Name'` to say which
+ * Windows service it is: the launcher then also asks Windows to start it when it is switched off, and says in plain words what is wrong when it does not answer. Add `kiosk: true` to open it full screen.
  */
 export function launcherDefines({ outFile, name, program, args = '', workdir = '.', check = program, icon = null, version = '1.0.0', company = 'NextGenOS', open = null }) {
   for (const [what, value] of Object.entries({ name, program, workdir, check, version, company })) if (typeof value !== 'string' || !value || bad(value)) throw new Error(`The launcher's ${what} is missing or has a quote or a line break in it.`);
@@ -64,7 +65,13 @@ export function launcherDefines({ outFile, name, program, args = '', workdir = '
         if (typeof open.startingText !== 'string' || !open.startingText || open.startingText.length > 120 || bad(open.startingText)) throw new Error('The launcher\'s "starting" words must be 1 to 120 characters with no quote or line break.');
         defines.push(`-DSTARTING_TEXT=${open.startingText}`);
       }
+      // The Windows service that is the program: the launcher asks Windows to start it when it is switched off, and when it does not answer says what is wrong and opens a note.
+      if (open.service !== undefined) {
+        if (typeof open.service !== 'string' || !/^[A-Za-z][A-Za-z0-9_.-]{0,60}$/.test(open.service)) throw new Error('The launcher\'s service name must be letters, digits, dots, dashes or underscores, starting with a letter.');
+        defines.push(`-DSERVICE_NAME=${open.service}`);
+      }
     } else if (open.startingText !== undefined) throw new Error('The "starting" words belong to a launcher that only waits (waitOnly).');
+    else if (open.service !== undefined) throw new Error('The service name belongs to a launcher that only waits (waitOnly).');
     if (open.kiosk) defines.push('-DKIOSK=1');
     if (open.helper !== undefined) {
       if (typeof open.helper !== 'string' || !open.helper || bad(open.helper)) throw new Error('The launcher\'s helper name is missing or has a quote or a line break in it.');

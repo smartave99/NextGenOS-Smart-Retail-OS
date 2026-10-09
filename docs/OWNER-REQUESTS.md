@@ -258,3 +258,9 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 > continue start from where stopped but before that tell me explicitly what was completed and whats left i dont know what you are doing how much done and are you doing what i said or just wasting my time
 
 (The assistant gave a plain account of what is done, what is left, and what only the owner can do, in its answer, and from now on says at the start of each answer what is done, what is next and what it is waiting for. `CLAUDE.md` section 13 already asks for this; it was not done often enough.)
+
+### 2026-10-09 (about; sent after the last answer; a picture was attached)
+
+> continue where stopped but solve this proble first
+
+(The picture is a Windows message box titled "Smart Retail POS Setup": "Smart Retail POS has not started yet. It starts by itself a minute or two after the PC starts, and the first time after it is installed. Wait a little, then open it again. If it still does not open, restart the PC. If that does not help, call the person who looks after your computers." So the owner pressed the Smart Retail POS icon on a real PC and the shop program (a Windows service) did not answer within the icon's three minutes. This is the first real evidence of the "some files do not open" report. It comes before everything else; see `docs/OPEN-WORK.md`, item 12zz.)

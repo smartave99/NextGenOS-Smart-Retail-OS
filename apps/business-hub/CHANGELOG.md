@@ -4,6 +4,12 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### When the program does not open, it now says why
+- **The Smart Retail POS icon switches the program on when it is off,** and gives up after about 40 seconds (not three minutes) when Windows keeps switching it off again. Then it says in one plain sentence what is wrong (not installed correctly, switched on but not answering on this PC's own address, still starting, or switched off) and opens a note with what Windows knows. Nothing is sent anywhere.
+- **The setup waits until the program answers,** and says so at once (with the same note) when it does not. A quiet install ends with code 3 then.
+- **The program starts with the PC at once** (it used to start a minute or two late), is restarted by Windows when it stops with an error, and the people at the PC may switch it on but not off or change it.
+- **The program writes a short note of how it started** (`%ProgramData%\NextGenOS\Logs\hub-start.txt`): version, Windows, which account, and "Ready" or why it could not start.
+
 ### A new starting look: one bar along the top
 - **The program now opens with one bar along the top**: the name, the menu as big pictures with the words under them, then who is signed in, a light/dark switch and Sign out. Buttons are big enough for a finger, and on the sell screen the items and the bill sit side by side. On a wide screen the shop's name shows in the bar too. It works with a finger or a mouse. **A shop that had already set its own layout keeps it**, and *Settings → Look* still lets the owner choose the list look, the counter look (menu down the left), each screen deciding, or the old layout ("As it was").
 - **A customer's folder can name the look** the shop starts with (`theme.json`, `"look"`); the Setup Studio's page *Look* has a card for each, with a live picture.

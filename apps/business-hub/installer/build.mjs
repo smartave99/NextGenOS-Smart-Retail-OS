@@ -57,7 +57,7 @@ try {
   const base = `SmartRetailPOS-Hub-${version}-${rid}`;
 
   // 4a. The setup, from the folder as it was published. It installs the Hub as a Windows service, and puts two small programs beside it that the icons use: they wait until the Hub
-  // (which Windows starts a minute or two after the PC starts) answers, and then open its window of its own. They never start a second copy of it and never use the web browser.
+  // (which Windows starts with the PC; the icon also asks Windows to start it when it is off) answers, and then open its window of its own. They never start a second copy of it and never use the web browser.
   say('Adding the programs that open the Hub\'s window to the folder for the setup');
   try { console.log(`  ${addServiceLaunchers(out, { version }).join('\n  ')}`); } catch (e) { console.error(`\n${e.message}`); process.exit(1); }
   process.stdout.write(run('node', [join(repo, 'scripts', 'audit-prerequisites.mjs'), out, '--os', 'windows', '--arch', 'x64']));

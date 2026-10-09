@@ -154,3 +154,61 @@ test('the launcher program never opens the usual web browser: its script has no 
     assert.ok(!has(bytes, 'This installs'), 'nothing of a setup');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ---- the icon of a program that is a Windows service: it switches the service on, and says what is wrong when it does not answer ------------------------------------------------
+
+test('a launcher can be told the name of the Windows service it opens; only a plain name is taken, and only by a launcher that waits', () => {
+  const waiting = { ...open, waitOnly: true };
+  assert.ok(launcherDefines({ ...base, open: { ...waiting, service: 'NextGenOSHub' } }).includes('-DSERVICE_NAME=NextGenOSHub'));
+  assert.ok(!launcherDefines({ ...base, open: waiting }).some((d) => d.startsWith('-DSERVICE_NAME')), 'no service named: the launcher does what it did before');
+  for (const service of ['', '1abc', 'a b', 'a"b', 'a&b', 'a|b', 'x'.repeat(62), 5, '..\\x']) assert.throws(() => launcherDefines({ ...base, open: { ...waiting, service } }), /service name/, String(service));
+  assert.throws(() => launcherDefines({ ...base, open: { ...open, service: 'NextGenOSHub' } }), /only waits/, 'a launcher that starts its program has no service');
+});
+
+test('the words that look at the PC (HubProblemNote.nsh) use only built-in Windows commands, hidden, write nothing but the note, and the launcher itself still runs nothing', () => {
+  const dir = join(repo, 'scripts', 'launcher');
+  const note = readFileSync(join(dir, 'HubProblemNote.nsh'), 'utf8').replace(/^\s*;.*$/gm, '');
+  assert.ok(!/powershell|wscript|cscript|mshta|bitsadmin|certutil|curl|wget|\.vbs|\.ps1|\.bat\b/i.test(note), 'no script host and no download tool');
+  const allowed = new Set(['sc.exe', 'cmd.exe', 'netstat', 'findstr', 'find', 'netsh', 'wevtutil.exe', 'type', 'date', 'time', 'ver', 'echo', 'echo.', 'notepad.exe']);
+  // Every command named in a nsExec line or a note section is one of the built-in ones.
+  const commands = [];
+  for (const m of note.matchAll(/nsExec::\w+\s+'([^']+)'/g)) commands.push(m[1]);
+  for (const m of note.matchAll(/HubNoteSection\s+"[^"]*"\s+(?:"([^"]+)"|'([^']+)')/g)) commands.push(m[1] ?? m[2]);
+  assert.ok(commands.length >= 10, 'the note asks Windows several things');
+  for (const text of commands) {
+    for (const part of text.replace(/^cmd\.exe \/c /, '').replace(/2>&1/g, '').split(/\s*(?:&|\|)\s*/)) {
+      const first = part.replace(/^\(+/, '').trim().split(/[\s>)]/)[0];
+      if (first && !first.startsWith('${')) assert.ok(allowed.has(first), `"${first}" is not a built-in command the note may run (in: ${text})`);
+    }
+  }
+  // It is hidden (nsExec) and writes only to the note.
+  assert.ok(!/ExecWait|ExecShell|ExecShellWait/.test(note.replace(/Exec\s+'"\$R0" "\$R8"'/g, '')), 'nothing is run with a window except the note opened for reading');
+  for (const m of note.matchAll(/FileOpen\s+\$\w+\s+"([^"]+)"/g)) assert.equal(m[1], '$R8', 'it writes to the note and nowhere else');
+  assert.ok(!/RegWrite|WriteReg|DeleteReg|Delete\s|CopyFiles|Rename|RMDir|WriteINIStr/i.test(note), 'it changes nothing on the PC');
+  // The sentences are plain: no jargon in what a shop owner reads.
+  const sentences = [...note.matchAll(/StrCpy \$R7 "([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(sentences.length, 5, 'one sentence for each thing that can be wrong');
+  for (const s of sentences) assert.ok(!/exception|stack|dll|registry|SCM|0x[0-9a-f]+/i.test(s), `plain words: ${s}`);
+  // AppLauncher.nsi itself: still nothing run and nothing written (the helpers are the .nsh files).
+  const launcher = readFileSync(LAUNCHER_SCRIPT, 'utf8').replace(/^\s*;.*$/gm, '');
+  assert.ok(!/cmd\.exe|nsExec|powershell|wscript|cscript|mshta/i.test(launcher), 'the launcher script runs no command');
+  for (const f of ['TcpAnswers.nsh', 'HubProblemNote.nsh']) assert.ok(!/powershell|wscript|cscript|mshta/i.test(readFileSync(join(dir, f), 'utf8')), `${f} runs no script host`);
+});
+
+test('the icon of the Business Hub asks Windows to switch the service on, gives up when it keeps switching itself off, and says in words what is wrong; the other icons do not', { skip }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'service-launcher-'));
+  try {
+    const out = join(dir, 'Open.exe');
+    buildLauncher({ outFile: out, name: 'Example', program: 'app\\run.exe', icon, open: { ...open, waitOnly: true, service: 'ExampleService', startingText: 'Example is starting.' } });
+    const exe = readFileSync(out);
+    for (const text of ['sc.exe start ExampleService', 'sc.exe query ExampleService', 'did not open.', 'is not installed correctly on this PC', 'is switched on but does not answer on this PC', 'is still starting', 'could not keep', 'is keeping the place (port',
+      'problem-note.txt', 'NEXTGENOS_NOTE_VIEWER', 'wevtutil.exe', 'excludedportrange', 'hub-start.txt', 'Please send the note, or a picture of it, to the person who looks after your computers']) assert.ok(has(exe, text), `the icon says "${text}"`);
+    assert.ok(!has(exe, 'has not started yet'), 'the vague message is gone from this icon');
+    // An icon that names no service is the one it was before: it waits and says so, and runs nothing.
+    const plain = join(dir, 'Plain.exe');
+    buildLauncher({ outFile: plain, name: 'Example', program: 'app\\run.exe', icon, open: { ...open, waitOnly: true } });
+    const p = readFileSync(plain);
+    assert.ok(has(p, 'has not started yet'));
+    for (const text of ['sc.exe', 'wevtutil', 'problem-note', 'NEXTGENOS_NOTE_VIEWER']) assert.ok(!has(p, text), `no "${text}" in an icon that names no service`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

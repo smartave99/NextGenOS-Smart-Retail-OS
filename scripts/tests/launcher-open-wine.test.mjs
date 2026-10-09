@@ -11,7 +11,7 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LAUNCHER_SCRIPT, launcherDefines } from '../lib/build-launcher.mjs';
@@ -30,6 +30,24 @@ async function until(what, check, ms = 60_000) {
 }
 const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 const listen = (port) => new Promise((resolve, reject) => { const s = net.createServer((c) => c.end()); s.once('error', reject); s.listen(port, '127.0.0.1', () => resolve(s)); });
+
+/** The note about a problem, where the launcher writes it: the person's own folder (%LOCALAPPDATA%\\NextGenOS\\problem-note.txt), which Wine keeps under the prefix. */
+function noteText() {
+  const users = join(prefix, 'drive_c', 'users');
+  if (!existsSync(users)) return null;
+  for (const user of readdirSync(users)) {
+    for (const where of [join('AppData', 'Local'), join('Local Settings', 'Application Data')]) {
+      const file = join(users, user, where, 'NextGenOS', 'problem-note.txt');
+      if (existsSync(file)) return readFileSync(file, 'latin1').replace(/\0/g, '');
+    }
+  }
+  return null;
+}
+const forgetNote = () => {
+  const users = join(prefix, 'drive_c', 'users');
+  if (existsSync(users)) for (const user of readdirSync(users)) for (const where of [join('AppData', 'Local'), join('Local Settings', 'Application Data')]) rmSync(join(users, user, where, 'NextGenOS', 'problem-note.txt'), { force: true });
+};
+const wineSc = (...args) => spawnSync(WINE64, ['sc', ...args], { env: wineEnv(), encoding: 'utf8', timeout: 60_000 });
 
 let root = null;
 let prefix = null;
@@ -51,6 +69,10 @@ function folder(variant, { port, wait = 60, open = {}, browser = true }) {
     '  FileOpen $0 "$EXEDIR\\browser.txt" a', '  FileSeek $0 0 END', '  FileWrite $0 "$CMDLINE$\\r$\\n"', '  FileClose $0', 'SectionEnd', ''].join('\n'));
   const stand = spawnSync('makensis', ['-V1', nsi], { encoding: 'utf8' });
   assert.equal(stand.status, 0, stand.stdout + stand.stderr);
+  // The stand-in for Notepad (the note about a problem is opened in it): the same tiny program, in a folder of its own, so that what it was given can be read.
+  const viewerDir = join(dir, 'viewer');
+  mkdirSync(viewerDir);
+  copyFileSync(join(web, 'msedge.exe'), join(viewerDir, 'viewer.exe'));
   const launcher = join(app, 'Start Hub.exe');
   // The same defines the shipped launcher gets.
   const defines = launcherDefines({ outFile: launcher, name: 'Test Hub', program: 'hub.exe', args: '/c echo x>> started.txt', open: { url: `http://127.0.0.1:${port}`, waitSeconds: wait, profile: 'test-window', helper: 'Start Hub (with a window, for problems)', ...open } });
@@ -62,8 +84,10 @@ function folder(variant, { port, wait = 60, open = {}, browser = true }) {
     started: () => lines(join(app, 'started.txt')),
     windows: () => lines(join(web, 'browser.txt')),
     windowFile: join(web, 'browser.txt'),
+    // What the stand-in for Notepad was given (the note's path), one line each time it was opened.
+    opened: () => lines(join(viewerDir, 'browser.txt')),
     run: () => {
-      const child = spawn(variant.wine, [launcher], { env: wineEnv({ NEXTGENOS_APP_BROWSER: browser ? join(web, 'msedge.exe') : join(web, 'no-such-browser.exe') }), stdio: 'ignore', detached: true });
+      const child = spawn(variant.wine, [launcher], { env: wineEnv({ NEXTGENOS_APP_BROWSER: browser ? join(web, 'msedge.exe') : join(web, 'no-such-browser.exe'), NEXTGENOS_NOTE_VIEWER: join(viewerDir, 'viewer.exe') }), stdio: 'ignore', detached: true });
       const done = new Promise((resolve) => child.once('exit', resolve));
       return { child, done, kill: () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* it is gone */ } } };
     },
@@ -248,6 +272,61 @@ for (const variant of variants) {
       assert.ok(line.includes(`--kiosk http://127.0.0.1:${port}`), line);
       assert.ok(line.includes('--edge-kiosk-type=fullscreen'), line);
       assert.ok(!line.includes('--app='), line);
+    } finally { run.kill(); server.close(); }
+  });
+
+  // ---- the icon of a Windows service (the Business Hub): it switches the service on when it is off, and says what is wrong when the program does not answer ----------------------------
+
+  t('the service is not installed at all: no window, the program is not started, and a note says so in one plain sentence', {}, async () => {
+    forgetNote();
+    const port = await freePort();
+    const f = folder(variant, { port, wait: 3, open: { waitOnly: true, service: 'NextGenNoSuchService' } });
+    const run = f.run();
+    try {
+      await until('the note to be opened', () => f.opened().length > 0, 90_000);
+      const note = noteText();
+      assert.ok(note, 'the note is written in the person\'s own folder');
+      assert.match(note, /is not installed correctly on this PC: its Windows service is missing/, 'the one sentence says what is wrong');
+      assert.match(note, /Please send this note, or a picture of it/, 'and what to do with the note');
+      for (const part of ['the day and time', 'the program, as Windows sees it', 'who holds the place (port', 'places Windows keeps for itself', 'what Windows wrote about starting the program']) assert.ok(note.includes(part), `the note has "${part}"`);
+      assert.ok(/problem-note\.txt/.test(f.opened()[0]), `the note is opened in a window of its own: ${f.opened()[0]}`);
+      assert.equal(f.windows().length, 0, 'no window of the program: it is not there');
+      assert.equal(f.started().length, 0, 'the icon never starts a second copy of the program itself');
+    } finally { run.kill(); }
+  });
+
+  t('the service is switched off: the icon asks Windows to start it, and when it stays off the note says it is switched off', {}, async () => {
+    forgetNote();
+    const port = await freePort();
+    const name = `NextGenTest${process.pid}${variant.name.length}`;
+    const dir = mkdtempSync(join(root, 'svc-'));
+    const proof = join(dir, 'service-started.txt');
+    const created = wineSc('create', name, 'binPath=', `C:\\windows\\system32\\cmd.exe /c echo x>> Z:${proof.replace(/\//g, '\\')}`);
+    const made = wineSc('query', name);
+    assert.ok(/STOPPED/.test(made.stdout), `Wine made the stand-in service and it is switched off: ${created.stdout}${created.stderr}${made.stdout}${made.stderr}`);
+    const f = folder(variant, { port, wait: 4, open: { waitOnly: true, service: name } });
+    const run = f.run();
+    try {
+      await until('Windows to be asked to start the service', () => existsSync(proof), 60_000);
+      assert.equal(f.started().length, 0, 'the icon itself did not start the program');
+      await until('the note to be opened', () => f.opened().length > 0, 90_000);
+      assert.match(noteText() ?? '', /Windows could not keep Smart Retail POS running: it is switched off/, 'the sentence says it is switched off');
+      assert.equal(f.windows().length, 0);
+    } finally { run.kill(); wineSc('delete', name); }
+  });
+
+  t('the program answers: the window opens at once and no note is written', {}, async () => {
+    forgetNote();
+    const port = await freePort();
+    const server = await listen(port);
+    const f = folder(variant, { port, open: { waitOnly: true, service: 'NextGenNoSuchService' } });
+    const run = f.run();
+    try {
+      await until('the window', () => f.windows().length > 0);
+      await run.done;
+      assert.equal(f.windows().length, 1);
+      assert.equal(f.opened().length, 0, 'no note opened');
+      assert.equal(noteText(), null, 'no note written');
     } finally { run.kill(); server.close(); }
   });
 

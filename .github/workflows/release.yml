@@ -355,7 +355,14 @@ jobs:
           $svc = Get-Service -Name NextGenOSHub -ErrorAction Stop
           $cfg = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\NextGenOSHub'
           if ($cfg.ObjectName -ne 'NT AUTHORITY\LocalService') { throw "The service runs as $($cfg.ObjectName)." }
-          if ($cfg.Start -ne 2 -or $cfg.DelayedAutostart -ne 1) { throw 'The service does not start with the PC (delayed automatic start).' }
+          if ($cfg.Start -ne 2) { throw 'The service does not start with the PC (automatic start).' }
+          if ($cfg.DelayedAutostart -eq 1) { throw 'The service is set to start late (delayed): a till must be ready as early as the PC is.' }
+          # The people at the PC may switch the service ON (the icon does, when it finds it off) and nothing more: not stop it, change it or delete it.
+          $sd = (& sc.exe sdshow NextGenOSHub) -join ''
+          $iu = [regex]::Match($sd, '\(A;;([A-Z]+);;;IU\)').Groups[1].Value
+          $rights = @([regex]::Matches($iu, '..') | ForEach-Object { $_.Value })
+          if ($rights -notcontains 'RP') { throw "The people at the PC may not switch the service on: $sd" }
+          foreach ($bad in 'WP', 'DT', 'DC', 'SD', 'WD', 'WO') { if ($rights -contains $bad) { throw "The people at the PC may do more with the service than switch it on ($bad): $sd" } }
           for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 2 }
           if ((Get-Service NextGenOSHub).Status -ne 'Running') { Get-WinEvent -LogName Application -MaxEvents 20 | Format-List TimeCreated, ProviderName, Message; throw 'The service did not start.' }
           $code = 0
@@ -369,6 +376,58 @@ jobs:
           $acl = (Get-Acl 'C:\ProgramData\NextGenOS\Hub').Access | ForEach-Object { $_.IdentityReference.Value }
           if ($acl -match 'Users|Everyone|Authenticated Users') { throw "The shop's data folder can be read by: $($acl -join ', ')" }
           Write-Host 'Installed, the service runs, the Hub answers 402 without a licence, the data folder is closed to ordinary users.'
+          # The program writes a note of how it started (the icon's problem note quotes it): it must be there, written by the service's own account, saying it is ready.
+          $startLog = 'C:\ProgramData\NextGenOS\Logs\hub-start.txt'
+          if (-not (Test-Path $startLog)) { throw 'The program wrote no note about how it started.' }
+          if ((Get-Content $startLog -Raw) -notmatch 'Ready\. It answers at') { throw "The note about how the program started does not say it is ready: $(Get-Content $startLog -Raw)" }
+          Write-Host 'The program wrote its start-up note.'
+
+          # THE ICON, as a person would use it. (1) The service is switched OFF: the icon asks Windows to switch it on and opens the window (a stand-in for Edge records that it was asked).
+          $icon = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\Open Smart Retail POS.exe'
+          if (-not (Test-Path $icon)) { throw 'The icon program was not installed.' }
+          $fakeWindow = Join-Path $env:RUNNER_TEMP 'fake-edge.cmd'
+          $windowAsked = Join-Path $env:RUNNER_TEMP 'window-asked.txt'
+          Set-Content -Path $fakeWindow -Value "@echo off`r`necho %* >> `"$windowAsked`"" -Encoding ascii
+          Stop-Service NextGenOSHub -Force
+          for ($i = 0; $i -lt 30 -and (Get-Service NextGenOSHub).Status -ne 'Stopped'; $i++) { Start-Sleep -Seconds 1 }
+          if ((Get-Service NextGenOSHub).Status -ne 'Stopped') { throw 'The service would not stop for the test.' }
+          $env:NEXTGENOS_APP_BROWSER = $fakeWindow
+          $icon1 = Start-Process -FilePath $icon -PassThru
+          for ($i = 0; $i -lt 120 -and -not (Test-Path $windowAsked); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $windowAsked)) { throw 'With the service switched off, the icon did not bring the program up and open its window.' }
+          if ((Get-Service NextGenOSHub).Status -ne 'Running') { throw 'The icon opened the window, but the service is not running.' }
+          if ((Get-Content $windowAsked -Raw) -notmatch '--app=http://127\.0\.0\.1:5280') { throw "The icon opened something other than the program's own window: $(Get-Content $windowAsked -Raw)" }
+          Write-Host 'The icon switched the service on and opened the program in a window of its own.'
+          # (2) The service cannot start (switched off for good): the icon gives up in under a minute, says what is wrong in one plain sentence and opens a note; it opens no window.
+          Stop-Service NextGenOSHub -Force
+          Set-Service NextGenOSHub -StartupType Disabled
+          for ($i = 0; $i -lt 30 -and (Get-Service NextGenOSHub).Status -ne 'Stopped'; $i++) { Start-Sleep -Seconds 1 }
+          Remove-Item $windowAsked -ErrorAction SilentlyContinue
+          $noteViewer = Join-Path $env:RUNNER_TEMP 'fake-notepad.cmd'
+          $noteOpened = Join-Path $env:RUNNER_TEMP 'note-opened.txt'
+          Set-Content -Path $noteViewer -Value "@echo off`r`necho %* >> `"$noteOpened`"" -Encoding ascii
+          $env:NEXTGENOS_NOTE_VIEWER = $noteViewer
+          $noteFile = Join-Path $env:LOCALAPPDATA 'NextGenOS\problem-note.txt'
+          Remove-Item $noteFile -ErrorAction SilentlyContinue
+          $icon2 = Start-Process -FilePath $icon -PassThru
+          for ($i = 0; $i -lt 180 -and -not (Test-Path $noteOpened); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $noteOpened)) { Stop-Process -Id $icon2.Id -Force -ErrorAction SilentlyContinue; throw 'With the service unable to start, the icon did not open a note about what is wrong.' }
+          if (-not (Test-Path $noteFile)) { throw 'The icon said it opened a note, but there is none.' }
+          $note = Get-Content $noteFile -Raw
+          Write-Host '---- the note the icon wrote ----'
+          Write-Host $note
+          Write-Host '---- end of the note ----'
+          if ($note -notmatch 'it is switched off') { throw 'The note does not say in one sentence that Windows could not keep the program running.' }
+          foreach ($part in 'the program, as Windows sees it', 'who holds the place', 'places Windows keeps for itself', 'what Windows wrote about starting the program', 'the notes the program keeps about how it started') { if ($note -notmatch [regex]::Escape($part)) { throw "The note has no part called: $part" } }
+          if ($note -notmatch 'Ready\. It answers at') { throw 'The note does not carry the program''s own start-up note.' }
+          if (Test-Path $windowAsked) { throw 'A window of the program was opened though the program was not on.' }
+          Stop-Process -Id $icon2.Id -Force -ErrorAction SilentlyContinue
+          Remove-Item Env:NEXTGENOS_APP_BROWSER, Env:NEXTGENOS_NOTE_VIEWER
+          Set-Service NextGenOSHub -StartupType Automatic
+          Start-Service NextGenOSHub
+          for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 1 }
+          if ((Get-Service NextGenOSHub).Status -ne 'Running') { throw 'The service would not start again after the test.' }
+          Write-Host 'The icon says what is wrong, and opens a note, when the program cannot be brought up.'
           # Something in the data folder must survive the uninstall.
           Set-Content 'C:\ProgramData\NextGenOS\Hub\keep-me.txt' 'shop data'
           $un = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\Uninstall.exe'

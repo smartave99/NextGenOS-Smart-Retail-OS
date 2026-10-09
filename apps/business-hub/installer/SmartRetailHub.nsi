@@ -7,6 +7,12 @@
 ; data folder is readable by that account and administrators only. Uninstalling never removes the shop's data.
 ;
 ; Quiet install for a person setting up many PCs:  SmartRetailHub-Setup.exe /S   (and /D=C:\Folder\Hub for another folder, last on the line)
+; A quiet install ends with code 0 when the program is on and answers, and with code 3 when it was installed but does not answer within about a minute and a half (a note of what Windows
+; knows is then left in %LOCALAPPDATA%\NextGenOS\problem-note.txt of the account that ran it).
+;
+; The service starts with the PC (automatic start, not "delayed": a till must be ready as early as the PC is), is restarted by Windows if it stops, and the people at the PC may switch it
+; on (not off, not change it): the icon that opens the program does so when it finds it switched off. The setup does not finish well until the program ANSWERS, and says in one plain sentence
+; what is wrong when it does not (scripts/launcher/HubProblemNote.nsh, the same words the icon uses).
 ;
 ; A setup prepared for one business: NextGenOS's Setup Studio puts a folder called "profile" next to this setup file. It holds only data (setup.json, theme.json,
 ; brand.json and install.ini) and setup copies it beside the program, where the Hub reads it at first run. With no such folder this is the plain setup. When install.ini
@@ -55,6 +61,14 @@ ManifestSupportedOS Win10
 !include FileFunc.nsh
 !include x64.nsh
 !include WinVer.nsh
+
+; The same two helpers as the icon that opens the program (scripts/launcher): "does it answer?" and "say in one sentence what is wrong, and write a note for the person who looks after the PC".
+!define ANSWER_HOST "127.0.0.1"
+!define ANSWER_PORT "${PORT}"
+!define HUB_SERVICE "${SERVICE}"
+!define HUB_PORT "${PORT}"
+!include "../../../scripts/launcher/TcpAnswers.nsh"
+!include "../../../scripts/launcher/HubProblemNote.nsh"
 
 Name "${APP}"
 OutFile "${OUTFILE}"
@@ -208,11 +222,12 @@ Function StopService
     ${EndIf}
 FunctionEnd
 
-; After "start": Windows answers at once when it cannot start the service at all ($0 is not 0), or the service is up for a moment and stops again. Waits up to ten seconds
-; for it to be running; says in plain words if it is not. A service that is merely slow is not a fault: the icon's "starting" window waits for it.
+; After "start" ($0 is what it answered): leaves 1 in $0 when Windows has the service running or on its way within ten seconds, otherwise 0. Windows answers at once when it cannot start the
+; service at all ($0 is not 0), or the service is up for a moment and stops again. A service that is merely slow is not a fault: WaitForHub waits for it.
 Function CheckStarted
   ${If} $0 != 0
-    Goto failed
+    StrCpy $0 0
+    Return
   ${EndIf}
   StrCpy $2 0
   looking:
@@ -220,12 +235,14 @@ Function CheckStarted
     Pop $0
     Pop $1
     ${If} $0 == 0
+      StrCpy $0 1
       Return
     ${EndIf}
     nsExec::ExecToStack 'cmd.exe /c sc.exe query ${SERVICE} | find "START_PENDING"'
     Pop $0
     Pop $1
     ${If} $0 == 0
+      StrCpy $0 1
       Return
     ${EndIf}
     IntOp $2 $2 + 1
@@ -233,8 +250,69 @@ Function CheckStarted
       Sleep 500
       Goto looking
     ${EndIf}
-  failed:
-  MessageBox MB_OK|MB_ICONEXCLAMATION "${APP} is installed, but Windows could not start it just now.$\r$\n$\r$\nRestart this PC, then open Smart Retail POS from its icon. If it is still not ready, an anti-virus program may be stopping it: allow the folder $INSTDIR in the anti-virus program and restart the PC." /SD IDOK
+  StrCpy $0 0
+FunctionEnd
+
+; Waits (up to about a minute and a half) until the program answers on this PC's own address. Leaves 1 in $0 when it does. Gives up sooner when Windows keeps saying that the service is
+; switched off (it is asked to start again each time).
+Function WaitForHub
+  StrCpy $2 0
+  StrCpy $3 0
+  StrCpy $4 0
+  asking:
+    Call Answers
+    ${If} $0 == 1
+      Return
+    ${EndIf}
+    IntOp $2 $2 + 1
+    ${If} $2 > 180
+      StrCpy $0 0
+      Return
+    ${EndIf}
+    IntOp $4 $4 + 1
+    ${If} $4 >= 10
+      StrCpy $4 0
+      Call HubServiceStopped
+      ${If} $0 == 1
+        IntOp $3 $3 + 1
+        ${If} $3 >= 4
+          StrCpy $0 0
+          Return
+        ${EndIf}
+        Call HubServiceStart
+      ${EndIf}
+    ${EndIf}
+    Sleep 500
+    Goto asking
+FunctionEnd
+
+; After "start": the service must be on its way, and then the program must answer. When it does not, say so now, in one plain sentence, and leave a note of what Windows knows (HubProblemNote.nsh):
+; the person at the counter should not be the first to find out. A quiet install ends with code 3 then.
+Function VerifyStarted
+  Call CheckStarted
+  ${If} $0 == 1
+    DetailPrint "Waiting for ${APP} to answer (the first start can take a minute)..."
+    Call WaitForHub
+    ${If} $0 == 1
+      DetailPrint "${APP} is on and answers."
+      Return
+    ${EndIf}
+    StrCpy $R9 "answer"
+  ${Else}
+    StrCpy $R9 "start"
+  ${EndIf}
+  Call HubWriteNote
+  DetailPrint "${APP} is not working yet. A note of what Windows knows is in $R8"
+  ${IfNot} ${Silent}
+    Call HubOpenNote
+  ${Else}
+    SetErrorLevel 3
+  ${EndIf}
+  ${If} $R9 == "start"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${APP} is installed, but Windows could not start it just now.$\r$\n$\r$\n$R7$\r$\n$\r$\nRestart this PC, then open Smart Retail POS from its icon. If it is still not ready, an anti-virus program may be stopping it: allow the folder $INSTDIR in the anti-virus program and restart the PC.$\r$\n$\r$\nA note with the details has opened in another window. Please send it, or a picture of it, to the person who looks after your computers." /SD IDOK
+  ${Else}
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${APP} is installed, but it does not answer yet.$\r$\n$\r$\n$R7$\r$\n$\r$\nA note with the details has opened in another window. Please send it, or a picture of it, to the person who looks after your computers." /SD IDOK
+  ${EndIf}
 FunctionEnd
 
 Section "Smart Retail POS Hub" SecMain
@@ -254,6 +332,13 @@ Section "Smart Retail POS Hub" SecMain
 
   DetailPrint "Stopping an earlier copy, if there is one..."
   Call StopService
+
+  ; Windows keeps some places (ports) for itself (Hyper-V, Docker and WSL do): a program cannot use one, and the Hub could not start, with nothing to say why. Say it now.
+  Call PortBind
+  ${If} $0 == 10013
+    MessageBox MB_OK|MB_ICONSTOP "Windows is keeping the place (port ${PORT}) that ${APP} needs for itself on this PC, so it could not start.$\r$\n$\r$\nRestart the PC and run this setup again first. If this message comes back, tell the person who looks after your PCs that Windows keeps port ${PORT} for itself (Hyper-V, Docker or WSL do this)." /SD IDOK
+    Abort
+  ${EndIf}
 
   ; Something else on the PC already holds the Hub's port: the Hub could not start, and nothing would say why. Say it now.
   Call PortInUse
@@ -292,23 +377,34 @@ Section "Smart Retail POS Hub" SecMain
   ; account, administrators and the system may read it: the people at the PC use the Hub's own sign-in.
   CreateDirectory "$APPDATA\${COMPANY}\Hub"
   nsExec::ExecToLog 'icacls.exe "$APPDATA\${COMPANY}\Hub" /inheritance:r /grant:r "*S-1-5-19:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F"'
+  ; Files that an earlier copy of the Hub (started by a person from the zip, or by another version) left there may carry rights that keep the service out: they take the folder's rights again.
+  nsExec::ExecToLog 'icacls.exe "$APPDATA\${COMPANY}\Hub\*" /reset /T /C /Q'
   ; The licence is shared by every program of the suite on this PC: they read it, the Hub's service may also write it.
   CreateDirectory "$APPDATA\${COMPANY}\SmartRetailPOS"
   nsExec::ExecToLog 'icacls.exe "$APPDATA\${COMPANY}\SmartRetailPOS" /grant "*S-1-5-19:(OI)(CI)M"'
 
+  ; The notes the program keeps about how it started (Diagnostics/StartupLog.cs): the service writes them, the people at the PC may read them (the icon's note quotes them).
+  CreateDirectory "$APPDATA\${COMPANY}\Logs"
+  nsExec::ExecToLog 'icacls.exe "$APPDATA\${COMPANY}\Logs" /grant "*S-1-5-19:(OI)(CI)M" "*S-1-5-32-545:(OI)(CI)RX"'
+
   DetailPrint "Setting up the Windows service..."
-  nsExec::ExecToLog 'sc.exe create ${SERVICE} binPath= "\"$INSTDIR\${EXE}\"" start= delayed-auto obj= "NT AUTHORITY\LocalService" DisplayName= "${APP}"'
+  nsExec::ExecToLog 'sc.exe create ${SERVICE} binPath= "\"$INSTDIR\${EXE}\"" start= auto obj= "NT AUTHORITY\LocalService" DisplayName= "${APP}"'
   Pop $0
   ${If} $0 != 0
     ; Already there (an update): bring its settings up to date.
-    nsExec::ExecToLog 'sc.exe config ${SERVICE} binPath= "\"$INSTDIR\${EXE}\"" start= delayed-auto obj= "NT AUTHORITY\LocalService" DisplayName= "${APP}"'
+    nsExec::ExecToLog 'sc.exe config ${SERVICE} binPath= "\"$INSTDIR\${EXE}\"" start= auto obj= "NT AUTHORITY\LocalService" DisplayName= "${APP}"'
     Pop $0
   ${EndIf}
   nsExec::ExecToLog 'sc.exe description ${SERVICE} "Smart Retail POS Hub by ${COMPANY}: the counter, stock, bills and reports of the business. Open it from the Smart Retail POS icon."'
   nsExec::ExecToLog 'sc.exe failure ${SERVICE} reset= 86400 actions= restart/5000/restart/10000/restart/30000'
+  ; Windows restarts it also when it stops by itself with an error, not only when it crashes.
+  nsExec::ExecToLog 'sc.exe failureflag ${SERVICE} 1'
+  ; Who may do what with the service: the system and administrators everything; the people at the PC may see it and switch it ON (the icon does, when it finds it switched off), nothing more;
+  ; other service accounts may only look.
+  nsExec::ExecToLog 'sc.exe sdset ${SERVICE} "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)"'
   nsExec::ExecToLog 'sc.exe start ${SERVICE}'
   Pop $0
-  Call CheckStarted
+  Call VerifyStarted
 
   ; The icon people use: a small program that waits until the Hub is ready (Windows starts it a minute or two after the PC starts, and the first time after this setup) and then opens
   ; it in a window of its own (Microsoft Edge in "app" mode: no address bar, no tabs; Chrome when there is no Edge). It never opens the usual web browser. The Hub is a service and keeps

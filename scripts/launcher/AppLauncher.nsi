@@ -14,11 +14,15 @@
 ;      ... -DOPEN_URL="http://127.0.0.1:5280" -DOPEN_HOST=127.0.0.1 -DOPEN_PORT=5280 [-DOPEN_WAIT=60] [-DOPEN_PROFILE=smart-retail-pos-window] [-DOPEN_HELPER="Start Business Hub (with a window, for problems)"]
 ;    NEXTGENOS_APP_BROWSER names a Chromium-based browser by hand (the same setting scripts/lib/app-window.mjs reads).
 ;
-;    Two more settings for a program that Windows itself starts (the Business Hub is a Windows service that starts with the PC, a minute or two after it, and the launcher must not
+;    Two more settings for a program that Windows itself starts (the Business Hub is a Windows service that starts with the PC, and the launcher must not
 ;    start a second copy of it, which would run without the service's rights to the shop's data):
 ;      -DWAIT_ONLY=1        never start the program; only wait for it. While it has not answered, a small window says that it is starting (-DSTARTING_TEXT="..."), and when the time is
 ;                           up a plain message says what to do. The window of the program opens the moment it answers.
 ;      -DKIOSK=1            open the program full screen with nothing else on the screen (a touch till), instead of in a window.
+;      -DSERVICE_NAME=NextGenOSHub   (with WAIT_ONLY) the name of the Windows service. Then the launcher also: asks Windows to start the service when it is switched off (it is one
+;                           service, so this never makes a second copy), waits until it answers, and when it does not says in one plain sentence what is wrong (switched off, not
+;                           installed, still starting, running but not answering) and opens a note of what Windows knows about it (HubProblemNote.nsh). NEXTGENOS_NOTE_VIEWER names
+;                           another program than Notepad to open the note (for tests).
 Unicode true
 !ifndef OUTFILE
   !error "Pass the file to write: -DOUTFILE=..."
@@ -46,6 +50,11 @@ Unicode true
 !endif
 !ifdef OPEN_URL
   !include LogicLib.nsh
+  !ifdef SERVICE_NAME
+    !ifndef WAIT_ONLY
+      !error "SERVICE_NAME belongs to a launcher that only waits (WAIT_ONLY)."
+    !endif
+  !endif
   !ifndef OPEN_HOST
     !define OPEN_HOST "127.0.0.1"
   !endif
@@ -85,40 +94,16 @@ VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "LegalCopyright" "(c) 2026 ${COMPANY}. All rights reserved."
 
 !ifdef OPEN_URL
-; Leaves 1 in $0 when something accepts a connection at ${OPEN_HOST}:${OPEN_PORT}, otherwise 0. A plain connection is made and closed at once; nothing is sent.
-Function Answers
-  Push $1
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-  StrCpy $0 0
-  System::Alloc 512
-  Pop $1
-  System::Call 'ws2_32::WSAStartup(i 0x0202, p r1) i .r5'
-  ${If} $5 == 0
-    System::Call 'ws2_32::inet_addr(m "${OPEN_HOST}") i .r3'
-    System::Call 'ws2_32::htons(i ${OPEN_PORT}) i .r4'
-    System::Alloc 16
-    Pop $2
-    ; struct sockaddr_in: the family (2 = internet), the port and the address; the rest stays zero.
-    System::Call '*$2(&i2 2, &i2 r4, &i4 r3)'
-    System::Call 'ws2_32::socket(i 2, i 1, i 6) p .r5'
-    System::Call 'ws2_32::connect(p r5, p r2, i 16) i .r3'
-    ${If} $3 == 0
-      StrCpy $0 1
-    ${EndIf}
-    System::Call 'ws2_32::closesocket(p r5)'
-    System::Free $2
-    System::Call 'ws2_32::WSACleanup()'
-  ${EndIf}
-  System::Free $1
-  Pop $5
-  Pop $4
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
+; Answers: leaves 1 in $0 when something accepts a connection at ${OPEN_HOST}:${OPEN_PORT}, otherwise 0 (TcpAnswers.nsh, shared with the Hub's setup).
+!define ANSWER_HOST "${OPEN_HOST}"
+!define ANSWER_PORT "${OPEN_PORT}"
+!include "TcpAnswers.nsh"
+
+!ifdef SERVICE_NAME
+  !define HUB_SERVICE "${SERVICE_NAME}"
+  !define HUB_PORT "${OPEN_PORT}"
+  !include "HubProblemNote.nsh"
+!endif
 
 ; Tries one place for a browser that can show a page as an app window; leaves the path in $R0 when it is there.
 !macro TryBrowser BASE RELATIVE
@@ -178,25 +163,58 @@ Section
     IfErrors notstarted
 !else
     ; Windows starts the program (a service): this launcher only shows that it is on its way.
+!ifdef SERVICE_NAME
+    ; A service that is switched off (it did not start with the PC, or stopped) is asked to start now, so that nobody waits for Windows' own start-after-boot. There is one service:
+    ; this never makes a second copy of the program. (Windows allows people at the PC to ask for this, and only for this.)
+    Call HubServiceStopped
+    ${If} $0 == 1
+      Call HubServiceStart
+    ${EndIf}
+!endif
     Banner::show /NOUNLOAD /set 76 "${STARTING_TEXT}" /set 54 "Please wait. This window closes by itself." "${NAME}"
     StrCpy $9 1
 !endif
     System::Call 'kernel32::GetTickCount() i .r8'
+    StrCpy $5 0
+    StrCpy $6 0
     waiting:
       Sleep 500
       Call Answers
       ${If} $0 == 1
         Goto ready
       ${EndIf}
+!ifdef SERVICE_NAME
+      ; Every ten seconds: is the service switched off? Ask it to start again; when it is off again each time, there is no point in waiting the whole time.
+      IntOp $5 $5 + 1
+      ${If} $5 >= 20
+        StrCpy $5 0
+        Call HubServiceStopped
+        ${If} $0 == 1
+          IntOp $6 $6 + 1
+          ${If} $6 >= 4
+            Goto waitfailed
+          ${EndIf}
+          Call HubServiceStart
+        ${EndIf}
+      ${EndIf}
+!endif
       System::Call 'kernel32::GetTickCount() i .r7'
       IntOp $7 $7 - $8
       ${If} $7 < ${OPEN_WAIT_MS}
         Goto waiting
       ${EndIf}
+    !ifdef SERVICE_NAME
+    waitfailed:
+    !endif
     ${If} $9 == 1
       Banner::destroy
     ${EndIf}
-    !ifdef WAIT_ONLY
+    !ifdef SERVICE_NAME
+      ; Say what is wrong, in one sentence, and open a note of what Windows knows (HubProblemNote.nsh).
+      Call HubWriteNote
+      Call HubOpenNote
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${NAME} did not open.$\r$\n$\r$\n$R7$\r$\n$\r$\nA note with the details has opened in another window. Please send the note, or a picture of it, to the person who looks after your computers."
+    !else ifdef WAIT_ONLY
       MessageBox MB_OK|MB_ICONEXCLAMATION "${NAME} has not started yet.$\r$\n$\r$\nIt starts by itself a minute or two after the PC starts, and the first time after it is installed. Wait a little, then open it again.$\r$\n$\r$\nIf it still does not open, restart the PC. If that does not help, call the person who looks after your computers."
     !else ifdef OPEN_HELPER
       MessageBox MB_OK|MB_ICONSTOP "${NAME} did not start within ${OPEN_WAIT} seconds.$\r$\n$\r$\nTry again in a moment. If it still does not open, open $\"${OPEN_HELPER}$\" in this folder and read what it says, or call the person who gave you the program."

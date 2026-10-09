@@ -183,11 +183,15 @@ Section
       ${If} $0 == 1
         Goto ready
       ${EndIf}
+      System::Call 'kernel32::GetTickCount() i .r7'
+      IntOp $7 $7 - $8
 !ifdef SERVICE_NAME
-      ; Every ten seconds: is the service switched off? Ask it to start again; when it is off again each time, there is no point in waiting the whole time.
-      IntOp $5 $5 + 1
-      ${If} $5 >= 20
-        StrCpy $5 0
+      ; Every ten seconds BY THE CLOCK ($5 is the time of the last look, $7 the time since the start): is the service switched off? Ask it to start again; when it is off again each time,
+      ; there is no point in waiting the whole time. By the clock, not by counting turns of this loop: Windows takes a second or two to refuse a connection, so a turn is not half a second
+      ; (counting turns made "about forty seconds" nearly four minutes on a real PC, which is how this was found).
+      IntOp $4 $7 - $5
+      ${If} $4 >= 10000
+        StrCpy $5 $7
         Call HubServiceStopped
         ${If} $0 == 1
           IntOp $6 $6 + 1
@@ -198,8 +202,6 @@ Section
         ${EndIf}
       ${EndIf}
 !endif
-      System::Call 'kernel32::GetTickCount() i .r7'
-      IntOp $7 $7 - $8
       ${If} $7 < ${OPEN_WAIT_MS}
         Goto waiting
       ${EndIf}

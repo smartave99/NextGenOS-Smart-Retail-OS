@@ -315,6 +315,25 @@ for (const variant of variants) {
     } finally { run.kill(); wineSc('delete', name); }
   });
 
+  t('the service cannot be started and the waiting time is the shipped one (three minutes): the icon gives up after about forty seconds, not at the end of the waiting time', {}, async () => {
+    forgetNote();
+    const port = await freePort();
+    const name = `NextGenStuck${process.pid}${variant.name.length}`;
+    const dir = mkdtempSync(join(root, 'svc-'));
+    const created = wineSc('create', name, 'binPath=', `C:\\windows\\system32\\cmd.exe /c echo x>> Z:${join(dir, 'tried.txt').replace(/\//g, '\\')}`);
+    assert.ok(/STOPPED/.test(wineSc('query', name).stdout), `Wine made the stand-in service: ${created.stdout}${created.stderr}`);
+    const f = folder(variant, { port, wait: 180, open: { waitOnly: true, service: name } });
+    const began = Date.now();
+    const run = f.run();
+    try {
+      await until('the note to be opened', () => f.opened().length > 0, 150_000);
+      const seconds = (Date.now() - began) / 1000;
+      assert.ok(seconds < 90, `the icon gave up after ${seconds} seconds; it must not wait the whole three minutes when Windows keeps the program off`);
+      assert.match(noteText() ?? '', /it is switched off/, 'and says why');
+      assert.equal(f.windows().length, 0);
+    } finally { run.kill(); wineSc('delete', name); }
+  });
+
   t('the program answers: the window opens at once and no note is written', {}, async () => {
     forgetNote();
     const port = await freePort();

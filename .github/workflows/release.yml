@@ -410,8 +410,17 @@ jobs:
           $noteFile = Join-Path $env:LOCALAPPDATA 'NextGenOS\problem-note.txt'
           Remove-Item $noteFile -ErrorAction SilentlyContinue
           $icon2 = Start-Process -FilePath $icon -PassThru
-          for ($i = 0; $i -lt 180 -and -not (Test-Path $noteOpened); $i++) { Start-Sleep -Seconds 1 }
-          if (-not (Test-Path $noteOpened)) { Stop-Process -Id $icon2.Id -Force -ErrorAction SilentlyContinue; throw 'With the service unable to start, the icon did not open a note about what is wrong.' }
+          $clock = [Diagnostics.Stopwatch]::StartNew()
+          for ($i = 0; $i -lt 120 -and -not (Test-Path $noteOpened); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $noteOpened)) {
+            Write-Host "After $([int]$clock.Elapsed.TotalSeconds) seconds: the icon is still running: $(-not $icon2.HasExited); the note file exists: $(Test-Path $noteFile)"
+            if (Test-Path $noteFile) { Write-Host (Get-Content $noteFile -Raw) }
+            Get-Process | Where-Object { $_.ProcessName -match 'sc|cmd|netstat|wevtutil|netsh|find' } | Format-Table Id, ProcessName, StartTime -AutoSize | Out-String | Write-Host
+            Stop-Process -Id $icon2.Id -Force -ErrorAction SilentlyContinue
+            throw 'With the service unable to start, the icon did not open a note about what is wrong within two minutes (it should give up in under a minute).'
+          }
+          Write-Host "The icon gave up and opened the note after $([int]$clock.Elapsed.TotalSeconds) seconds."
+          if ($clock.Elapsed.TotalSeconds -gt 100) { throw "The icon took $([int]$clock.Elapsed.TotalSeconds) seconds to give up; it is meant to take about forty." }
           if (-not (Test-Path $noteFile)) { throw 'The icon said it opened a note, but there is none.' }
           $note = Get-Content $noteFile -Raw
           Write-Host '---- the note the icon wrote ----'

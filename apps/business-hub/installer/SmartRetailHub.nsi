@@ -256,34 +256,43 @@ FunctionEnd
 ; Waits (up to about a minute and a half) until the program answers on this PC's own address. Leaves 1 in $0 when it does. Gives up sooner when Windows keeps saying that the service is
 ; switched off (it is asked to start again each time).
 Function WaitForHub
-  StrCpy $2 0
+  Push $5
+  Push $6
+  Push $7
+  System::Call 'kernel32::GetTickCount() i .r6'
   StrCpy $3 0
-  StrCpy $4 0
+  StrCpy $4 $6
   asking:
     Call Answers
     ${If} $0 == 1
-      Return
+      Goto waited
     ${EndIf}
-    IntOp $2 $2 + 1
-    ${If} $2 > 180
+    ; By the clock, not by counting turns of this loop: Windows takes a second or two to refuse a connection, so a turn is not half a second ($6 is when the waiting began, $4 the last look at the service).
+    System::Call 'kernel32::GetTickCount() i .r7'
+    IntOp $2 $7 - $6
+    ${If} $2 > 90000
       StrCpy $0 0
-      Return
+      Goto waited
     ${EndIf}
-    IntOp $4 $4 + 1
-    ${If} $4 >= 10
-      StrCpy $4 0
+    IntOp $5 $7 - $4
+    ${If} $5 >= 10000
+      StrCpy $4 $7
       Call HubServiceStopped
       ${If} $0 == 1
         IntOp $3 $3 + 1
         ${If} $3 >= 4
           StrCpy $0 0
-          Return
+          Goto waited
         ${EndIf}
         Call HubServiceStart
       ${EndIf}
     ${EndIf}
     Sleep 500
     Goto asking
+  waited:
+  Pop $7
+  Pop $6
+  Pop $5
 FunctionEnd
 
 ; After "start": the service must be on its way, and then the program must answer. When it does not, say so now, in one plain sentence, and leave a note of what Windows knows (HubProblemNote.nsh):

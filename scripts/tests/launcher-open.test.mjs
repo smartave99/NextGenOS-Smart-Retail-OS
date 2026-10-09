@@ -212,3 +212,15 @@ test('the icon of the Business Hub asks Windows to switch the service on, gives 
     for (const text of ['sc.exe', 'wevtutil', 'problem-note', 'NEXTGENOS_NOTE_VIEWER']) assert.ok(!has(p, text), `no "${text}" in an icon that names no service`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the waiting for a service is timed by the clock, never by counting turns of a loop (Windows takes a second or two to refuse a connection, so a turn is not half a second)', () => {
+  const launcher = readFileSync(LAUNCHER_SCRIPT, 'utf8').replace(/^\s*;.*$/gm, '');
+  const setup = readFileSync(join(repo, 'apps', 'business-hub', 'installer', 'SmartRetailHub.nsi'), 'utf8').replace(/^\s*;.*$/gm, '');
+  const loops = [['the icon', launcher.slice(launcher.indexOf('waiting:'), launcher.indexOf('waitfailed:'))], ['the setup', setup.slice(setup.indexOf('Function WaitForHub'), setup.indexOf('FunctionEnd', setup.indexOf('Function WaitForHub')))]];
+  for (const [who, loop] of loops) {
+    assert.ok(loop.length > 200, `${who}: the loop was found`);
+    assert.match(loop, /GetTickCount/, `${who} reads the clock`);
+    assert.ok(!/IntOp \$\d \$\d \+ 1\s+\$\{If\} \$\d (>=|>) (10|20|180)\b/.test(loop), `${who} must not count turns of the loop to know that ten seconds have passed`);
+    assert.match(loop, /10000/, `${who} looks at the service every ten seconds by the clock`);
+  }
+});

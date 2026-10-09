@@ -45,6 +45,15 @@ namespace SmartRetail.AI.Tests
             return done.Task;
         }
 
+        /// <summary>The times the waits that have not ended are waiting for (so a test can wait until a loop has armed its wait before it moves the clock).</summary>
+        public IReadOnlyList<DateTimeOffset> PendingAt()
+        {
+            lock (_gate)
+            {
+                return _waiting.Where(wait => !wait.Done.Task.IsCompleted).Select(wait => wait.At).ToList();
+            }
+        }
+
         public void Advance(TimeSpan by)
         {
             List<(DateTimeOffset At, TaskCompletionSource<bool> Done)> due;
@@ -290,9 +299,12 @@ namespace SmartRetail.AI.Tests
             var pause = Pause();
             pause.Hit(Limit(Morning.AddHours(1)));
             var wait = pause.WaitAsync(CancellationToken.None);
-            await Task.Delay(50);
+            Assert.True(SpinWait.SpinUntil(() => _time.PendingAt().Count == 1, TimeSpan.FromSeconds(10)), "the work waits for the first time");
 
             pause.Hit(Limit(Morning.AddHours(5)));
+            // The waiting loop looks at the new time on another thread and arms its wait again. The clock is moved only after that: moved earlier, a slow thread
+            // would arm its wait from the moved clock and wait hours too long (this test timed out once on a busy machine for that reason).
+            Assert.True(SpinWait.SpinUntil(() => _time.PendingAt().Any(at => at > Morning.AddHours(4)), TimeSpan.FromSeconds(10)), "the work waits for the new time");
             _time.Advance(TimeSpan.FromMinutes(70));
             await Task.Delay(100);
             Assert.False(wait.IsCompleted, "the first time is no longer the one waited for");

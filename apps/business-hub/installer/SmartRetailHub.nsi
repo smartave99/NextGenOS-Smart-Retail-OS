@@ -17,6 +17,8 @@ Target amd64-unicode
 ManifestDPIAware true
 SetCompressor /SOLID lzma
 RequestExecutionLevel admin
+; Without this Windows tells the setup it is on Windows 8, and the version check below could not tell Windows 10 from 8.
+ManifestSupportedOS Win10
 
 !ifndef VERSION
   !error "Pass the version: -DVERSION=1.0.0"
@@ -39,6 +41,9 @@ RequestExecutionLevel admin
 !define EXE "NextGenOS.Hub.exe"
 !define SERVICE "NextGenOSHub"
 !define ADDRESS "http://127.0.0.1:5280"
+; The port the Hub listens on (the same as in ADDRESS) and the room the setup asks the disk for (the program, its updates and the shop's own backups).
+!define PORT "5280"
+!define NEED_MB 1024
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NextGenOS.SmartRetailPOS.Hub"
 !define MENU_FOLDER "Smart Retail POS"
 ; The two small programs beside the Hub (made by zip-launcher.mjs, addServiceLaunchers): they wait until the Hub, which Windows starts, answers, and then open its window (full screen for a till).
@@ -49,6 +54,7 @@ RequestExecutionLevel admin
 !include LogicLib.nsh
 !include FileFunc.nsh
 !include x64.nsh
+!include WinVer.nsh
 
 Name "${APP}"
 OutFile "${OUTFILE}"
@@ -107,6 +113,11 @@ Function .onInit
     MessageBox MB_OK|MB_ICONSTOP "${APP} needs a 64-bit version of Windows 10 or Windows 11 (or Windows Server 2019 or later)." /SD IDOK
     Abort
   ${EndIf}
+  ; Windows 10 version 1809 (build 17763) is also Windows Server 2019, the oldest the program runs on.
+  ${IfNot} ${AtLeastBuild} 17763
+    MessageBox MB_OK|MB_ICONSTOP "${APP} needs Windows 10 (version 1809 or later), Windows 11 or Windows Server 2019 or later. This PC has an older Windows.$\r$\n$\r$\nRun Windows Update, or use a newer PC." /SD IDOK
+    Abort
+  ${EndIf}
   SetRegView 64
   ; A folder given with /D= (for a quiet install) wins over the earlier or the default one.
 FunctionEnd
@@ -121,6 +132,53 @@ Function CheckFolder
   ${OrIf} "$INSTDIR" == "$PROGRAMFILES32"
     MessageBox MB_OK|MB_ICONEXCLAMATION "Please give ${APP} a folder of its own, for example:$\r$\n$PROGRAMFILES64\${COMPANY}\${APP}"
     Abort
+  ${EndIf}
+  Call CheckSpace
+FunctionEnd
+
+; Is there room on the drive of the install folder? (Asked when leaving the folder page, and again at the start of the install, which is the only time a quiet install asks.)
+Function CheckSpace
+  ${GetRoot} "$INSTDIR" $0
+  ${DriveSpace} "$0\" "/D=F /S=M" $1
+  ${If} $1 < ${NEED_MB}
+    MessageBox MB_OK|MB_ICONSTOP "There is not enough free room on drive $0 for ${APP}: it needs about ${NEED_MB} MB and this drive has $1 MB free.$\r$\n$\r$\nFree some space (empty the Recycle Bin, remove programs you do not use) or choose another drive, then run this setup again." /SD IDOK
+    Abort
+  ${EndIf}
+FunctionEnd
+
+; Is Microsoft Edge or Google Chrome on this PC? The program opens in a window of its own and that window is one of them (never the usual web browser). Leaves 1 in $R0 when there is one.
+!macro TryBrowser BASE RELATIVE
+  ${If} $R0 == 0
+  ${AndIf} "${BASE}" != ""
+  ${AndIf} ${FileExists} "${BASE}\${RELATIVE}"
+    StrCpy $R0 1
+  ${EndIf}
+!macroend
+Function FindBrowser
+  StrCpy $R0 0
+  ReadEnvStr $R1 "ProgramFiles(x86)"
+  ReadEnvStr $R2 "ProgramFiles"
+  ReadEnvStr $R3 "ProgramW6432"
+  ReadEnvStr $R4 "LOCALAPPDATA"
+  !insertmacro TryBrowser $R1 "Microsoft\Edge\Application\msedge.exe"
+  !insertmacro TryBrowser $R2 "Microsoft\Edge\Application\msedge.exe"
+  !insertmacro TryBrowser $R3 "Microsoft\Edge\Application\msedge.exe"
+  !insertmacro TryBrowser $R4 "Microsoft\Edge\Application\msedge.exe"
+  !insertmacro TryBrowser $R1 "Google\Chrome\Application\chrome.exe"
+  !insertmacro TryBrowser $R2 "Google\Chrome\Application\chrome.exe"
+  !insertmacro TryBrowser $R3 "Google\Chrome\Application\chrome.exe"
+  !insertmacro TryBrowser $R4 "Google\Chrome\Application\chrome.exe"
+FunctionEnd
+
+; Is something already listening on the Hub's port? Leaves 1 in $0 when so. (Asked after an earlier copy of the Hub was stopped, so it is not that.)
+Function PortInUse
+  nsExec::ExecToStack 'cmd.exe /c netstat -ano -p tcp | find ":${PORT} " | find "LISTENING"'
+  Pop $0
+  Pop $1
+  ${If} $0 == 0
+    StrCpy $0 1
+  ${Else}
+    StrCpy $0 0
   ${EndIf}
 FunctionEnd
 
@@ -150,13 +208,59 @@ Function StopService
     ${EndIf}
 FunctionEnd
 
+; After "start": Windows answers at once when it cannot start the service at all ($0 is not 0), or the service is up for a moment and stops again. Waits up to ten seconds
+; for it to be running; says in plain words if it is not. A service that is merely slow is not a fault: the icon's "starting" window waits for it.
+Function CheckStarted
+  ${If} $0 != 0
+    Goto failed
+  ${EndIf}
+  StrCpy $2 0
+  looking:
+    nsExec::ExecToStack 'cmd.exe /c sc.exe query ${SERVICE} | find "RUNNING"'
+    Pop $0
+    Pop $1
+    ${If} $0 == 0
+      Return
+    ${EndIf}
+    nsExec::ExecToStack 'cmd.exe /c sc.exe query ${SERVICE} | find "START_PENDING"'
+    Pop $0
+    Pop $1
+    ${If} $0 == 0
+      Return
+    ${EndIf}
+    IntOp $2 $2 + 1
+    ${If} $2 < 20
+      Sleep 500
+      Goto looking
+    ${EndIf}
+  failed:
+  MessageBox MB_OK|MB_ICONEXCLAMATION "${APP} is installed, but Windows could not start it just now.$\r$\n$\r$\nRestart this PC, then open Smart Retail POS from its icon. If it is still not ready, an anti-virus program may be stopping it: allow the folder $INSTDIR in the anti-virus program and restart the PC." /SD IDOK
+FunctionEnd
+
 Section "Smart Retail POS Hub" SecMain
   SectionIn RO
   SetRegView 64
   SetShellVarContext all
 
+  ; The machine is checked first, in plain words (a quiet install asks too, and takes the answer shown after "/SD").
+  DetailPrint "Checking this PC..."
+  Call CheckSpace
+  Call FindBrowser
+  ${If} $R0 == 0
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION "Neither Microsoft Edge nor Google Chrome was found on this PC. ${APP} opens in a window of its own, and that needs one of them.$\r$\n$\r$\nMicrosoft Edge is free and comes with Windows 10 and 11 (run Windows Update), or it can be installed from microsoft.com/edge.$\r$\n$\r$\nInstall ${APP} anyway? (Other counters can still use this PC as the main PC, but its own window will not open until a browser is there.)" /SD IDYES IDYES browserlater
+    Abort
+    browserlater:
+  ${EndIf}
+
   DetailPrint "Stopping an earlier copy, if there is one..."
   Call StopService
+
+  ; Something else on the PC already holds the Hub's port: the Hub could not start, and nothing would say why. Say it now.
+  Call PortInUse
+  ${If} $0 == 1
+    MessageBox MB_OK|MB_ICONSTOP "Another program on this PC is already using the place (port ${PORT}) that ${APP} needs, so it could not start.$\r$\n$\r$\nRestart the PC and run this setup again first. If this message comes back, close the other program that uses port ${PORT} (the person who looks after your PCs can tell which one it is)." /SD IDOK
+    Abort
+  ${EndIf}
 
   SetOutPath "$INSTDIR"
   File /r "${SOURCE}\*.*"
@@ -164,6 +268,12 @@ Section "Smart Retail POS Hub" SecMain
   !ifdef NOTICES
     File "${NOTICES}"
   !endif
+
+  ; An anti-virus program can remove a new program the moment it is written. Say so, rather than leaving a program that is not there.
+  ${IfNot} ${FileExists} "$INSTDIR\${EXE}"
+    MessageBox MB_OK|MB_ICONSTOP "The program file was removed right after it was copied. This is usually an anti-virus program that does not know ${APP} yet.$\r$\n$\r$\nAllow the folder $INSTDIR in the anti-virus program (or turn it off for a few minutes), then run this setup again." /SD IDOK
+    Abort
+  ${EndIf}
 
   ; The prepared set-up for this business, when there is one next to this setup file. Only these five plain files are taken, never anything else in that folder.
   ${If} ${FileExists} "$EXEDIR\profile\setup.json"
@@ -198,6 +308,7 @@ Section "Smart Retail POS Hub" SecMain
   nsExec::ExecToLog 'sc.exe failure ${SERVICE} reset= 86400 actions= restart/5000/restart/10000/restart/30000'
   nsExec::ExecToLog 'sc.exe start ${SERVICE}'
   Pop $0
+  Call CheckStarted
 
   ; The icon people use: a small program that waits until the Hub is ready (Windows starts it a minute or two after the PC starts, and the first time after this setup) and then opens
   ; it in a window of its own (Microsoft Edge in "app" mode: no address bar, no tabs; Chrome when there is no Edge). It never opens the usual web browser. The Hub is a service and keeps

@@ -4,6 +4,10 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### The setup checks the PC first
+- **Before it installs, the Hub setup checks, and says in plain words what is wrong and what to do:** Windows 10 (version 1809) or later, 1 GB of free room on the drive, Microsoft Edge or Google Chrome on the PC, and that nothing else on the PC already uses the Hub's place (port 5280). If another program holds it, the setup stops and installs nothing, instead of leaving a Hub that cannot start with no word of why.
+- **After it installs, the setup says so if the program file was removed (an anti-virus program that does not know it yet) or if Windows could not start the Hub,** with the steps to take, instead of finishing as if all was well.
+
 ### Opens in a window of its own, never in the web browser
 - **The setup's "Open Smart Retail POS now" button and the icons open the program in a window of its own** (no address bar), not in your usual web browser. Press the icon before the program is ready (right after the PC starts, or right after the setup) and a small "Smart Retail POS is starting" window shows; the program opens by itself when it is ready. It no longer shows "This site can't be reached". A till opens full screen the same way. If a PC has no Microsoft Edge or Google Chrome, it says so and what to install; it never falls back to the browser.
 - The same rule now holds for the Setup Studio, the Brand Studio and the Linux menu entry. The Linux package asks for Chromium (Firefox cannot show a window of its own).

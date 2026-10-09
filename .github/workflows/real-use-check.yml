@@ -162,6 +162,15 @@ jobs:
           . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
           $setup = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-Setup-*.exe' | Select-Object -First 1
           if (-not $setup) { Result 'Hub setup' $false 'the setup is not on the release'; exit 0 }
+          # The setup checks the PC first: another program already holds the Hub's port (5280), so the Hub could not start. The setup must stop, and put nothing on the PC.
+          $holder = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, 5280)
+          $holder.Start()
+          $busy = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          $holder.Stop()
+          $hubExe = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe'
+          $hasService = [bool](Get-Service NextGenOSHub -ErrorAction SilentlyContinue)
+          Result 'Hub setup with its port in use by another program: stops and installs nothing' ((-not (Test-Path $hubExe)) -and (-not $hasService)) "exit code $($busy.ExitCode); program installed: $(Test-Path $hubExe); service made: $hasService"
+          Start-Sleep -Seconds 2
           $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
           Result 'Hub setup finishes' ($p.ExitCode -eq 0) "exit code $($p.ExitCode)"
           for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub -ErrorAction SilentlyContinue).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 2 }

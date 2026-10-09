@@ -54,8 +54,23 @@ setup="$work/setup.exe"
 makensis -V1 -DVERSION=1.2.3 -DSOURCE="$src" -DUNINSTALL_LIST="$work/uninstall-files.nsh" -DOUTFILE="$setup" -DEULA="$repo/EULA.txt" -DNOTICES="$repo/THIRD-PARTY-NOTICES.md" "$here/SmartRetailHub.nsi"
 
 c="$WINEPREFIX/drive_c"
+# The setup refuses a Windows older than 10 (it asks Windows which version it is on): Wine pretends to be Windows 10 for this test.
+"$WINE" reg add 'HKCU\Software\Wine' /v Version /t REG_SZ /d win10 /f > /dev/null 2>&1 || true
 app="$c/Program Files/NextGenOS/Smart Retail POS Hub"
 data="$c/ProgramData/NextGenOS/Hub"
+
+echo "== the setup checks the PC first, and stops without leaving half an install"
+# A Windows older than 10: Wine is told it is Windows 7; the setup (quiet, so it takes its default answer) must stop and put nothing on the PC.
+"$WINE" reg add 'HKCU\Software\Wine' /v Version /t REG_SZ /d win7 /f > /dev/null 2>&1 || true
+timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true
+check "on a Windows older than 10 nothing is installed" test ! -e "$app/NextGenOS.Hub.exe"
+"$WINE" reg add 'HKCU\Software\Wine' /v Version /t REG_SZ /d win10 /f > /dev/null 2>&1 || true
+# (Another program on the Hub's port: Wine's own netstat does not list the programs that are waiting for a connection, so this one cannot be made to happen here. The Real-use check makes it
+# happen on a real Windows machine: a program holds the port, the setup must stop and put nothing on the PC.)
+# The words people read for the checks that Wine cannot make happen (a full disk, no browser, a program removed by anti-virus, a service that will not start).
+for phrase in "not enough free room" "Neither Microsoft Edge nor Google Chrome" "removed right after it was copied" "could not start it just now" "needs Windows 10" "already using the place"; do
+  check "the setup has the plain words '$phrase'" grep -q "$phrase" "$here/SmartRetailHub.nsi"
+done
 
 echo "== quiet install"
 timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true

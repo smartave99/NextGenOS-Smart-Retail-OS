@@ -2,6 +2,8 @@
 
 Written on 7 October 2026. This page is a **plan and a list of facts, not finished work**. Nothing has been ported, built or deleted yet. The owner's decision is in `docs/PLATFORM-DECISIONS.md` (decisions 25 and 26) and the owner's own words are in `docs/OWNER-REQUESTS.md`.
 
+> **Where each part stands now:** `docs/MERGE-LEDGER.md` (checked on 9 October 2026). The group table below is the first reading of 7 October and is kept for the reasons; the ledger is the current state.
+
 ## What the owner said
 
 > merge it fool make the best out of it and delete rest instead of wasting the token

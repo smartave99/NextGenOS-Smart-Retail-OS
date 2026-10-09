@@ -220,3 +220,13 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-08 (about; sent again while the assistant was working)
 
 > I hit my usage limit while you were working, but it has reset now. Please continue from where you left off.
+
+### 2026-10-09 (about; the owner's message after trial 13 and the question "what is left?")
+
+> i want you to complete all and release
+
+### 2026-10-09 (about; sent while the assistant was working on the day book and the stock movement report)
+
+> continue start from where stopped and have you tested the intaller and software you are releasing on github because i tested its not completley functional some dont even open
+
+(The owner tried the trial files on a real PC and says some do not open. Which files, and what was seen, were not said. This is the first real-PC report; it comes before new features.)

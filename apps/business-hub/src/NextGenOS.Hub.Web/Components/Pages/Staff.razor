@@ -1,0 +1,353 @@
+@page "/staff"
+@attribute [Authorize(Policy = Perm.Staff)]
+@inherits HubPage
+@using NextGenOS.Hub.Staff
+
+<PageTitle>Staff</PageTitle>
+<h1>Staff</h1>
+<p class="sub">Salespeople and brokers who earn a commission on what you sell, and what you owe them.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-people" class="@(tab == "people" ? "on" : "")" aria-selected="@(tab == "people")" @onclick='() => Pick("people")'>People</button>
+    <button type="button" role="tab" id="tab-owed" class="@(tab == "owed" ? "on" : "")" aria-selected="@(tab == "owed")" @onclick='() => Pick("owed")'>Owed and paid</button>
+    <button type="button" role="tab" id="tab-summary" class="@(tab == "summary" ? "on" : "")" aria-selected="@(tab == "summary")" @onclick='() => Pick("summary")'>Summary</button>
+</div>
+
+@if (tab == "people")
+{
+    <div class="toolbar">
+        <div class="tabs" role="group" aria-label="Kind of person">
+            <button type="button" id="kind-salesperson" class="@(kind == EarnerKinds.Salesperson ? "on" : "")" aria-pressed="@(kind == EarnerKinds.Salesperson)" @onclick="() => PickKind(EarnerKinds.Salesperson)">Salespeople</button>
+            <button type="button" id="kind-broker" class="@(kind == EarnerKinds.Broker ? "on" : "")" aria-pressed="@(kind == EarnerKinds.Broker)" @onclick="() => PickKind(EarnerKinds.Broker)">Brokers</button>
+        </div>
+        <span class="spacer"></span>
+        <button type="button" class="btn primary" id="add-earner" @onclick="NewPerson">Add @(kind == EarnerKinds.Broker ? "a broker" : "a salesperson")</button>
+    </div>
+    <p class="muted small">@KindHint()</p>
+
+    <div class="card tbl-wrap">
+        @if (people.Count == 0)
+        {
+            <div class="empty">Nobody here yet.</div>
+        }
+        else
+        {
+            <table class="tbl">
+                <thead><tr><th>Name</th><th>Phone</th><th class="num">@(kind == EarnerKinds.Broker ? "Usual commission" : "Commission")</th><th class="num">We owe</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var p in people)
+                {
+                    <tr>
+                        <td><strong>@p.Name</strong>@if (!p.Active) { <span class="chip">Off</span> }</td>
+                        <td>@p.Phone</td>
+                        <td class="num">@Qty(p.PctMilli)%</td>
+                        <td class="num">@(owedBy.TryGetValue(p.Id, out var o) ? Money(o) : "")</td>
+                        <td class="right">
+                            <button type="button" class="btn ghost small" @onclick="() => Account(p.Id)" aria-label="Account of @p.Name">Account</button>
+                            <button type="button" class="btn ghost small" @onclick="() => Edit(p)" aria-label="Edit @p.Name">Edit</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+else if (tab == "owed")
+{
+    <div class="card stack">
+        <label for="o-person">Person</label>
+        <select id="o-person" value="@(selected?.ToString() ?? "")" @onchange="e => ChoosePerson(e.Value?.ToString())">
+            <option value="">Choose a person</option>
+            @foreach (var p in all)
+            {
+                <option value="@p.Id">@p.Name (@(p.Kind == EarnerKinds.Broker ? "broker" : "salesperson"))@(p.Active ? "" : ", off")</option>
+            }
+        </select>
+    </div>
+
+    @if (selected is not null)
+    {
+        <div class="card stat">
+            <span class="label">We owe @SelectedName</span>
+            <span class="value" id="owed-now">@Money(Math.Max(0, owedNow))</span>
+            @if (owedNow < 0) { <span class="note" id="overpaid-note">@SelectedName has been paid @Money(-owedNow) more than was earned.</span> }
+        </div>
+
+        <div class="card stack">
+            <h3>Pay</h3>
+            <div class="field-row">
+                <div><label for="o-amount">Amount paid</label><input id="o-amount" inputmode="decimal" placeholder="@(owedNow > 0 ? Shop.Text(owedNow) : "")" @bind="payAmount" /></div>
+                <div>
+                    <label for="o-method">Paid by</label>
+                    <select id="o-method" @bind="payMethod">
+                        @foreach (var m in Shop.PaymentMethods) { <option value="@m">@(char.ToUpperInvariant(m[0]) + m[1..])</option> }
+                    </select>
+                </div>
+            </div>
+            <label for="o-note">Note (optional)</label>
+            <input id="o-note" @bind="payNote" maxlength="120" />
+            <div class="row"><button type="button" class="btn primary" id="pay-earner" @onclick="PayNow">Record payment</button></div>
+        </div>
+
+        <div class="card tbl-wrap">
+            @if (statement.Count == 0)
+            {
+                <div class="empty">Nothing yet.</div>
+            }
+            else
+            {
+                <table class="tbl" id="statement">
+                    <thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th class="num">We owe</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in statement)
+                    {
+                        <tr>
+                            <td>@Day(l.At)</td>
+                            <td>@if (l.DocumentId is { } d) { <a href="documents/@d">@l.Memo</a> } else { @l.Memo }</td>
+                            <td class="num">@(l.AmountMinor >= 0 ? "+" : "−")@Money(Math.Abs(l.AmountMinor))</td>
+                            <td class="num">@Money(l.BalanceMinor)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+}
+else
+{
+    <div class="toolbar">
+        @foreach (var (key, label) in Presets)
+        {
+            <button type="button" class="btn @(preset == key ? "primary" : "ghost") small" @onclick="() => PickPreset(key)">@label</button>
+        }
+        <input id="s-from" class="date" type="date" aria-label="From" value="@from.ToString("yyyy-MM-dd")" @onchange="e => SetFrom(e.Value?.ToString())" />
+        <input id="s-to" class="date" type="date" aria-label="To" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" />
+    </div>
+    <div class="card tbl-wrap">
+        @if (summary.Count == 0)
+        {
+            <div class="empty">Nobody here yet.</div>
+        }
+        else
+        {
+            <table class="tbl" id="summary">
+                <thead><tr><th>Name</th><th class="num">Bills</th><th class="num">Sales counted</th><th class="num">Earned</th><th class="num">Taken back</th><th class="num">Paid</th><th class="num">We owe now</th></tr></thead>
+                <tbody>
+                @foreach (var s in summary)
+                {
+                    <tr>
+                        <td><strong>@s.Name</strong> <span class="muted small">@(s.Kind == EarnerKinds.Broker ? "broker" : "salesperson")</span></td>
+                        <td class="num">@s.Bills</td>
+                        <td class="num">@Money(s.BaseMinor)</td>
+                        <td class="num">@Money(s.EarnedMinor)</td>
+                        <td class="num">@Money(s.ReversedMinor)</td>
+                        <td class="num">@Money(s.PaidMinor)</td>
+                        <td class="num">@Money(s.OwedMinor)</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th>Everyone</th>
+                        <th class="num">@summary.Sum(s => s.Bills)</th>
+                        <th class="num">@Money(summary.Sum(s => s.BaseMinor))</th>
+                        <th class="num">@Money(summary.Sum(s => s.EarnedMinor))</th>
+                        <th class="num">@Money(summary.Sum(s => s.ReversedMinor))</th>
+                        <th class="num">@Money(summary.Sum(s => s.PaidMinor))</th>
+                        <th class="num">@Money(summary.Sum(s => s.OwedMinor))</th>
+                    </tr>
+                </tfoot>
+            </table>
+        }
+    </div>
+    <p class="muted small">"Sales counted" is the value of the bills before tax, after every discount, less the goods that came back.</p>
+}
+
+@if (form is not null)
+{
+    <div class="sheet-back" @onclick="() => form = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="@(form.Id is null ? "New" : "Edit") person" @onclick:stopPropagation="true">
+            <h2>@(form.Id is null ? "New " : "Edit ")@(form.Kind == EarnerKinds.Broker ? "broker" : "salesperson")</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <label for="e-name">Name</label>
+                <input id="e-name" @bind="form.Name" maxlength="120" />
+                <div class="field-row">
+                    <div><label for="e-phone">Phone</label><input id="e-phone" @bind="form.Phone" maxlength="40" inputmode="tel" /></div>
+                    <div><label for="e-email">Email</label><input id="e-email" @bind="form.Email" maxlength="120" inputmode="email" /></div>
+                </div>
+                <label for="e-addr">Address</label>
+                <textarea id="e-addr" rows="2" @bind="form.Address" maxlength="300"></textarea>
+                <label for="e-pct">@(form.Kind == EarnerKinds.Broker ? "Usual commission (percent, shown when this broker is chosen)" : "Commission (percent of each bill before tax)")</label>
+                <input id="e-pct" inputmode="decimal" placeholder="for example 2.5" @bind="percent" />
+                <label for="e-notes">Notes</label>
+                <textarea id="e-notes" rows="2" @bind="form.Notes" maxlength="500"></textarea>
+                @if (form.Id is not null)
+                {
+                    <label class="check"><input id="e-active" type="checkbox" @bind="active" /> In use</label>
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-earner" @onclick="Save">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Presets = { ("week", "7 days"), ("month", "30 days"), ("year", "This year") };
+
+    private string tab = "people";
+    private string kind = EarnerKinds.Salesperson;
+    private IReadOnlyList<Earner> people = Array.Empty<Earner>();
+    private IReadOnlyList<Earner> all = Array.Empty<Earner>();
+    private Dictionary<long, long> owedBy = new();
+    private EarnerInput? form;
+    private string? formError;
+    private string percent = "";
+    private bool active = true;
+
+    private long? selected;
+    private long owedNow;
+    private IReadOnlyList<EarnerLine> statement = Array.Empty<EarnerLine>();
+    private string payAmount = "";
+    private string payMethod = "cash";
+    private string payNote = "";
+
+    private string preset = "month";
+    private DateOnly from, to;
+    private IReadOnlyList<EarnerSummary> summary = Array.Empty<EarnerSummary>();
+
+    private string SelectedName => all.FirstOrDefault(p => p.Id == selected)?.Name ?? "";
+
+    private string KindHint() => kind == EarnerKinds.Broker
+        ? "A broker is someone outside the shop who brought a customer. You type the commission on each bill, as a percent or as an amount."
+        : "A salesperson is named on a bill at the till. They earn their commission percent of the bill before tax.";
+
+    protected override Task LoadAsync()
+    {
+        payMethod = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        if (from == default) (from, to) = (Today.AddDays(-29), Today);
+        ReadPeople();
+        ReadAccount();
+        ReadSummary();
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string t)
+    {
+        tab = t;
+        Error = null;
+        Info = null;
+    }
+
+    private void PickKind(string k)
+    {
+        kind = k;
+        ReadPeople();
+    }
+
+    private void ReadPeople()
+    {
+        all = App.Earners.List(null, true);
+        people = all.Where(p => p.Kind == kind).ToList();
+        owedBy = all.ToDictionary(p => p.Id, p => App.Earners.Owed(p.Id));
+    }
+
+    private void ReadAccount()
+    {
+        if (selected is not { } id) { statement = Array.Empty<EarnerLine>(); owedNow = 0; return; }
+        owedNow = App.Earners.Owed(id);
+        statement = App.Earners.Statement(id).Reverse().ToList();
+    }
+
+    private void ReadSummary() => summary = App.Earners.Summary(Shop.Time.StartOfDay(from), Shop.Time.StartOfNextDay(to));
+
+    private void Account(long id)
+    {
+        selected = id;
+        Pick("owed");
+        ReadAccount();
+    }
+
+    private void ChoosePerson(string? text)
+    {
+        selected = long.TryParse(text, out var id) ? id : null;
+        payAmount = "";
+        payNote = "";
+        Run(ReadAccount);
+    }
+
+    private void NewPerson()
+    {
+        formError = null;
+        form = new EarnerInput { Kind = kind };
+        percent = "";
+        active = true;
+    }
+
+    private void Edit(Earner p)
+    {
+        formError = null;
+        form = new EarnerInput { Id = p.Id, Kind = p.Kind, Name = p.Name, Phone = p.Phone, Email = p.Email, Address = p.Address, PctMilli = p.PctMilli, Notes = p.Notes };
+        percent = p.PctMilli == 0 ? "" : Qty(p.PctMilli);
+        active = p.Active;
+    }
+
+    private void Save()
+    {
+        formError = null;
+        try
+        {
+            if (form is null) return;
+            try { form.PctMilli = percent.Trim().Length == 0 ? 0 : ShopContext.QtyMilli(percent.Trim().TrimEnd('%').Trim()); }
+            catch (FormatException) { throw new HubException("earner-percent", "Please type the commission as a percent, like 2.5, or leave it empty."); }
+            var saved = App.Earners.Save(form, Me.Id);
+            if (form.Id is not null && active != all.First(p => p.Id == saved.Id).Active) App.Earners.SetActive(saved.Id, active, Me.Id);
+            form = null;
+            ReadPeople();
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void PayNow() => Run(() =>
+    {
+        if (selected is not { } id) return;
+        if (!TryMoney(Shop, payAmount, out var amount) || amount <= 0) throw new HubException("pay-amount", "Please type the amount paid as a number, like 500 or 99.50.");
+        var result = App.Earners.Pay(id, amount, payMethod, payNote, Me.Id);
+        payAmount = "";
+        payNote = "";
+        ReadAccount();
+        ReadPeople();
+        Info = result.Overpaid
+            ? $"Recorded. {SelectedName} has now been paid {Money(-result.OwedAfterMinor)} more than was earned."
+            : "Recorded.";
+    });
+
+    private void PickPreset(string key)
+    {
+        preset = key;
+        (from, to) = key switch
+        {
+            "week" => (Today.AddDays(-6), Today),
+            "year" => (new DateOnly(Today.Year, 1, 1), Today),
+            _ => (Today.AddDays(-29), Today),
+        };
+        Run(ReadSummary);
+    }
+
+    private void SetFrom(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { from = d; if (to < from) to = from; preset = ""; Run(ReadSummary); }
+    }
+
+    private void SetTo(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Run(ReadSummary); }
+    }
+}

@@ -142,6 +142,37 @@
                 }
             }
 
+            @if (salespeople.Count > 0)
+            {
+                <h3>Salesperson</h3>
+                <select id="salesperson" aria-label="Salesperson" value="@(salespersonId?.ToString() ?? "")" @onchange="e => salespersonId = long.TryParse(e.Value?.ToString(), out var sid) ? sid : null">
+                    <option value="">No one</option>
+                    @foreach (var p in salespeople) { <option value="@p.Id">@p.Name</option> }
+                </select>
+            }
+            @if (brokers.Count > 0)
+            {
+                <h3>Broker</h3>
+                <select id="broker" aria-label="Broker" value="@(brokerId?.ToString() ?? "")" @onchange="e => ChooseBroker(e.Value?.ToString())">
+                    <option value="">No one</option>
+                    @foreach (var p in brokers) { <option value="@p.Id">@p.Name</option> }
+                </select>
+                @if (brokerId is not null)
+                {
+                    <div class="row wrap">
+                        <input id="broker-value" class="disc-in" inputmode="decimal" aria-label="Broker's commission" @bind="brokerValue" />
+                        <select id="broker-unit" aria-label="Percent or amount" @bind="brokerUnit">
+                            <option value="percent">percent</option>
+                            <option value="amount">amount</option>
+                        </select>
+                        @if (brokerUnit == "percent")
+                        {
+                            <label class="check"><input id="broker-tax" type="checkbox" @bind="brokerWithTax" /> Count the tax too</label>
+                        }
+                    </div>
+                }
+            }
+
             @if (App.Loyalty.Enabled && customer is not null)
             {
                 var balance = App.Loyalty.Balance(customer.Id);
@@ -204,6 +235,13 @@
     private readonly string saleKey = Guid.NewGuid().ToString("N");
     private Party? customer;
     private string customerQuery = "";
+    private IReadOnlyList<NextGenOS.Hub.Staff.Earner> salespeople = Array.Empty<NextGenOS.Hub.Staff.Earner>();
+    private IReadOnlyList<NextGenOS.Hub.Staff.Earner> brokers = Array.Empty<NextGenOS.Hub.Staff.Earner>();
+    private long? salespersonId;
+    private long? brokerId;
+    private string brokerValue = "";
+    private string brokerUnit = "percent";
+    private bool brokerWithTax;
     private string method = "cash";
     private string tender = "";
     private readonly List<PaymentInput> payments = new();
@@ -264,6 +302,9 @@
         }
         method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
         categories = App.Catalog.Categories();
+        var earners = App.Earners.List();
+        salespeople = earners.Where(e => e.Kind == NextGenOS.Hub.Staff.EarnerKinds.Salesperson).ToList();
+        brokers = earners.Where(e => e.Kind == NextGenOS.Hub.Staff.EarnerKinds.Broker).ToList();
         drawerPrinter = App.PrinterProfiles.For("receipt") is not null;
         Search();
         return Task.CompletedTask;
@@ -443,6 +484,39 @@
         });
     }
 
+    /// <summary>Choosing a broker fills in the broker's usual commission, to be changed for this bill.</summary>
+    private void ChooseBroker(string? text)
+    {
+        brokerId = long.TryParse(text, out var id) ? id : null;
+        var usual = brokers.FirstOrDefault(b => b.Id == brokerId)?.PctMilli ?? 0;
+        brokerValue = usual > 0 ? Qty(usual) : "";
+        brokerUnit = "percent";
+        brokerWithTax = false;
+    }
+
+    /// <summary>Names the salesperson and the broker on the bill just before it is made final (nothing is needed when the shop has none).</summary>
+    private void NameEarners()
+    {
+        if (cart is null || (salespeople.Count == 0 && brokers.Count == 0)) return;
+        if (salespeople.Count > 0) App.Earners.ChooseSalesperson(cart.Document.Id, salespersonId);
+        if (brokers.Count == 0) return;
+        if (brokerId is not { } broker) { App.Earners.ChooseBroker(cart.Document.Id, null); return; }
+        var value = brokerValue.Trim().TrimEnd('%').Trim();
+        if (value.Length == 0) throw new HubException("broker-how", "Please type the broker's commission, as a percent or as an amount.");
+        if (brokerUnit == "percent")
+        {
+            long pct;
+            try { pct = ShopContext.QtyMilli(value); }
+            catch (FormatException) { throw new HubException("earner-percent", "Please type the broker's commission as a percent, like 2.5."); }
+            App.Earners.ChooseBroker(cart.Document.Id, broker, brokerWithTax, pctMilli: pct);
+        }
+        else
+        {
+            if (!TryMoney(Shop, value, out var amount)) throw new HubException("broker-amount", "Please type the broker's commission as an amount, like 250 or 99.50.");
+            App.Earners.ChooseBroker(cart.Document.Id, broker, false, amountMinor: amount);
+        }
+    }
+
     private void OnPayKey(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") AddPayment();
@@ -468,6 +542,8 @@
             if (cart is null) return;
             if (!onAccount && tender.Trim().Length > 0) AddPayment();
             if (!onAccount && payments.All(p => p.Method == DocumentService.AccountCredit) && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });   // nothing typed (or only the customer's credit): the rest is taken in the way chosen
+            try { NameEarners(); }
+            catch (HubException ex) when (ex.Code == "not-open") { /* pressed twice, or a retry after a dropped connection: the bill is already made, and the key below gives it back */ }
             var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount, RequestKey = saleKey });
             finished = true;
             Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");

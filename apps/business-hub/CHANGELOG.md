@@ -4,6 +4,11 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Salespeople and brokers, and their commission
+- **A new screen, Staff** (owners and managers): add the salespeople who sell for you and the brokers who bring you customers. At the till, **name the salesperson and the broker on the sale** (a broker's commission is a percent or an amount you type for that sale).
+- **The commission is worked out from the bill before tax, after every discount,** so the same goods earn the same whether your prices include tax or not. It is written when the sale is made, with the percent of that moment. **Goods that are brought back take back only their share of the commission;** a cancelled sale takes all of it back. (The older POS took back the whole line's, and had two commission methods that never met.)
+- **Owed and paid:** each person has an account, line by line, with what you owe them after each line. Record a payment in cash or another way you take money; paying more than was earned is allowed and tells you so. **Summary:** for any days you choose, who earned what and what is still owed. The books show *Sales commission* as a cost and *Commission to pay* as a debt.
+
 ### Labels for many items
 - **Products → Change many at once → Labels:** choose items, say how many labels of each, and print them in one go on your label printer. On a received purchase, **Print labels for what came** fills in one label for each unit that arrived.
 

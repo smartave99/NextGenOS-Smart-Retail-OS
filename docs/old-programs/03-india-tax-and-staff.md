@@ -613,7 +613,9 @@ Method 2 (touch till; percent per batch):
 
 ### B1.7 What the Hub has today
 
-Nothing for salespeople (no commission, no ledger of a person, no salesman on a document: `documents` has the cashier `user_id`, not a salesperson; the Hub map section 6.3 lists "staff" as a new master). The Hub's `audit_log`, `users` and roles are for sign-in, not for commission. The engine and `DocumentService` keep the data a Method 1 or Method 2 port needs (line taxable and discount per line in the stored `result`), so the base can be the **line taxable value after discount**, which is the corrected rule above. Porting needs: a `salespeople` master, `document.salesperson_id`, a `commission` rule (percent on master, on item, or on batch), a person ledger table (with `tenant_id`, `site_id`), payments to a person, and the reports.
+**Hub now (9 October 2026, staff part 1, `Staff/EarnerService.cs`, `EarnerTests`).** Built: the salesperson master (name, phone, email, address, a percent, on or off; a salesperson cannot be a broker; one phone number per person), the person named on a sale at the till, commission as a percent of the bill's **taxable value after every discount** (the corrected rule above, so Method 1 and Method 2 become one), written when the bill becomes final with the percent of that moment, taken back **in proportion** when goods are brought back (quirk fixed) and in full when the bill is cancelled, one account for each person with the balance after each line, payments to a person (more than owed allowed, with a warning), the books (Sales commission as a cost, Commission to pay as a debt) and a summary for a period. Tests M1 to M8, K1 to K10 and L1 to L6 are in `EarnerTests` where they apply. Not built: the commission per stock batch (Method 2, dropped), a commission per item, a printed statement.
+
+(Before this: nothing for salespeople (no commission, no ledger of a person, no salesman on a document: `documents` has the cashier `user_id`, not a salesperson; the Hub map section 6.3 lists "staff" as a new master). The Hub's `audit_log`, `users` and roles are for sign-in, not for commission. The engine and `DocumentService` keep the data a Method 1 or Method 2 port needs (line taxable and discount per line in the stored `result`), so the base can be the **line taxable value after discount**, which is the corrected rule above. Porting needs: a `salespeople` master, `document.salesperson_id`, a `commission` rule (percent on master, on item, or on batch), a person ledger table (with `tenant_id`, `site_id`), payments to a person, and the reports.
 
 ## B2. Broker, transport and route
 
@@ -671,7 +673,9 @@ Let `G = txtGrandTotal` of the bill (after round-off, so it includes freight and
 
 ### B2.6 What the Hub has today
 
-Nothing: no broker, transporter or route master, no commission. The Hub's `parties.kind` field is the only existing party typing (customer, supplier); a broker and a transporter would be new party kinds or new masters (`06-hub-map.md` recipe 6.3). The Hub's documents carry no remarks drop-down fed by transporters.
+**Hub now (9 October 2026, staff part 1).** Built: the broker master (the same screen as salespeople), the broker named on a sale with a percent of the taxable value or of the whole total, or an amount typed for the bill (one of the two), commission written when the bill becomes final, taken back with returns and cancellations, an account and payments as for a salesperson, the summary. Not built: transporter and route masters, the transporter's remark on a bill.
+
+(Before this: nothing: no broker, transporter or route master, no commission. The Hub's `parties.kind` field is the only existing party typing (customer, supplier); a broker and a transporter would be new party kinds or new masters (`06-hub-map.md` recipe 6.3). The Hub's documents carry no remarks drop-down fed by transporters.
 
 ## B3. Employees, attendance, salary slips, advances, employee payments
 

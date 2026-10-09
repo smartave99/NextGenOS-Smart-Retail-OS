@@ -216,6 +216,12 @@ public class AccessTests : IDisposable
         yield return new("Earners.Statement", new[] { Perm.Staff }, a => a.Earners.Statement(1));
         yield return new("Earners.Summary", new[] { Perm.Staff }, a => a.Earners.Summary(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
         yield return new("Catalog.OpenPacks", new[] { Perm.Stock }, a => a.Catalog.OpenPacks(itemId, 1));
+        var groupPickers = new[] { Perm.Sell, Perm.Orders, Perm.Catalog };
+        yield return new("Groups.List", groupPickers, a => a.Groups.List());
+        yield return new("Groups.Get", groupPickers, a => a.Groups.Get(1));
+        yield return new("Groups.FindByBarcode", groupPickers, a => a.Groups.FindByBarcode("x"));
+        yield return new("Groups.Save", new[] { Perm.Catalog }, a => a.Groups.Save(new NextGenOS.Hub.Catalog.GroupInput { Name = "T", Members = { (itemId, 1_000) } }));
+        yield return new("Groups.Delete", new[] { Perm.Catalog }, a => a.Groups.Delete(1));
         var batchReaders = new[] { Perm.Stock, Perm.Catalog, Perm.Purchases, Perm.Reports, Perm.Sell, Perm.Orders };
         yield return new("Batches.ForItem", batchReaders, a => a.Batches.ForItem(1));
         yield return new("Batches.Expiring", batchReaders, a => a.Batches.Expiring(30));

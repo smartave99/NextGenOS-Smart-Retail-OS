@@ -58,6 +58,7 @@ public sealed class HubApp
         Earners = new EarnerService(db, Shop, clock, Audit, Books, Access);
         Payroll = new PayrollService(db, Shop, clock, Audit, Books, Access);
         Batches = new BatchService(db, Shop, clock, Audit, Access);
+        Groups = new GroupService(db, Catalog, Audit, clock, Access);
         Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Outbox, Access, Earners);
         Users = new UserService(db, clock, Audit, Access);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit, Access);
@@ -108,6 +109,7 @@ public sealed class HubApp
     public EarnerService Earners { get; }
     public PayrollService Payroll { get; }
     public BatchService Batches { get; }
+    public GroupService Groups { get; }
     public LoyaltyService Loyalty { get; }
     public OffersService Offers { get; }
     public DocumentService Documents { get; }

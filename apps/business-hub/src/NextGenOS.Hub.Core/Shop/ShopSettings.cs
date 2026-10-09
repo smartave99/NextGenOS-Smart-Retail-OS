@@ -39,6 +39,8 @@ public sealed class ShopSettings
     public int PayrollDaysBasis { get; set; }
     /// <summary>Whether leaving earlier than the usual working time takes pay away. Off: only time beyond the usual counts as overtime.</summary>
     public bool PayrollPayShortTime { get; set; }
+    /// <summary>The keys of the sell screen the shop chose (action → key, "" for none); an action not here has its starting key (see <see cref="TillKeys"/>).</summary>
+    public Dictionary<string, string> ShortcutKeys { get; set; } = new();
     public bool SetupDone { get; set; }
     /// <summary>Parts of the Hub the owner switched on or off, over the industry's defaults (name → on/off).</summary>
     public Dictionary<string, bool> FeatureOverrides { get; set; } = new();

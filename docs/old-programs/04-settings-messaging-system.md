@@ -527,6 +527,7 @@ The table is read from the handlers; `frmPOSNewTuch_Quotation`, `_Service`, `_St
 ### D.4 Quirks and probable bugs (keep or fix?)
 
 1. **Keys differ by till** (D.0 item 1). **Fix:** one key map for the Hub's sell screen, shown on the screen, stored as data so a customer can change it (CLAUDE.md section 8: a visible hint like "F2" is customer-visible).
+   **Hub now (9 October 2026):** built (`docs/OPEN-WORK.md` item 12m).
 2. **Settings kept as the words "Yes"/"No"/"Enabled"/"Disable"** and compared with text, in several spellings (C.4 item 8). A typo or a changed word silently turns a setting off. **Fix:** a real on/off value.
 3. **One-row tables enforced by a count check in the screen, not by the table.** Two screens open at once can add two rows; which one wins when reading (`Read` takes the first row returned, with no `ORDER BY`) is not defined. **Fix.**
 4. **Defaults for the shop are India words in code:** "GST", the suffix built from the two year boxes ("25/26" style), the NON GST series "SINV-". **Do not copy;** the Hub gets them from the country pack and the customer's profile.

@@ -1,0 +1,145 @@
+@page "/items/groups"
+@attribute [Authorize(Policy = Perm.Catalog)]
+@inherits HubPage
+@using NextGenOS.Hub.Catalog
+
+<PageTitle>Quick groups</PageTitle>
+<p><a href="items">&larr; @Shop.Plural("item")</a></p>
+<h1>Quick groups</h1>
+<p class="sub">A quick group adds several @Shop.Plural("item").ToLowerInvariant() to a sale with one press (or one scan of the group's own barcode). Each is still sold at its own price; a group has no price of its own.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <span class="spacer"></span>
+    <button type="button" class="btn primary" id="add-group" @onclick="New">Add a group</button>
+</div>
+
+<div class="card tbl-wrap">
+    @if (groups.Count == 0)
+    {
+        <div class="empty" id="groups-empty">No groups yet.</div>
+    }
+    else
+    {
+        <table class="tbl" id="groups-table">
+            <thead><tr><th>Group</th><th>Barcode</th><th>@Shop.Plural("item")</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var g in groups)
+            {
+                <tr>
+                    <td><strong>@g.Name</strong>@if (!g.Active) { <span class="chip">Off</span> }</td>
+                    <td>@g.Barcode</td>
+                    <td>@string.Join(", ", g.Members.Select(m => Qty(m.QtyMilli) + " × " + m.Name))</td>
+                    <td class="right">
+                        <button type="button" class="btn ghost small" @onclick="() => Edit(g)" aria-label="Edit @g.Name">Edit</button>
+                        <button type="button" class="btn ghost small" @onclick="() => Remove(g)" aria-label="Take away @g.Name">Take away</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (form is not null)
+{
+    <div class="sheet-back" @onclick="() => form = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="@(form.Id is null ? "New" : "Edit") group" @onclick:stopPropagation="true">
+            <h2>@(form.Id is null ? "New group" : "Edit group")</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <label for="g-name">Name</label>
+                <input id="g-name" @bind="form.Name" maxlength="80" />
+                <label for="g-bar">Barcode of its own (optional)</label>
+                <input id="g-bar" @bind="form.Barcode" maxlength="40" autocomplete="off" />
+                <label>@Shop.Plural("item") in the group</label>
+                @foreach (var (row, n) in rows.Select((r, n) => (r, n)))
+                {
+                    <div class="inline-form">
+                        <div>
+                            <select aria-label="@Shop.Singular("item") @(n + 1)" @bind="row.Item">
+                                <option value="">Choose…</option>
+                                @foreach (var i in items) { <option value="@i.Id">@i.Name</option> }
+                            </select>
+                        </div>
+                        <div><input class="qty" aria-label="How many of item @(n + 1)" inputmode="decimal" @bind="row.Qty" /></div>
+                        <button type="button" class="btn ghost small" aria-label="Take this one out" @onclick="() => rows.RemoveAt(n)">×</button>
+                    </div>
+                }
+                <div class="row"><button type="button" class="btn secondary" id="g-more" @onclick="MoreRow">Add another</button></div>
+                @if (form.Id is not null)
+                {
+                    <label class="check"><input id="g-active" type="checkbox" @bind="form.Active" /> In use</label>
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-group" @onclick="Save">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private sealed class Row { public string Item { get; set; } = ""; public string Qty { get; set; } = "1"; }
+
+    private IReadOnlyList<ItemGroup> groups = Array.Empty<ItemGroup>();
+    private IReadOnlyList<Item> items = Array.Empty<Item>();
+    private GroupInput? form;
+    private readonly List<Row> rows = new();
+    private string? formError;
+
+    protected override Task LoadAsync()
+    {
+        groups = App.Groups.List(true);
+        items = App.Catalog.Search(null, null, null, 1000);
+        return Task.CompletedTask;
+    }
+
+    private void MoreRow() => rows.Add(new Row());
+
+    private void New()
+    {
+        formError = null;
+        form = new GroupInput();
+        rows.Clear();
+        MoreRow();
+        MoreRow();
+    }
+
+    private void Edit(ItemGroup g)
+    {
+        formError = null;
+        form = new GroupInput { Id = g.Id, Name = g.Name, Barcode = g.Barcode, Active = g.Active };
+        rows.Clear();
+        foreach (var m in g.Members) rows.Add(new Row { Item = m.ItemId.ToString(), Qty = Qty(m.QtyMilli) });
+    }
+
+    private void Save()
+    {
+        formError = null;
+        try
+        {
+            if (form is null) return;
+            form.Members = new();
+            foreach (var r in rows.Where(r => r.Item != "" || r.Qty.Trim().Length > 0 && r.Qty.Trim() != "1"))
+            {
+                if (!long.TryParse(r.Item, out var id)) throw new HubException("group-item", "Please choose an item on every line, or take the line out.");
+                long q;
+                try { q = ShopContext.QtyMilli(r.Qty.Trim()); } catch (FormatException) { throw new HubException("group-qty", "Please type how many as a number, like 2."); }
+                form.Members.Add((id, q));
+            }
+            App.Groups.Save(form, Me.Id);
+            form = null;
+            groups = App.Groups.List(true);
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void Remove(ItemGroup g) => Run(() =>
+    {
+        App.Groups.Delete(g.Id, Me.Id);
+        groups = App.Groups.List(true);
+    }, "The group is taken away. The items are not touched.");
+}

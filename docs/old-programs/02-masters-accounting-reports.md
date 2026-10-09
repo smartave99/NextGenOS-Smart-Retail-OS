@@ -517,6 +517,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **At the till** (`B/frmPOSNewTuch.vb:14123`): choosing a combo shows its member products as tiles with their photo, barcode, retail price (`Temp_Stock.SPrice`), stock and `DefaultQty`. Each member is sold on its own at its own price. **There is no combo price or discount**: a combo is a quick way to add a group of items, not a bundle price.
 - **Test vectors:** CB1 combo "Breakfast" with Bread (default 1) and Milk (default 2): picking it offers both tiles with quantity 1 and 2, each at its own price. CB2 create "Breakfast" twice: second refused. CB3 delete the combo: `ComboPack` row removed (members removed? **not understood**).
 - **Hub today:** none. **Port:** a "quick group" of items with default quantities (low priority); if the owner wants true bundle prices that is new design.
+- **Hub now (9 October 2026):** built as **quick groups** (`docs/OPEN-WORK.md` item 12n); CB1 to CB3 are tests; no bundle price, as the older program had none.
 
 #### A2.8 Quantity discounts (per barcode)
 

@@ -25,6 +25,7 @@
     {
         @if (!lending) { <a class="btn ghost" id="change-many" href="/items/changes">Change many at once</a> <a class="btn ghost" id="items-sheet" href="/items/sheet">Spreadsheet</a> }
         @if (Me.Can(Perm.Stock) && !lending) { <a class="btn ghost" id="items-batches" href="/items/batches">Batches and expiry</a> }
+        @if (!lending) { <a class="btn ghost" id="items-groups" href="/items/groups">Quick groups</a> }
         <button type="button" class="btn primary" id="add-item" @onclick="NewItem">Add @Shop.Singular("item").ToLowerInvariant()</button>
     }
 </div>

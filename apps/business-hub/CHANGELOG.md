@@ -4,6 +4,10 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Keys at the till, and quick groups
+- **Keys at the till:** the sell screen shows its keys (starting with F2 to scan, F4 for the customer, F6 for the cash drawer, F8 for the amount received and F12 to complete the sale). **Settings → Keys at the till** lets you choose your own for each (a function key, or Ctrl or Alt with a letter or number; a key can do only one thing).
+- **Products → Quick groups:** make a group such as "Breakfast" (1 bread, 2 milk). One press at the till, or one scan of the group's own barcode, adds every item at its own price. A group has no price of its own.
+
 ### Customers and suppliers in a spreadsheet
 - **People → Spreadsheet:** send your customers and suppliers to a spreadsheet, change them there and bring the file back, or fill in an empty sheet to bring in a whole list. You see exactly what would be added and changed (and every wrong row, with its row number) before anything is written; a copy of your shop's data is made first. A person who is there is found by phone number, then by name. **Balance** (what a new customer owes you, or what you owe a new supplier) goes into your books as an opening balance.
 

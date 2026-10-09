@@ -4,6 +4,23 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Customers and suppliers in a spreadsheet
+- **People → Spreadsheet:** send your customers and suppliers to a spreadsheet, change them there and bring the file back, or fill in an empty sheet to bring in a whole list. You see exactly what would be added and changed (and every wrong row, with its row number) before anything is written; a copy of your shop's data is made first. A person who is there is found by phone number, then by name. **Balance** (what a new customer owes you, or what you owe a new supplier) goes into your books as an opening balance.
+
+### Selling loose from a box
+- On a product, choose **Sold loose from** another product (a box or a pack) and say how many are in one. When a sale needs more pieces than are on the shelf, **whole boxes are opened by themselves**: the boxes go down, the pieces go up, and each piece costs its share of the box. You can also open a box yourself from the product's *Stock*. Stock of both stays exact, with no fractions of a box. (The older POS divided the quantity at the till, which left fractions in stock.)
+
+### More reports (Reports → More reports)
+- **Bills:** every bill and return of the days you choose, with a column for each way it was paid, what is still owed, what the goods cost and what the bill earned. Choose one cashier to see only their bills. A return is a line of its own, below nothing.
+- **Profit by product:** what each product sold for (before tax, after discounts), what it cost and what is left. **Most and least sold:** by how many were sold, with goods brought back taken off. **Bought:** the purchases (and goods sent back) with the tax and what is still to be paid. **One product's sales:** every line it was sold on, with the price before discount and tax. **Out of stock:** what has nothing on the shelf.
+- Each of these (except one product's sales) downloads as a file for a spreadsheet.
+
+### Batch numbers and expiry dates
+- **Medicines and food:** on a product, choose **Keep batch numbers and expiry dates**. When goods arrive, the Hub asks for the **batch number and dates** from the pack (and says so in plain words if the number is missing); a count or damage names the batch too.
+- **The till sells the batch that expires first, and never one that is out of date** (a batch is out of date on its expiry date). The bill says which batches the goods came from. Goods that are brought back go into the batch they came out of; cancelling a sale puts every batch back.
+- **Products → Batches and expiry** lists what is out of date or soon will be (30, 60, 90 or 180 days), and every batch on the shelf; a date typed wrong can be corrected. Out of date stock can be written off from the product's *Stock*.
+- Stock values and the average cost are worked out exactly as before; batches only share them out.
+
 ### Employees and their pay
 - **A new screen, Employees** (owners and managers): add the people who work for you with their monthly pay and usual hours. **Days:** write down who was present or absent each day, with the time they came and left if you want overtime counted. **Pay in advance:** give someone money before payday and see what is still to be paid back. **Monthly pay:** choose the person and the days, give the overtime pay for an hour if any, and take part of an advance out of the pay; you see exactly what will be paid out before you pay. Each payment is a **pay slip** you can read and print.
 - **A month's pay is divided by the days of that month** (or by a number you choose, such as 26 or 30, under *Pay rules*). Leaving early does not take pay away unless you turn that on. A slip can cover a single day. **The days on a slip cannot be changed**; a slip made by mistake is cancelled (it stays on record) and the advance paid back out of it is owed again. The books show *Staff pay* and *Paid to staff in advance*.

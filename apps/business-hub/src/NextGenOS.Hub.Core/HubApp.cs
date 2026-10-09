@@ -57,6 +57,7 @@ public sealed class HubApp
         Offers = new OffersService(db, Shop, clock, Audit, Access);
         Earners = new EarnerService(db, Shop, clock, Audit, Books, Access);
         Payroll = new PayrollService(db, Shop, clock, Audit, Books, Access);
+        Batches = new BatchService(db, Shop, clock, Audit, Access);
         Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Outbox, Access, Earners);
         Users = new UserService(db, clock, Audit, Access);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit, Access);
@@ -78,6 +79,7 @@ public sealed class HubApp
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
+        PartySheets = new PartySheetService(db, Shop, clock, Audit, Parties, Books, Access);
         // The shop's own copies, made every night to a second place the owner chose (Settings, Backups), and putting one back.
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
         // Updates through the main PC: looks for a signed newer version, keeps it checked on this PC, and waits for the owner's yes. Nothing is installed by it. A copy built without a place to look never looks.
@@ -102,8 +104,10 @@ public sealed class HubApp
     public OutboxService Outbox { get; }
     public CatalogChangeService CatalogChanges { get; }
     public ItemSheetService ItemSheets { get; }
+    public PartySheetService PartySheets { get; }
     public EarnerService Earners { get; }
     public PayrollService Payroll { get; }
+    public BatchService Batches { get; }
     public LoyaltyService Loyalty { get; }
     public OffersService Offers { get; }
     public DocumentService Documents { get; }

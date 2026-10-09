@@ -17,6 +17,7 @@
 <div class="toolbar">
     <input class="search" type="search" placeholder="Search by name or phone" aria-label="Search" @bind="text" @bind:event="oninput" @onkeydown="SearchKey" />
     <span class="spacer"></span>
+    <a class="btn ghost" id="people-sheet" href="/people/sheet">Spreadsheet</a>
     <button type="button" class="btn primary" id="add-person" @onclick="NewPerson">Add @Singular(CurrentKind).ToLowerInvariant()</button>
 </div>
 

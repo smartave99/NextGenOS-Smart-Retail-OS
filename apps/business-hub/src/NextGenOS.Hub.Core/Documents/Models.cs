@@ -70,6 +70,10 @@ public sealed class LineInput
     public string? Note { get; set; }
     public string? Station { get; set; }
     public long? BoqId { get; set; }
+    /// <summary>For a purchase of an item that keeps batches: the batch that arrives with this line, and its dates.</summary>
+    public string? BatchNo { get; set; }
+    public DateOnly? MfgOn { get; set; }
+    public DateOnly? ExpOn { get; set; }
 }
 
 public sealed record PaymentRow(long Id, long? DocumentId, string Method, long AmountMinor, string? Reference, DateTimeOffset At, string Kind, long? UserId);

@@ -483,6 +483,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **Unit buttons** (`frmUnitButton`): a touch pop-up for a scanned barcode with buttons for the main and alternate unit and the default quantity; `calvalue = 1 / Conv * DefQty` is the main-unit quantity of the default quantity (`:303-306`).
 - **Test vectors:** U1 main "Box", alt "Pc", Conv 12, sell 6 Pc: main quantity 0.5 Box, line = 0.5 * price per box, `AltQty` 6. U2 sell 2 Box: main 2, `AltQty` 24. U3 Conv 0 and alternate unit picked: division by zero (guard in the Hub). U4 unit "Kg" is used as sales unit: delete refused. U5 unit "Pc" is only used as an alternate unit: delete is **allowed** (bug).
 - **Hub today:** `Item.Unit` free text and quantities in thousandths (`qty_milli`); no conversion. **Port:** add `alt_unit` + `conv`; do the division with integers in thousandths and round once (decide rounding).
+- **Hub now (9 October 2026):** built the Hub's way, as **two linked items** (the loose item is opened from its box) instead of a conversion, so stock stays exact (`docs/OPEN-WORK.md` item 12p). U1 and the margin example M4 are tests; U3 cannot happen (a pack holds two or more whole pieces).
 
 #### A2.4 Tax rates, tax types, HSN
 
@@ -1138,6 +1139,8 @@ Rules are in A1.5 and A3.5 (grouping by `CustNameid` / `SuplNameid`, sign rules,
 2. Golden tests: R1 to R8, U1 to U3, F1 to F3, E1 to E3, T1 to T3, G1 to G3, H1 to H3, W1 to W4, plus the book tests in B (P1 to P9, M1 to M5, S1 to S7) and the customer tests in A1.5.
 3. Where the old report has a quirk (stale opening in the stock movement; purchase grand total includes previous due; best sellers ignore returns), the Hub uses the corrected rule, with the old figure kept in the test as a "differs from old on purpose" note.
 4. Cost for profit: store the cost on the document line at issue (Hub change), because the old program's profit depends on it.
+
+**Hub now (9 October 2026, reports wave 3, `docs/OPEN-WORK.md` item 12q).** Built: R6 and R8 (bills with payment columns, cashier filter), F1 to F3 (profit by bill from the stock moves' values), profit by item, E1 to E3 (by quantity, returns taken off: E2 differs on purpose), U1 and U2 (purchase list), the product sales history and the out-of-stock list (T1). Not built: sale type and till filters, Net Sale, D-Sale, the summary 1 to 3 variants, printed layouts.
 
 ### C12. Not understood (reports)
 

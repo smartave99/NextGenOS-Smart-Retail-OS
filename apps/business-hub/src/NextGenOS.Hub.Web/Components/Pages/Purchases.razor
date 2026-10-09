@@ -125,6 +125,30 @@
     </div>
 }
 
+@if (arriving is not null)
+{
+    <div class="sheet-back" @onclick="() => arriving = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Goods arrived" @onclick:stopPropagation="true">
+            <h2>Goods arrived: @arriving.Number</h2>
+            <p class="muted small">These items keep batch numbers. Type the batch and its dates from the pack.</p>
+            <Notice Error="@formError" />
+            @foreach (var (line, item) in arrivingLines)
+            {
+                var b = arrivingBatch[line.Id];
+                <div class="card stack">
+                    <strong>@Qty(line.QtyMilli) × @item.Name</strong>
+                    <div class="field-row">
+                        <div><label for="rb-no-@line.Id">Batch number</label><input id="rb-no-@line.Id" @bind="b.No" maxlength="40" autocomplete="off" /></div>
+                        <div><label for="rb-mfg-@line.Id">Made on</label><input id="rb-mfg-@line.Id" type="date" value="@b.Mfg" @onchange="x => b.Mfg = x.Value?.ToString() ?? string.Empty" /></div>
+                        <div><label for="rb-exp-@line.Id">Expires on</label><input id="rb-exp-@line.Id" type="date" value="@b.Exp" @onchange="x => b.Exp = x.Value?.ToString() ?? string.Empty" /></div>
+                    </div>
+                </div>
+            }
+            <div class="row"><button type="button" class="btn secondary" @onclick="() => arriving = null">Cancel</button><button type="button" class="btn primary grow" id="confirm-receive" @onclick="ConfirmReceive">Goods arrived</button></div>
+        </div>
+    </div>
+}
+
 @if (termsSheet)
 {
     <div class="sheet-back" @onclick="() => termsSheet = false">
@@ -404,11 +428,47 @@
         catch (HubException ex) { formError = ex.Message; }
     }
 
+    private sealed class BatchEdit { public string No { get; set; } = ""; public string Mfg { get; set; } = ""; public string Exp { get; set; } = ""; }
+
+    private NextGenOS.Hub.Documents.Document? arriving;
+    private List<(NextGenOS.Hub.Documents.DocLine Line, NextGenOS.Hub.Catalog.Item Item)> arrivingLines = new();
+    private readonly Dictionary<long, BatchEdit> arrivingBatch = new();
+
+    /// <summary>The goods arrived. When some of them keep batch numbers, the batches are asked for first; otherwise the stock is updated at once.</summary>
     private Task Receive(NextGenOS.Hub.Documents.Document d) => Run(() =>
     {
-        App.Purchasing.Receive(d.Id, Me.Id);
-        Read();
-    }, "Stock is updated.");
+        var view = App.Documents.Get(d.Id);
+        var batched = (view?.Lines ?? new List<NextGenOS.Hub.Documents.DocLine>()).Where(l => l.ItemId is not null).Select(l => (Line: l, Item: App.Catalog.Get(l.ItemId!.Value))).Where(x => x.Item is { TrackBatches: true })
+            .Select(x => (x.Line, x.Item!)).ToList();
+        if (batched.Count == 0)
+        {
+            App.Purchasing.Receive(d.Id, Me.Id);
+            Read();
+            Info = "Stock is updated.";
+            return;
+        }
+        arriving = d;
+        arrivingLines = batched;
+        arrivingBatch.Clear();
+        formError = "";
+        foreach (var (line, _) in batched) arrivingBatch[line.Id] = new BatchEdit();
+    });
+
+    private void ConfirmReceive()
+    {
+        formError = "";
+        try
+        {
+            if (arriving is null) return;
+            DateOnly? Day(string text) => DateOnly.TryParse(text, out var day) ? day : null;
+            var batches = arrivingBatch.ToDictionary(kv => kv.Key, kv => new NextGenOS.Hub.Purchasing.ReceivedBatch(kv.Value.No, Day(kv.Value.Mfg), Day(kv.Value.Exp)));
+            App.Purchasing.Receive(arriving.Id, Me.Id, batches);
+            arriving = null;
+            Read();
+            Info = "Stock is updated.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
 
     private void OpenPay(NextGenOS.Hub.Documents.Document d)
     {

@@ -78,7 +78,7 @@ internal static class StockCost
     }
 
     /// <summary>Writes a move of stock with its value. Returns its number.</summary>
-    public static long Insert(SqliteConnection c, SqliteTransaction t, long itemId, long qtyMilli, string reason, long? documentId, string? note, DateTimeOffset at, long? userId, long valueMinor) => HubDb.Insert(c,
-        "INSERT INTO stock_moves(item_id, qty_milli, reason, document_id, note, at, user_id, value_minor) VALUES ($i, $q, $r, $d, $n, $at, $u, $v)", t,
-        ("$i", itemId), ("$q", qtyMilli), ("$r", reason), ("$d", documentId), ("$n", note), ("$at", Iso.Text(at)), ("$u", userId), ("$v", valueMinor));
+    public static long Insert(SqliteConnection c, SqliteTransaction t, long itemId, long qtyMilli, string reason, long? documentId, string? note, DateTimeOffset at, long? userId, long valueMinor, long? batchId = null) => HubDb.Insert(c,
+        "INSERT INTO stock_moves(item_id, qty_milli, reason, document_id, note, at, user_id, value_minor, batch_id) VALUES ($i, $q, $r, $d, $n, $at, $u, $v, $b)", t,
+        ("$i", itemId), ("$q", qtyMilli), ("$r", reason), ("$d", documentId), ("$n", note), ("$at", Iso.Text(at)), ("$u", userId), ("$v", valueMinor), ("$b", batchId));
 }

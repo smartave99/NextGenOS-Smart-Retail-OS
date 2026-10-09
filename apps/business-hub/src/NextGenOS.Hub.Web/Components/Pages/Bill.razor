@@ -103,7 +103,7 @@ else
         }
     </div>
 
-    <Receipt View="view" Shop="Shop" Points="@Points()" Offers="@App.Offers.ForDocument(Id)" />
+    <Receipt View="view" Shop="Shop" Points="@Points()" Offers="@App.Offers.ForDocument(Id)" Batches="@BatchesOnBill()" />
 
     @if (credits.Count > 0)
     {
@@ -173,6 +173,10 @@ else
     };
 
     private bool CanReturn() => view!.Document is { Type: DocTypes.Invoice, Status: DocStatus.Issued } && Me.Can(Perm.Sell);
+
+    /// <summary>The batches the goods of this bill came from, for those who may see stock (null for anyone else).</summary>
+    private IReadOnlyList<NextGenOS.Hub.Catalog.BatchOnBill>? BatchesOnBill() =>
+        view!.Document.Type is DocTypes.Invoice or DocTypes.Purchase && (Me.Can(Perm.Sell) || Me.Can(Perm.Stock) || Me.Can(Perm.Reports) || Me.Can(Perm.Purchases)) ? AsMe(() => App.Batches.OnBill(Id)) : null;
 
     private bool CanPrintLabels() => view!.Document is { Type: DocTypes.Purchase, Status: DocStatus.Issued } && Me.Can(Perm.Catalog);
 

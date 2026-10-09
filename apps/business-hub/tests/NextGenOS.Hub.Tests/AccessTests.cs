@@ -50,6 +50,7 @@ public class AccessTests : IDisposable
         yield return new("Documents.CreateDraft", doc, a => a.Documents.CreateDraft(new DraftOptions()));
         yield return new("Documents.AddLine", doc, a => a.Documents.AddLine(draftId, new LineInput { ItemId = itemId }));
         yield return new("Documents.RemoveLine", doc, a => a.Documents.RemoveLine(draftId, 0));
+        yield return new("Documents.SetLineBatch", doc, a => a.Documents.SetLineBatch(draftId, 0, null, null, null));
         yield return new("Documents.SetAdjustments", doc, a => a.Documents.SetAdjustments(draftId, Array.Empty<NextGenOS.Tax.TaxAdjustmentInput>()));
         yield return new("Documents.SetParty", doc, a => a.Documents.SetParty(draftId, null));
         yield return new("Documents.SetLoyaltyPoints", doc, a => a.Documents.SetLoyaltyPoints(draftId, 0));
@@ -194,6 +195,10 @@ public class AccessTests : IDisposable
         // Items as a spreadsheet (merge, products tools F): the same right as changing the catalog.
         yield return new("ItemSheets.Export", new[] { Perm.Catalog }, a => a.ItemSheets.Export());
         yield return new("ItemSheets.Template", new[] { Perm.Catalog }, a => a.ItemSheets.Template());
+        yield return new("PartySheets.Export", new[] { Perm.Parties }, a => a.PartySheets.Export());
+        yield return new("PartySheets.Template", new[] { Perm.Parties }, a => a.PartySheets.Template());
+        yield return new("PartySheets.Check", new[] { Perm.Parties }, a => a.PartySheets.Check("x.csv", "Name\nX\n"));
+        yield return new("PartySheets.Import", new[] { Perm.Parties }, a => a.PartySheets.Import(new PartySheetCheck("x.csv", 0, 0, 0, 0, Array.Empty<SheetProblem>(), Array.Empty<SheetLine>(), Array.Empty<string>(), "x"), null));
         yield return new("ItemSheets.Check", new[] { Perm.Catalog }, a => a.ItemSheets.Check("x.csv", "Name\nX\n"));
         yield return new("ItemSheets.Import", new[] { Perm.Catalog }, a => a.ItemSheets.Import(new SheetCheck("x.csv", 0, 0, 0, 0, Array.Empty<SheetProblem>(), Array.Empty<SheetLine>(), Array.Empty<string>(), "x"), null));
 
@@ -210,6 +215,13 @@ public class AccessTests : IDisposable
         yield return new("Earners.Pay", new[] { Perm.Staff }, a => a.Earners.Pay(1, 100, "cash"));
         yield return new("Earners.Statement", new[] { Perm.Staff }, a => a.Earners.Statement(1));
         yield return new("Earners.Summary", new[] { Perm.Staff }, a => a.Earners.Summary(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
+        yield return new("Catalog.OpenPacks", new[] { Perm.Stock }, a => a.Catalog.OpenPacks(itemId, 1));
+        var batchReaders = new[] { Perm.Stock, Perm.Catalog, Perm.Purchases, Perm.Reports, Perm.Sell, Perm.Orders };
+        yield return new("Batches.ForItem", batchReaders, a => a.Batches.ForItem(1));
+        yield return new("Batches.Expiring", batchReaders, a => a.Batches.Expiring(30));
+        yield return new("Batches.Search", batchReaders, a => a.Batches.Search());
+        yield return new("Batches.OnBill", batchReaders, a => a.Batches.OnBill(1));
+        yield return new("Batches.SetDates", new[] { Perm.Stock }, a => a.Batches.SetDates(1, null, null));
         yield return new("Payroll.List", new[] { Perm.Staff }, a => a.Payroll.List());
         yield return new("Payroll.Get", new[] { Perm.Staff }, a => a.Payroll.Get(1));
         yield return new("Payroll.Save", new[] { Perm.Staff }, a => a.Payroll.Save(new NextGenOS.Hub.Staff.EmployeeInput { Name = "Test person", SalaryMinor = 1000 }));
@@ -246,6 +258,11 @@ public class AccessTests : IDisposable
         yield return new("Reports.Purchases", new[] { Perm.Reports }, a => a.Reports.Purchases(from, to));
         yield return new("Reports.StockMovement", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.StockMovement(from, to));
         yield return new("Reports.StockCard", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.StockCard(itemId, from, to));
+        yield return new("Reports.Bills", new[] { Perm.Reports }, a => a.Reports.Bills(from, to));
+        yield return new("Reports.ProfitByItem", new[] { Perm.Reports }, a => a.Reports.ProfitByItem(from, to));
+        yield return new("Reports.PurchaseRegister", new[] { Perm.Reports }, a => a.Reports.PurchaseRegister(from, to));
+        yield return new("Reports.ProductHistory", new[] { Perm.Reports }, a => a.Reports.ProductHistory(itemId));
+        yield return new("Reports.OutOfStock", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.OutOfStock());
         yield return new("TaxRegisters.Register", new[] { Perm.Reports }, a => a.TaxRegisters.Register("sales", from, to));
         yield return new("TaxRegisters.ReturnLists", new[] { Perm.Reports }, a => a.TaxRegisters.ReturnLists(from, to));
         yield return new("TaxRegisters.SupplySummary", new[] { Perm.Reports }, a => a.TaxRegisters.SupplySummary(from, to));

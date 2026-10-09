@@ -12,7 +12,24 @@
     "symbolSpace": false,
     "grouping": "indian",
     "decimalSeparator": ".",
-    "groupSeparator": ","
+    "groupSeparator": ",",
+    "words": {
+      "major": [
+        "rupee",
+        "rupees"
+      ],
+      "minor": [
+        "paisa",
+        "paise"
+      ],
+      "scales": [
+        "thousand",
+        "lakh",
+        "crore"
+      ],
+      "join": "and",
+      "ending": "only"
+    }
   },
   "locale": "en-IN",
   "languages": [

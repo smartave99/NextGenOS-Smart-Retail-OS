@@ -43,6 +43,11 @@
                 <select id="s-region" @bind="s.Region">@foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }</select>
             }
             <label for="s-foot">Words at the bottom of every bill</label><input id="s-foot" @bind="s.ReceiptFooter" maxlength="160" />
+            <label for="s-layout">How a bill is shown and printed</label>
+            <select id="s-layout" @bind="s.BillLayout"><option value="receipt">Receipt (a narrow slip)</option><option value="a4">Full page, A4</option><option value="a5">Full page, A5</option></select>
+            <p class="muted small">The full page shows every line with its tax, the tax for each rate, the total in words (where your country's data has the words) and a place to sign. Whoever is at the bill can switch for that one bill.</p>
+            <label for="s-terms">Terms and bank details on the full page (optional)</label><textarea id="s-terms" rows="3" @bind="s.InvoiceTerms" maxlength="600"></textarea>
+            <label for="s-sign">Words under the signing line</label><input id="s-sign" @bind="s.InvoiceSignature" maxlength="60" />
             <label for="s-gift">Words printed when a bill earns a gift voucher</label><input id="s-gift" @bind="s.GiftVoucherText" maxlength="240" />
             <p class="muted small">Use {code}, {amount} and {valid}: they are filled in for each voucher.</p>
             <label for="s-pay">Ways of paying (separated by commas)</label><input id="s-pay" @bind="payText" maxlength="200" />
@@ -720,6 +725,9 @@ else if (tab == "activity")
         }
         s.Name = s.Name.Trim();
         s.TaxId = s.TaxId.Trim().ToUpperInvariant();
+        if (s.BillLayout is not ("receipt" or "a4" or "a5")) s.BillLayout = "receipt";
+        s.InvoiceTerms = (s.InvoiceTerms ?? "").Trim();
+        s.InvoiceSignature = (s.InvoiceSignature ?? "").Trim();
         var methods = payText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(m => m.ToLowerInvariant()).Distinct().ToList();
         if (methods.Count == 0) throw new HubException("pay", "Please give at least one way of paying.");
         if (methods.Any(m => m.Length > 20 || m.Any(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '-'))) throw new HubException("pay", "Ways of paying should be short words, like cash, card, upi.");

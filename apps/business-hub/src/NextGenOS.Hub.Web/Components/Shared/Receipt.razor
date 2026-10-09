@@ -96,16 +96,7 @@
 
     private static string P(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
-    private string Title => View.Document.Type switch
-    {
-        DocTypes.CreditNote => "Credit note",
-        DocTypes.DebitNote => "Debit note",
-        DocTypes.Quote => "Quote",
-        DocTypes.Purchase => "Purchase order",
-        DocTypes.ProgressBill => "Progress bill",
-        DocTypes.Order => "Order",
-        _ => Shop.Settings.TaxRegistered && !string.IsNullOrWhiteSpace(Shop.Country.Invoice?.Title) ? Shop.Country.Invoice.Title : "Bill",
-    };
+    private string Title => BillTitle.For(View.Document, Shop);
 
     private static string Qty(long milli) => ShopContext.Qty(milli).TrimEnd('0').TrimEnd('.');
 }

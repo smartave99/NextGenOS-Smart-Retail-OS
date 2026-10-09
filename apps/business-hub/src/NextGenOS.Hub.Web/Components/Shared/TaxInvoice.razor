@@ -1,0 +1,219 @@
+@* The bill as a full page (A4 or A5): the shop and the buyer, every line with its code, tax and total, the tax by rate, the total in words when the country's pack gives the money's words, the terms and a place to sign. Every word that is a country's or a shop's comes from the pack or the shop's settings. *@
+@using NextGenOS.Tax
+@using System.Numerics
+<div class="invoice @PaperClass" id="invoice">
+    <div class="inv-head">
+        <div class="inv-seller">
+            <h2>@Shop.Settings.Name</h2>
+            @if (!string.IsNullOrWhiteSpace(Shop.Settings.Address)) { <div class="inv-address">@Shop.Settings.Address</div> }
+            @if (!string.IsNullOrWhiteSpace(Shop.Settings.Phone)) { <div>@Shop.Settings.Phone</div> }
+            @if (!string.IsNullOrWhiteSpace(Shop.Settings.Email)) { <div>@Shop.Settings.Email</div> }
+            @if (!string.IsNullOrWhiteSpace(Shop.Settings.TaxId)) { <div>@(Shop.Country.Tax.BusinessId?.Label ?? "Tax no."): <strong>@Shop.Settings.TaxId</strong></div> }
+        </div>
+        <div class="inv-meta">
+            <div class="inv-title">@BillTitle.For(View.Document, Shop)</div>
+            <div>No. <strong>@(View.Document.Number ?? "Draft")</strong></div>
+            <div>Date: @Shop.Time.ToLocal(View.Document.IssuedAt ?? View.Document.CreatedAt).ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</div>
+            @if (View.Document.DueAt is { } due) { <div>Due: @Shop.Time.ToLocal(due).ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</div> }
+            @if (View.Document.Status == DocStatus.Void) { <div class="inv-void">VOID</div> }
+        </div>
+    </div>
+
+    @if (View.Party is { } party)
+    {
+        <div class="inv-party">
+            <div class="inv-label">@PartyLabel</div>
+            <strong>@party.Name</strong>
+            @if (!string.IsNullOrWhiteSpace(party.Address)) { <div>@party.Address</div> }
+            @if (!string.IsNullOrWhiteSpace(party.Phone)) { <div>@party.Phone</div> }
+            @{ var partyTaxId = View.Document.PartyTaxId ?? party.TaxId; }
+            @if (!string.IsNullOrWhiteSpace(partyTaxId)) { <div>@(Shop.Country.Tax.BusinessId?.Label ?? "Tax no."): @partyTaxId</div> }
+            @if (PlaceOfSupply() is { } place) { <div>@place</div> }
+        </div>
+    }
+
+    <table class="inv-lines">
+        <thead>
+            <tr>
+                <th class="num">No.</th>
+                <th>Description</th>
+                @if (ShowCode) { <th>@CodeLabel</th> }
+                <th class="num">Qty</th>
+                <th class="num">Price</th>
+                <th class="num">Discount</th>
+                <th class="num">Taxable value</th>
+                @foreach (var name in componentNames) { <th class="num">@name</th> }
+                @if (ShowExtraTax) { <th class="num">@ExtraTaxLabel</th> }
+                <th class="num">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            @{ var n = 0; }
+            @foreach (var line in View.Lines)
+            {
+                n++;
+                var r = View.ResultFor(line);
+                <tr>
+                    <td class="num">@n</td>
+                    <td>
+                        @line.Description
+                        @foreach (var b in Batches?.Where(x => x.ItemId == line.ItemId) ?? Enumerable.Empty<NextGenOS.Hub.Catalog.BatchOnBill>())
+                        {
+                            <div class="inv-small batch-line">Batch @b.BatchNo@(b.ExpOn is { } exp ? ", expires " + exp.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "")</div>
+                        }
+                    </td>
+                    @if (ShowCode) { <td>@line.ItemCode</td> }
+                    <td class="num">@Qty(line.QtyMilli)@(string.IsNullOrWhiteSpace(line.Unit) ? "" : " " + line.Unit)</td>
+                    @if (line.IsFree)
+                    {
+                        <td class="num" colspan="@(4 + componentNames.Count + (ShowExtraTax ? 1 : 0))">free</td>
+                    }
+                    else
+                    {
+                        <td class="num">@Shop.Text(line.UnitPriceMinor)</td>
+                        <td class="num">@(r is null ? "" : Money(r.Discount))</td>
+                        <td class="num">@(r is null ? "" : Money(r.Taxable))</td>
+                        @foreach (var name in componentNames) { <td class="num">@(r is null ? "" : Money(AmountOf(r.Components, name)))</td> }
+                        @if (ShowExtraTax) { <td class="num">@(r is null ? "" : Money(r.Cess))</td> }
+                        <td class="num">@(r is null ? "" : Money(r.LineTotal))</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (View.Document.PricesIncludeTax) { <div class="inv-small">The prices in the Price column include the tax.</div> }
+
+    @if (View.Result is { } result)
+    {
+        var t = result.Totals;
+        <div class="inv-bottom">
+            <div class="inv-by-rate">
+                @if (result.ByCode is { Count: > 0 } byCode && Shop.Settings.TaxRegistered)
+                {
+                    var rateParts = byCode.SelectMany(b => b.Components ?? new List<Component>()).Select(c => c.Name).Distinct().ToList();
+                    var rateCess = byCode.Any(b => !string.IsNullOrEmpty(b.Cess) && Shop.Minor(b.Cess) != 0);
+                    <table class="inv-rates" id="tax-by-rate">
+                        <thead>
+                            <tr>
+                                <th>@(Shop.Country.Tax.Name) rate</th>
+                                <th class="num">Taxable value</th>
+                                @foreach (var name in rateParts) { <th class="num">@name</th> }
+                                @if (rateCess) { <th class="num">@ExtraTaxLabel</th> }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var b in byCode)
+                            {
+                                <tr>
+                                    <td>@RateLabel(b)</td>
+                                    <td class="num">@Money(b.Taxable)</td>
+                                    @foreach (var name in rateParts) { <td class="num">@Money(AmountOf(b.Components, name))</td> }
+                                    @if (rateCess) { <td class="num">@Money(b.Cess)</td> }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+            <div class="inv-totals">
+                @if (Shop.Minor(t.Discount) > 0) { <div class="r"><span>Discount given</span><span>−@Shop.Money(Shop.Minor(t.Discount))</span></div> }
+                @foreach (var applied in Offers?.Applied ?? Array.Empty<NextGenOS.Hub.Offers.AppliedOffer>())
+                {
+                    <div class="r inv-small offer-line"><span>@applied.Label</span><span>−@Shop.Money(applied.AmountMinor)</span></div>
+                }
+                <div class="r"><span>Value before tax</span><span>@Shop.Money(Shop.Minor(t.Taxable))</span></div>
+                @foreach (var c in t.Components ?? new List<Component>())
+                {
+                    if (Shop.Minor(c.Amount) == 0) continue;
+                    <div class="r"><span>@c.Name</span><span>@Shop.Money(Shop.Minor(c.Amount))</span></div>
+                }
+                @if (!string.IsNullOrEmpty(t.Cess) && Shop.Minor(t.Cess) != 0) { <div class="r"><span>@ExtraTaxLabel</span><span>@Shop.Money(Shop.Minor(t.Cess))</span></div> }
+                @foreach (var a in result.Adjustments ?? new List<AdjustmentResult>())
+                {
+                    <div class="r"><span>@a.Label</span><span>@Shop.Money(Shop.Minor(a.Amount))</span></div>
+                }
+                @if (Shop.Minor(t.RoundOff) != 0) { <div class="r"><span>Rounding</span><span>@Shop.Money(Shop.Minor(t.RoundOff))</span></div> }
+                <div class="r b inv-grand"><span>Total</span><span id="inv-total">@Shop.Money(View.Document.PayableMinor)</span></div>
+            </div>
+        </div>
+    }
+
+    @if (InWords() is { } words)
+    {
+        <div class="inv-words" id="inv-words"><span class="inv-label">Total in words</span> @words</div>
+    }
+
+    @if (View.Payments.Any(p => p.Kind == "payment") || View.Document.BalanceMinor > 0)
+    {
+        <div class="inv-paid">
+            @foreach (var p in View.Payments.Where(p => p.Kind == "payment"))
+            {
+                <div class="r"><span>Paid by @(p.Method == DocumentService.AccountCredit ? "credit on account" : p.Method)</span><span>@Shop.Money(p.AmountMinor)</span></div>
+            }
+            @if (View.Document.BalanceMinor > 0) { <div class="r b"><span>Balance due</span><span>@Shop.Money(View.Document.BalanceMinor)</span></div> }
+        </div>
+    }
+
+    <div class="inv-foot">
+        <div class="inv-terms">
+            @if (!string.IsNullOrWhiteSpace(Shop.Settings.InvoiceTerms))
+            {
+                <div class="inv-label">Terms</div>
+                <div class="inv-terms-text" id="inv-terms">@Shop.Settings.InvoiceTerms</div>
+            }
+        </div>
+        <div class="inv-sign">
+            <div>For <strong>@Shop.Settings.Name</strong></div>
+            <div class="inv-sign-line"></div>
+            <div class="inv-small">@Shop.Settings.InvoiceSignature</div>
+        </div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Shop.Settings.ReceiptFooter)) { <div class="inv-thanks">@Shop.Settings.ReceiptFooter</div> }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DocumentView View { get; set; } = default!;
+    [Parameter, EditorRequired] public ShopContext Shop { get; set; } = default!;
+    /// <summary>"a4" or "a5": the paper the page is made for when it is printed.</summary>
+    [Parameter] public string Paper { get; set; } = "a4";
+    /// <summary>What offers and codes took off this bill; null when there is nothing to say.</summary>
+    [Parameter] public NextGenOS.Hub.Offers.DocumentOffers? Offers { get; set; }
+    /// <summary>The batches the goods came from (items that keep batches); null when there is nothing to say.</summary>
+    [Parameter] public IReadOnlyList<NextGenOS.Hub.Catalog.BatchOnBill>? Batches { get; set; }
+
+    private List<string> componentNames = new();
+
+    private string PaperClass => Paper == "a5" ? "a5" : "a4";
+    private string? CodeLabel => Shop.Country.Tax.ItemCode?.Label;
+    private bool ShowCode => CodeLabel is not null && View.Lines.Any(l => !string.IsNullOrWhiteSpace(l.ItemCode));
+    private string ExtraTaxLabel => Shop.Country.Tax.ExtraTax?.Label ?? "Extra tax";
+    private bool ShowExtraTax => View.Result is { } r && r.Lines.Any(l => !string.IsNullOrEmpty(l.Cess) && Shop.Minor(l.Cess) != 0);
+    private string PartyLabel => View.Document.Type is DocTypes.Purchase or DocTypes.DebitNote ? "Supplier" : "Bill to";
+
+    protected override void OnParametersSet()
+    {
+        // the tax parts the lines show, in the order they first appear (CGST and SGST, or IGST, or VAT ...)
+        componentNames = (View.Result?.Lines ?? new List<LineResult>()).SelectMany(l => l.Components ?? new List<Component>()).Select(c => c.Name).Distinct().ToList();
+    }
+
+    /// <summary>An amount the engine gave as text, shown with the currency's decimals and no symbol; an empty text shows nothing.</summary>
+    private string Money(string? amount) => string.IsNullOrEmpty(amount) ? "" : Shop.Text(Shop.Minor(amount));
+
+    private static string AmountOf(List<Component>? parts, string name) => parts?.FirstOrDefault(c => c.Name == name)?.Amount ?? "";
+
+    private string RateLabel(ByCodeResult b) => Shop.Country.Tax.Rates.FirstOrDefault(r => r.Code == b.Code)?.Label ?? (string.IsNullOrEmpty(b.Percent) ? b.Code : b.Percent + "%");
+
+    /// <summary>The buyer's state or province as the country's pack words it ("State: Maharashtra (27)"); null when the pack has no regions or none was given.</summary>
+    private string? PlaceOfSupply()
+    {
+        var regions = Shop.Country.Tax.Regions;
+        var code = View.Document.BuyerRegion;
+        if (regions?.List is null || string.IsNullOrWhiteSpace(code)) return null;
+        var found = regions.List.FirstOrDefault(r => r.Code == code);
+        return found is null ? null : $"{regions.Label ?? "Place"}: {found.Name} ({found.Code})";
+    }
+
+    private string? InWords() => NumberWords.AmountInWords(new BigInteger(Math.Abs(View.Document.PayableMinor)), Shop.Country.Currency);
+
+    private static string Qty(long milli) => ShopContext.Qty(milli).TrimEnd('0').TrimEnd('.');
+}

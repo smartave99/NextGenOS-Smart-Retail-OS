@@ -42,6 +42,23 @@ namespace NextGenOS.Tax
         [JsonProperty("grouping")] public string Grouping { get; set; }
         [JsonProperty("decimalSeparator")] public string DecimalSeparator { get; set; }
         [JsonProperty("groupSeparator")] public string GroupSeparator { get; set; }
+        /// <summary>The currency's words, for writing an amount in words on a full tax invoice (SPEC section 4d). Null: the pack gives none and no words are printed.</summary>
+        [JsonProperty("words")] public CurrencyWords Words { get; set; }
+    }
+
+    /// <summary>The words a country uses for its money when an amount is written out (SPEC section 4d). English words only; other languages come with the screen translations.</summary>
+    public sealed class CurrencyWords
+    {
+        /// <summary>The whole unit, singular and plural: ["rupee", "rupees"].</summary>
+        [JsonProperty("major")] public System.Collections.Generic.List<string> Major { get; set; }
+        /// <summary>The smallest unit, singular and plural: ["paisa", "paise"]. Needed when the currency has decimals.</summary>
+        [JsonProperty("minor")] public System.Collections.Generic.List<string> Minor { get; set; }
+        /// <summary>The names of the big steps, smallest first: ["thousand", "lakh", "crore"]. Needed with "indian" grouping; without it the English thousand, million, billion and trillion are used.</summary>
+        [JsonProperty("scales")] public System.Collections.Generic.List<string> Scales { get; set; }
+        /// <summary>The word between the whole part and the small part. Null: "and".</summary>
+        [JsonProperty("join")] public string Join { get; set; }
+        /// <summary>The word that closes the amount ("only"). Null or empty: none.</summary>
+        [JsonProperty("ending")] public string Ending { get; set; }
     }
 
     public sealed class FiscalYearStart

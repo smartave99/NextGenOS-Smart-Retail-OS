@@ -45,7 +45,8 @@ country-packs/
     "symbolSpace": false,                // a space between the symbol and the number
     "grouping": "indian",                // "indian" (12,34,567.89) | "standard" (1,234,567.89) | "none"
     "decimalSeparator": ".",             // "." or ","
-    "groupSeparator": ","                // "," or "." or a (non-breaking) space
+    "groupSeparator": ",",               // "," or "." or a (non-breaking) space
+    "words": { "major": ["rupee", "rupees"], "minor": ["paisa", "paise"], "scales": ["thousand", "lakh", "crore"], "join": "and", "ending": "only" }   // optional: the money's words, for a total written in words (section 4d)
   },
   "locale": "en-IN",                     // BCP 47, for dates and names of months
   "languages": ["en", "hi"],             // the languages the programs offer first
@@ -126,6 +127,13 @@ of every issued bill, credit note and purchase of the period goes in the first b
 * `partyHasTaxId`, `betweenRegions` – as in section 4b, for the bill the line is on.
 
 Everything named must be true. A line that meets no block is in none (it is counted, so that it can be looked at). Bills of a shop that is not registered for the tax and cancelled bills are left out.
+
+### 4d. The currency's words (optional)
+
+A full tax invoice can show its total in words. The words are the country's, so they are in the pack and never in program code: `currency.words` names the whole unit (`major`, singular then plural: `["rupee", "rupees"]`), the smallest unit (`minor`, the same; needed when `decimals` is above 0), the
+names of the big steps (`scales`, smallest first: `["thousand", "lakh", "crore"]`; needed when `grouping` is `indian`; for the other groupings the English thousand, million, billion and trillion are used when it is left out; the last name takes everything above it, so a hundred crore is "one hundred crore"),
+the word between the two parts (`join`, "and" when left out) and the word that closes the amount (`ending`, for example "only"; none when left out). The words are English; another language comes with the screen translations of that country. A pack without `words`, or one whose grouping needs `scales` and does not give them, gets no line in words:
+the invoice simply does not show one. Example, `words` as above and 1,250.50 on a bill: "One thousand two hundred fifty rupees and fifty paise only".
 
 ## 5. Models
 

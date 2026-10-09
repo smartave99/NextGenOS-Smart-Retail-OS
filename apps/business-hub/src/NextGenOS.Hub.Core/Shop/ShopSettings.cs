@@ -25,6 +25,12 @@ public sealed class ShopSettings
     /// <summary>The biggest discount a cashier may give at the till, as a percent of the bill in thousandths (5000 = 5%). 0 means none; owners and managers have no limit.</summary>
     public long CashierDiscountPctMilli { get; set; }
     public string ReceiptFooter { get; set; } = "Thank you!";
+    /// <summary>How a bill is shown and printed: "receipt" (a narrow slip), "a4" or "a5" (a full page with the tax by rate, the total in words, the terms and a place to sign). The cashier can switch for one bill.</summary>
+    public string BillLayout { get; set; } = "receipt";
+    /// <summary>The terms and bank details printed at the foot of the full-page bill. Empty: none are printed; the starting words say nothing about the shop.</summary>
+    public string InvoiceTerms { get; set; } = "";
+    /// <summary>The words under the signing line of the full-page bill.</summary>
+    public string InvoiceSignature { get; set; } = "Authorised signature";
     /// <summary>The words printed on a bill that earns a gift voucher: {code}, {amount} and {valid} (the days it can be used) are filled in. The starting words say nothing about the shop.</summary>
     public string GiftVoucherText { get; set; } = "Gift voucher {code} worth {amount}. Show this code on your next visit. Valid {valid}.";
     /// <summary>Loyalty points (decision 31). Off until the owner turns them on in Settings; the starting words and numbers below are neutral (nothing is earned until a value is set).</summary>

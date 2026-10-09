@@ -178,8 +178,44 @@ label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; f
 .receipt .r { display: flex; justify-content: space-between; gap: 8px; }
 .receipt .r.b { font-weight: 700; font-size: 1.05em; }
 
+/* The bill as a full page (A4 or A5, also printed) */
+.layout-choice { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.layout-choice .chip-btn { text-decoration: none; display: inline-flex; align-items: center; font-weight: 600; }
+.invoice { background: #fff; color: #111; max-width: 194mm; margin: 0 auto; padding: 10mm; border-radius: 12px; border: 1px solid var(--ngos-line); font-size: 12px; line-height: 1.4; page: invoice-a4; container-type: inline-size; }
+.invoice.a5 { max-width: 138mm; padding: 7mm; font-size: 10.5px; page: invoice-a5; }
+.invoice h2 { font-family: var(--ngos-font); font-size: 1.35rem; margin: 0 0 2px; }
+.invoice .inv-head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
+.invoice .inv-meta { text-align: right; white-space: nowrap; }
+.invoice .inv-title { font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.invoice .inv-void { font-weight: 800; color: #b00020; }
+.invoice .inv-address { white-space: pre-line; }
+.invoice .inv-label { font-size: .85em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #555; }
+.invoice .inv-party { margin-bottom: 8px; padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; }
+.invoice .inv-small { font-size: .85em; color: #555; }
+.invoice table { width: 100%; border-collapse: collapse; }
+.invoice .inv-lines th, .invoice .inv-lines td, .invoice .inv-rates th, .invoice .inv-rates td { border: 1px solid #888; padding: 3px 5px; vertical-align: top; text-align: left; }
+.invoice .inv-lines th, .invoice .inv-rates th { background: #eee; font-weight: 700; }
+.invoice td.num, .invoice th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.invoice .inv-bottom { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-top: 10px; break-inside: avoid; }
+.invoice .inv-by-rate { flex: 1 1 55%; }
+.invoice .inv-totals { flex: 0 0 40%; }
+.invoice .r { display: flex; justify-content: space-between; gap: 8px; }
+.invoice .r.b { font-weight: 700; }
+.invoice .inv-grand { border-top: 2px solid #111; margin-top: 4px; padding-top: 4px; font-size: 1.15em; }
+.invoice .inv-words { margin-top: 8px; padding: 6px 8px; border: 1px solid #888; font-weight: 600; }
+.invoice .inv-paid { margin-top: 8px; max-width: 50%; margin-left: auto; }
+.invoice .inv-foot { display: flex; justify-content: space-between; gap: 16px; margin-top: 14px; break-inside: avoid; }
+.invoice .inv-terms { flex: 1 1 55%; }
+.invoice .inv-terms-text { white-space: pre-line; }
+.invoice .inv-sign { flex: 0 0 38%; text-align: center; }
+.invoice .inv-sign-line { height: 16mm; border-bottom: 1px solid #111; }
+.invoice .inv-thanks { text-align: center; margin-top: 12px; font-weight: 600; }
+@page invoice-a4 { size: A4; margin: 10mm; }
+@page invoice-a5 { size: A5; margin: 8mm; }
+
 @media print {
   body { background: #fff; }
+  .invoice { border: 0; border-radius: 0; padding: 0; max-width: none; }
   .side, .top, .no-print { display: none !important; }
   .shell { display: block; }
   main#content { padding: 0; max-width: none; }

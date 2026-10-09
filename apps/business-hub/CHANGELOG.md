@@ -4,6 +4,8 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### The bill as a full page
+- **A bill can be shown, and printed, as a full A4 or A5 page** (the buttons above a bill: *Receipt*, *Full page A4*, *Full page A5*; **Settings → Business → How a bill is shown and printed** chooses the starting look for every bill). The page has the shop and the buyer, every line with its code and each tax part, the tax for each rate, the total, a line with the total written in words where your country's data has the money's words (India's does: "One hundred eighteen rupees only"), the terms and bank details you typed in Settings, and a signing line. The narrow receipt is still the starting look.
 ### Pictures of products
 - **On a product, add up to four pictures** (PNG, JPEG, WebP or GIF, up to 400 KB each). The first one shows on the till's tile for that product. A file that is not a picture is refused, whatever its name says. The pictures are kept with your shop's data, so a backup carries them.
 

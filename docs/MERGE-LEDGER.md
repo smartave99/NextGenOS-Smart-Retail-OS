@@ -94,7 +94,8 @@ This is the one page that answers "what happened to learning from the old progra
 | Users, roles, permissions | Partly: five fixed roles and the discount right; whether roles become data the owner edits, and the other till rights, wait for the owner | study 04 A.11 |
 | Till keys | Done (the shop chooses; the screen shows them) | OPEN-WORK 12m |
 | Receipt, labels, kitchen ticket, drawer, auto-print | Done (the Hub already had them) | study 04 B.8 |
-| A4 or A5 tax invoice with full columns, amount in words, bill styles | Open | study 04 B.8 gaps 1, 2, 7, 10 |
+| A4 or A5 tax invoice with code and tax columns, tax by rate, amount in words, terms, signature | Done (one component beside the receipt; the money's words are in the pack) | OPEN-WORK 12j; study 04 B.8 gap 1 |
+| A choice of bill styles, second-copy words (original, duplicate) | Open | study 04 B.8 gaps 2, 10 |
 | Backup and restore | Done (the Backups page, the notice on Today); the online copy stays off until the owner turns it on | `Backups/` in the Hub; decision 11 |
 | Language conversion and screen translation | Open (English first; translations come country by country, decision 21) | study 04 E.6 |
 | Messages (WhatsApp, SMS, email, broadcast) | Not built: what leaves the shop needs the owner's permission, in plain words (decision 4, `CLAUDE.md` section 15) | study 04 F |

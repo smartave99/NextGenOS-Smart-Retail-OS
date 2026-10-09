@@ -143,6 +143,24 @@ public class SetupProfileTests
     }
 
     [Fact]
+    public void A_profile_sets_how_the_bill_looks_and_its_terms_and_a_layout_that_is_none_of_the_three_is_left_out()
+    {
+        var p = SetupProfile.Parse("{\"schema\":1,\"settings\":{\"billLayout\":\" A4 \",\"invoiceTerms\":\"Pay in 7 days.\\nBank: X\",\"invoiceSignature\":\"Signed\"}}");
+        var settings = new ShopSettings();
+        Assert.Equal("receipt", settings.BillLayout);                      // the starting layout is the narrow slip, whatever the country
+        Assert.Equal("", settings.InvoiceTerms);
+        p.ApplyTo(settings);
+        Assert.Equal("a4", settings.BillLayout);
+        Assert.Equal("Pay in 7 days.\nBank: X", settings.InvoiceTerms);
+        Assert.Equal("Signed", settings.InvoiceSignature);
+
+        var odd = SetupProfile.Parse("{\"schema\":1,\"settings\":{\"billLayout\":\"poster\"}}");
+        var kept = new ShopSettings { BillLayout = "a5" };
+        odd.ApplyTo(kept);
+        Assert.Equal("a5", kept.BillLayout);
+    }
+
+    [Fact]
     public void A_profile_with_no_settings_leaves_the_shops_own_choices_alone()
     {
         var settings = new ShopSettings { PricesIncludeTax = false, RoundTotal = true, ReceiptFooter = "Keep me" };

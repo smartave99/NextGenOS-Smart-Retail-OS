@@ -8,6 +8,16 @@ export interface CurrencyInfo {
     grouping: "indian" | "standard" | "none";
     decimalSeparator: string;
     groupSeparator: string;
+    /** The money's words for a total written in words (SPEC section 4d); the storefront does not use them. */
+    words?: CurrencyWords;
+}
+
+export interface CurrencyWords {
+    major: [string, string];
+    minor?: [string, string];
+    scales?: string[];
+    join?: string;
+    ending?: string;
 }
 
 export interface TaxRate {

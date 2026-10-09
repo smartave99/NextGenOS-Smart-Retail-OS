@@ -21,7 +21,8 @@ This is the one page that answers "what happened to learning from the old progra
 | Estimates and quotations (shop sales), turn into a bill | Done (decision 35) | The quote document type | `SaveAsEstimate`, `BillFromEstimate` | OPEN-WORK 12d |
 | Services and job billing | Done (the Hub already had services and appointments) | Hub | none | study 01 section 7.4 |
 | Purchases, goods arrived, pay, purchase return ("debit note") | Done | Hub purchases | Purchase returns, purchase list report | OPEN-WORK 12q; study 01 section 7.5 |
-| Supplier credit limit, inward notice, payment at receipt | Open | | | MERGE-PLAN group "Buying" |
+| Supplier credit limit | Done (checked when goods arrive; SL1 to SL4 are the tests) | Books balances, the supplier on the People screen | `SupplierBalance` inside the receive, a field on the supplier | OPEN-WORK 12i; study 02 A3.3 |
+| Inward notice, payment at receipt | Open | | | MERGE-PLAN group "Buying" |
 | Stock entry, adjustment, damage, count | Done (valued stock moves with a reason) | `StockCost` (decision 36, average cost) | | OPEN-WORK 12y; study 01 section 7.6 |
 | Stock movement report and stock card | Done | | `ReportService.StockMovement/StockCard` | OPEN-WORK 12y |
 | Batch numbers and expiry dates | Done | `StockCost` | `StockBatches`, `BatchService`, step 24, the Batches page | OPEN-WORK 12r; study 01 section 6.2 and 6.8 |

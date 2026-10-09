@@ -83,6 +83,10 @@
                     <label for="p-card">Card barcode (optional, scan it)</label>
                     <input id="p-card" @bind="form.CardBarcode" maxlength="40" autocomplete="off" />
                 }
+                @if (form.Kind == "supplier")
+                {
+                    <div><label for="p-limit">Most you may owe this supplier (empty = no limit)</label><input id="p-limit" inputmode="decimal" @bind="limit" /></div>
+                }
                 @if (Shop.Features.Credit && form.Kind is "customer" or "client")
                 {
                     <div class="field-row">

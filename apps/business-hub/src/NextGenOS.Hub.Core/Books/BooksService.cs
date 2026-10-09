@@ -563,4 +563,8 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
 
     /// <summary>What the shop owes the supplier now (negative when the supplier owes the shop).</summary>
     public long SupplierBalance(long partyId) => SupplierLedger(partyId).LastOrDefault()?.BalanceMinor ?? 0;
+
+    /// <summary>The same, read inside a transaction that is changing the books (the limit check of goods being received).</summary>
+    public long SupplierBalance(SqliteConnection c, SqliteTransaction t, long partyId) => Convert.ToInt64(HubDb.Scalar(c,
+        "SELECT COALESCE(SUM(l.credit_minor - l.debit_minor), 0) FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE l.party_id = $p AND a.role IN ('payable', 'supplier-advances')", t, ("$p", partyId)) ?? 0L);
 }

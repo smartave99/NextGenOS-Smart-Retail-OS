@@ -599,6 +599,14 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             due = now.AddDays(party.TermsDays > 0 ? party.TermsDays : (int)context.Rule("creditDays", 30));
         }
 
+        // Goods bought on account (study 02 A3.3, SL1 to SL4): what the shop would owe the supplier after this purchase must not be more than the limit set on the supplier (equal is allowed, no limit means none).
+        if (type == DocTypes.Purchase && header.PartyId is { } supplierId && parties.Get(supplierId) is { CreditLimitMinor: > 0 } supplier)
+        {
+            var owedAfter = books.SupplierBalance(c, t, supplier.Id) + (payable - paid);
+            if (owedAfter > supplier.CreditLimitMinor)
+                throw new HubException("over-limit", $"Buying this would mean owing {supplier.Name} {context.Money(owedAfter)}, more than the limit of {context.Money(supplier.CreditLimitMinor)} set for them. Pay what is due first, or raise the limit under People.");
+        }
+
         HubDb.Exec(c,
             "UPDATE documents SET type = $type, number = $number, status = 'issued', issued_at = $at, due_at = $due, meta = $meta, user_id = COALESCE($user, user_id), request_key = $key WHERE id = $id", t,
             ("$type", type), ("$number", number), ("$at", Iso.Text(now)), ("$due", due is { } dv ? Iso.Text(dv) : null), ("$meta", JsonSerializer.Serialize(meta)), ("$user", options.UserId), ("$key", requestKey), ("$id", documentId));

@@ -4,6 +4,8 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### The most you may owe a supplier
+- **A limit on each supplier** (*People → Suppliers → the supplier*, "Most you may owe this supplier"; empty means no limit). When goods arrive, what you would then owe that supplier (what you owe now plus this bill) may not be more than the limit; exactly the limit is allowed. If it would be more, the goods are not received and the screen says what would be owed and what the limit is. Pay what is due first, or raise the limit.
 ### The bill as a full page
 - **A bill can be shown, and printed, as a full A4 or A5 page** (the buttons above a bill: *Receipt*, *Full page A4*, *Full page A5*; **Settings → Business → How a bill is shown and printed** chooses the starting look for every bill). The page has the shop and the buyer, every line with its code and each tax part, the tax for each rate, the total, a line with the total written in words where your country's data has the money's words (India's does: "One hundred eighteen rupees only"), the terms and bank details you typed in Settings, and a signing line. The narrow receipt is still the starting look.
 ### Pictures of products

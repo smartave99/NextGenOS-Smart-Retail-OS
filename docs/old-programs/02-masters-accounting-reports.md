@@ -630,6 +630,8 @@ The "purchase type" box on the purchase screen has three values: index 0 = cash 
 
 **Hub today:** none for suppliers. **Port:** apply the same check when receiving an order if the owner wants it (feature flag).
 
+**Hub now (9 October 2026):** built (`docs/OPEN-WORK.md` item 12i): the check is made when goods are received (`DocumentService.Issue`, a purchase), reading what is owed from the books (`BooksService.SupplierBalance`), with SL1 to SL4 as tests (`SupplierLimitTests`). A limit of nothing means no limit (the older flag "No"). Not a feature flag: a supplier with no limit is never refused, so a shop that sets none sees no change.
+
 #### A3.4 Supplier payments
 
 **What a person sees.** `frmPayment` (`B/frmPayment.vb`): pick a supplier, see the current balance, enter date, payment mode (cash, cheque, online transfer, PhonePe, Google Pay, Paytm, E-wallet), amount, optional bank account (required for the bank modes), remarks.

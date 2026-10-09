@@ -35,3 +35,36 @@ test('a run with no failed test gives nothing, and only the first few are shown'
   const many = Array.from({ length: 20 }, (_, i) => `  Failed T.T${i} [1 ms]\n  Error Message:\n   no\n`).join('');
   assert.equal(failedTests(many, 6).length, 6);
 });
+
+test('a Node test that failed is shown with its message, and a test that passed is left out', () => {
+  const tap = [
+    'ok 1 - one',
+    '  ---',
+    '  duration_ms: 4.8',
+    "  type: 'test'",
+    '  ...',
+    'not ok 2 - a part that failed is published with its words',
+    '  ---',
+    '  duration_ms: 806.3',
+    "  type: 'test'",
+    "  location: '/work/customer-build-results.test.mjs:287:1'",
+    "  failureType: 'testCodeFailure'",
+    '  error: |-',
+    '    The input was expected to not match the regular expression /apk|aab|ANDROID/.',
+    "  code: 'ERR_ASSERTION'",
+    '  stack: |-',
+    '    at TestContext.<anonymous> (file:///work/customer-build-results.test.mjs:303:10)',
+    '  ...',
+    'ok 3 - three',
+    '  ---',
+    '  duration_ms: 1',
+    '  ...',
+    '# tests 3',
+  ].join('\n');
+  const found = failedTests(tap);
+  assert.equal(found.length, 1);
+  assert.match(found[0], /^not ok 2 - a part that failed is published with its words/);
+  assert.match(found[0], /expected to not match the regular expression/);
+  assert.doesNotMatch(found[0], /three|duration_ms|at TestContext/);
+  assert.deepEqual(failedTests('ok 1 - fine\n  ---\n  duration_ms: 1\n  ...\n# fail 0\n'), []);
+});

@@ -299,8 +299,9 @@ test('a part that failed is published with its words, and leaves no file of its 
   assert.match(result.parts.android.message, /Android app could not be made\. It stopped while building it/);
   assert.equal(result.parts['website-linux'].status, 'success');
   assert.deepEqual(names(rel), ['SHA256SUMS.txt', 'inputs.zip', 'result.json', 'website-acme-test-linux.zip', 'website-acme-test-windows.zip'], 'the app\'s partial files are taken away');
-  const sums = rel.files.get('SHA256SUMS.txt').data.toString();
-  assert.doesNotMatch(sums, /apk|aab|ANDROID/);
+  // Only the file names are looked at: each line also holds a fingerprint (64 random letters and digits), which can spell "aab" by chance (it did, once in about a hundred runs).
+  const listed = rel.files.get('SHA256SUMS.txt').data.toString().split('\n').filter(Boolean).map((line) => line.replace(/^[0-9a-f]{64}\s+/, ''));
+  assert.deepEqual(listed, ['inputs.zip', 'result.json', 'website-acme-test-linux.zip', 'website-acme-test-windows.zip'], 'the list names the files that are on the release, and no file of the app');
 });
 
 test('a part that left no report is explained from how its job ended, and a part not asked for is skipped', async () => {

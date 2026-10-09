@@ -191,6 +191,8 @@ public class AccessTests : IDisposable
         yield return new("Reports.TopCustomers", new[] { Perm.Reports }, a => a.Reports.TopCustomers(from, to));
         yield return new("Reports.StockValues", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.StockValues());
         yield return new("Reports.Purchases", new[] { Perm.Reports }, a => a.Reports.Purchases(from, to));
+        yield return new("Reports.StockMovement", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.StockMovement(from, to));
+        yield return new("Reports.StockCard", new[] { Perm.Reports, Perm.Stock }, a => a.Reports.StockCard(itemId, from, to));
         yield return new("TaxRegisters.Register", new[] { Perm.Reports }, a => a.TaxRegisters.Register("sales", from, to));
         yield return new("TaxRegisters.ReturnLists", new[] { Perm.Reports }, a => a.TaxRegisters.ReturnLists(from, to));
         yield return new("TaxRegisters.SupplySummary", new[] { Perm.Reports }, a => a.TaxRegisters.SupplySummary(from, to));
@@ -198,6 +200,9 @@ public class AccessTests : IDisposable
         yield return new("Books.TrialBalance", new[] { Perm.Reports }, a => a.Books.TrialBalance(null, null));
         yield return new("Books.Profit", new[] { Perm.Reports }, a => a.Books.Profit(null, null));
         yield return new("Books.Position", new[] { Perm.Reports }, a => a.Books.Position(null));
+        yield return new("Books.DayBook", new[] { Perm.Reports }, a => a.Books.DayBook(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
+        yield return new("Books.MoneyWays", new[] { Perm.Reports }, a => a.Books.MoneyWays());
+        yield return new("Books.MoneyBook", new[] { Perm.Reports }, a => a.Books.MoneyBook("cash", DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
         var accounts = new[] { Perm.Parties, Perm.Reports, Perm.Sell, Perm.Purchases, Perm.Orders, Perm.Loans, Perm.Projects, Perm.Appointments };
         yield return new("Books.CustomerLedger", accounts, a => a.Books.CustomerLedger(partyId));
         yield return new("Books.SupplierLedger", accounts, a => a.Books.SupplierLedger(supplierId));

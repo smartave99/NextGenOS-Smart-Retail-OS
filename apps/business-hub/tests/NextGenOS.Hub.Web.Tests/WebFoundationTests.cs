@@ -145,6 +145,26 @@ public class WebFoundationTests
     }
 
     [Fact]
+    public async Task The_stock_movement_report_the_day_book_and_the_cash_books_are_files_for_people_who_may_see_reports()
+    {
+        using var f = new HubWebFactory();
+        SetUp(f);
+        var http = Client(f);
+        var owner = await SignIn(http, "owner", "correct horse battery");
+        foreach (var path in new[] { "/export/stock-movement.csv", "/export/daybook.csv", "/export/moneybook.csv", "/export/moneybook.csv?way=cash", "/export/moneybook.csv?way=way:card" })
+        {
+            var csv = await Get(http, path, owner);
+            Assert.Equal(HttpStatusCode.OK, csv.StatusCode);
+            Assert.StartsWith("text/csv", csv.Content.Headers.ContentType!.ToString());
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await Get(http, "/export/moneybook.csv?way=nonsense", owner)).StatusCode);
+
+        var cashier = await SignIn(http, "till", "another good password");
+        foreach (var path in new[] { "/export/stock-movement.csv", "/export/daybook.csv", "/export/moneybook.csv" })
+            Assert.NotEqual(HttpStatusCode.OK, (await Get(http, path, cashier)).StatusCode);
+    }
+
+    [Fact]
     public async Task Reports_as_files_are_for_people_allowed_to_see_reports()
     {
         using var f = new HubWebFactory();

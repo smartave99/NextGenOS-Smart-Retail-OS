@@ -31,6 +31,15 @@ public sealed record TopCustomer(long PartyId, string Name, int Documents, long 
 
 public sealed record StockValue(long ItemId, string Name, long OnHandMilli, long CostMinor, long ValueMinor);
 
+/// <summary>One item's stock over a period (or over one day of it): what the shelf held before, what came in, what went out, and what was left.</summary>
+public sealed record StockMovementRow(DateOnly? Day, long ItemId, string Name, string Unit, long OpeningMilli, long InMilli, long OutMilli)
+{
+    public long ClosingMilli => OpeningMilli + InMilli - OutMilli;
+}
+
+/// <summary>One move of one item's stock. The value is negative for stock that left, and empty for a move made before values were kept.</summary>
+public sealed record StockCardRow(DateTimeOffset At, string Reason, long QtyMilli, long? ValueMinor, string? Note, string? Document);
+
 /// <summary>The numbers an owner looks at: sales by day, top items, tax by rate, what was paid how, who owes what, stock worth.</summary>
 public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clock, CatalogService catalog, Access access)
 {
@@ -170,6 +179,67 @@ public sealed class ReportService(HubDb db, ShopContextProvider shop, IClock clo
     {
         access.RequireAny(Perm.Reports, Perm.Stock);
         return catalog.StockList().Where(s => s.OnHandMilli > 0).Select(s => new StockValue(s.ItemId, s.Name, s.OnHandMilli, s.CostMinor, s.ValueMinor)).ToList();
+    }
+
+    /// <summary>
+    /// Stock in, stock out and what was left, for each item that had any of it in the period (the older POS's stock movement report, study 01 section 6.7). <paramref name="byDay"/> gives a row for each day an
+    /// item moved instead of one for the whole period. <b>Opening</b> is what the shelf held before the first day (before that day, when by day); <b>in</b> is every move that added stock (a delivery, a
+    /// purchase, goods back from a customer, a count that found more); <b>out</b> is every move that took stock off (a sale, goods sent back to a supplier, damage, a count that found less);
+    /// <b>closing</b> is opening + in − out, and for a period that ends today it is what the item holds now. Every kind of move is in one place (the older program left some out, so its report did not agree with its stock).
+    /// </summary>
+    public IReadOnlyList<StockMovementRow> StockMovement(DateOnly from, DateOnly to, long? itemId = null, bool byDay = false)
+    {
+        access.RequireAny(Perm.Reports, Perm.Stock);
+        var time = shop.Current.Time;
+        var start = Iso.Text(time.StartOfDay(from));
+        var end = Iso.Text(time.StartOfNextDay(to));
+        var opening = db.Query(
+            "SELECT m.item_id, i.name, i.unit, SUM(m.qty_milli) AS qty FROM stock_moves m JOIN items i ON i.id = m.item_id WHERE m.at < $s AND ($i IS NULL OR m.item_id = $i) GROUP BY m.item_id",
+            r => (Item: r.Int("item_id"), Name: r.Text("name"), Unit: r.Text("unit"), Qty: r.Int("qty")), ("$s", start), ("$i", itemId));
+        var moves = db.Query(
+            "SELECT m.item_id, i.name, i.unit, m.qty_milli, m.at FROM stock_moves m JOIN items i ON i.id = m.item_id WHERE m.at >= $s AND m.at < $e AND m.qty_milli <> 0 AND ($i IS NULL OR m.item_id = $i) ORDER BY m.at, m.id",
+            r => (Item: r.Int("item_id"), Name: r.Text("name"), Unit: r.Text("unit"), Qty: r.Int("qty_milli"), At: r.Time("at")), ("$s", start), ("$e", end), ("$i", itemId));
+
+        var names = new Dictionary<long, (string Name, string Unit)>();
+        var before = new Dictionary<long, long>();
+        foreach (var o in opening) { names[o.Item] = (o.Name, o.Unit); before[o.Item] = o.Qty; }
+        foreach (var m in moves) names[m.Item] = (m.Name, m.Unit);
+
+        var rows = new List<StockMovementRow>();
+        if (!byDay)
+        {
+            foreach (var group in moves.GroupBy(m => m.Item))
+                rows.Add(new StockMovementRow(null, group.Key, names[group.Key].Name, names[group.Key].Unit, before.GetValueOrDefault(group.Key), group.Where(m => m.Qty > 0).Sum(m => m.Qty), group.Where(m => m.Qty < 0).Sum(m => -m.Qty)));
+            foreach (var item in before.Keys.Where(k => before[k] != 0 && rows.All(r => r.ItemId != k)))
+                rows.Add(new StockMovementRow(null, item, names[item].Name, names[item].Unit, before[item], 0, 0));   // held stock that did not move still shows, so the closing figure is the whole shelf
+            return rows.OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(r => r.ItemId).ToList();
+        }
+
+        var running = new Dictionary<long, long>(before);
+        foreach (var day in moves.GroupBy(m => time.LocalDate(m.At)).OrderBy(g => g.Key))
+        {
+            foreach (var item in day.GroupBy(m => m.Item).OrderBy(g => names[g.Key].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(g => g.Key))
+            {
+                var open = running.GetValueOrDefault(item.Key);
+                var added = item.Where(m => m.Qty > 0).Sum(m => m.Qty);
+                var taken = item.Where(m => m.Qty < 0).Sum(m => -m.Qty);
+                rows.Add(new StockMovementRow(day.Key, item.Key, names[item.Key].Name, names[item.Key].Unit, open, added, taken));
+                running[item.Key] = open + added - taken;
+            }
+        }
+        return rows;
+    }
+
+    /// <summary>One item's moves in the period, one by one, newest last: what moved, why, what it was worth (known from the day values were kept) and the bill it came with, if any.</summary>
+    public IReadOnlyList<StockCardRow> StockCard(long itemId, DateOnly from, DateOnly to)
+    {
+        access.RequireAny(Perm.Reports, Perm.Stock);
+        var time = shop.Current.Time;
+        return db.Query(
+            "SELECT m.at, m.reason, m.qty_milli, m.value_minor, m.note, d.number FROM stock_moves m LEFT JOIN documents d ON d.id = m.document_id " +
+            "WHERE m.item_id = $i AND m.at >= $s AND m.at < $e AND m.qty_milli <> 0 ORDER BY m.at, m.id",
+            r => new StockCardRow(r.Time("at"), r.Text("reason"), r.Int("qty_milli"), r.IntOrNull("value_minor"), r.TextOrNull("note"), r.TextOrNull("number")),
+            ("$i", itemId), ("$s", Iso.Text(time.StartOfDay(from))), ("$e", Iso.Text(time.StartOfNextDay(to))));
     }
 
     /// <summary>Purchases received in the period (goods sent back to suppliers taken off) and what is still unpaid to suppliers (credit from goods sent back already counts as paid).</summary>

@@ -491,7 +491,11 @@
         formError = null;
         try
         {
-            var change = QtyOf(delta.Replace("+", ""));
+            // "Take off with a minus": the number is read without its sign (the shared reader of quantities takes no sign), then the sign is put back.
+            var typed = delta.Trim().Replace("+", "").Trim();
+            var takeOff = typed.StartsWith('-') || typed.StartsWith('−');
+            var change = QtyOf(takeOff ? typed[1..].Trim() : typed);
+            if (takeOff) change = -change;
             if (change == 0) throw new HubException("qty", "Please type how many to add or take off.");
             App.Catalog.Adjust(stockItem!.Id, change, why, null, Me.Id);
             stockItem = null;

@@ -4,6 +4,16 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Opens in a window of its own, never in the web browser
+- **The setup's "Open Smart Retail POS now" button and the icons open the program in a window of its own** (no address bar), not in your usual web browser. Press the icon before the program is ready (right after the PC starts, or right after the setup) and a small "Smart Retail POS is starting" window shows; the program opens by itself when it is ready. It no longer shows "This site can't be reached". A till opens full screen the same way. If a PC has no Microsoft Edge or Google Chrome, it says so and what to install; it never falls back to the browser.
+- The same rule now holds for the Setup Studio, the Brand Studio and the Linux menu entry. The Linux package asks for Chromium (Firefox cannot show a window of its own).
+- The example Android app shows its own sample page instead of an "offline" page.
+
+### Stock in and out, the day book and the cash book
+- **Reports, "Stock coming in and going out":** for each item that moved in the days you choose, what was on the shelf before, what came in, what went out (sales, goods sent back, damage, a count that found less) and what is left; press a name to see every move with its reason and what it was worth. It downloads as a file for a spreadsheet. (From the older POS's stock movement report; unlike the older one, damage and counts are included, so the figures always agree with the stock.)
+- **Books, "Day book":** everything the books wrote down, in the order it was written, entry by entry. **"Cash and bank":** the money the till (or a card, or a bank) took and gave back, line by line, with the figure at the start and at the end. Both download as files.
+- **Fixed:** on the Products screen, taking stock off with a minus ("-3", as the screen says) was refused with "Please type a number". Damaged or expired goods, and a count that found fewer, could not be recorded from there.
+
 ### Goods sent back to a supplier
 - **A received purchase has a new button, *Send goods back*.** Type how many of each go back and why. The goods leave the stock at what they cost, the tax paid on them is taken back, and what you owe the supplier goes down by the total of the new **debit note** (numbered `DN-...`, printed and listed like the other documents). The credit is first put against what is still unpaid on that purchase; if the purchase was already paid, you choose whether the supplier **pays the money back now** or it **stays as credit with the supplier**.
 - You cannot send back more than you received (counting what already went back), and a shop that does not allow negative stock cannot send back what it no longer has. A purchase that was sent back cannot be cancelled, and a return cannot be cancelled.

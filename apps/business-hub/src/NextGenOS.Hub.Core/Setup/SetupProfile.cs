@@ -37,6 +37,10 @@ public sealed class SetupProfile
     public bool? RoundTotal { get; private set; }
     public bool? AllowNegativeStock { get; private set; }
     public string? ReceiptFooter { get; private set; }
+    /// <summary>"receipt", "a4" or "a5": how a bill is shown and printed; anything else is left out.</summary>
+    public string? BillLayout { get; private set; }
+    public string? InvoiceTerms { get; private set; }
+    public string? InvoiceSignature { get; private set; }
     public List<string> PaymentMethods { get; } = new();
     public Dictionary<string, string[]> Vocabulary { get; } = new();
     public Dictionary<string, bool> FeatureChoices { get; } = new();
@@ -119,6 +123,9 @@ public sealed class SetupProfile
             RoundTotal = Flag(s, "roundTotal");
             AllowNegativeStock = Flag(s, "allowNegativeStock");
             ReceiptFooter = Clean(Text(s, "receiptFooter"), 160);
+            BillLayout = Text(s, "billLayout") is { } layout && layout.Trim().ToLowerInvariant() is "receipt" or "a4" or "a5" ? layout.Trim().ToLowerInvariant() : null;
+            InvoiceTerms = Clean(Text(s, "invoiceTerms"), 600);
+            InvoiceSignature = Clean(Text(s, "invoiceSignature"), 60);
             if (s.TryGetProperty("paymentMethods", out var methods) && methods.ValueKind == JsonValueKind.Array)
             {
                 foreach (var m in methods.EnumerateArray())
@@ -200,6 +207,9 @@ public sealed class SetupProfile
         if (RoundTotal is { } c) settings.RoundTotal = c;
         if (AllowNegativeStock is { } d) settings.AllowNegativeStock = d;
         if (ReceiptFooter is not null) settings.ReceiptFooter = ReceiptFooter;
+        if (BillLayout is not null) settings.BillLayout = BillLayout;
+        if (InvoiceTerms is not null) settings.InvoiceTerms = InvoiceTerms;
+        if (InvoiceSignature is not null) settings.InvoiceSignature = InvoiceSignature;
         if (PaymentMethods.Count > 0) settings.PaymentMethods = PaymentMethods.ToList();
         foreach (var (term, pair) in Vocabulary) settings.VocabularyOverrides[term] = pair;
         foreach (var (feature, on) in FeatureChoices) settings.FeatureOverrides[feature] = on;

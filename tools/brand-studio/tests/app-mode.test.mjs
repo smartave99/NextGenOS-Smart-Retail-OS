@@ -96,7 +96,7 @@ test('with a window: it is the browser it is told to use, and closing it stops t
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });
 
-test('a browser that ends at once and whose page never appears: the page goes to the usual browser, and the Brand Studio keeps running', { skip, timeout: 60_000 }, async () => {
+test('a browser that ends at once and whose page never appears: the usual web browser is NOT used; a note says what to do, and the Brand Studio stops', { skip, timeout: 60_000 }, async () => {
   const home = mkdtempSync(join(tmpdir(), 'brand-handoff-'));
   const bin = join(home, 'bin'); mkdirSync(bin);
   const standIn = join(bin, 'stand-in-browser'); writeFileSync(standIn, '#!/bin/sh\nexit 0\n'); chmodSync(standIn, 0o755);
@@ -107,8 +107,12 @@ test('a browser that ends at once and whose page never appears: the page goes to
   try {
     const url = await run.url;
     for (let i = 0; i < 80 && !existsSync(join(home, 'opened.txt')); i += 1) await wait(100);
-    assert.equal(readFileSync(join(home, 'opened.txt'), 'utf8').trim(), url);
-    assert.equal(run.child.exitCode, null, 'still running');
+    const opened = readFileSync(join(home, 'opened.txt'), 'utf8').trim();
+    assert.notEqual(opened, url, 'the page was NOT handed to the usual web browser');
+    assert.match(opened, /Brand Studio problem\.txt$/, 'what was opened is the note');
+    assert.match(readFileSync(opened, 'utf8'), /Microsoft Edge, Google Chrome or Chromium/, 'the note says what is missing');
+    for (let i = 0; i < 50 && run.child.exitCode === null; i += 1) await wait(100);
+    assert.notEqual(run.child.exitCode, null, 'the Brand Studio stopped: it has no window to show');
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });
 

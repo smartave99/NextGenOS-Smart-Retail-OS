@@ -134,11 +134,23 @@ try {
   // ---- a damaged profile changes nothing and breaks nothing --------------------------------------------------------------------------
   const broken = makeProfile('broken', { 'theme.json': '{ this is not json', 'brand.json': '[1,2,3]' });
   await run(['--E2E:White=full', `--Hub:ProfileFolder=${broken}`], async (page) => {
-    assert.strictEqual(await attr(page, 'data-density'), 'comfortable');
-    assert.strictEqual(await attr(page, 'data-nav'), 'left');
+    assert.strictEqual(await attr(page, 'data-look'), 'top', 'a damaged profile names no look: the starting look shows');
+    assert.strictEqual(await attr(page, 'data-density'), 'touch');
+    assert.strictEqual(await attr(page, 'data-nav'), 'top');
     assert.match(await page.locator('main h1').innerText(), /Today/);
-    step('a damaged profile file changes nothing and breaks nothing');
+    step('a damaged profile file changes nothing and breaks nothing (the starting look shows)');
   });
+
+  // ---- the customer's profile names the look the shop starts with (the Studio's choice for that client), whatever the licence level ----------------------------------------
+  for (const [look, nav, density] of [['counter', 'left', 'touch'], ['list', 'top', 'comfortable']]) {
+    const named = makeProfile('look-' + look, { 'theme.json': { look } });
+    await run(['--E2E:White=none', `--Hub:ProfileFolder=${named}`], async (page) => {
+      assert.strictEqual(await attr(page, 'data-look'), look);
+      assert.strictEqual(await attr(page, 'data-nav'), nav);
+      assert.strictEqual(await attr(page, 'data-density'), density);
+      step(`a profile that names the "${look}" look makes the shop start in it`);
+    });
+  }
 
   // ---- a dark profile follows until the person chooses -------------------------------------------------------------------------------
   const dark = makeProfile('dark', { 'theme.json': { mode: 'dark' } });

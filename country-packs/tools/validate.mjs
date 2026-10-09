@@ -28,6 +28,21 @@ export function validatePack(pack, fileName) {
     if (![',', '.'].includes(c.decimalSeparator)) bad('"decimalSeparator" must be "." or ","');
     if (typeof c.groupSeparator !== 'string' || c.groupSeparator.length !== 1) bad('"groupSeparator" must be one character');
     if (c.groupSeparator === c.decimalSeparator) bad('the group and decimal separators must differ');
+    if (c.words !== undefined) {
+      const w = c.words;
+      const pair = (x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'string' && v.trim() && v.length <= 30);
+      if (!isObj(w)) bad('currency "words" must be an object');
+      else {
+        if (!pair(w.major)) bad('currency words "major" must be two words: the singular and the plural, like ["rupee", "rupees"]');
+        if (w.minor !== undefined && !pair(w.minor)) bad('currency words "minor" must be two words: the singular and the plural');
+        if (c.decimals > 0 && w.minor === undefined) bad('currency words need "minor" when the currency has decimals');
+        if (w.scales !== undefined && !(Array.isArray(w.scales) && w.scales.length >= 1 && w.scales.length <= 6 && w.scales.every((v) => typeof v === 'string' && v.trim() && v.length <= 30))) bad('currency words "scales" must be a list of one to six names, smallest first, like ["thousand", "lakh", "crore"]');
+        if (c.grouping === 'indian' && !(Array.isArray(w.scales) && w.scales.length >= 3)) bad('currency words need "scales" with at least three names when the grouping is indian');
+        for (const k of ['join', 'ending']) if (w[k] !== undefined && !(typeof w[k] === 'string' && w[k].length <= 30)) bad(`currency words "${k}" must be a short text`);
+        const known = ['major', 'minor', 'scales', 'join', 'ending'];
+        for (const k of Object.keys(w)) if (!known.includes(k)) bad(`currency words: "${k}" is not a known part`);
+      }
+    }
   }
   if (!pack.locale || !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(pack.locale)) bad('"locale" must look like en-IN');
   if (!Array.isArray(pack.languages) || !pack.languages.length) bad('"languages" must list at least one language');

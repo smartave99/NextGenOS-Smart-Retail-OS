@@ -708,11 +708,23 @@ jobs:
           if (Test-Path $note) { throw 'The note that the Studio is running was not removed.' }
           Write-Host 'The Setup Studio opened in a window of its own, ran once, and quit when asked.'
 
+  real-use:
+    # Every file is opened the way a person opens it, on a fresh Windows machine (and the Android app on a phone), with none of the settings the checks above give their programs: the icons,
+    # the one-click setups, the window each one shows, and the icon pressed before the Hub is ready. The owner found files that did not open on a real PC; a release is not published until this
+    # has passed (.github/workflows/real-use-check.yml says what it does and what it cannot show).
+    name: Opened the way a person opens them
+    needs: [gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website]
+    if: ${{ !startsWith(github.ref_name, 'studio-v') }}
+    uses: ./.github/workflows/real-use-check.yml
+    with:
+      release_id: ${{ needs.prepare.outputs.release_id }}
+
   publish:
     name: Publish the GitHub Release
-    needs: [gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website]
-    # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not.
-    if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' }}
+    needs: [gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website, real-use]
+    # The release goes out when the gate passed, even if one of the two builds failed: the person testing gets what was built, and the notes say what was not. It does NOT go out when the files
+    # that were built did not open the way a person opens them (real-use): that is the one thing the person testing cannot be asked to find out.
+    if: ${{ always() && (startsWith(github.ref, 'refs/tags/') || inputs.publish_trial == true) && needs.gate.result == 'success' && needs.prepare.result == 'success' && (needs.real-use.result == 'success' || needs.real-use.result == 'skipped') }}
     runs-on: ubuntu-latest
     env:
       VERSION_NAME: ${{ needs.prepare.outputs.version }}
@@ -735,6 +747,7 @@ jobs:
           STUDIO: ${{ needs.studio.result }}
           STUDIO_WINDOWS: ${{ needs.studio-windows.result }}
           WEBSITE: ${{ needs.website.result }}
+          REAL_USE: ${{ needs.real-use.result }}
           STUDIO_ONLY: ${{ startsWith(github.ref_name, 'studio-v') }}
           TRIAL_WITHOUT_KEYS: ${{ inputs.trial_without_keys || contains(github.ref_name, '-trial') }}
         run: |
@@ -759,6 +772,7 @@ jobs:
               echo "Setup Studio for staff: ${STUDIO}"
               echo "Setup Studio opened on a Windows PC: ${STUDIO_WINDOWS}"
               echo "Website, the same for every customer (Linux and Windows): ${WEBSITE}"
+              echo "Windows files opened from their icons and the Android app opened on a phone (a fresh Windows machine and an emulator): ${REAL_USE}"
             } > dist/BUILD-STATUS.txt
             cp .github/HOW-TO-TRY.txt dist/HOW-TO-TRY.txt
           fi

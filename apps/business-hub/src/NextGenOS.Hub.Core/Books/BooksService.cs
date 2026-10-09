@@ -38,11 +38,13 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         ["stock"] = ("asset", 1200, "Stock on the shelves"),
         ["retention-receivable"] = ("asset", 1150, "Held back by customers"),
         ["supplier-advances"] = ("asset", 1160, "Paid to suppliers in advance"),
+        ["staff-advances"] = ("asset", 1170, "Paid to staff in advance"),
         ["tax-input"] = ("asset", 1300, " paid on purchases"),            // one for each part of the tax: ref = its name
         ["payable"] = ("liability", 2000, "We owe suppliers"),
         ["customer-advances"] = ("liability", 2100, "Customers' money kept for them"),
         ["tips-payable"] = ("liability", 2150, "Tips to hand on"),
         ["retention-payable"] = ("liability", 2160, "Held back from suppliers"),
+        ["commission-payable"] = ("liability", 2300, "Commission to pay"),
         ["tax-output"] = ("liability", 2200, " collected"),                 // one for each part of the tax: ref = its name
         ["opening-balance"] = ("equity", 3000, "Opening balances"),
         ["sales"] = ("income", 4000, "Sales"),
@@ -50,6 +52,8 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         ["purchases"] = ("expense", 5000, "Purchases"),
         ["cogs"] = ("expense", 5100, "Cost of goods sold"),
         ["stock-adjust"] = ("expense", 5200, "Stock lost, damaged or gained"),
+        ["commission"] = ("expense", 5300, "Sales commission"),
+        ["staff-pay"] = ("expense", 5400, "Staff pay"),
         ["suspense"] = ("asset", 9999, "Needs checking"),
     };
 
@@ -174,6 +178,19 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
             HubDb.Exec(c, "INSERT INTO journal_lines(tenant_id, site_id, entry_id, account_id, party_id, debit_minor, credit_minor) VALUES ($t, $s, $e, $a, $p, $d, $cr)", t,
                 ("$t", Tenant), ("$s", Site), ("$e", entry), ("$a", Account(c, t, l.Role, l.Ref)), ("$p", l.Party), ("$d", l.Debit), ("$cr", l.Credit));
         return entry;
+    }
+
+    /// <summary>One line of an entry another part of the program posts: a role of account (and a reference where the role has one), and a debit or a credit.</summary>
+    public readonly record struct EntryLine(string Role, string? Ref, long DebitMinor, long CreditMinor);
+
+    /// <summary>
+    /// Posts an entry for something the Hub records elsewhere (commission earned, commission paid, an advance to a member of staff, a month's pay), inside the caller's transaction. It is posted once for
+    /// each source and its number: asking again does nothing and gives 0. Lines that do not add up are made to, as for a bill.
+    /// </summary>
+    public long PostEntry(SqliteConnection c, SqliteTransaction t, DateTimeOffset at, string source, long sourceId, string memo, long? userId, IReadOnlyList<EntryLine> lines)
+    {
+        if (Exists(c, t, source, sourceId)) return 0;
+        return Post(c, t, at, source, sourceId, memo, userId, lines.Select(l => new Line(l.Role, l.Ref, null, l.DebitMinor, l.CreditMinor)).ToList());
     }
 
     // ---- posting a bill and its payments ------------------------------------------------------------------------------------------
@@ -401,6 +418,105 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
             rows.Where(r => r.Kind == "income").Sum(r => -r.BalanceMinor) - rows.Where(r => r.Kind == "expense").Sum(r => r.BalanceMinor));
     }
 
+    // ---- the day book, and the cash and bank books ----------------------------------------------------------------------------
+
+    /// <summary>One line of an entry in the day book: the account and the side it is on.</summary>
+    public sealed record DayBookLine(string Code, string Name, long DebitMinor, long CreditMinor);
+
+    /// <summary>One entry of the books as it was written: when, what kind of thing it was (in words), what it says, and its lines, which always add up (debits = credits).</summary>
+    public sealed record DayBookEntry(long Id, DateTimeOffset At, string Kind, string Memo, IReadOnlyList<DayBookLine> Lines)
+    {
+        public long TotalMinor => Lines.Sum(l => l.DebitMinor);
+    }
+
+    /// <summary>What an entry's source is called to a person.</summary>
+    private static string SourceName(string source) => source switch
+    {
+        "bill" => "Bill",
+        "void" => "Cancelled bill",
+        "payment" => "Payment",
+        "opening" => "Balance brought across",
+        "stock-move" => "Stock change",
+        "commission" => "Commission earned",
+        "commission-back" => "Commission taken back",
+        "commission-paid" => "Commission paid",
+        "staff-advance" => "Paid to staff in advance",
+        "staff-pay" => "Staff pay",
+        "staff-pay-back" => "Staff pay cancelled",
+        "stock-sale" or "stock-return" or "stock-purchase" or "stock-purchase-return" or "stock-void" => "Cost of stock",
+        _ => "Entry",
+    };
+
+    /// <summary>
+    /// Every entry written in the period, in the order it was written, with its lines (the older POS's day book, study 02). The entries are never changed after they are written; a cancelled bill
+    /// has a second entry that turns the first round. At most <paramref name="limit"/> entries are returned (the earliest of the period).
+    /// </summary>
+    public IReadOnlyList<DayBookEntry> DayBook(DateTimeOffset from, DateTimeOffset to, int limit = 1000)
+    {
+        access.Require(Perm.Reports);
+        var rows = db.Query(
+            "SELECT e.id, e.at, e.source, e.memo, a.code, a.name, l.debit_minor, l.credit_minor FROM journal_entries e JOIN journal_lines l ON l.entry_id = e.id JOIN accounts a ON a.id = l.account_id " +
+            "WHERE e.tenant_id = $t AND e.site_id = $s AND e.id IN (SELECT id FROM journal_entries WHERE tenant_id = $t AND site_id = $s AND at >= $f AND at < $e ORDER BY at, id LIMIT $n) " +
+            "ORDER BY e.at, e.id, l.id",
+            r => (Id: r.GetInt64(0), At: Iso.Parse(r.GetString(1)), Source: r.GetString(2), Memo: r.IsDBNull(3) ? "" : r.GetString(3), Line: new DayBookLine(r.GetString(4), r.GetString(5), r.GetInt64(6), r.GetInt64(7))),
+            ("$t", Tenant), ("$s", Site), ("$f", Iso.Text(from)), ("$e", Iso.Text(to)), ("$n", Math.Max(1, limit)));
+        return rows.GroupBy(x => x.Id).Select(g => new DayBookEntry(g.Key, g.First().At, SourceName(g.First().Source), g.First().Memo, g.Select(x => x.Line).ToList())).ToList();
+    }
+
+    /// <summary>A book of money kept in one place: the till's cash, or one way of being paid that is not cash (a card, a bank transfer). <see cref="Key"/> names it for a screen or a file.</summary>
+    public sealed record MoneyWay(string Key, string Name);
+
+    private const string CashKey = "cash";
+    private const string WayKey = "way:";
+
+    /// <summary>The books of money there are: "Cash", and a book for each other way the shop has been paid in.</summary>
+    public IReadOnlyList<MoneyWay> MoneyWays()
+    {
+        access.Require(Perm.Reports);
+        var ways = new List<MoneyWay> { new(CashKey, "Cash") };
+        ways.AddRange(db.Query("SELECT name, ref FROM accounts WHERE tenant_id = $t AND site_id = $s AND role = 'method' ORDER BY code",
+            r => new MoneyWay(WayKey + r.GetString(1), r.GetString(0)), ("$t", Tenant), ("$s", Site)));
+        return ways;
+    }
+
+    /// <summary>One line of a book of money: money in (debit), money out (credit) and what the book held after it.</summary>
+    public sealed record MoneyRow(DateTimeOffset At, string Memo, long InMinor, long OutMinor, long BalanceMinor);
+
+    /// <summary>A book of money for a period: what it held at the start, every line, and what it held at the end.</summary>
+    public sealed record MoneyBookPage(string Name, long OpeningMinor, IReadOnlyList<MoneyRow> Rows, long ClosingMinor)
+    {
+        public long InMinor => Rows.Sum(r => r.InMinor);
+        public long OutMinor => Rows.Sum(r => r.OutMinor);
+    }
+
+    /// <summary>
+    /// The cash book (<c>"cash"</c>) or the book of one other way of being paid (<c>"way:card"</c>, as listed by <see cref="MoneyWays"/>) for a period, read from the same entries as everything else, so its
+    /// closing figure is the figure of that account in the trial balance. A way nobody has paid by yet has an empty book.
+    /// </summary>
+    public MoneyBookPage MoneyBook(string way, DateTimeOffset from, DateTimeOffset to)
+    {
+        access.Require(Perm.Reports);
+        string role, reference, name;
+        if (way == CashKey) { role = "cash"; reference = ""; name = "Cash"; }
+        else if (way.StartsWith(WayKey, StringComparison.Ordinal) && way.Length > WayKey.Length) { role = "method"; reference = way[WayKey.Length..]; name = RoleInfo["method"].Name + Label(reference); }
+        else throw new HubException("not-found", "That book was not found.");
+        var found = db.Scalar("SELECT id FROM accounts WHERE tenant_id = $t AND site_id = $s AND role = $r AND COALESCE(ref, '') = $f", ("$t", Tenant), ("$s", Site), ("$r", role), ("$f", reference));
+        if (found is not long account) return new MoneyBookPage(name, 0, Array.Empty<MoneyRow>(), 0);
+        var opening = Convert.ToInt64(db.Scalar(
+            "SELECT COALESCE(SUM(l.debit_minor - l.credit_minor), 0) FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id WHERE l.account_id = $a AND e.at < $f", ("$a", account), ("$f", Iso.Text(from))) ?? 0L);
+        var lines = db.Query(
+            "SELECT e.at, e.memo, l.debit_minor, l.credit_minor FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id WHERE l.account_id = $a AND e.at >= $f AND e.at < $e ORDER BY e.at, e.id, l.id",
+            r => (At: Iso.Parse(r.GetString(0)), Memo: r.IsDBNull(1) ? "" : r.GetString(1), In: r.GetInt64(2), Out: r.GetInt64(3)), ("$a", account), ("$f", Iso.Text(from)), ("$e", Iso.Text(to)));
+        var rows = new List<MoneyRow>();
+        var running = opening;
+        foreach (var l in lines)
+        {
+            running += l.In - l.Out;
+            rows.Add(new MoneyRow(l.At, l.Memo, l.In, l.Out, running));
+        }
+        return new MoneyBookPage(name, opening, rows, running);
+    }
+
     public sealed record LedgerRow(DateTimeOffset At, string Memo, long DebitMinor, long CreditMinor, long BalanceMinor);
 
     /// <summary>
@@ -447,4 +563,8 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
 
     /// <summary>What the shop owes the supplier now (negative when the supplier owes the shop).</summary>
     public long SupplierBalance(long partyId) => SupplierLedger(partyId).LastOrDefault()?.BalanceMinor ?? 0;
+
+    /// <summary>The same, read inside a transaction that is changing the books (the limit check of goods being received).</summary>
+    public long SupplierBalance(SqliteConnection c, SqliteTransaction t, long partyId) => Convert.ToInt64(HubDb.Scalar(c,
+        "SELECT COALESCE(SUM(l.credit_minor - l.debit_minor), 0) FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE l.party_id = $p AND a.role IN ('payable', 'supplier-advances')", t, ("$p", partyId)) ?? 0L);
 }

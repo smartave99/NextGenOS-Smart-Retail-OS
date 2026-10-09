@@ -12,7 +12,7 @@
 
 <PageTitle>Settings</PageTitle>
 <h1>Settings</h1>
-<p class="sub">How the shop is set up. Changes apply at once.</p>
+<p class="sub">How the shop is set up. Changes apply at once. <a href="settings/keys" id="till-keys-link">Keys at the till</a></p>
 <Notice Error="@Error" Info="@Info" />
 
 <div class="tabs" role="tablist">
@@ -43,6 +43,11 @@
                 <select id="s-region" @bind="s.Region">@foreach (var r in regions) { <option value="@r.Code">@r.Name</option> }</select>
             }
             <label for="s-foot">Words at the bottom of every bill</label><input id="s-foot" @bind="s.ReceiptFooter" maxlength="160" />
+            <label for="s-layout">How a bill is shown and printed</label>
+            <select id="s-layout" @bind="s.BillLayout"><option value="receipt">Receipt (a narrow slip)</option><option value="a4">Full page, A4</option><option value="a5">Full page, A5</option></select>
+            <p class="muted small">The full page shows every line with its tax, the tax for each rate, the total in words (where your country's data has the words) and a place to sign. Whoever is at the bill can switch for that one bill.</p>
+            <label for="s-terms">Terms and bank details on the full page (optional)</label><textarea id="s-terms" rows="3" @bind="s.InvoiceTerms" maxlength="600"></textarea>
+            <label for="s-sign">Words under the signing line</label><input id="s-sign" @bind="s.InvoiceSignature" maxlength="60" />
             <label for="s-gift">Words printed when a bill earns a gift voucher</label><input id="s-gift" @bind="s.GiftVoucherText" maxlength="240" />
             <p class="muted small">Use {code}, {amount} and {valid}: they are filled in for each voucher.</p>
             <label for="s-pay">Ways of paying (separated by commas)</label><input id="s-pay" @bind="payText" maxlength="200" />
@@ -201,8 +206,8 @@ else if (tab == "look")
         }
     </section>
     <section class="card" id="look-card">
-        <h2>The two looks</h2>
-        <p class="muted">The <strong>list look</strong> is for a PC or laptop. The <strong>counter look</strong> is for a touch screen at the counter. Choose one for the whole shop, or let each screen decide: a touch screen gets the counter look and any other screen gets the list look.</p>
+        <h2>The looks</h2>
+        <p class="muted">The <strong>top menu look</strong> is the one every shop starts with: it works with a finger or a mouse. The <strong>list look</strong> is for a PC or laptop, the <strong>counter look</strong> for a touch screen with the menu down the left. Choose one for the whole shop, or let each screen decide: a touch screen gets the counter look and any other screen gets the list look.</p>
         <div class="look-choices" role="group" aria-label="The look of the shop">
             @foreach (var (id, name, text) in LookChoices)
             {
@@ -215,6 +220,7 @@ else if (tab == "look")
         <p class="muted">This computer can use its own look whatever the shop chose. It is kept in this browser.</p>
         <div class="row">
             <button type="button" class="btn secondary" id="here-shop" data-set-look="">Same as the shop</button>
+            <button type="button" class="btn secondary" id="here-top" data-set-look="top">Top menu look</button>
             <button type="button" class="btn secondary" id="here-list" data-set-look="list">List look</button>
             <button type="button" class="btn secondary" id="here-counter" data-set-look="counter">Counter look</button>
         </div>
@@ -578,7 +584,7 @@ else if (tab == "activity")
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
         layout = Themes.Current;
-        shopLook = ShopLook.Current;
+        shopLook = Themes.ShopLook(ShopLook);
         scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
@@ -656,6 +662,7 @@ else if (tab == "activity")
 
     private static readonly (string Id, string Name, string Text)[] LookChoices =
     [
+        (NextGenOS.Hub.Web.Branding.ShopLooks.Top.Id, NextGenOS.Hub.Web.Branding.ShopLooks.Top.Name, NextGenOS.Hub.Web.Branding.ShopLooks.Top.Text),
         ("standard", "As it was", "The layout you set below, the same on every screen."),
         ("auto", "Each screen decides", "A touch screen gets the counter look, any other screen gets the list look."),
         (NextGenOS.Hub.Web.Branding.ShopLooks.List.Id, NextGenOS.Hub.Web.Branding.ShopLooks.List.Name, NextGenOS.Hub.Web.Branding.ShopLooks.List.Text),
@@ -720,6 +727,9 @@ else if (tab == "activity")
         }
         s.Name = s.Name.Trim();
         s.TaxId = s.TaxId.Trim().ToUpperInvariant();
+        if (s.BillLayout is not ("receipt" or "a4" or "a5")) s.BillLayout = "receipt";
+        s.InvoiceTerms = (s.InvoiceTerms ?? "").Trim();
+        s.InvoiceSignature = (s.InvoiceSignature ?? "").Trim();
         var methods = payText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(m => m.ToLowerInvariant()).Distinct().ToList();
         if (methods.Count == 0) throw new HubException("pay", "Please give at least one way of paying.");
         if (methods.Any(m => m.Length > 20 || m.Any(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '-'))) throw new HubException("pay", "Ways of paying should be short words, like cash, card, upi.");

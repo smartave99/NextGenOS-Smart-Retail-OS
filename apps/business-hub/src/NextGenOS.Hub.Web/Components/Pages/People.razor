@@ -17,6 +17,7 @@
 <div class="toolbar">
     <input class="search" type="search" placeholder="Search by name or phone" aria-label="Search" @bind="text" @bind:event="oninput" @onkeydown="SearchKey" />
     <span class="spacer"></span>
+    <a class="btn ghost" id="people-sheet" href="/people/sheet">Spreadsheet</a>
     <button type="button" class="btn primary" id="add-person" @onclick="NewPerson">Add @Singular(CurrentKind).ToLowerInvariant()</button>
 </div>
 
@@ -81,6 +82,10 @@
                     </select>
                     <label for="p-card">Card barcode (optional, scan it)</label>
                     <input id="p-card" @bind="form.CardBarcode" maxlength="40" autocomplete="off" />
+                }
+                @if (form.Kind == "supplier")
+                {
+                    <div><label for="p-limit">Most you may owe this supplier (empty = no limit)</label><input id="p-limit" inputmode="decimal" @bind="limit" /></div>
                 }
                 @if (Shop.Features.Credit && form.Kind is "customer" or "client")
                 {

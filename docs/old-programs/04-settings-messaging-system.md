@@ -359,6 +359,8 @@ The layouts were not opened. To know exactly which field a given style prints, a
 - **White-label (`CLAUDE.md` section 8):** bill words, terms text, brand name, UPI id and logo must come from the customer's profile; every old report file has the old customer's words and tax-invoice wording inside it, which is why they cannot be copied; templates must be data (a layout plus the customer's text).
 - **Port in this order (smallest safe):** (1) an A4/A5 tax invoice and a 3-inch/80 mm receipt as two HTML templates fed by one **bill data model** (the 33 line columns minus cost and margin, plus the named values; use the old names as the model's field names so the old reports can be compared); (2) the "printer per counter" key and the plain message when no printer fits; (3) MRP/batch/expiry/size/colour on labels once lots exist; (4) credit note and estimate prints with the same model; (5) a list of 3 to 5 invoice styles stored as data (a style = template + fonts + what to show); (6) a label layout designer only if customers ask. Tests: take TV-B1 to TV-B5 as rules; compare the printed totals with the stored document.
 
+**Hub now (9 October 2026):** gap 1 (a full A4/A5 tax invoice with its code and tax columns, the tax by rate and the amount in words) is built (`docs/OPEN-WORK.md` item 12j): one component, `TaxInvoice.razor`, fed by the same stored bill as the receipt; the money's words are in the country pack (`currency.words`, SPEC 4d), not in code. Still open here: gaps 2 (a choice of bill styles), 3, 4 (MRP, size, colour on labels), 5, 6, 7 (credit note, quote, purchase and salary-slip prints other than on screen), 8, 9, 10 (second-copy words). Quotes and credit notes do open in the full-page look (the same component), only their own words differ.
+
 ### B.9 Not understood (topic B)
 
 - The captions of the Enable/Disable print-mode drop-down and of the "B-1/B-2" buttons on the label screen.
@@ -527,6 +529,7 @@ The table is read from the handlers; `frmPOSNewTuch_Quotation`, `_Service`, `_St
 ### D.4 Quirks and probable bugs (keep or fix?)
 
 1. **Keys differ by till** (D.0 item 1). **Fix:** one key map for the Hub's sell screen, shown on the screen, stored as data so a customer can change it (CLAUDE.md section 8: a visible hint like "F2" is customer-visible).
+   **Hub now (9 October 2026):** built (`docs/OPEN-WORK.md` item 12m).
 2. **Settings kept as the words "Yes"/"No"/"Enabled"/"Disable"** and compared with text, in several spellings (C.4 item 8). A typo or a changed word silently turns a setting off. **Fix:** a real on/off value.
 3. **One-row tables enforced by a count check in the screen, not by the table.** Two screens open at once can add two rows; which one wins when reading (`Read` takes the first row returned, with no `ORDER BY`) is not defined. **Fix.**
 4. **Defaults for the shop are India words in code:** "GST", the suffix built from the two year boxes ("25/26" style), the NON GST series "SINV-". **Do not copy;** the Hub gets them from the country pack and the customer's profile.

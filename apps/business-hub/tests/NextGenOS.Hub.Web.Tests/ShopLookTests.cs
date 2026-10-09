@@ -18,6 +18,7 @@ public class ShopLookTests : IDisposable
     }
 
     [Theory]
+    [InlineData("top")]
     [InlineData("list")]
     [InlineData("counter")]
     public void Each_look_is_made_only_of_settings_the_theme_already_accepts(string id)
@@ -40,16 +41,41 @@ public class ShopLookTests : IDisposable
     }
 
     [Fact]
+    public void The_starting_look_is_the_top_menu_one_with_big_buttons_and_the_owner_can_choose_another()
+    {
+        // the owner's choice of 9 October 2026: the horizontal bar, because many counters are touch screens
+        Assert.Equal("top", ShopLooks.Default);
+        Assert.Equal(("top", "touch", "right"), (ShopLooks.Top.Nav, ShopLooks.Top.Density, ShopLooks.Top.Cart));
+        Assert.Equal("top", ShopLooks.Choices[0]);
+        var store = ShopLookStore.Over(app);
+        Assert.Null(store.Chosen);                                              // nobody has chosen
+        Assert.Equal("top", store.Effective(profileLook: null, themeSetsLayout: false));
+    }
+
+    [Fact]
+    public void A_shop_that_already_set_its_own_layout_keeps_it_and_a_profile_can_name_the_look_for_its_customer()
+    {
+        var store = ShopLookStore.Over(app);
+        Assert.Equal("standard", store.Effective(null, themeSetsLayout: true));         // a layout was set before: the shop does not change under its owner
+        Assert.Equal("list", store.Effective("list", themeSetsLayout: false));          // the customer's profile names the look
+        Assert.Equal("list", store.Effective("list", themeSetsLayout: true));
+        Assert.Equal("top", store.Effective("poster", themeSetsLayout: false));         // a word that is not a look is left out
+        store.Save("counter", userId: null);
+        Assert.Equal("counter", store.Effective("list", themeSetsLayout: false));       // the owner's choice wins over the profile
+    }
+
+    [Fact]
     public void A_look_chosen_for_the_shop_is_kept_and_a_wrong_one_means_the_standard_layout()
     {
         var store = ShopLookStore.Over(app);
-        Assert.Equal("standard", store.Current);   // nothing chosen: the layout the shop already has
         store.Save("counter", userId: null);
-        Assert.Equal("counter", ShopLookStore.Over(app).Current);   // read again from the shop's own database
+        Assert.Equal("counter", ShopLookStore.Over(app).Chosen);   // read again from the shop's own database
         store.Save("auto", userId: null);
-        Assert.Equal("auto", store.Current);
+        Assert.Equal("auto", store.Chosen);
+        store.Save("top", userId: null);
+        Assert.Equal("top", store.Chosen);
         store.Save("sideways", userId: null);
-        Assert.Equal("standard", store.Current);
+        Assert.Equal("standard", store.Chosen);
         Assert.Contains(app.Audit.Recent(20), e => e.Detail != null && e.Detail.Contains("look of the shop: counter"));
     }
 
@@ -64,6 +90,7 @@ public class ShopLookTests : IDisposable
     }
 
     [Theory]
+    [InlineData("top")]
     [InlineData("list")]
     [InlineData("counter")]
     public void The_values_the_page_script_applies_are_the_same_as_the_looks_here(string id)

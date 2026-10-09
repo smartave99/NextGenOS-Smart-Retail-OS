@@ -52,6 +52,12 @@ public sealed class OfferInput
     public bool Enabled { get; set; } = true;
 }
 
+/// <summary>A percent off a line of one item when the quantity bought is from <see cref="MinQtyMilli"/> up to <see cref="MaxQtyMilli"/> (no top when null). Quantities in thousandths, the percent in thousandths.</summary>
+public sealed record QtyBand(long Id, long ItemId, long MinQtyMilli, long? MaxQtyMilli, long PctMilli)
+{
+    public bool Covers(long qtyMilli) => qtyMilli >= MinQtyMilli && (MaxQtyMilli is null || qtyMilli <= MaxQtyMilli);
+}
+
 /// <summary>A coupon (made by the shop for a customer) or a gift voucher (earned by a bill).</summary>
 public sealed record Voucher(
     long Id, string Kind, string Code, long AmountMinor, long? PartyId, string? PartyName, DateOnly? ValidFrom, DateOnly? ValidTo, bool Enabled,
@@ -106,6 +112,16 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
     /// </summary>
     public static (long PctMilli, string? Source) ResolveLineDiscount(long customerPctMilli, long itemOfferPctMilli) =>
         customerPctMilli > 0 ? (customerPctMilli, "customer") : itemOfferPctMilli > 0 ? (itemOfferPctMilli, "offer") : (0, null);
+
+    /// <summary>The same with the item's quantity bands: the customer's standing discount first, then the item offer, then the band for the quantity. They never add up.</summary>
+    public static (long PctMilli, string? Source) ResolveLineDiscount(long customerPctMilli, long itemOfferPctMilli, long bandPctMilli) =>
+        customerPctMilli > 0 ? (customerPctMilli, "customer") : itemOfferPctMilli > 0 ? (itemOfferPctMilli, "offer") : bandPctMilli > 0 ? (bandPctMilli, "band") : (0, null);
+
+    /// <summary>
+    /// The percent off for a quantity from an item's bands (study 02, A2.8, QD1 to QD6, with the older program's probable bug fixed): the band the quantity falls in, the largest if bands
+    /// overlap, and <b>nothing</b> when the quantity is in no band. Quantities are in thousandths.
+    /// </summary>
+    public static long BandPctMilli(IEnumerable<QtyBand> bands, long qtyMilli) => bands.Where(b => b.Covers(qtyMilli)).Select(b => b.PctMilli).DefaultIfEmpty(0).Max();
 
     /// <summary>
     /// The free goods for a line that is bought: when at least the minimum is bought, the free quantity for each full minimum, in whole units (buy 3 get 1: buying 7 gives 2; buying 2 gives
@@ -367,6 +383,69 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
         });
     }
 
+    // ---- quantity bands ----------------------------------------------------------------------------------------------------------------------
+
+    private static QtyBand MapBand(SqliteDataReader r) => new(r.Int("id"), r.Int("item_id"), r.Int("min_qty_milli"), r.IntOrNull("max_qty_milli"), r.Int("pct_milli"));
+
+    /// <summary>The quantity bands of an item, smallest quantity first.</summary>
+    public IReadOnlyList<QtyBand> Bands(long itemId)
+    {
+        access.Require(Perm.Discount);
+        return db.Query("SELECT id, item_id, min_qty_milli, max_qty_milli, pct_milli FROM item_qty_bands WHERE item_id = $i ORDER BY min_qty_milli, id", MapBand, ("$i", itemId));
+    }
+
+    /// <summary>
+    /// Adds a band: <paramref name="pctMilli"/> off a line of the item when the quantity is from <paramref name="minQtyMilli"/> up to <paramref name="maxQtyMilli"/> (no top when null). Two bands of
+    /// one item may not cover the same quantity (the older program let them overlap and read them in no order). A bill already being made keeps its discount until the quantity of the line changes.
+    /// </summary>
+    public QtyBand AddBand(long itemId, long minQtyMilli, long? maxQtyMilli, long pctMilli, long? userId = null)
+    {
+        access.Require(Perm.Discount);
+        if (minQtyMilli <= 0) throw new HubException("band-from", "A band starts at a quantity above 0.");
+        if (maxQtyMilli is { } top && top < minQtyMilli) throw new HubException("band-to", "The top of a band cannot be less than its start.");
+        if (pctMilli is <= 0 or > 100_000) throw new HubException("band-percent", "The percent must be above 0 and at most 100.");
+        return db.InTransaction((c, t) =>
+        {
+            var name = HubDb.Scalar(c, "SELECT name FROM items WHERE id = $i", t, ("$i", itemId)) as string ?? throw new HubException("band-item", "That item was not found.");
+            var clash = HubDb.Query(c, "SELECT id, item_id, min_qty_milli, max_qty_milli, pct_milli FROM item_qty_bands WHERE item_id = $i", MapBand, t, ("$i", itemId))
+                .FirstOrDefault(b => b.MinQtyMilli <= (maxQtyMilli ?? long.MaxValue) && minQtyMilli <= (b.MaxQtyMilli ?? long.MaxValue));
+            if (clash is not null) throw new HubException("band-overlap", $"Another band of {name} already covers some of those quantities. Take it away first, or choose quantities it does not cover.");
+            var id = HubDb.Insert(c, "INSERT INTO item_qty_bands(item_id, min_qty_milli, max_qty_milli, pct_milli, created_at) VALUES ($i, $min, $max, $p, $at)", t,
+                ("$i", itemId), ("$min", minQtyMilli), ("$max", maxQtyMilli), ("$p", pctMilli), ("$at", Iso.Text(clock.UtcNow)));
+            audit.Log(c, t, userId, "band-add", "item", itemId, $"{name}: from {minQtyMilli / 1000m:0.###} to {(maxQtyMilli is { } m ? (m / 1000m).ToString("0.###", CultureInfo.InvariantCulture) : "no limit")}, {pctMilli / 1000m:0.###}%");
+            return new QtyBand(id, itemId, minQtyMilli, maxQtyMilli, pctMilli);
+        });
+    }
+
+    /// <summary>Takes a band away. Bills already made keep what it gave them.</summary>
+    public void RemoveBand(long id, long? userId = null)
+    {
+        access.Require(Perm.Discount);
+        db.InTransaction((c, t) =>
+        {
+            var item = HubDb.Query(c, "SELECT item_id FROM item_qty_bands WHERE id = $id", r => r.Int("item_id"), t, ("$id", id));
+            if (item.Count == 0) throw new HubException("not-found", "That band was not found.");
+            HubDb.Exec(c, "DELETE FROM item_qty_bands WHERE id = $id", t, ("$id", id));
+            audit.Log(c, t, userId, "band-remove", "item", item[0], null);
+        });
+    }
+
+    /// <summary>
+    /// The quantity of a line changed: if its discount is one the program gave (the customer's, an offer's, a band's, or none yet) and not one a person typed, it is worked out again for the new
+    /// quantity, so that a band starts and stops giving its discount as the quantity crosses its edges.
+    /// </summary>
+    internal void ReapplyLineDiscount(SqliteConnection c, SqliteTransaction t, long documentId, long lineId)
+    {
+        var bill = LoadBill(c, t, documentId);
+        if (bill is null || !IsSale(bill)) return;
+        var line = HubDb.Query(c,
+            "SELECT item_id, qty_milli FROM document_lines WHERE id = $id AND document_id = $d AND item_id IS NOT NULL AND free_for_line_id IS NULL AND ref_line_id IS NULL " +
+            "AND (discount_source IN ('customer', 'offer', 'band') OR (discount_pct_milli = 0 AND discount_amount_minor = 0))", r => (Item: r.Int("item_id"), Qty: r.Int("qty_milli")), t, ("$id", lineId), ("$d", documentId)).FirstOrDefault();
+        if (line == default) return;
+        var (pct, source) = AutoLineDiscount(c, t, line.Item, bill.PartyId, line.Qty);
+        HubDb.Exec(c, "UPDATE document_lines SET discount_pct_milli = $p, discount_amount_minor = 0, discount_source = $s WHERE id = $id", t, ("$p", pct), ("$s", source), ("$id", lineId));
+    }
+
     // ---- on a bill that is being made --------------------------------------------------------------------------------------------------------
 
     private sealed record Bill(string Type, string Status, string Direction, long? PartyId, bool Declined, long TotalMinor, string? Number);
@@ -377,8 +456,8 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
 
     private static bool IsSale(Bill bill) => bill.Direction == "out" && bill.Type is DocTypes.Invoice or DocTypes.Order or DocTypes.Quote;
 
-    /// <summary>The percent off a new line of an item for a customer: the customer's standing discount, else the best item offer running today, else none.</summary>
-    internal (long PctMilli, string? Source) AutoLineDiscount(SqliteConnection c, SqliteTransaction t, long itemId, long? partyId)
+    /// <summary>The percent off a line of an item, for a customer and a quantity: the customer's standing discount, else the best item offer running today, else the item's quantity band, else none.</summary>
+    internal (long PctMilli, string? Source) AutoLineDiscount(SqliteConnection c, SqliteTransaction t, long itemId, long? partyId, long qtyMilli)
     {
         long customer = 0;
         if (partyId is { } p) customer = Convert.ToInt64(HubDb.Scalar(c, "SELECT CASE WHEN enabled = 1 THEN pct_milli ELSE 0 END FROM party_discounts WHERE party_id = $p", t, ("$p", p)) ?? 0L);
@@ -386,7 +465,8 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
         var offer = Convert.ToInt64(HubDb.Scalar(c,
             "SELECT COALESCE(MAX(pct_milli), 0) FROM offers WHERE kind = 'item-percent' AND item_id = $i AND enabled = 1 AND (valid_from IS NULL OR valid_from <= $d) AND (valid_to IS NULL OR valid_to >= $d)", t,
             ("$i", itemId), ("$d", day)) ?? 0L);
-        return ResolveLineDiscount(customer, offer);
+        var band = customer > 0 || offer > 0 ? 0 : BandPctMilli(HubDb.Query(c, "SELECT id, item_id, min_qty_milli, max_qty_milli, pct_milli FROM item_qty_bands WHERE item_id = $i", MapBand, t, ("$i", itemId)), qtyMilli);
+        return ResolveLineDiscount(customer, offer, band);
     }
 
     /// <summary>
@@ -398,11 +478,11 @@ public sealed class OffersService(HubDb db, ShopContextProvider shop, IClock clo
         var bill = LoadBill(c, t, documentId);
         if (bill is null || !IsSale(bill)) return;
         var lines = HubDb.Query(c,
-            "SELECT id, item_id FROM document_lines WHERE document_id = $d AND item_id IS NOT NULL AND free_for_line_id IS NULL AND ref_line_id IS NULL " +
-            "AND (discount_source IN ('customer', 'offer') OR (discount_pct_milli = 0 AND discount_amount_minor = 0))", r => (Id: r.Int("id"), Item: r.Int("item_id")), t, ("$d", documentId));
-        foreach (var (id, item) in lines)
+            "SELECT id, item_id, qty_milli FROM document_lines WHERE document_id = $d AND item_id IS NOT NULL AND free_for_line_id IS NULL AND ref_line_id IS NULL " +
+            "AND (discount_source IN ('customer', 'offer', 'band') OR (discount_pct_milli = 0 AND discount_amount_minor = 0))", r => (Id: r.Int("id"), Item: r.Int("item_id"), Qty: r.Int("qty_milli")), t, ("$d", documentId));
+        foreach (var (id, item, qty) in lines)
         {
-            var (pct, source) = AutoLineDiscount(c, t, item, partyId);
+            var (pct, source) = AutoLineDiscount(c, t, item, partyId, qty);
             HubDb.Exec(c, "UPDATE document_lines SET discount_pct_milli = $p, discount_amount_minor = 0, discount_source = $s WHERE id = $id", t, ("$p", pct), ("$s", source), ("$id", id));
         }
     }

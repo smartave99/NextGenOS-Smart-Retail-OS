@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import net from 'node:net';
+import { pruneApp } from '../make-website-package.mjs';
 import { fileURLToPath } from 'node:url';
 import { listZip } from '../../tools/setup-studio/lib/zip.mjs';
 import { assembleWebsite } from '../../tools/setup-studio/lib/website-assemble.mjs';
@@ -670,4 +671,23 @@ test('a symbolic link in the build cannot carry a file from outside into the pac
     // The link is followed at the time of copying (the build's own files only): what is in the package is a plain file, never a link.
     assert.ok(!existsSync(copied) || !statSync(copied).isSymbolicLink());
   } finally { clean(b.root); }
+});
+
+test('the protocol-buffer examples and tests with the longest paths are left out of the package; the protocol files a running program loads stay', () => {
+  const root = tmp();
+  try {
+    const gax = 'node_modules/@google-cloud/firestore-api/node_modules/google-gax/build/protos/google/protobuf';
+    put(root, {
+      [`${gax}/compiler/ruby/ruby_generated_pkg_explicit_legacy.proto`]: 'x',
+      [`${gax}/test_protos/repeated_field_proxy_import_message.proto`]: 'x',
+      [`${gax}/any.proto`]: 'needed',
+      [`${gax.replace('google/protobuf', 'google/api')}/http.proto`]: 'needed',
+    });
+    const removed = pruneApp(root, 'windows');
+    assert.ok(!existsSync(join(root, ...`${gax}/compiler`.split('/'))));
+    assert.ok(!existsSync(join(root, ...`${gax}/test_protos`.split('/'))));
+    assert.ok(existsSync(join(root, ...`${gax}/any.proto`.split('/'))), 'a protocol file the running program loads stays');
+    assert.ok(existsSync(join(root, ...`${gax.replace('google/protobuf', 'google/api')}/http.proto`.split('/'))));
+    assert.deepEqual(removed.other, ['protocol-buffer examples and tests']);
+  } finally { clean(root); }
 });

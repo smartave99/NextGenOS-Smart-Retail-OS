@@ -75,7 +75,7 @@ export async function waitUntil(seen, { waitMs = 40_000, pollMs = 250, now = Dat
  *   'stop'           the person closed the window: stop the program.
  *   'handed-off'     it ended at once, but the page itself said it is there (Edge and Chrome hand the page to a copy of themselves that is already running and end): the window is open,
  *                    only it is not ours to watch. Leave it alone, and stop when nobody has used the page for a while. Opening the page again in the usual browser would show it twice.
- *   'show-elsewhere' it could not start, or no page appeared in time: show the page in the PC's usual browser.
+ *   'show-elsewhere' it could not start, or no page appeared in time: there is no window of ours to show. The caller says so in a plain note and stops; it never shows the page in the PC's usual web browser (the owner's rule: our programs open like programs).
  * pageSeen() says whether the page has said it is there since the window was opened.
  */
 export async function whatNextAfterWindow(ended, { pageSeen, waitMs, ...timing }) {

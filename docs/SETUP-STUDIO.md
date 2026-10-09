@@ -12,7 +12,7 @@ The Setup Studio turns what you learn about a customer (their business, country,
 | Linux | Run `./setup-studio.sh` once (the terminal can be closed at once). `./setup-studio.sh --install-menu` puts "NextGenOS Setup Studio" in the applications menu; `./setup-studio.sh --show` runs it in the terminal for finding a problem. |
 | From the repository | `node tools/setup-studio/studio.mjs serve --app` (a window of its own) or `serve --open` (in this terminal, and a tab in your usual browser) |
 
-**It opens as a program of its own: a window with no address bar and no black terminal window behind it.** The window is the PC's own Edge (every Windows 10 and 11 has it), or Chrome or Chromium on Linux, opened in "app" mode with a profile of its own, so it never touches your own browsing. On a PC with none of these it opens in your usual browser, as a tab.
+**It opens as a program of its own: a window with no address bar and no black terminal window behind it.** The window is the PC's own Edge (every Windows 10 and 11 has it), or Chrome or Chromium on Linux, opened in "app" mode with a profile of its own, so it never touches your own browsing. On a PC with none of these it does **not** open in your usual browser: a note opens that says what to install (Microsoft Edge is free), and the Studio stops.
 
 - **One Studio at a time.** Opening it again while it is open brings up its window; it never starts a second Studio on the same files.
 - **To stop it:** close its window, or press the power button at the bottom left of the Studio. A Studio that nobody has had open for ten minutes stops by itself (a sleeping PC is not counted). The page says plainly when the Studio has stopped.
@@ -36,7 +36,7 @@ The person who prepared or sent a set-up **cannot approve it**. An administrator
 ## The journey of one customer
 
 1. **Details**: who they are, country, kind of business, bills and money, their own words, a first list of items or people (pasted from a spreadsheet), and whether they also get a website, an Android app or the AI assistant.
-2. **Look and screens**: colours, logo, style, and the machine (laptop, touch-screen till, tablet, kiosk), with a real picture of the program beside the choices.
+2. **Look and screens**: colours, logo, style, **how the program is laid out** (a card for each look: *Top menu*, the starting choice, one bar along the top with big picture buttons; *List*; *Counter*, the menu down the left; *Each screen decides*; *By machine*, the older way) and the machine (laptop, touch-screen till, tablet, kiosk), with a real picture of the program beside the choices. The choice is written into the customer's `theme.json` as `"look"`; the shop's owner can still choose another look in Settings.
 3. **Prepare**: the Studio makes the set-up from the details and explains it in plain words. An AI tool may improve it (below); you see every change and accept or refuse.
 4. **Review**: a second person checks and approves. Approval makes a **numbered release** that never changes (its files are fingerprinted; the Studio refuses to use one that was altered afterwards).
 5. **Website and app**: if the customer gets a website, a reviewer or administrator presses **Make the website package** and the Studio puts it together **on this PC**, with no internet and no GitHub ("The website package, made on this PC", below). If the customer also gets an Android app, one more button asks the build service to make it and the Studio brings it back (below). The Android app cannot be made on this PC yet.

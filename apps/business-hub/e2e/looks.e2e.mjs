@@ -35,10 +35,20 @@ try {
   await setUp(page, hub, { name: 'Corner Mart', industry: 'retail', demo: true });
   await signIn(page, hub);
 
-  // ---- nothing chosen yet: the layout the program always had ---------------------------------------------------------------------------
-  assert.strictEqual(await attr(page, 'data-look'), 'standard');
-  assert.strictEqual(await attr(page, 'data-nav'), 'left');
-  step('with nothing chosen the layout is the one the program always had');
+  // ---- nothing chosen yet: the top menu look (the owner's choice of the starting look: one bar along the top, big buttons, the bill beside the items) -------------------
+  assert.strictEqual(await attr(page, 'data-look'), 'top');
+  assert.strictEqual(await attr(page, 'data-nav'), 'top');
+  assert.strictEqual(await attr(page, 'data-density'), 'touch');
+  assert.strictEqual(await attr(page, 'data-cart'), 'right');
+  const bar = await page.locator('.side').boundingBox();
+  assert.ok(bar.y < 2 && bar.width > 1000 && bar.height < 100, 'the menu is one bar along the top: ' + JSON.stringify(bar));
+  const firstRun = await sellLayout(page);
+  assert.ok(firstRun.cart.x > firstRun.items.x + firstRun.items.width - 4, 'the bill is beside the items');
+  await go(page, 'Settings');
+  await page.getByRole('tab', { name: 'Look' }).click();
+  await page.locator('#look-card').waitFor();
+  assert.strictEqual(await page.locator('#look-top').getAttribute('aria-pressed'), 'true', 'the starting look is shown as the one in force');
+  step('with nothing chosen the program opens in the top menu look: one bar along the top, big buttons, the bill beside the items');
 
   // ---- the owner chooses the counter look for the shop ----------------------------------------------------------------------------------
   await chooseShop(page, 'counter');

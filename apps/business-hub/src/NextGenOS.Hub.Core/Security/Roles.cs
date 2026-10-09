@@ -19,6 +19,8 @@ public static class Perm
     public const string Discount = "discount";
     public const string Settings = "settings";
     public const string Users = "users";
+    /// <summary>The people who work for the shop: commission earners (salespeople, brokers) and what is owed to them, and, later, employees and their pay. Owners and managers.</summary>
+    public const string Staff = "staff";
     /// <summary>Connecting AI services, choosing what they may receive, and reading what they cost. The owner only.</summary>
     public const string Ai = "ai";
     /// <summary>Letting counter PCs connect over the shop's network, pairing them and removing them. The owner only.</summary>
@@ -37,8 +39,8 @@ public static class Roles
 
     private static readonly Dictionary<string, HashSet<string>> Grants = new()
     {
-        [Owner] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount, Perm.Settings, Perm.Users, Perm.Ai, Perm.Network }),
-        [Manager] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount }),
+        [Owner] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount, Perm.Settings, Perm.Users, Perm.Ai, Perm.Network, Perm.Staff }),
+        [Manager] = new(new[] { Perm.Sell, Perm.Orders, Perm.Kitchen, Perm.Loans, Perm.Projects, Perm.Appointments, Perm.Catalog, Perm.Parties, Perm.Stock, Perm.Purchases, Perm.Reports, Perm.Void, Perm.Discount, Perm.Staff }),
         [Cashier] = new(new[] { Perm.Sell, Perm.Orders, Perm.Loans, Perm.Appointments, Perm.Parties }),
         [Kitchen] = new(new[] { Perm.Kitchen }),
         [Librarian] = new(new[] { Perm.Loans, Perm.Parties, Perm.Catalog }),

@@ -1,0 +1,129 @@
+@page "/items/batches"
+@attribute [Authorize(Policy = Perm.Stock)]
+@inherits HubPage
+@using NextGenOS.Hub.Catalog
+
+<PageTitle>Batches and expiry</PageTitle>
+<p><a href="items">&larr; Products</a></p>
+<h1>Batches and expiry</h1>
+<p class="sub">Items that keep batch numbers: what is on the shelf in each batch, and what is out of date or soon will be.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="group" aria-label="Show">
+    <button type="button" id="show-attention" class="@(show == "attention" ? "on" : "")" aria-pressed="@(show == "attention")" @onclick='() => Show("attention")'>Out of date or soon</button>
+    <button type="button" id="show-all" class="@(show == "all" ? "on" : "")" aria-pressed="@(show == "all")" @onclick='() => Show("all")'>Every batch on the shelf</button>
+</div>
+
+<div class="toolbar">
+    @if (show == "attention")
+    {
+        <label for="b-days">Soon means within</label>
+        <select id="b-days" @bind="days" @bind:after="Find">
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+            <option value="180">180 days</option>
+        </select>
+    }
+    else
+    {
+        <input class="search" type="search" placeholder="Search by name or batch number" aria-label="Search" @bind="text" @bind:event="oninput" @onkeydown="SearchKey" />
+    }
+</div>
+
+<div class="card tbl-wrap">
+    @if (rows.Count == 0)
+    {
+        <div class="empty" id="batches-empty">@(show == "attention" ? "Nothing is out of date or about to be." : "No batches yet.")</div>
+    }
+    else
+    {
+        <table class="tbl" id="batches-table">
+            <thead><tr><th>Item</th><th>Batch</th><th>Made</th><th>Expires</th><th class="num">On the shelf</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var b in rows)
+            {
+                var state = b.State(days);
+                <tr data-state="@state">
+                    <td><strong>@b.ItemName</strong></td>
+                    <td>@b.BatchNo</td>
+                    <td>@(b.MfgOn is { } m ? m.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "")</td>
+                    <td>
+                        @(b.ExpOn is { } e ? e.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "")
+                        @if (state == "expired") { <span class="chip warn">Out of date</span> }
+                        else if (state == "soon") { <span class="chip">@b.DaysLeft days left</span> }
+                    </td>
+                    <td class="num">@Qty(b.OnHandMilli) @b.Unit</td>
+                    <td class="right">@if (b.Id > 0) { <button type="button" class="btn ghost small" @onclick="() => Edit(b)" aria-label="Change the dates of batch @b.BatchNo">Dates</button> }</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+<p class="muted small">A batch is out of date on its expiry date. The till never sells an out of date batch and takes the batch that expires first. To write out of date stock off, use <em>Stock</em> on the product and name the batch.</p>
+
+@if (editing is not null)
+{
+    <div class="sheet-back" @onclick="() => editing = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Dates of batch @editing.BatchNo" @onclick:stopPropagation="true">
+            <h2>@editing.ItemName, batch @editing.BatchNo</h2>
+            <Notice Error="@formError" />
+            <div class="field-row">
+                <div><label for="d-mfg">Made on</label><input id="d-mfg" type="date" value="@mfg" @onchange="e => mfg = e.Value?.ToString() ?? string.Empty" /></div>
+                <div><label for="d-exp">Expires on</label><input id="d-exp" type="date" value="@exp" @onchange="e => exp = e.Value?.ToString() ?? string.Empty" /></div>
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => editing = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-dates" @onclick="SaveDates">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string show = "attention";
+    private int days = 30;
+    private string text = "";
+    private IReadOnlyList<BatchInfo> rows = Array.Empty<BatchInfo>();
+    private BatchInfo? editing;
+    private string mfg = "", exp = "", formError = "";
+
+    protected override Task LoadAsync()
+    {
+        Find();
+        return Task.CompletedTask;
+    }
+
+    private void Show(string which)
+    {
+        show = which;
+        Find();
+    }
+
+    private void SearchKey(KeyboardEventArgs e) => Find();
+
+    private void Find() => rows = show == "attention" ? App.Batches.Expiring(days) : App.Batches.Search(string.IsNullOrWhiteSpace(text) ? null : text);
+
+    private void Edit(BatchInfo b)
+    {
+        editing = b;
+        formError = "";
+        mfg = b.MfgOn?.ToString("yyyy-MM-dd") ?? "";
+        exp = b.ExpOn?.ToString("yyyy-MM-dd") ?? "";
+    }
+
+    private void SaveDates()
+    {
+        formError = "";
+        try
+        {
+            if (editing is null) return;
+            App.Batches.SetDates(editing.Id, DateOnly.TryParse(mfg, out var m) ? m : null, DateOnly.TryParse(exp, out var e) ? e : null, Me.Id);
+            editing = null;
+            Find();
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+}

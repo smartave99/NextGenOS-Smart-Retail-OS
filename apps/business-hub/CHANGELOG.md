@@ -4,6 +4,73 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### A new starting look: one bar along the top
+- **The program now opens with one bar along the top**: the name, the menu as big pictures with the words under them, then who is signed in, a light/dark switch and Sign out. Buttons are big enough for a finger, and on the sell screen the items and the bill sit side by side. On a wide screen the shop's name shows in the bar too. It works with a finger or a mouse. **A shop that had already set its own layout keeps it**, and *Settings → Look* still lets the owner choose the list look, the counter look (menu down the left), each screen deciding, or the old layout ("As it was").
+- **A customer's folder can name the look** the shop starts with (`theme.json`, `"look"`); the Setup Studio's page *Look* has a card for each, with a live picture.
+- The bill's buttons (Print, Receipt, Full page, Take something back, Cancel) have small pictures.
+### The most you may owe a supplier
+- **A limit on each supplier** (*People → Suppliers → the supplier*, "Most you may owe this supplier"; empty means no limit). When goods arrive, what you would then owe that supplier (what you owe now plus this bill) may not be more than the limit; exactly the limit is allowed. If it would be more, the goods are not received and the screen says what would be owed and what the limit is. Pay what is due first, or raise the limit.
+### The bill as a full page
+- **A bill can be shown, and printed, as a full A4 or A5 page** (the buttons above a bill: *Receipt*, *Full page A4*, *Full page A5*; **Settings → Business → How a bill is shown and printed** chooses the starting look for every bill). The page has the shop and the buyer, every line with its code and each tax part, the tax for each rate, the total, a line with the total written in words where your country's data has the money's words (India's does: "One hundred eighteen rupees only"), the terms and bank details you typed in Settings, and a signing line. The narrow receipt is still the starting look.
+### Pictures of products
+- **On a product, add up to four pictures** (PNG, JPEG, WebP or GIF, up to 400 KB each). The first one shows on the till's tile for that product. A file that is not a picture is refused, whatever its name says. The pictures are kept with your shop's data, so a backup carries them.
+
+### Keys at the till, and quick groups
+- **Keys at the till:** the sell screen shows its keys (starting with F2 to scan, F4 for the customer, F6 for the cash drawer, F8 for the amount received and F12 to complete the sale). **Settings → Keys at the till** lets you choose your own for each (a function key, or Ctrl or Alt with a letter or number; a key can do only one thing).
+- **Products → Quick groups:** make a group such as "Breakfast" (1 bread, 2 milk). One press at the till, or one scan of the group's own barcode, adds every item at its own price. A group has no price of its own.
+
+### Customers and suppliers in a spreadsheet
+- **People → Spreadsheet:** send your customers and suppliers to a spreadsheet, change them there and bring the file back, or fill in an empty sheet to bring in a whole list. You see exactly what would be added and changed (and every wrong row, with its row number) before anything is written; a copy of your shop's data is made first. A person who is there is found by phone number, then by name. **Balance** (what a new customer owes you, or what you owe a new supplier) goes into your books as an opening balance.
+
+### Selling loose from a box
+- On a product, choose **Sold loose from** another product (a box or a pack) and say how many are in one. When a sale needs more pieces than are on the shelf, **whole boxes are opened by themselves**: the boxes go down, the pieces go up, and each piece costs its share of the box. You can also open a box yourself from the product's *Stock*. Stock of both stays exact, with no fractions of a box. (The older POS divided the quantity at the till, which left fractions in stock.)
+
+### More reports (Reports → More reports)
+- **Bills:** every bill and return of the days you choose, with a column for each way it was paid, what is still owed, what the goods cost and what the bill earned. Choose one cashier to see only their bills. A return is a line of its own, below nothing.
+- **Profit by product:** what each product sold for (before tax, after discounts), what it cost and what is left. **Most and least sold:** by how many were sold, with goods brought back taken off. **Bought:** the purchases (and goods sent back) with the tax and what is still to be paid. **One product's sales:** every line it was sold on, with the price before discount and tax. **Out of stock:** what has nothing on the shelf.
+- Each of these (except one product's sales) downloads as a file for a spreadsheet.
+
+### Batch numbers and expiry dates
+- **Medicines and food:** on a product, choose **Keep batch numbers and expiry dates**. When goods arrive, the Hub asks for the **batch number and dates** from the pack (and says so in plain words if the number is missing); a count or damage names the batch too.
+- **The till sells the batch that expires first, and never one that is out of date** (a batch is out of date on its expiry date). The bill says which batches the goods came from. Goods that are brought back go into the batch they came out of; cancelling a sale puts every batch back.
+- **Products → Batches and expiry** lists what is out of date or soon will be (30, 60, 90 or 180 days), and every batch on the shelf; a date typed wrong can be corrected. Out of date stock can be written off from the product's *Stock*.
+- Stock values and the average cost are worked out exactly as before; batches only share them out.
+
+### Employees and their pay
+- **A new screen, Employees** (owners and managers): add the people who work for you with their monthly pay and usual hours. **Days:** write down who was present or absent each day, with the time they came and left if you want overtime counted. **Pay in advance:** give someone money before payday and see what is still to be paid back. **Monthly pay:** choose the person and the days, give the overtime pay for an hour if any, and take part of an advance out of the pay; you see exactly what will be paid out before you pay. Each payment is a **pay slip** you can read and print.
+- **A month's pay is divided by the days of that month** (or by a number you choose, such as 26 or 30, under *Pay rules*). Leaving early does not take pay away unless you turn that on. A slip can cover a single day. **The days on a slip cannot be changed**; a slip made by mistake is cancelled (it stays on record) and the advance paid back out of it is owed again. The books show *Staff pay* and *Paid to staff in advance*.
+- There are no fines, provident fund, insurance or tax deductions yet (the older POS had none); they will come as rules of the country.
+
+### Salespeople and brokers, and their commission
+- **A new screen, Staff** (owners and managers): add the salespeople who sell for you and the brokers who bring you customers. At the till, **name the salesperson and the broker on the sale** (a broker's commission is a percent or an amount you type for that sale).
+- **The commission is worked out from the bill before tax, after every discount,** so the same goods earn the same whether your prices include tax or not. It is written when the sale is made, with the percent of that moment. **Goods that are brought back take back only their share of the commission;** a cancelled sale takes all of it back. (The older POS took back the whole line's, and had two commission methods that never met.)
+- **Owed and paid:** each person has an account, line by line, with what you owe them after each line. Record a payment in cash or another way you take money; paying more than was earned is allowed and tells you so. **Summary:** for any days you choose, who earned what and what is still owed. The books show *Sales commission* as a cost and *Commission to pay* as a debt.
+
+### Labels for many items
+- **Products → Change many at once → Labels:** choose items, say how many labels of each, and print them in one go on your label printer. On a received purchase, **Print labels for what came** fills in one label for each unit that arrived.
+
+### Items in a spreadsheet, and discounts by quantity
+- **Products → Spreadsheet:** send all your items to a spreadsheet, change them there and bring the file back, or fill in an empty sheet to bring in a whole list at once. You see exactly what would be added and changed (and every row that is wrong, with its row number) before anything is written; a copy of your shop's data is made first. An item that is there is found by its barcode, then its SKU, then its name; a column left empty leaves that field as it is. Opening stock is counted for new items.
+- **Offers → By quantity:** set a percent off for an item by how many are bought (for example 5 to 9 give 5%, 10 or more give 10%). The till gives it by itself and works it out again when the quantity changes; a discount you typed is left alone. A quantity in no band gets no discount.
+
+### Change many items at once
+- **Products → Change many at once:** choose items, then raise or lower their price by a percent or an amount (rounded to a step you choose), type a new price beside each item, change the trade price, move items from one tax rate to another (only items that have exactly the old rate are touched), or take them off and back on sale. **You see exactly what would change before anything is saved**; bills already made are never changed.
+- **Every change is kept** (who, when, and what each item was and became) and **a change can be taken back** while the items are still as it left them. (From the older POS's bulk price and bulk tax change, which had no record and no undo.)
+
+### The setup checks the PC first
+- **Before it installs, the Hub setup checks, and says in plain words what is wrong and what to do:** Windows 10 (version 1809) or later, 1 GB of free room on the drive, Microsoft Edge or Google Chrome on the PC, and that nothing else on the PC already uses the Hub's place (port 5280). If another program holds it, the setup stops and installs nothing, instead of leaving a Hub that cannot start with no word of why.
+- **After it installs, the setup says so if the program file was removed (an anti-virus program that does not know it yet) or if Windows could not start the Hub,** with the steps to take, instead of finishing as if all was well.
+
+### Opens in a window of its own, never in the web browser
+- **The setup's "Open Smart Retail POS now" button and the icons open the program in a window of its own** (no address bar), not in your usual web browser. Press the icon before the program is ready (right after the PC starts, or right after the setup) and a small "Smart Retail POS is starting" window shows; the program opens by itself when it is ready. It no longer shows "This site can't be reached". A till opens full screen the same way. If a PC has no Microsoft Edge or Google Chrome, it says so and what to install; it never falls back to the browser.
+- The same rule now holds for the Setup Studio, the Brand Studio and the Linux menu entry. The Linux package asks for Chromium (Firefox cannot show a window of its own).
+- The example Android app shows its own sample page instead of an "offline" page.
+
+### Stock in and out, the day book and the cash book
+- **Reports, "Stock coming in and going out":** for each item that moved in the days you choose, what was on the shelf before, what came in, what went out (sales, goods sent back, damage, a count that found less) and what is left; press a name to see every move with its reason and what it was worth. It downloads as a file for a spreadsheet. (From the older POS's stock movement report; unlike the older one, damage and counts are included, so the figures always agree with the stock.)
+- **Books, "Day book":** everything the books wrote down, in the order it was written, entry by entry. **"Cash and bank":** the money the till (or a card, or a bank) took and gave back, line by line, with the figure at the start and at the end. Both download as files.
+- **Fixed:** on the Products screen, taking stock off with a minus ("-3", as the screen says) was refused with "Please type a number". Damaged or expired goods, and a count that found fewer, could not be recorded from there.
+
 ### Goods sent back to a supplier
 - **A received purchase has a new button, *Send goods back*.** Type how many of each go back and why. The goods leave the stock at what they cost, the tax paid on them is taken back, and what you owe the supplier goes down by the total of the new **debit note** (numbered `DN-...`, printed and listed like the other documents). The credit is first put against what is still unpaid on that purchase; if the purchase was already paid, you choose whether the supplier **pays the money back now** or it **stays as credit with the supplier**.
 - You cannot send back more than you received (counting what already went back), and a shop that does not allow negative stock cannot send back what it no longer has. A purchase that was sent back cannot be cancelled, and a return cannot be cancelled.

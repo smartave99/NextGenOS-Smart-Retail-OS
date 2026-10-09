@@ -2,7 +2,7 @@
 // Hub in the background and opens it in a window of its own; a helper with a window for finding a problem; and a read-me that says the setup is the normal way.
 // The setup (SmartRetailHub.nsi) does not carry these: it installs the Hub as a Windows service and puts the window shortcuts in the Start menu and on the desktop.
 // The Hub is a background program of the shop: closing its window does NOT stop it (section 10 names it as the one kind that keeps running on purpose).
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildLauncher, findMakensis } from '../../../scripts/lib/build-launcher.mjs';
 import { repo } from './common.mjs';
@@ -13,6 +13,9 @@ export const HUB_PROGRAM = 'NextGenOS.Hub.exe';
 export const LAUNCHER_FILE = 'Start Business Hub.exe';
 export const PROBLEM_HELPER = 'Start Business Hub (with a window, for problems)';
 export const README_FILE = 'READ ME FIRST.txt';
+/** The two small programs the SETUP puts beside the Hub (the Hub is a Windows service there): they wait until it answers and then open its window, normal or full screen. */
+export const OPENER_FILE = 'Open Smart Retail POS.exe';
+export const OPENER_FULL_FILE = 'Open Smart Retail POS (full screen).exe';
 
 const crlf = (lines) => lines.join('\r\n') + '\r\n';
 
@@ -84,4 +87,33 @@ export function addZipLauncher(folder, { version, makensis = findMakensis() } = 
   manifest.launchers = [...new Set([...(manifest.launchers ?? []), LAUNCHER_FILE])];
   writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
   return [LAUNCHER_FILE, `${PROBLEM_HELPER}.bat`, README_FILE];
+}
+
+/**
+ * The setup's two launchers, put into the folder before the setup is written. Unlike the zip's launcher they never start the Hub (Windows starts it, as a service, a minute or two after
+ * the PC starts; a second copy started by a person would run without the service's rights to the shop's data): they show a small "starting" window until the Hub answers, then open its
+ * window of its own (never the usual web browser). Returns the names written.
+ */
+export function addServiceLaunchers(folder, { version, makensis = findMakensis() } = {}) {
+  if (!/^\d+\.\d+\.\d+$/.test(String(version ?? ''))) throw new Error('Say the version as three numbers, like 1.0.0.');
+  if (!existsSync(join(folder, HUB_PROGRAM))) throw new Error(`${HUB_PROGRAM} is not in ${folder}: the launcher has nothing to wait for.`);
+  const manifestFile = join(folder, 'prerequisites.json');
+  if (!existsSync(manifestFile)) throw new Error('prerequisites.json is missing: write it before adding the launchers.');
+  const common = { name: 'Smart Retail POS', program: HUB_PROGRAM, check: HUB_PROGRAM, version, icon: join(repo, 'scripts', 'launcher', 'product.ico'), makensis };
+  const open = { url: HUB_ADDRESS, waitSeconds: 180, profile: 'smart-retail-pos-window', waitOnly: true, startingText: 'Smart Retail POS is starting.' };
+  buildLauncher({ ...common, outFile: join(folder, OPENER_FILE), open });
+  buildLauncher({ ...common, outFile: join(folder, OPENER_FULL_FILE), open: { ...open, kiosk: true } });
+  const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
+  manifest.launchers = [...new Set([...(manifest.launchers ?? []), OPENER_FILE, OPENER_FULL_FILE])];
+  writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
+  return [OPENER_FILE, OPENER_FULL_FILE];
+}
+
+/** Takes the setup's two launchers out again (the zip has its own launcher and must not carry them). */
+export function removeServiceLaunchers(folder) {
+  for (const f of [OPENER_FILE, OPENER_FULL_FILE]) rmSync(join(folder, f), { force: true });
+  const manifestFile = join(folder, 'prerequisites.json');
+  const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
+  manifest.launchers = (manifest.launchers ?? []).filter((f) => f !== OPENER_FILE && f !== OPENER_FULL_FILE);
+  writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
 }

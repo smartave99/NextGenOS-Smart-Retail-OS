@@ -613,7 +613,9 @@ Method 2 (touch till; percent per batch):
 
 ### B1.7 What the Hub has today
 
-Nothing for salespeople (no commission, no ledger of a person, no salesman on a document: `documents` has the cashier `user_id`, not a salesperson; the Hub map section 6.3 lists "staff" as a new master). The Hub's `audit_log`, `users` and roles are for sign-in, not for commission. The engine and `DocumentService` keep the data a Method 1 or Method 2 port needs (line taxable and discount per line in the stored `result`), so the base can be the **line taxable value after discount**, which is the corrected rule above. Porting needs: a `salespeople` master, `document.salesperson_id`, a `commission` rule (percent on master, on item, or on batch), a person ledger table (with `tenant_id`, `site_id`), payments to a person, and the reports.
+**Hub now (9 October 2026, staff part 1, `Staff/EarnerService.cs`, `EarnerTests`).** Built: the salesperson master (name, phone, email, address, a percent, on or off; a salesperson cannot be a broker; one phone number per person), the person named on a sale at the till, commission as a percent of the bill's **taxable value after every discount** (the corrected rule above, so Method 1 and Method 2 become one), written when the bill becomes final with the percent of that moment, taken back **in proportion** when goods are brought back (quirk fixed) and in full when the bill is cancelled, one account for each person with the balance after each line, payments to a person (more than owed allowed, with a warning), the books (Sales commission as a cost, Commission to pay as a debt) and a summary for a period. Tests M1 to M8, K1 to K10 and L1 to L6 are in `EarnerTests` where they apply. Not built: the commission per stock batch (Method 2, dropped), a commission per item, a printed statement.
+
+(Before this: nothing for salespeople (no commission, no ledger of a person, no salesman on a document: `documents` has the cashier `user_id`, not a salesperson; the Hub map section 6.3 lists "staff" as a new master). The Hub's `audit_log`, `users` and roles are for sign-in, not for commission. The engine and `DocumentService` keep the data a Method 1 or Method 2 port needs (line taxable and discount per line in the stored `result`), so the base can be the **line taxable value after discount**, which is the corrected rule above. Porting needs: a `salespeople` master, `document.salesperson_id`, a `commission` rule (percent on master, on item, or on batch), a person ledger table (with `tenant_id`, `site_id`), payments to a person, and the reports.
 
 ## B2. Broker, transport and route
 
@@ -671,7 +673,9 @@ Let `G = txtGrandTotal` of the bill (after round-off, so it includes freight and
 
 ### B2.6 What the Hub has today
 
-Nothing: no broker, transporter or route master, no commission. The Hub's `parties.kind` field is the only existing party typing (customer, supplier); a broker and a transporter would be new party kinds or new masters (`06-hub-map.md` recipe 6.3). The Hub's documents carry no remarks drop-down fed by transporters.
+**Hub now (9 October 2026, staff part 1).** Built: the broker master (the same screen as salespeople), the broker named on a sale with a percent of the taxable value or of the whole total, or an amount typed for the bill (one of the two), commission written when the bill becomes final, taken back with returns and cancellations, an account and payments as for a salesperson, the summary. Not built: transporter and route masters, the transporter's remark on a bill.
+
+(Before this: nothing: no broker, transporter or route master, no commission. The Hub's `parties.kind` field is the only existing party typing (customer, supplier); a broker and a transporter would be new party kinds or new masters (`06-hub-map.md` recipe 6.3). The Hub's documents carry no remarks drop-down fed by transporters.
 
 ## B3. Employees, attendance, salary slips, advances, employee payments
 
@@ -747,7 +751,9 @@ Register -> daily attendance -> (any time) advance -> at payday: choose employee
 
 ### B3.7 What the Hub has today
 
-Nothing: no employee master, attendance, payroll, advance or payment of staff (`06-hub-map.md` 6.3 lists "staff" as a new master). The Hub's `users` table is for sign-in and roles only. A port needs new tables (all with `tenant_id` and `site_id`), an India payroll rule set kept as pack data (PF, ESI, professional tax, TDS are **not** in the old code, so there is nothing to port for them), and decisions on the quirks above (the old figures P3, P5 depend on the fixed 30 and on half-to-even rounding, so goldens must say which rounding the port uses; the Hub's half-up rounding would give the same figures for P1 to P7 and P9 and differs only when a result is exactly on a half paisa).
+**Hub now (9 October 2026, staff part 2, `Staff/PayrollService.cs`, `PayrollTests`).** Built: the employee master (no gender, blood group or photo), attendance with times as minutes and the overtime of the day, advances, the pay slip (rules 2 to 9 above with the fixes for quirks 1, 2, 3, 5, 7, 8 and 9: the divisor is a setting, decimal overtime rate, short time off unless the shop turns it on, one-day slips, days on a slip are locked, the advance before and after is shown, one key for an employee), cancelling a slip instead of deleting it, the books (Staff pay, Paid to staff in advance), a printable slip. Tests P1 to P18 are in `PayrollTests` where they apply (P1 to P5 with the divisor set to 30 as the older program had it). Not built: typed deductions and statutory parts (quirk 4), the Crystal layout of the slip, a payroll report.
+
+(Before this: nothing: no employee master, attendance, payroll, advance or payment of staff (`06-hub-map.md` 6.3 lists "staff" as a new master). The Hub's `users` table is for sign-in and roles only. A port needs new tables (all with `tenant_id` and `site_id`), an India payroll rule set kept as pack data (PF, ESI, professional tax, TDS are **not** in the old code, so there is nothing to port for them), and decisions on the quirks above (the old figures P3, P5 depend on the fixed 30 and on half-to-even rounding, so goldens must say which rounding the port uses; the Hub's half-up rounding would give the same figures for P1 to P7 and P9 and differs only when a result is exactly on a half paisa).
 
 ## C. What the Hub has today, porting notes, not understood
 

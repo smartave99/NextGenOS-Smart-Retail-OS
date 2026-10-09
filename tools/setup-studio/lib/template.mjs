@@ -25,10 +25,26 @@ export function deviceTokens(device) {
   }
 }
 
+/** What each look of the shop program is made of (the Hub's ShopLooks, which a test compares with this list). "auto" and "standard" are not bundles: the screen, or the machine, decides. */
+export const LOOK_TOKENS = {
+  top: { density: 'touch', nav: 'top', navLabels: 'full', cart: 'right', fontScale: 1 },
+  list: { density: 'comfortable', nav: 'top', navLabels: 'full', cart: 'bottom', fontScale: 1 },
+  counter: { density: 'touch', nav: 'left', navLabels: 'full', cart: 'right', fontScale: 1.1 },
+};
+
+/** The layout choices a look gives on a machine: its own bundle, a touch machine's counter look or any other's list look for "each screen decides", or the machine's own for "by machine". */
+export function layoutTokens(layout, device) {
+  if (layout === 'standard') return deviceTokens(device);
+  if (layout === 'auto') return LOOK_TOKENS[device.kind === 'laptop' ? 'list' : 'counter'];
+  return LOOK_TOKENS[layout] ?? LOOK_TOKENS.top;
+}
+
 /** The theme file for an intake. Only what differs from the plain defaults is written, so the file stays short and says what was chosen. */
 export function themeFor(intake) {
-  const wanted = { ...STYLES[intake.look.style] ?? STYLES.modern, mode: intake.look.appearance, ...deviceTokens(intake.device) };
-  const theme = {};
+  const layout = intake.look.layout ?? 'top';
+  // The look is named in the file, so the Hub opens in it. Only "by machine" also writes the layout choices of the machine (the older way); every other look carries its own.
+  const wanted = { ...STYLES[intake.look.style] ?? STYLES.modern, mode: intake.look.appearance, ...(layout === 'standard' ? deviceTokens(intake.device) : {}) };
+  const theme = { look: layout };
   for (const [token, value] of Object.entries(wanted)) if (value !== THEME_DEFAULTS[token]) theme[token] = value;
   return theme;
 }
@@ -78,7 +94,9 @@ export function explain(intake, proposal) {
   if (t.navLabels === 'icons') layout.push('the menu as small pictures');
   if (t.cart === 'bottom') layout.push('the basket below the items');
   if (t.fontScale && t.fontScale !== 1) layout.push(`letters ${Math.round((t.fontScale - 1) * 100)}% bigger`);
-  out.push({ part: 'layout', text: `For a ${label(OPTIONS.deviceKinds, intake.device.kind).toLowerCase()} (${label(OPTIONS.screens, intake.device.screen).toLowerCase()} screen): ${layout.length ? layout.join(', ') : 'the standard layout'}.` });
+  const chosenLayout = OPTIONS.layouts.find((x) => x.id === (intake.look.layout ?? 'top'));
+  if (chosenLayout && chosenLayout.id !== 'standard') out.push({ part: 'layout', text: `The program opens in the "${chosenLayout.label}" look: ${chosenLayout.hint}` });
+  else out.push({ part: 'layout', text: `For a ${label(OPTIONS.deviceKinds, intake.device.kind).toLowerCase()} (${label(OPTIONS.screens, intake.device.screen).toLowerCase()} screen): ${layout.length ? layout.join(', ') : 'the standard layout'}.` });
   const s = STYLES[intake.look.style] ?? STYLES.modern;
   out.push({ part: 'look', text: `The "${label(OPTIONS.styles, intake.look.style)}" look: ${s.shape} corners, ${s.surface} background, ${s.font} letters, ${s.depth} shadows, in ${intake.look.primaryColor}${usableColour(intake.look.accentColor) ? ` with ${intake.look.accentColor}` : ''}. Appearance: ${label(OPTIONS.appearances, intake.look.appearance).toLowerCase()}.` });
   const level = intake.licence.whiteLabel;

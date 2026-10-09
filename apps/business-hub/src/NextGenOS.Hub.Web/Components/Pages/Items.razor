@@ -23,6 +23,9 @@
     <span class="spacer"></span>
     @if (Me.Can(Perm.Catalog))
     {
+        @if (!lending) { <a class="btn ghost" id="change-many" href="/items/changes">Change many at once</a> <a class="btn ghost" id="items-sheet" href="/items/sheet">Spreadsheet</a> }
+        @if (Me.Can(Perm.Stock) && !lending) { <a class="btn ghost" id="items-batches" href="/items/batches">Batches and expiry</a> }
+        @if (!lending) { <a class="btn ghost" id="items-groups" href="/items/groups">Quick groups</a> }
         <button type="button" class="btn primary" id="add-item" @onclick="NewItem">Add @Shop.Singular("item").ToLowerInvariant()</button>
     }
 </div>
@@ -149,6 +152,52 @@
                             </div>
                         </div>
                         <label class="check"><input type="checkbox" @bind="track" /> Keep count of how many I have</label>
+                        @if (track && !lending)
+                        {
+                            <label class="check"><input id="f-batches" type="checkbox" @bind="batches" /> Keep batch numbers and expiry dates (medicines, food)</label>
+                        }
+                        @if (track && !lending && !batches)
+                        {
+                            <div class="field-row">
+                                <div>
+                                    <label for="f-pack">Sold loose from (the box or pack it comes out of)</label>
+                                    <select id="f-pack" @bind="packItem">
+                                        <option value="">Not sold loose</option>
+                                        @foreach (var p in packChoices) { <option value="@p.Id">@p.Name</option> }
+                                    </select>
+                                </div>
+                                @if (packItem != "")
+                                {
+                                    <div><label for="f-perpack">How many in one</label><input id="f-perpack" inputmode="decimal" @bind="perPack" placeholder="for example 12" /></div>
+                                }
+                            </div>
+                            @if (packItem != "") { <span class="muted small">When a sale needs more than are on the shelf, whole boxes are opened by themselves and the pieces take their share of the box's cost.</span> }
+                        }
+                    }
+                    @if (!lending)
+                    {
+                        <label>Pictures</label>
+                        @if (editing is null) { <span class="muted small">Save the @Shop.Singular("item").ToLowerInvariant() first, then open it again to add pictures.</span> }
+                        else
+                        {
+                            <div class="thumbs" id="thumbs">
+                                @foreach (var img in images)
+                                {
+                                    <div class="thumb">
+                                        <img src="/item-images/@img.Id" alt="Picture of @editing.Name" />
+                                        <span>
+                                            @if (img.Id != images[0].Id) { <button type="button" class="btn ghost small" @onclick="() => FirstPicture(img)">Show first</button> }
+                                            <button type="button" class="btn ghost small" @onclick="() => TakePicture(img)" aria-label="Take this picture away">Take away</button>
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                            @if (images.Count < NextGenOS.Hub.Catalog.ImageService.MaxPerItem)
+                            {
+                                <InputFile id="f-picture" OnChange="PictureChosen" accept="image/png,image/jpeg,image/webp,image/gif" />
+                                <span class="muted small">A PNG, JPEG, WebP or GIF picture, up to @(NextGenOS.Hub.Catalog.ImageService.MaxBytes / 1024) KB. Up to @NextGenOS.Hub.Catalog.ImageService.MaxPerItem pictures; the first shows on the till.</span>
+                            }
+                        }
                     }
                     @if (App.Loyalty.Enabled && !lending)
                     {
@@ -221,6 +270,14 @@
             <Notice Error="@formError" />
             <label for="s-delta">Add (or take off with a minus)</label>
             <input id="s-delta" inputmode="decimal" @bind="delta" placeholder="for example 20 or -3" />
+            @if (stockItem.TrackBatches)
+            {
+                <label for="s-batch">Batch</label>
+                <input id="s-batch" @bind="stockBatch" maxlength="40" list="batch-list" autocomplete="off" placeholder="the batch number printed on the pack" />
+                <datalist id="batch-list">@foreach (var b in AsMe(() => App.Batches.ForItem(stockItem.Id))) { <option value="@b.BatchNo">@Qty(b.OnHandMilli) @stockItem.Unit@(b.ExpOn is { } ex ? ", expires " + ex.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "")</option> }</datalist>
+                <label for="s-exp">Expires on (for a new batch)</label>
+                <input id="s-exp" type="date" value="@stockExp" @onchange="e => stockExp = e.Value?.ToString() ?? string.Empty" />
+            }
             <label for="s-why">Why</label>
             <select id="s-why" @bind="why">
                 <option value="delivery">Delivery received</option>
@@ -228,6 +285,10 @@
                 <option value="damaged">Damaged or expired</option>
                 <option value="other">Other</option>
             </select>
+            @if (stockItem.PackItemId is not null)
+            {
+                <p class="muted small">Sold loose from a pack. A sale opens a pack by itself when it needs more; you can also open one now. <button type="button" class="btn ghost small" id="open-pack" @onclick="OpenPack">Open a pack</button></p>
+            }
             <div class="row">
                 <button type="button" class="btn secondary" @onclick="() => stockItem = null">Cancel</button>
                 <button type="button" class="btn primary grow" id="save-stock" @onclick="SaveStock">Save</button>
@@ -289,6 +350,7 @@
     private ItemInput? form;
     private Item? editing;
     private Item? stockItem;
+    private string stockBatch = "", stockExp = "";
     private Item? copiesFor;
     private string? formError;
     private string price = "", tradePrice = "", cost = "", reorder = "", delta = "", why = "delivery";
@@ -372,6 +434,10 @@
         copies = 1;
         duration = first?.HasDuration == true ? 30 : null;
         track = first?.TracksStock == true && Shop.Industry.Features.StockTracking == "always";
+        batches = false;
+        packItem = perPack = "";
+        images = Array.Empty<NextGenOS.Hub.Catalog.ItemImage>();
+        ReadPackChoices(null);
     }
 
     private void Edit(Item i)
@@ -389,11 +455,58 @@
         cost = Shop.Text(i.CostMinor);
         reorder = i.ReorderMilli > 0 ? Qty(i.ReorderMilli) : "";
         track = i.TrackStock;
+        batches = i.TrackBatches;
+        packItem = i.PackItemId?.ToString() ?? "";
+        perPack = i.PackItemId is null ? "" : Qty(i.PerPackMilli);
+        ReadPackChoices(i.Id);
+        images = lending ? Array.Empty<NextGenOS.Hub.Catalog.ItemImage>() : App.Images.ForItem(i.Id);
         duration = i.DurationMin;
         author = i.Attrs.GetValueOrDefault("author") ?? "";
         isbn = i.Attrs.GetValueOrDefault("isbn") ?? "";
     }
 
+    private IReadOnlyList<NextGenOS.Hub.Catalog.ItemImage> images = Array.Empty<NextGenOS.Hub.Catalog.ItemImage>();
+
+    private async Task PictureChosen(InputFileChangeEventArgs e)
+    {
+        formError = null;
+        try
+        {
+            if (editing is null) return;
+            var file = e.File;
+            if (file.Size > NextGenOS.Hub.Catalog.ImageService.MaxBytes) throw new HubException("image-big", $"That picture is too big ({file.Size / 1024} KB). Please use one under {NextGenOS.Hub.Catalog.ImageService.MaxBytes / 1024} KB.");
+            using var stream = file.OpenReadStream(NextGenOS.Hub.Catalog.ImageService.MaxBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            using var scope = App.Access.As(() => Me?.Id);
+            App.Images.Add(editing.Id, memory.ToArray(), Me.Id);
+            images = App.Images.ForItem(editing.Id);
+            Find();
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void TakePicture(NextGenOS.Hub.Catalog.ItemImage img)
+    {
+        formError = null;
+        try { App.Images.Remove(img.Id, Me.Id); images = App.Images.ForItem(img.ItemId); Find(); }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void FirstPicture(NextGenOS.Hub.Catalog.ItemImage img)
+    {
+        formError = null;
+        try { App.Images.MakeFirst(img.Id, Me.Id); images = App.Images.ForItem(img.ItemId); }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private bool batches;
+    private string packItem = "", perPack = "";
+    private IReadOnlyList<Item> packChoices = Array.Empty<Item>();
+
+    /// <summary>The items a loose item can be opened from: those that keep count, are not themselves sold loose, and are not the item being changed.</summary>
+    private void ReadPackChoices(long? self) =>
+        packChoices = App.Catalog.Search(null, null, null, 1000).Where(p => p.TrackStock && p.PackItemId is null && p.Id != self).ToList();
     private string loyaltyMode = "", loyaltyValue = "";
     private string itemCode = "", extraTax = "";
 
@@ -426,6 +539,9 @@
                 form.CostMinor = cost.Trim().Length > 0 ? Money(cost, "cost price") : 0;
                 form.ReorderMilli = reorder.Trim().Length > 0 ? QtyOf(reorder) : 0;
                 form.TrackStock = track;
+                form.TrackBatches = track && batches;
+                form.PackItemId = track && !batches && long.TryParse(packItem, out var packId) ? packId : (editing is null ? null : 0);
+                form.PerPackMilli = form.PackItemId is > 0 ? QtyOf(perPack) : null;
                 form.DurationMin = Kind(form.Kind)?.HasDuration == true ? duration : null;
                 if (App.Loyalty.Enabled)
                 {
@@ -481,9 +597,23 @@
     private void OpenStock(Item i)
     {
         stockItem = i;
+        stockBatch = stockExp = "";
         delta = "";
         why = "delivery";
         formError = null;
+    }
+
+    private void OpenPack()
+    {
+        formError = null;
+        try
+        {
+            App.Catalog.OpenPacks(stockItem!.Id, 1, Me.Id);
+            stockItem = null;
+            Find();
+            Info = "A pack was opened.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
     }
 
     private void SaveStock()
@@ -491,9 +621,14 @@
         formError = null;
         try
         {
-            var change = QtyOf(delta.Replace("+", ""));
+            // "Take off with a minus": the number is read without its sign (the shared reader of quantities takes no sign), then the sign is put back.
+            var typed = delta.Trim().Replace("+", "").Trim();
+            var takeOff = typed.StartsWith('-') || typed.StartsWith('−');
+            var change = QtyOf(takeOff ? typed[1..].Trim() : typed);
+            if (takeOff) change = -change;
             if (change == 0) throw new HubException("qty", "Please type how many to add or take off.");
-            App.Catalog.Adjust(stockItem!.Id, change, why, null, Me.Id);
+            DateOnly? exp = DateOnly.TryParse(stockExp, out var expDay) ? expDay : null;
+            App.Catalog.Adjust(stockItem!.Id, change, why, null, Me.Id, string.IsNullOrWhiteSpace(stockBatch) ? null : stockBatch, exp);
             stockItem = null;
             Find();
             Info = "Stock updated.";

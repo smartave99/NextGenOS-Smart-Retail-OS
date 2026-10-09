@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSetup, parseTheme, parseBrand, resolveTheme, scale, usableColour, logoProblem, THEME_DEFAULTS } from '../lib/rules.mjs';
+import { parseSetup, parseTheme, parseBrand, resolveTheme, scale, usableColour, logoProblem, THEME_DEFAULTS, LOOKS } from '../lib/rules.mjs';
+import { previewInput, previewHtml, previewTheme, previewLook } from '../lib/preview.mjs';
+import { repoRoot } from '../lib/packs.mjs';
 import { build as buildVectors } from '../scripts/make-setup-vectors.mjs';
-import { propose, themeFor, deviceTokens, STYLES } from '../lib/template.mjs';
+import { propose, themeFor, deviceTokens, layoutTokens, LOOK_TOKENS, STYLES } from '../lib/template.mjs';
 import { checkIntake, OPTIONS, blankIntake, slugFor } from '../lib/intake.mjs';
 import { countries, industries } from '../lib/packs.mjs';
 import { diffProposals } from '../lib/diff.mjs';
@@ -93,9 +95,10 @@ test('a proposal depends only on the details: the same details give the same fil
 });
 
 test('machines become layouts: touch and kiosk get big buttons, a small laptop gets a tight one, a normal laptop gets nothing special', () => {
-  assert.deepEqual(themeFor(checkIntake({ business: { name: 'A' }, device: { kind: 'laptop', screen: 'standard' } }).value), {});
-  const small = themeFor(checkIntake({ business: { name: 'A' }, device: { kind: 'laptop', screen: 'small' } }).value);
-  assert.deepEqual(small, { density: 'compact', navLabels: 'icons' });
+  // "by machine" is the older way: the machine decides the button size and the menu place
+  assert.deepEqual(themeFor(checkIntake({ business: { name: 'A' }, look: { layout: 'standard' }, device: { kind: 'laptop', screen: 'standard' } }).value), { look: 'standard' });
+  const small = themeFor(checkIntake({ business: { name: 'A' }, look: { layout: 'standard' }, device: { kind: 'laptop', screen: 'small' } }).value);
+  assert.deepEqual(small, { look: 'standard', density: 'compact', navLabels: 'icons' });
   const kiosk = deviceTokens({ kind: 'kiosk', screen: 'standard' });
   assert.equal(kiosk.density, 'touch'); assert.equal(kiosk.nav, 'bottom'); assert.equal(kiosk.fontScale, 1.2);
   const till = deviceTokens({ kind: 'touch-pos', screen: 'standard' });
@@ -147,4 +150,55 @@ test('the difference between two proposals is listed in plain words', () => {
   const d = diffProposals(a, b);
   assert.deepEqual(d.map((x) => x.what).sort(), ['Corner shape', 'The word for "customer"', 'Words at the bottom of a bill'].sort());
   assert.deepEqual(diffProposals(a, a), []);
+});
+
+// ---- the look of the program, chosen per customer (the owner's idea: staff give each client the look they want, in a few clicks) --------------------------------------------------------------
+
+test('a new customer gets the top menu look, written into the theme file by name, and the machine no longer decides the menu', () => {
+  const a = checkIntake({ business: { name: 'A' } }).value;
+  assert.equal(a.look.layout, 'top');
+  assert.deepEqual(themeFor(a), { look: 'top' });
+  const till = checkIntake({ business: { name: 'A' }, device: { kind: 'touch-pos', screen: 'standard' } }).value;
+  assert.deepEqual(themeFor(till), { look: 'top' }, 'a touch till opens in the same look; its machine kind only sets printer and size of the preview');
+  for (const layout of ['top', 'list', 'counter', 'auto', 'standard']) {
+    const theme = themeFor(checkIntake({ business: { name: 'A' }, look: { layout, style: 'classic' } }).value);
+    assert.equal(theme.look, layout);
+    assert.deepEqual(parseTheme(theme).problems, [], layout);
+  }
+  assert.equal(checkIntake({ business: { name: 'A' }, look: { layout: 'poster' } }).value.look.layout, 'top', 'a word that is not a look is replaced by the starting look');
+});
+
+test('a theme file may name a look, and a word that is not a look is left out and said', () => {
+  assert.deepEqual(parseTheme({ look: 'list' }), { value: { look: 'list' }, problems: [] });
+  const bad = parseTheme({ look: 'poster', density: 'touch' });
+  assert.deepEqual(bad.value, { density: 'touch' });
+  assert.match(bad.problems.join(' '), /"look" must be one of/);
+});
+
+test('the looks are the same words in the Studio and in the Hub (the choices, and what each look is made of)', () => {
+  assert.deepEqual(OPTIONS.layouts.map((l) => l.id), LOOKS);
+  const hubDir = join(repoRoot, 'apps', 'business-hub', 'src', 'NextGenOS.Hub.Web');
+  const code = readFileSync(join(hubDir, 'Branding', 'ShopLook.cs'), 'utf8');
+  const choices = /Choices = \[([^\]]*)\]/.exec(code)[1].split(',').map((x) => x.trim().replace(/"/g, ''));
+  assert.deepEqual([...choices].sort(), [...LOOKS].sort());
+  const script = readFileSync(join(hubDir, 'wwwroot', 'theme.js'), 'utf8');
+  for (const id of ['top', 'list', 'counter']) {
+    const m = new RegExp(id + ": \\{ density: '(\\w+)', nav: '(\\w+)', navLabels: '(\\w+)', cart: '(\\w+)', scale: '([\\d.]+)' \\}").exec(script);
+    assert.ok(m, 'theme.js has no values for ' + id);
+    const t = LOOK_TOKENS[id];
+    assert.deepEqual([t.density, t.nav, t.navLabels, t.cart, t.fontScale.toFixed(2)], [m[1], m[2], m[3], m[4], m[5]], id);
+  }
+});
+
+test('"each screen decides" gives a touch machine the counter look and a laptop the list look; the preview follows the choice', () => {
+  assert.equal(layoutTokens('auto', { kind: 'laptop', screen: 'standard' }).cart, 'bottom');
+  assert.equal(layoutTokens('auto', { kind: 'touch-pos', screen: 'standard' }).nav, 'left');
+  assert.equal(layoutTokens('top', { kind: 'kiosk', screen: 'small' }).nav, 'top');
+  for (const layout of ['top', 'list', 'counter']) {
+    const p = previewInput({ name: 'X', layout, kind: 'laptop', level: 'none' });
+    assert.equal(previewTheme(p).nav, LOOK_TOKENS[layout].nav, layout);
+    assert.match(previewHtml(p, { cssHref: '/b.css', logoSrc: null }), new RegExp(`data-look="${layout}"`));
+  }
+  assert.equal(previewLook(previewInput({ layout: 'auto', kind: 'tablet' })), 'counter');
+  assert.equal(previewInput({ layout: 'poster' }).layout, 'top');
 });

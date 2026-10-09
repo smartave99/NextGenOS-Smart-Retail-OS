@@ -20,6 +20,10 @@
         var r = View.ResultFor(line);
         <div>@line.Description</div>
         @if (line.ItemCode is { Length: > 0 } lineCode && Shop.Country.Tax.ItemCode is { } codeRule) { <div class="muted small">@codeRule.Label: @lineCode</div> }
+        @foreach (var b in Batches?.Where(x => x.ItemId == line.ItemId) ?? Enumerable.Empty<NextGenOS.Hub.Catalog.BatchOnBill>())
+        {
+            <div class="muted small batch-line">Batch @b.BatchNo@(b.ExpOn is { } exp ? ", expires " + exp.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "")</div>
+        }
         @if (line.IsFree)
         {
             <div class="r"><span>@Qty(line.QtyMilli) free</span><span>@Shop.Money(0)</span></div>
@@ -87,19 +91,12 @@
     [Parameter] public NextGenOS.Hub.Loyalty.LoyaltyService.Summary? Points { get; set; }
     /// <summary>What offers and codes took off this bill, and the gift voucher it earned; null when there is nothing to say.</summary>
     [Parameter] public NextGenOS.Hub.Offers.DocumentOffers? Offers { get; set; }
+    /// <summary>The batches the goods came from (items that keep batches); null when there is nothing to say.</summary>
+    [Parameter] public IReadOnlyList<NextGenOS.Hub.Catalog.BatchOnBill>? Batches { get; set; }
 
     private static string P(long cent) => (cent / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
-    private string Title => View.Document.Type switch
-    {
-        DocTypes.CreditNote => "Credit note",
-        DocTypes.DebitNote => "Debit note",
-        DocTypes.Quote => "Quote",
-        DocTypes.Purchase => "Purchase order",
-        DocTypes.ProgressBill => "Progress bill",
-        DocTypes.Order => "Order",
-        _ => Shop.Settings.TaxRegistered && !string.IsNullOrWhiteSpace(Shop.Country.Invoice?.Title) ? Shop.Country.Invoice.Title : "Bill",
-    };
+    private string Title => BillTitle.For(View.Document, Shop);
 
     private static string Qty(long milli) => ShopContext.Qty(milli).TrimEnd('0').TrimEnd('.');
 }

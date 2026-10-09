@@ -38,7 +38,8 @@ export function checkOpenAddress(url) {
 /**
  * The makensis -D settings for one launcher, after checking every value (nothing with a quote or a line break in it can reach the script). `program` is the program to start and
  * `check` a file that must be there, both relative to where the launcher will sit; `workdir` is where it runs (also relative); `args` is what it is given (may be empty).
- * `open: { url, waitSeconds, profile, helper }` makes it a launcher of a background program shown in a window (see the top of this file).
+ * `open: { url, waitSeconds, profile, helper }` makes it a launcher of a background program shown in a window (see the top of this file). Add `waitOnly: true` (and `startingText`) when Windows
+ * starts the program itself (a service): the launcher then never starts it, it shows a small "starting" window until the program answers. Add `kiosk: true` to open it full screen.
  */
 export function launcherDefines({ outFile, name, program, args = '', workdir = '.', check = program, icon = null, version = '1.0.0', company = 'NextGenOS', open = null }) {
   for (const [what, value] of Object.entries({ name, program, workdir, check, version, company })) if (typeof value !== 'string' || !value || bad(value)) throw new Error(`The launcher's ${what} is missing or has a quote or a line break in it.`);
@@ -56,6 +57,15 @@ export function launcherDefines({ outFile, name, program, args = '', workdir = '
       if (typeof open.profile !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9 ._-]{0,60}$/.test(open.profile)) throw new Error('The launcher\'s window profile must be a plain folder name (letters, digits, spaces, dots, dashes).');
       defines.push(`-DOPEN_PROFILE=${open.profile}`);
     }
+    // A program that Windows itself starts (a service): the launcher only waits for it and says that it is starting; and, for a touch till, opens it full screen.
+    if (open.waitOnly) {
+      defines.push('-DWAIT_ONLY=1');
+      if (open.startingText !== undefined) {
+        if (typeof open.startingText !== 'string' || !open.startingText || open.startingText.length > 120 || bad(open.startingText)) throw new Error('The launcher\'s "starting" words must be 1 to 120 characters with no quote or line break.');
+        defines.push(`-DSTARTING_TEXT=${open.startingText}`);
+      }
+    } else if (open.startingText !== undefined) throw new Error('The "starting" words belong to a launcher that only waits (waitOnly).');
+    if (open.kiosk) defines.push('-DKIOSK=1');
     if (open.helper !== undefined) {
       if (typeof open.helper !== 'string' || !open.helper || bad(open.helper)) throw new Error('The launcher\'s helper name is missing or has a quote or a line break in it.');
       defines.push(`-DOPEN_HELPER=${open.helper}`);

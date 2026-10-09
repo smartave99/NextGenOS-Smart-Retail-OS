@@ -10,6 +10,7 @@
 
 <div class="tabs" role="tablist">
     <button type="button" role="tab" id="tab-offers" class="@(tab == "offers" ? "on" : "")" aria-selected="@(tab == "offers")" @onclick='() => Pick("offers")'>Offers</button>
+    <button type="button" role="tab" id="tab-bands" class="@(tab == "bands" ? "on" : "")" aria-selected="@(tab == "bands")" @onclick='() => Pick("bands")'>By quantity</button>
     <button type="button" role="tab" id="tab-coupons" class="@(tab == "coupons" ? "on" : "")" aria-selected="@(tab == "coupons")" @onclick='() => Pick("coupons")'>Coupons</button>
     <button type="button" role="tab" id="tab-gifts" class="@(tab == "gifts" ? "on" : "")" aria-selected="@(tab == "gifts")" @onclick='() => Pick("gifts")'>Gift vouchers</button>
 </div>
@@ -45,6 +46,55 @@
                 }
                 </tbody>
             </table>
+        }
+    </div>
+}
+else if (tab == "bands")
+{
+    <div class="card">
+        <h2>Discount by quantity</h2>
+        <p class="muted">The more a customer buys of one @Shop.Singular("item").ToLowerInvariant(), the more comes off that line. A quantity that is in no band gets no discount. The till works it out by itself, and works it out again when the quantity changes; a discount typed by a person is left alone.</p>
+        <label for="band-find">@Shop.Singular("item")</label>
+        <input id="band-find" autocomplete="off" placeholder="Type a name" @bind="bandQuery" @bind:event="oninput" />
+        @if (bandQuery.Trim().Length >= 2)
+        {
+            <div class="chips">
+                @foreach (var item in App.Catalog.Search(bandQuery, null, null, 8))
+                {
+                    <button type="button" class="@(bandItem?.Id == item.Id ? "on" : "")" @onclick="() => PickBandItem(item)">@item.Name</button>
+                }
+            </div>
+        }
+        @if (bandItem is not null)
+        {
+            <h3>@bandItem.Name</h3>
+            @if (bands.Count == 0)
+            {
+                <div class="empty">No bands yet.</div>
+            }
+            else
+            {
+                <table class="tbl" id="bands-table">
+                    <thead><tr><th>From</th><th>Up to</th><th class="num">Percent off</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var b in bands)
+                    {
+                        <tr>
+                            <td>@Qty(b.MinQtyMilli)</td>
+                            <td>@(b.MaxQtyMilli is { } top ? Qty(top) : "no limit")</td>
+                            <td class="num">@Qty(b.PctMilli)%</td>
+                            <td class="right"><button type="button" class="btn ghost small" aria-label="Take this band away" @onclick="() => RemoveBand(b)">Take away</button></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+            <div class="field-row">
+                <div><label for="band-from">From quantity</label><input id="band-from" inputmode="decimal" @bind="bandFrom" /></div>
+                <div><label for="band-to">Up to (empty: no limit)</label><input id="band-to" inputmode="decimal" @bind="bandTo" /></div>
+                <div><label for="band-pct">Percent off</label><input id="band-pct" inputmode="decimal" @bind="bandPct" /></div>
+            </div>
+            <div class="row"><button type="button" class="btn primary" id="add-band" @onclick="AddBand">Add this band</button></div>
         }
     </div>
 }
@@ -181,6 +231,10 @@ else
     private OfferForm? form;
     private string? formError;
 
+    private string bandQuery = "", bandFrom = "", bandTo = "", bandPct = "";
+    private Item? bandItem;
+    private IReadOnlyList<QtyBand> bands = Array.Empty<QtyBand>();
+
     private string couponQuery = "";
     private readonly List<Party> chosen = new();
     private string couponAmount = "";
@@ -291,6 +345,31 @@ else
         App.Offers.DeleteOffer(o.Id, Me.Id);
         offers = App.Offers.Offers();
     }, "The offer was deleted. Bills already made keep what it gave them.");
+
+    // ---- quantity bands -----------------------------------------------------------------------------------------------------------------------
+
+    private void PickBandItem(Item item)
+    {
+        bandItem = item;
+        bandQuery = "";
+        bands = App.Offers.Bands(item.Id);
+    }
+
+    private Task AddBand() => Run(() =>
+    {
+        var from = Milli(bandFrom, "the quantity the band starts at");
+        long? to = string.IsNullOrWhiteSpace(bandTo) ? null : Milli(bandTo, "the quantity the band ends at");
+        var pct = Milli(bandPct, "the percent");
+        App.Offers.AddBand(bandItem!.Id, from, to, pct, Me.Id);
+        bands = App.Offers.Bands(bandItem.Id);
+        bandFrom = bandTo = bandPct = "";
+    }, "The band was added. Lines already on a bill change when their quantity changes.");
+
+    private Task RemoveBand(QtyBand b) => Run(() =>
+    {
+        App.Offers.RemoveBand(b.Id, Me.Id);
+        bands = App.Offers.Bands(b.ItemId);
+    }, "The band was taken away. Bills already made keep what it gave them.");
 
     // ---- coupons ------------------------------------------------------------------------------------------------------------------------------
 

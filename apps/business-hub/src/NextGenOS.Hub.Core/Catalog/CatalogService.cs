@@ -10,12 +10,12 @@ namespace NextGenOS.Hub.Catalog;
 /// <summary>Items (products, menu items, titles, services, materials) and their stock.</summary>
 public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock clock, Access access, BooksService books, NextGenOS.Hub.Events.OutboxService outbox)
 {
-    private const string Columns = "id, kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, active";
+    private const string Columns = "id, kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, active, track_batches, pack_item_id, per_pack_milli";
 
     private static Item Map(SqliteDataReader r) => new(
         r.Int("id"), r.Text("kind"), r.TextOrNull("sku"), r.TextOrNull("barcode"), r.Text("name"), r.TextOrNull("category"), r.Text("unit"), r.Int("price_minor"),
         r.IntOrNull("trade_price_minor"), r.Int("cost_minor"), r.Text("tax_code"), r.Flag("track_stock"), r.Int("reorder_milli"), r.TextOrNull("station"),
-        r.IntOrNull("duration_min") is { } d ? (int)d : null, ParseAttrs(r.Text("attrs")), r.Flag("active"));
+        r.IntOrNull("duration_min") is { } d ? (int)d : null, ParseAttrs(r.Text("attrs")), r.Flag("active"), r.Flag("track_batches"), r.IntOrNull("pack_item_id"), r.Int("per_pack_milli"));
 
     private static IReadOnlyDictionary<string, string> ParseAttrs(string json) =>
         JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
@@ -31,15 +31,18 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
     public long Create(SqliteConnection connection, SqliteTransaction transaction, ItemInput input)
     {
         var (taxCode, track) = Validate(input);
+        if (input.PackItemId is > 0 and var packItem) StockPacks.Validate(connection, transaction, null, input.Name.Trim(), track, track && input.TrackBatches == true, packItem, input.PerPackMilli ?? 0);
         try
         {
-            return HubDb.Insert(connection,
-                "INSERT INTO items(kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, reorder_milli, station, duration_min, attrs, created_at) " +
-                "VALUES ($kind, $sku, $barcode, $name, $category, $unit, $price, $trade, $cost, $tax, $track, $reorder, $station, $dur, $attrs, $at)", transaction,
+            var created = HubDb.Insert(connection,
+                "INSERT INTO items(kind, sku, barcode, name, category, unit, price_minor, trade_price_minor, cost_minor, tax_code, track_stock, track_batches, reorder_milli, station, duration_min, attrs, created_at) " +
+                "VALUES ($kind, $sku, $barcode, $name, $category, $unit, $price, $trade, $cost, $tax, $track, $batches, $reorder, $station, $dur, $attrs, $at)", transaction,
                 ("$kind", input.Kind), ("$sku", Blank(input.Sku)), ("$barcode", Blank(input.Barcode)), ("$name", input.Name.Trim()), ("$category", Blank(input.Category)),
                 ("$unit", string.IsNullOrWhiteSpace(input.Unit) ? "pc" : input.Unit.Trim()), ("$price", input.PriceMinor), ("$trade", input.TradePriceMinor), ("$cost", input.CostMinor),
-                ("$tax", taxCode), ("$track", track ? 1 : 0), ("$reorder", input.ReorderMilli), ("$station", Blank(input.Station)), ("$dur", input.DurationMin),
+                ("$tax", taxCode), ("$track", track ? 1 : 0), ("$batches", track && input.TrackBatches == true ? 1 : 0), ("$reorder", input.ReorderMilli), ("$station", Blank(input.Station)), ("$dur", input.DurationMin),
                 ("$attrs", JsonSerializer.Serialize(input.Attrs)), ("$at", Iso.Text(clock.UtcNow)));
+            if (input.PackItemId is > 0 and var linked) HubDb.Exec(connection, "UPDATE items SET pack_item_id = $p, per_pack_milli = $n WHERE id = $id", transaction, ("$p", linked), ("$n", input.PerPackMilli ?? 0), ("$id", created));
+            return created;
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
         {
@@ -62,18 +65,34 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
     public Item Update(long id, ItemInput input)
     {
         access.Require(Perm.Catalog);
+        db.InTransaction((c, t) => Update(c, t, id, input));
+        return Get(id)!;
+    }
+
+    /// <summary>Changes an item inside the caller's transaction (so that a bigger action, such as bringing items in from a spreadsheet, is all or nothing).</summary>
+    public void Update(SqliteConnection connection, SqliteTransaction transaction, long id, ItemInput input)
+    {
         var (taxCode, track) = Validate(input);
+        var batchesBefore = HubDb.Scalar(connection, "SELECT track_batches FROM items WHERE id = $id", transaction, ("$id", id)) is { } was && Convert.ToInt64(was) != 0;
+        var batchesNow = track && (input.TrackBatches ?? batchesBefore);
+        var link = StockPacks.Link(connection, transaction, id);
+        var (packNow, perPackNow) = input.PackItemId switch { null => link, 0 => ((long?)null, 0L), { } p => (p, input.PerPackMilli ?? link.PerPackMilli) };
+        if (!track) (packNow, perPackNow) = (null, 0);
+        if (batchesNow && HubDb.Scalar(connection, "SELECT 1 FROM items WHERE pack_item_id = $i LIMIT 1", transaction, ("$i", id)) is not null)
+            throw new HubException("pack-batches", "Other items are sold loose from this one, and items that keep batch numbers cannot be sold loose from a pack yet.");
+        if (packNow is { } packId) StockPacks.Validate(connection, transaction, id, input.Name.Trim(), track, batchesNow, packId, perPackNow);
         try
         {
-            var changed = db.InTransaction((c, t) => HubDb.Exec(c,
+            var changed = HubDb.Exec(connection,
                 "UPDATE items SET kind=$kind, sku=$sku, barcode=$barcode, name=$name, category=$category, unit=$unit, price_minor=$price, trade_price_minor=$trade, cost_minor=$cost, " +
-                "tax_code=$tax, track_stock=$track, reorder_milli=$reorder, station=$station, duration_min=$dur, attrs=$attrs WHERE id=$id", t,
+                "tax_code=$tax, track_stock=$track, track_batches=$batches, pack_item_id=$packitem, per_pack_milli=$perpack, reorder_milli=$reorder, station=$station, duration_min=$dur, attrs=$attrs WHERE id=$id", transaction,
+                ("$batches", batchesNow ? 1 : 0), ("$packitem", packNow), ("$perpack", packNow is null ? null : perPackNow),
                 ("$id", id), ("$kind", input.Kind), ("$sku", Blank(input.Sku)), ("$barcode", Blank(input.Barcode)), ("$name", input.Name.Trim()), ("$category", Blank(input.Category)),
                 ("$unit", string.IsNullOrWhiteSpace(input.Unit) ? "pc" : input.Unit.Trim()), ("$price", input.PriceMinor), ("$trade", input.TradePriceMinor), ("$cost", input.CostMinor),
                 ("$tax", taxCode), ("$track", track ? 1 : 0), ("$reorder", input.ReorderMilli), ("$station", Blank(input.Station)), ("$dur", input.DurationMin),
-                ("$attrs", JsonSerializer.Serialize(input.Attrs))));
+                ("$attrs", JsonSerializer.Serialize(input.Attrs)));
             if (changed == 0) throw new HubException("not-found", "That item was not found.");
-            return Get(id)!;
+            if (batchesNow && !batchesBefore) StockBatches.Start(connection, transaction, id, clock.UtcNow);   // what is on the shelf becomes the first batch
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
         {
@@ -119,7 +138,7 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
     /// Changes the stock of an item: a count, damage, a delivery. The reason is kept with who did it. The change is valued (decision 36): stock taken off leaves at the average cost, stock found
     /// by a count joins at the average cost, and a delivery joins at the item's last cost price; the books take it in at once (a loss or a gain, or purchases for a delivery).
     /// </summary>
-    public void Adjust(long itemId, long deltaMilli, string reason, string? note = null, long? userId = null)
+    public void Adjust(long itemId, long deltaMilli, string reason, string? note = null, long? userId = null, string? batchNo = null, DateOnly? expOn = null, DateOnly? mfgOn = null)
     {
         access.Require(Perm.Stock);
         var item = Get(itemId) ?? throw new HubException("not-found", "That item was not found.");
@@ -127,6 +146,22 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
         if (deltaMilli == 0) return;
         db.InTransaction((c, t) =>
         {
+            // An item that keeps batches: the batch is named (a delivery or a count that finds more may make it; a loss, damage or a count that finds less takes from one that is there).
+            long? batchId = null;
+            if (item.TrackBatches)
+            {
+                if (string.IsNullOrWhiteSpace(batchNo)) throw new HubException("batch-no", $"Please say which batch of {item.Name}.");
+                if (deltaMilli > 0) batchId = StockBatches.FindOrCreate(c, t, itemId, batchNo, mfgOn, expOn, clock.UtcNow);
+                else
+                {
+                    var row = HubDb.Query(c, "SELECT b.id, COALESCE((SELECT SUM(qty_milli) FROM stock_moves m WHERE m.batch_id = b.id), 0) FROM item_batches b WHERE b.item_id = $i AND b.batch_no = $n COLLATE NOCASE",
+                        r => (Id: r.GetInt64(0), Held: r.GetInt64(1)), t, ("$i", itemId), ("$n", batchNo.Trim())).FirstOrDefault();
+                    if (row == default) throw new HubException("batch-none", $"{item.Name} has no batch {batchNo.Trim()}.");
+                    if (row.Held + deltaMilli < 0 && !shop.Current.Settings.AllowNegativeStock)
+                        throw new HubException("stock", $"Only {StockBatches.Plain(row.Held)} of {item.Name} is in batch {batchNo.Trim()}.");
+                    batchId = row.Id;
+                }
+            }
             long value;
             if (deltaMilli < 0) value = -StockCost.TakeOut(c, t, itemId, -deltaMilli);
             else
@@ -134,11 +169,27 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
                 var last = StockCost.LastCost(c, t, itemId);
                 value = reason == "delivery" && last > 0 ? StockCost.Worth(deltaMilli, last) : StockCost.BringIn(c, t, itemId, deltaMilli);
             }
-            var move = StockCost.Insert(c, t, itemId, deltaMilli, reason, null, note, clock.UtcNow, userId, value);
+            var move = StockCost.Insert(c, t, itemId, deltaMilli, reason, null, note, clock.UtcNow, userId, value, batchId);
             books.SyncStockMove(c, t, move, userId);
             outbox.Add(c, t, "stock.adjusted", "item", itemId,
                 new Dictionary<string, object?> { ["itemId"] = itemId, ["deltaMilli"] = deltaMilli, ["reason"] = reason, ["valueMinor"] = value, ["moveId"] = move },
                 NextGenOS.Hub.Ai.DataClass.Internal, userId);
+        });
+    }
+
+    /// <summary>Opens packs by hand: the packs the item is sold loose from go down and the pieces go up (a sale does this by itself when it needs more pieces than there are).</summary>
+    public void OpenPacks(long pieceId, int packs, long? userId = null)
+    {
+        access.Require(Perm.Stock);
+        if (packs < 1) throw new HubException("pack-count", "Please say how many packs to open.");
+        var item = Get(pieceId) ?? throw new HubException("not-found", "That item was not found.");
+        if (item.PackItemId is not { } packItem) throw new HubException("not-loose", $"{item.Name} is not sold loose from a pack.");
+        db.InTransaction((c, t) =>
+        {
+            var onShelf = Math.Max(0, Convert.ToInt64(HubDb.Scalar(c, "SELECT COALESCE(SUM(qty_milli), 0) FROM stock_moves WHERE item_id = $i", t, ("$i", packItem)) ?? 0L)) / 1_000;
+            var packName = Get(packItem)?.Name ?? "the pack";
+            if (onShelf < packs) throw new HubException("stock", $"Only {onShelf} of {packName} {(onShelf == 1 ? "is" : "are")} on the shelf.");
+            StockPacks.Open(c, t, pieceId, packItem, item.PerPackMilli, packs, null, "Opened by hand", userId, clock.UtcNow);
         });
     }
 
@@ -160,6 +211,13 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
                 return new StockRow(r.Int("id"), r.Text("name"), r.TextOrNull("category"), r.Text("unit"), onHand, r.Int("reorder_milli"), average, value);
             });
         return lowOnly ? rows.Where(x => x.OnHandMilli <= x.ReorderMilli).ToList() : rows;
+    }
+
+    /// <summary>Why this would be refused as an item, in words, or null when it is fine. Nothing is written.</summary>
+    public string? Problem(ItemInput input)
+    {
+        try { Validate(input); return null; }
+        catch (HubException ex) { return ex.Message; }
     }
 
     // ---- rules ---------------------------------------------------------------------------------------------------------------------

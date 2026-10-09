@@ -483,6 +483,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **Unit buttons** (`frmUnitButton`): a touch pop-up for a scanned barcode with buttons for the main and alternate unit and the default quantity; `calvalue = 1 / Conv * DefQty` is the main-unit quantity of the default quantity (`:303-306`).
 - **Test vectors:** U1 main "Box", alt "Pc", Conv 12, sell 6 Pc: main quantity 0.5 Box, line = 0.5 * price per box, `AltQty` 6. U2 sell 2 Box: main 2, `AltQty` 24. U3 Conv 0 and alternate unit picked: division by zero (guard in the Hub). U4 unit "Kg" is used as sales unit: delete refused. U5 unit "Pc" is only used as an alternate unit: delete is **allowed** (bug).
 - **Hub today:** `Item.Unit` free text and quantities in thousandths (`qty_milli`); no conversion. **Port:** add `alt_unit` + `conv`; do the division with integers in thousandths and round once (decide rounding).
+- **Hub now (9 October 2026):** built the Hub's way, as **two linked items** (the loose item is opened from its box) instead of a conversion, so stock stays exact (`docs/OPEN-WORK.md` item 12p). U1 and the margin example M4 are tests; U3 cannot happen (a pack holds two or more whole pieces).
 
 #### A2.4 Tax rates, tax types, HSN
 
@@ -497,7 +498,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **Barcode creation.** Typed or scanned, or made by the program: `barcode = Company.BCode + (1000 + nextOpeningStockId)` where `nextOpeningStockId` is the highest `Product_OpeningStock.ID` + 1 padded to 4 digits (`B/frmProduct.vb:2977-3008`, `GenerateID1` `:2928-2965`). Made codes are remembered in `GenerateBarcode(Barcode)` and the last one is used for the next (`:6719-6785`). The prefix `Company.BCode` is a setting of the company.
 - **Label printing** (`frmBarcodeLabelPrinting`, `B/frmBarcodeLabelPrinting.vb`): search products by name, category, barcode, part number, HSN, batch, size or colour, or by a purchase invoice number, or by product ids; the list shows product code, name, category, barcode, available quantity, copies (starts at "1"), part no, HSN, MRP, sale price, wholesale price, batch, manufacturing date, expiry date, size, colour, GST % (`CGST + SGST` for stock rows, `CGSTPer + SGSTPer + IGSTPer` for a purchase), purchase invoice number, QR, discount (`:732-995`, grid columns `Designer :219-263`). The person ticks rows, chooses a template, and prints; "No(s) of Copy for All Products" sets one number for all rows. Templates are Crystal files named `BarcodeT1` to `BarcodeT18` and others; the list in the box "Template Type" holds "Standard A4 Size (2 x 1)", "Standard (L) Single (2 x 1)", "TVS Printer Dual (2 x 1)", "Standard Single (1 x 0.5)", "Standard (C) Single (2 x 1)", "Standard Single (1.5x1.5)", "Standard Single (3 x 1.5)" and more; the active one is stored in `BarcodePreview(BarcodeStyleId, BarcodeStyleName, PrintPreviewType, BarcodeStyleImage, is_active)` (`:1027-1200`, `:2235-2245`). Barcode symbol: Code 128 (`Barcode128.rpt`).
 - **Test vectors:** BC1 `BCode` "SA", highest opening-stock id 5: next id text "0006", barcode "SA" + 1006 = "SA1006". BC2 highest id 0: "0001", barcode "SA1001". BC3 copies 3 on two rows: 6 labels. BC4 nothing ticked: "Please select Barcode list". BC5 no template chosen: "Please select Barcode Template".
-- **Hub today:** `Item.Barcode` only; `Printing/` has receipts. **Port:** label printing as a Hub print job (barcode, name, price, copies); label sizes as settings; no Crystal.
+- **Hub today (9 October 2026):** `Item.Barcode`, "Make a number for me" (an in-store EAN-13 not used by any item) and the price label of one item already existed; **built now:** labels for many items (each its own copies) and for a delivery (`HubPrinting.PrintLabelBatchAsync`, `LabelsFor`; BC3 to BC5 are its tests). Not done: the older program's many designs and fields (MRP, batch, dates, size, colour, QR), an A4 sheet for an ordinary printer. **Port:** label printing as a Hub print job (barcode, name, price, copies); label sizes as settings; no Crystal.
 
 #### A2.6 Bulk price change, bulk GST change and bulk edit
 
@@ -507,7 +508,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **Bulk GST change** (`frmProductBulkUpdate_GST`, `UpdatelistdataGST_Rate`, `:2037-2090`). Pick "from GST" X and "to GST" Y (both must be above 0) and optionally an HSN; tick products. For each ticked product the program runs `UPDATE Product SET CGST = Y/2, SGST = Y/2 WHERE CGST = X/2 [AND HSNCode = hsn] AND ProductCode = code`. So a product changes only if its current CGST equals X/2. The message "Total Status Record(s) Updated N" counts **ticked** products, even those the `WHERE` did not match. Nothing is written for `Temp_Stock` or past bills. The "GST" tick box must be on first.
   - Test vectors: GB1 X 12, Y 18, product CGST 6: CGST and SGST become 9. GB2 product CGST 9 (so GST 18): unchanged but counted. GB3 X 12, Y 18, HSN "1234", product HSN "5678": unchanged. GB4 Y empty or 0: refused "To GST value can't be empty or 0."
 - **Bulk edit** (`frmProductBulkUpdate`, `B/frmProductBulkUpdate.vb`): a grid of many products; the person edits cells and the program runs one `UPDATE Product ...` for the changed columns: name, HSN, part no, description, cost, MRP, selling price, wholesale price (column `ReorderPoint`), discount, CGST, SGST, CESS, units, alternate unit, conversion, min stock, store, rack, default quantity, loyalty mode and value (`:1169`), plus `Temp_Stock` prices and `Product_OpeningStock` prices by barcode (`:1170-1171`). Separate buttons switch products active or inactive (`UPDATE Product SET Status = 'Yes'/'No'`, `:1485-1488`), change the description to another language (`:1682`) and set loyalty mode and value (`:1767`). The change-barcode button is `frmChangeBarcode` (rewrites barcodes in all tables as in A2.1). A confirmation "Are you sure to update record" comes first.
-- **Hub today:** none of these. **Port:** one "price list change" action (set, or raise by percent or amount, per category), with a log of old and new price; one "change tax rate" action matching on the old rate (copy rule GB1 to GB4); bulk active/inactive.
+- **Hub today (9 October 2026): BUILT** as `Catalog/CatalogChangeService.cs` and the page *Products → Change many at once*: price by percent or amount or typed beside each item, trade price, tax rate change (BP2 to BP5 and GB1 to GB4 are its tests; only items really changed are counted), on and off sale, a record of every change and an undo. Not done: bulk edit of every other column (name, units, rack ...), the change-barcode tool (the Hub keeps history by item id, so a new barcode needs no rewrite). **Port (done):** one "price list change" action (set, or raise by percent or amount, per category), with a log of old and new price; one "change tax rate" action matching on the old rate (copy rule GB1 to GB4); bulk active/inactive.
 
 #### A2.7 Combo packs
 
@@ -516,6 +517,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **At the till** (`B/frmPOSNewTuch.vb:14123`): choosing a combo shows its member products as tiles with their photo, barcode, retail price (`Temp_Stock.SPrice`), stock and `DefaultQty`. Each member is sold on its own at its own price. **There is no combo price or discount**: a combo is a quick way to add a group of items, not a bundle price.
 - **Test vectors:** CB1 combo "Breakfast" with Bread (default 1) and Milk (default 2): picking it offers both tiles with quantity 1 and 2, each at its own price. CB2 create "Breakfast" twice: second refused. CB3 delete the combo: `ComboPack` row removed (members removed? **not understood**).
 - **Hub today:** none. **Port:** a "quick group" of items with default quantities (low priority); if the owner wants true bundle prices that is new design.
+- **Hub now (9 October 2026):** built as **quick groups** (`docs/OPEN-WORK.md` item 12n); CB1 to CB3 are tests; no bundle price, as the older program had none.
 
 #### A2.8 Quantity discounts (per barcode)
 
@@ -523,7 +525,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 - **Rule at the till** (`B/frmPOSNewTuch.vb:13281-13333`, `16046-16056`): when the quantity changes: take the first band of that barcode with `MinQty <= quantity <= MaxQty` (quantity rounded to 3 places) and use its percent as the line discount. When no band matches, the discount is `MAX(DiscountPur)` over **all** bands of the barcode (not zero); when the barcode has no bands at all it keeps the percent already in the box. Bands may overlap and are read without an order.
 - **Quirk (probable bug).** A quantity outside every band (below the first minimum, or above the last maximum) gets the **largest** discount of the barcode. Fix?: Yes, ask the owner; the likely intent is zero or the product default. Also the band discount **replaces** the percent chosen by the customer discount or item offer rule of A1.9 whenever the quantity box changes (order of events not fully traced).
 - **Test vectors** (bands 1-4: 0 %, 5-9: 5 %, 10-999: 10 %): QD1 quantity 3: 0 %. QD2 quantity 7: 5 %. QD3 quantity 10: 10 %. QD4 quantity 1000: no band, so MAX = 10 %. QD5 quantity 0.5: no band, 10 %. QD6 barcode with no bands: keeps the box value.
-- **Hub today:** none.
+- **Hub today (9 October 2026): BUILT** (`OffersService` bands, *Offers → By quantity*; QD1 to QD6 are its tests). The probable bug is fixed: a quantity in no band gets no discount. A quantity change re-works a program-given discount and never replaces one a person typed.
 
 #### A2.9 Variants, batches and serial numbers
 
@@ -537,6 +539,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 
 - `Product_Join(ProductID, Photo)`: several JPEG blobs per product (`B/frmProduct.vb:7418-7440`); `Category.CPhoto` and `SubCategory.SCPhoto`; the till shows the first image on touch tiles (`Product_Join.Photo` is joined at `B/frmPOSNewTuch.vb:14123`). A product can get images from the web through `DevNet.QImage` ("Online Image Library" link, `frmOnlineImage`, `frmProductImageMaker`, `frmProductImageUpdator`). Limit "Image Limit" per product is a screen setting.
 - **Hub today:** none in Core. **Port:** store images as files with a path column, not blobs; online image search needs the owner's permission (rule 15: nothing leaves the shop unasked).
+- **Hub now (9 October 2026):** built (`docs/OPEN-WORK.md` item 12l), kept in the shop's database rather than as files so that backups carry them; online image search is not ported.
 
 #### A2.11 Porting notes for products
 
@@ -626,6 +629,8 @@ The "purchase type" box on the purchase screen has three values: index 0 = cash 
 **Test vectors A3.3:** SL1 limit 10,000 Yes, previous due 6,000, new bill 5,000 unpaid: balance 11,000 > 10,000, refused. SL2 same, paid 1,000 now: 10,000, allowed (not strictly more). SL3 limit flag No: never refused. SL4 limit 10,000 Yes, previous due 0, bill 12,000 paid in full: balance 0, allowed (the limit applies to what stays unpaid, not to the bill size).
 
 **Hub today:** none for suppliers. **Port:** apply the same check when receiving an order if the owner wants it (feature flag).
+
+**Hub now (9 October 2026):** built (`docs/OPEN-WORK.md` item 12i): the check is made when goods are received (`DocumentService.Issue`, a purchase), reading what is owed from the books (`BooksService.SupplierBalance`), with SL1 to SL4 as tests (`SupplierLimitTests`). A limit of nothing means no limit (the older flag "No"). Not a feature flag: a supplier with no limit is never refused, so a shop that sets none sees no change.
 
 #### A3.4 Supplier payments
 
@@ -1138,6 +1143,8 @@ Rules are in A1.5 and A3.5 (grouping by `CustNameid` / `SuplNameid`, sign rules,
 2. Golden tests: R1 to R8, U1 to U3, F1 to F3, E1 to E3, T1 to T3, G1 to G3, H1 to H3, W1 to W4, plus the book tests in B (P1 to P9, M1 to M5, S1 to S7) and the customer tests in A1.5.
 3. Where the old report has a quirk (stale opening in the stock movement; purchase grand total includes previous due; best sellers ignore returns), the Hub uses the corrected rule, with the old figure kept in the test as a "differs from old on purpose" note.
 4. Cost for profit: store the cost on the document line at issue (Hub change), because the old program's profit depends on it.
+
+**Hub now (9 October 2026, reports wave 3, `docs/OPEN-WORK.md` item 12q).** Built: R6 and R8 (bills with payment columns, cashier filter), F1 to F3 (profit by bill from the stock moves' values), profit by item, E1 to E3 (by quantity, returns taken off: E2 differs on purpose), U1 and U2 (purchase list), the product sales history and the out-of-stock list (T1). Not built: sale type and till filters, Net Sale, D-Sale, the summary 1 to 3 variants, printed layouts.
 
 ### C12. Not understood (reports)
 

@@ -5,7 +5,7 @@
 
 <PageTitle>Reports</PageTitle>
 <h1>Reports</h1>
-<p class="sub">Choose the days you want to look at.</p>
+<p class="sub">Choose the days you want to look at. <a href="reports/more" id="more-reports">More reports</a>: bill by bill, profit, most and least sold, what you bought, what is out of stock.</p>
 <Notice Error="@Error" />
 
 <div class="toolbar">
@@ -128,6 +128,52 @@
         </section>
     }
 
+    @if (Shop.Industry.Features.StockTracking != "never" && !Shop.Features.Lending)
+    {
+        <section class="card" id="r-movement-card">
+            <div class="head"><h2>Stock coming in and going out</h2><a class="btn ghost small" href="export/stock-movement.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+            <p class="muted small">For each @Shop.Singular("item").ToLowerInvariant() that moved in these days: what was on the shelf before, what came in (deliveries, purchases, goods brought back, a count that found more), what went out (sales, goods sent back, damage, a count that found less) and what was left. Press a name to see each move.</p>
+            @if (movement.Count == 0) { <div class="empty">Nothing moved in these days.</div> }
+            else
+            {
+                <div class="tbl-wrap">
+                <table class="tbl" id="r-movement"><thead><tr><th>@Shop.Singular("item")</th><th class="num">Before</th><th class="num">In</th><th class="num">Out</th><th class="num">Left</th></tr></thead>
+                    <tbody>
+                    @foreach (var m in movement.Take(200))
+                    {
+                        <tr>
+                            <td><button type="button" class="link" @onclick="() => OpenCard(m)">@m.Name</button></td>
+                            <td class="num">@Qty(m.OpeningMilli) @m.Unit</td><td class="num">@Qty(m.InMilli)</td><td class="num">@Qty(m.OutMilli)</td><td class="num"><strong>@Qty(m.ClosingMilli) @m.Unit</strong></td>
+                        </tr>
+                    }
+                    </tbody></table>
+                </div>
+                @if (movement.Count > 200) { <p class="muted small">The first 200 are shown. Download the file for all @movement.Count.</p> }
+            }
+            @if (cardFor is not null)
+            {
+                <h3 id="r-card-title">@cardFor.Name: each move</h3>
+                @if (card.Count == 0) { <div class="empty">No moves in these days.</div> }
+                else
+                {
+                    <div class="tbl-wrap">
+                    <table class="tbl" id="r-card"><thead><tr><th>When</th><th>What happened</th><th class="num">Quantity</th><th class="num">Worth</th><th>Note</th></tr></thead>
+                        <tbody>
+                        @foreach (var c in card)
+                        {
+                            <tr>
+                                <td>@When(c.At)</td><td>@Why(c.Reason)@(c.Document is null ? "" : " " + c.Document)</td>
+                                <td class="num">@(c.QtyMilli > 0 ? "+" : "−")@Qty(Math.Abs(c.QtyMilli))</td>
+                                <td class="num">@(c.ValueMinor is { } v ? (v < 0 ? "−" : "") + Money(Math.Abs(v)) : "")</td><td>@c.Note</td>
+                            </tr>
+                        }
+                        </tbody></table>
+                    </div>
+                }
+            }
+        </section>
+    }
+
     @if (Shop.Features.Purchases)
     {
         <section class="card">
@@ -192,6 +238,9 @@
     private IReadOnlyList<AgeingRow> owed = Array.Empty<AgeingRow>();
     private IReadOnlyList<TopCustomer> customers = Array.Empty<TopCustomer>();
     private IReadOnlyList<StockValue> stock = Array.Empty<StockValue>();
+    private IReadOnlyList<StockMovementRow> movement = Array.Empty<StockMovementRow>();
+    private StockMovementRow? cardFor;
+    private IReadOnlyList<StockCardRow> card = Array.Empty<StockCardRow>();
     private (long ReceivedMinor, long UnpaidMinor) purchases;
     private IReadOnlyList<Restaurant.TableTurnover> turnover = Array.Empty<Restaurant.TableTurnover>();
     private IReadOnlyList<Lending.PopularTitle> popular = Array.Empty<Lending.PopularTitle>();
@@ -228,6 +277,29 @@
         if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Read(); }
     }
 
+    private void OpenCard(StockMovementRow row)
+    {
+        cardFor = row;
+        card = App.Reports.StockCard(row.ItemId, from, to);
+    }
+
+    /// <summary>What a stock move was, in words (the reasons the program writes; anything else is shown as it was typed).</summary>
+    private static string Why(string reason) => reason switch
+    {
+        "sale" => "Sold on",
+        "purchase" => "Bought on",
+        "return" => "Brought back by a customer on",
+        "purchase-return" => "Sent back to the supplier on",
+        "void" => "Sale cancelled:",
+        "delivery" => "Delivery received",
+        "count" => "Stock count",
+        "damaged" => "Damaged or expired",
+        "opening stock" => "Opening stock",
+        "other" => "Other",
+        "" => "Move",
+        _ => char.ToUpperInvariant(reason[0]) + reason[1..],
+    };
+
     private void Read()
     {
         var r = App.Reports;
@@ -239,7 +311,12 @@
         payments = r.Payments(from, to);
         if (f.Credit || f.Projects) owed = r.Outstanding();
         if (f.CounterSale || f.Credit) customers = r.TopCustomers(from, to, 10);
-        if (Shop.Industry.Features.StockTracking != "never" && !f.Lending) stock = r.StockValues();
+        if (Shop.Industry.Features.StockTracking != "never" && !f.Lending)
+        {
+            stock = r.StockValues();
+            movement = r.StockMovement(from, to);
+            card = cardFor is null ? Array.Empty<StockCardRow>() : r.StockCard(cardFor.ItemId, from, to);
+        }
         if (f.Purchases) purchases = r.Purchases(from, to);
         var start = Shop.Time.StartOfDay(from);
         var end = Shop.Time.StartOfNextDay(to);

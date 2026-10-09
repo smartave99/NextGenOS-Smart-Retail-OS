@@ -1,0 +1,94 @@
+@page "/items/sheet"
+@attribute [Authorize(Policy = Perm.Catalog)]
+@inherits HubPage
+@using NextGenOS.Hub.Import
+
+<PageTitle>Items in a spreadsheet</PageTitle>
+<h1>Items in a spreadsheet</h1>
+<p class="sub">Send your items to a spreadsheet, change them there, and bring them back; or fill in a new sheet to bring in a whole list at once. You see what would happen before anything is written, and a copy of your shop's data is made first.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <a class="btn ghost" href="/items">Back to @Shop.Plural("item").ToLowerInvariant()</a>
+</div>
+
+<div class="card">
+    <h2>1. Get a sheet</h2>
+    <div class="row">
+        <a class="btn ghost" id="sheet-export" href="/sheets/items.csv" download>Download all my @Shop.Plural("item").ToLowerInvariant()</a>
+        <a class="btn ghost" id="sheet-template" href="/sheets/items-template.csv" download>Download an empty sheet to fill in</a>
+    </div>
+    <p class="muted">The columns: <strong>Name</strong> (needed), Category, Barcode, SKU, Unit, Price, Trade price, Cost price, Tax (a percent like 18, or its name), @(Shop.Country.Tax.ItemCode is { } code ? code.Label + ", " : "")@(Shop.Country.Tax.ExtraTax is { } extra ? extra.Label + ", " : "")Reorder level, Opening stock, Kind, On sale (yes or no). An item that is in the shop already is found by its barcode, then its SKU, then its name; a column left empty leaves that field as it is. Opening stock is taken for new items only.</p>
+</div>
+
+<div class="card">
+    <h2>2. Choose your file</h2>
+    <p class="muted">Save the sheet as <em>CSV</em> (a spreadsheet's “Save as” has it), then choose it here.</p>
+    <InputFile id="sheet-file" OnChange="FileChosen" accept=".csv,.txt,text/csv,text/plain" />
+</div>
+
+@if (check is not null)
+{
+    <div class="card" id="sheet-report">
+        <h2>3. What would happen — @check.FileName</h2>
+        <p id="sheet-summary"><strong>@check.ToAdd to add</strong>, <strong>@check.ToChange to change</strong>, @check.Same already as they are@(check.HasProblems ? $", and {check.Problems.Count} to fix" : "").</p>
+        @if (check.HasProblems)
+        {
+            <div class="notice error" role="alert">
+                <p><strong>Nothing can be written until these are fixed in the spreadsheet.</strong></p>
+                <ul id="sheet-problems">
+                    @foreach (var p in check.Problems.Take(60)) { <li>@(p.Row > 0 ? $"Row {p.Row}" : "File")@(p.Name is { } n ? $" ({n})" : ""): @p.Message</li> }
+                    @if (check.Problems.Count > 60) { <li>… and @(check.Problems.Count - 60) more.</li> }
+                </ul>
+            </div>
+        }
+        @if (check.Notes.Count > 0)
+        {
+            <details><summary>@check.Notes.Count notes</summary><ul id="sheet-notes">@foreach (var n in check.Notes.Take(60)) { <li>@n</li> }</ul></details>
+        }
+        @if (check.Lines.Count > 0)
+        {
+            <div class="tbl-wrap"><table class="tbl" id="sheet-lines">
+                <thead><tr><th>Row</th><th>Name</th><th>What</th><th>Details</th></tr></thead>
+                <tbody>@foreach (var l in check.Lines.Take(300)) { <tr><td>@l.Row</td><td>@l.Name</td><td>@Words(l.Action)</td><td>@l.Detail</td></tr> }</tbody>
+            </table></div>
+            @if (check.Lines.Count > 300) { <p class="muted">Showing the first 300 of @check.Lines.Count rows.</p> }
+        }
+        <div class="row">
+            @if (!check.HasProblems && !check.NothingToDo)
+            {
+                <button type="button" class="btn primary" id="sheet-write" @onclick="Write">Write these @(check.ToAdd + check.ToChange) @Shop.Plural("item").ToLowerInvariant()</button>
+            }
+            <button type="button" class="btn ghost" id="sheet-cancel" @onclick="Cancel">Start again</button>
+        </div>
+    </div>
+}
+
+@code {
+    private SheetCheck? check;
+
+    private static string Words(string action) => action switch { "add" => "Add", "change" => "Change", _ => "As it is" };
+
+    private Task FileChosen(InputFileChangeEventArgs e) => Run(async () =>
+    {
+        check = null;
+        var file = e.File;
+        if (file.Size > 3_000_000) throw new HubException("sheet-big", "That file is too big (over 3 MB). Please bring the items in in smaller files.");
+        using var reader = new StreamReader(file.OpenReadStream(3_000_000), System.Text.Encoding.UTF8, true);
+        check = App.ItemSheets.Check(Path.GetFileName(file.Name), await reader.ReadToEndAsync());
+    });
+
+    private Task Write() => Run(() =>
+    {
+        var result = App.ItemSheets.Import(check!, Me.Id);
+        check = null;
+        Info = $"Done: {result.Added} added, {result.Changed} changed" + (result.StockCounts > 0 ? $", {result.StockCounts} opening stock counted" : "") + ". A copy of your shop's data was made first.";
+    });
+
+    private void Cancel()
+    {
+        check = null;
+        Info = null;
+        Error = null;
+    }
+}

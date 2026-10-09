@@ -1,0 +1,51 @@
+@page "/settings/keys"
+@attribute [Authorize(Policy = Perm.Settings)]
+@inherits HubPage
+
+<PageTitle>Keys at the till</PageTitle>
+<p><a href="settings">&larr; Settings</a></p>
+<h1>Keys at the till</h1>
+<p class="sub">Choose a key for what the cashier does most. The sell screen shows the keys you choose. A key is a function key like F2, or Ctrl or Alt with a letter or a number, like Ctrl+S. Leave a box empty for no key.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="card stack">
+    @foreach (var a in TillKeys.Actions)
+    {
+        <div class="field-row">
+            <div><label for="key-@a.Id">@a.Label</label><input id="key-@a.Id" value="@keys[a.Id]" @onchange="e => keys[a.Id] = e.Value?.ToString() ?? string.Empty" maxlength="20" placeholder="@a.Default" /></div>
+        </div>
+    }
+    <div class="row">
+        <button type="button" class="btn secondary" id="keys-usual" @onclick="UsualKeys">Back to the usual keys</button>
+        <button type="button" class="btn primary" id="keys-save" @onclick="Save">Save the keys</button>
+    </div>
+</div>
+
+@code {
+    private Dictionary<string, string> keys = new();
+
+    protected override Task LoadAsync()
+    {
+        keys = TillKeys.Effective(App.Shop.Settings.ShortcutKeys).ToDictionary(k => k.Key, k => k.Value);
+        return Task.CompletedTask;
+    }
+
+    private void UsualKeys() => Run(() =>
+    {
+        var s = App.Shop.Settings;
+        s.ShortcutKeys = new();
+        App.Shop.Save(s);
+        keys = TillKeys.Effective(s.ShortcutKeys).ToDictionary(k => k.Key, k => k.Value);
+    }, "The usual keys are back.");
+
+    private void Save() => Run(() =>
+    {
+        if (TillKeys.Problem(keys) is { } problem) throw new HubException("keys", problem);
+        var normal = keys.ToDictionary(k => k.Key, k => TillKeys.Normalize(k.Value) ?? "");
+        var s = App.Shop.Settings;
+        // only what differs from the usual key is kept, so the usual keys can change with the program
+        s.ShortcutKeys = TillKeys.Actions.Where(a => normal[a.Id] != a.Default).ToDictionary(a => a.Id, a => normal[a.Id]);
+        App.Shop.Save(s);
+        keys = TillKeys.Effective(s.ShortcutKeys).ToDictionary(k => k.Key, k => k.Value);
+    }, "Saved.");
+}

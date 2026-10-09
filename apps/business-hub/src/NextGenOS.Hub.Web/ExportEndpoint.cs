@@ -10,7 +10,8 @@ namespace NextGenOS.Hub.Web;
 /// </summary>
 public static class ExportEndpoint
 {
-    public static IResult Handle(string report, string? from, string? to, HubApp app, HttpContext http)
+
+    public static IResult Handle(string report, string? from, string? to, string? way, long? cashier, HubApp app, HttpContext http)
     {
         long? who = long.TryParse(http.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
         using var scope = app.Access.As(who);
@@ -50,6 +51,62 @@ public static class ExportEndpoint
                 text = Csv.Build(new[] { "Item", "On hand", "Average cost each", "Value" },
                     app.Reports.StockValues().Select(s => (IReadOnlyList<object?>)new object?[] { s.Name, ShopContext.Qty(s.OnHandMilli), M(s.CostMinor), M(s.ValueMinor) }));
                 break;
+            case "stock-movement":
+                text = Csv.Build(new[] { "Item", "Unit", "Before", "In", "Out", "Left" },
+                    app.Reports.StockMovement(start, end).Select(r => (IReadOnlyList<object?>)new object?[] { r.Name, r.Unit, ShopContext.Qty(r.OpeningMilli), ShopContext.Qty(r.InMilli), ShopContext.Qty(r.OutMilli), ShopContext.Qty(r.ClosingMilli) }));
+                break;
+            case "bills":
+            {
+                var bills = app.Reports.Bills(start, end, cashier);
+                var methods = bills.SelectMany(b => b.ByMethod.Keys).Distinct().OrderBy(m => m).ToList();
+                text = Csv.Build(new[] { "Bill", "Date", "Time", "Kind", "Customer", "Cashier", "Total" }.Concat(methods).Concat(new[] { "Owed", "Cost", "Profit" }).ToList(),
+                    bills.Select(b => (IReadOnlyList<object?>)new object?[]
+                    {
+                        b.Number, shop.Time.ToLocal(b.At).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), shop.Time.ToLocal(b.At).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                        b.IsReturn ? "Return" : "Bill", b.Customer, b.Cashier, M(b.TotalMinor),
+                    }.Concat(methods.Select(m => (object?)(b.ByMethod.TryGetValue(m, out var v) && v != 0 ? M(v) : ""))).Concat(new object?[] { b.DueMinor == 0 ? "" : M(b.DueMinor), M(b.CostMinor), M(b.ProfitMinor) }).ToList()));
+                break;
+            }
+            case "profit":
+                text = Csv.Build(new[] { "Item", "Sold", "Sales before tax", "Cost", "Profit" },
+                    app.Reports.ProfitByItem(start, end).Select(p => (IReadOnlyList<object?>)new object?[] { p.Name, ShopContext.Qty(p.QtyMilli), M(p.TaxableMinor), M(p.CostMinor), M(p.ProfitMinor) }));
+                break;
+            case "purchase-list":
+                text = Csv.Build(new[] { "Purchase", "Date", "Kind", "From", "Before tax", "Tax", "Total", "Paid", "To pay" },
+                    app.Reports.PurchaseRegister(start, end).Select(b => (IReadOnlyList<object?>)new object?[]
+                    {
+                        b.Number, shop.Time.ToLocal(b.At).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), b.IsReturn ? "Sent back" : "Purchase", b.Supplier,
+                        M(b.TaxableMinor), M(b.TaxMinor), M(b.TotalMinor), M(b.PaidMinor), b.DueMinor == 0 ? "" : M(b.DueMinor),
+                    }));
+                break;
+            case "out-of-stock":
+                text = Csv.Build(new[] { "Item", "Unit", "On the shelf" }, app.Reports.OutOfStock().Select(o => (IReadOnlyList<object?>)new object?[] { o.Name, o.Unit, ShopContext.Qty(o.OnHandMilli) }));
+                break;
+            case "daybook":
+            {
+                var entries = app.Books.DayBook(shop.Time.StartOfDay(start), shop.Time.StartOfNextDay(end), 50_000);
+                text = Csv.Build(new[] { "Date", "Time", "Kind", "What", "Account number", "Account", "Debit", "Credit" },
+                    entries.SelectMany(e => e.Lines.Select(l => (IReadOnlyList<object?>)new object?[]
+                    {
+                        shop.Time.ToLocal(e.At).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), shop.Time.ToLocal(e.At).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                        e.Kind, e.Memo, l.Code, l.Name, l.DebitMinor == 0 ? "" : M(l.DebitMinor), l.CreditMinor == 0 ? "" : M(l.CreditMinor),
+                    })));
+                break;
+            }
+            case "moneybook":
+            {
+                NextGenOS.Hub.Books.BooksService.MoneyBookPage book;
+                try { book = app.Books.MoneyBook(string.IsNullOrWhiteSpace(way) ? "cash" : way, shop.Time.StartOfDay(start), shop.Time.StartOfNextDay(end)); }
+                catch (HubException e) when (e.Code == "not-found") { return Results.NotFound(); }
+                text = Csv.Build(new[] { "Date", "Time", "What", "In", "Out", "Left" },
+                    new[] { (IReadOnlyList<object?>)new object?[] { "", "", "Before this period", "", "", M(book.OpeningMinor) } }
+                        .Concat(book.Rows.Select(r => (IReadOnlyList<object?>)new object?[]
+                        {
+                            shop.Time.ToLocal(r.At).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), shop.Time.ToLocal(r.At).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                            r.Memo, r.InMinor == 0 ? "" : M(r.InMinor), r.OutMinor == 0 ? "" : M(r.OutMinor), M(r.BalanceMinor),
+                        })));
+                break;
+            }
             case "register-sales" or "register-credits" or "register-purchases" or "register-purchase-returns":
             {
                 var kind = report["register-".Length..];

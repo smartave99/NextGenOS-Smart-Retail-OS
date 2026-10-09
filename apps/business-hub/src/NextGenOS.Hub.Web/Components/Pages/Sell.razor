@@ -7,6 +7,7 @@
 <PageTitle>@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</PageTitle>
 <h1>@(Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant())</h1>
 <p class="sub">Scan a barcode, or type a name and press Enter.@if (drawerPrinter) { <button type="button" class="btn ghost small" id="drawer" @onclick="OpenDrawer">Open the cash drawer</button> }</p>
+@if (KeyHint() is { Length: > 0 } hint) { <p class="muted small" id="till-keys">Keys: @hint</p> }
 <Notice Error="@Error" Info="@Info" />
 
 <div class="pos">
@@ -14,6 +15,15 @@
         <div class="card">
             <input id="scan" class="big-input-left" placeholder="Scan or search" autocomplete="off" @bind="query" @bind:event="oninput" @onkeydown="OnKey" aria-label="Scan or search" />
             <div class="row"><CameraScan Id="cam-sell" Label="Scan with the camera" OnScanned="ScanFromCamera" /></div>
+            @if (groups.Count > 0)
+            {
+                <div class="chips" role="group" aria-label="Quick groups">
+                    @foreach (var g in groups)
+                    {
+                        <button type="button" class="group-chip" id="group-@g.Id" @onclick="() => AddGroup(g)" title="@string.Join(", ", g.Members.Select(m => Qty(m.QtyMilli) + " × " + m.Name))">+ @g.Name</button>
+                    }
+                </div>
+            }
             @if (categories.Count > 0)
             {
                 <div class="chips" role="group" aria-label="Categories">
@@ -34,6 +44,7 @@
                     @foreach (var item in results)
                     {
                         <button type="button" class="item-btn" @onclick="() => Add(item)">
+                            @if (pictures.TryGetValue(item.Id, out var pic)) { <img class="pic" src="/item-images/@pic" alt="" loading="lazy" /> }
                             <span class="nm">@item.Name</span>
                             <span class="pr">@Money(item.PriceFor(customer?.PriceLevel ?? "retail"))@(item.Unit is "pc" ? "" : " / " + item.Unit)</span>
                         </button>
@@ -130,13 +141,44 @@
             }
             else
             {
-                <input placeholder="Search by name or phone (or leave empty)" aria-label="Customer" @bind="customerQuery" @bind:event="oninput" />
+                <input id="customer-search" placeholder="Search by name or phone (or leave empty)" aria-label="Customer" @bind="customerQuery" @bind:event="oninput" />
                 @if (customerQuery.Trim().Length >= 2)
                 {
                     <div class="chips">
                         @foreach (var p in App.Parties.Search("customer", customerQuery, 6))
                         {
                             <button type="button" @onclick="() => PickCustomer(p)">@p.Name</button>
+                        }
+                    </div>
+                }
+            }
+
+            @if (salespeople.Count > 0)
+            {
+                <h3>Salesperson</h3>
+                <select id="salesperson" aria-label="Salesperson" value="@(salespersonId?.ToString() ?? "")" @onchange="e => salespersonId = long.TryParse(e.Value?.ToString(), out var sid) ? sid : null">
+                    <option value="">No one</option>
+                    @foreach (var p in salespeople) { <option value="@p.Id">@p.Name</option> }
+                </select>
+            }
+            @if (brokers.Count > 0)
+            {
+                <h3>Broker</h3>
+                <select id="broker" aria-label="Broker" value="@(brokerId?.ToString() ?? "")" @onchange="e => ChooseBroker(e.Value?.ToString())">
+                    <option value="">No one</option>
+                    @foreach (var p in brokers) { <option value="@p.Id">@p.Name</option> }
+                </select>
+                @if (brokerId is not null)
+                {
+                    <div class="row wrap">
+                        <input id="broker-value" class="disc-in" inputmode="decimal" aria-label="Broker's commission" @bind="brokerValue" />
+                        <select id="broker-unit" aria-label="Percent or amount" @bind="brokerUnit">
+                            <option value="percent">percent</option>
+                            <option value="amount">amount</option>
+                        </select>
+                        @if (brokerUnit == "percent")
+                        {
+                            <label class="check"><input id="broker-tax" type="checkbox" @bind="brokerWithTax" /> Count the tax too</label>
                         }
                     </div>
                 }
@@ -161,7 +203,7 @@
                     <button type="button" class="chips-btn @(method == m ? "on" : "")" aria-pressed="@(method == m)" @onclick="() => method = m">@Label(m)</button>
                 }
             </div>
-            <input class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(Remaining)" @bind="tender" @bind:event="oninput" @onkeydown="OnPayKey" />
+            <input id="tender" class="big-input" inputmode="decimal" aria-label="Amount received" placeholder="@Shop.Text(Remaining)" @bind="tender" @bind:event="oninput" @onkeydown="OnPayKey" />
             <div class="row wrap">
                 <button type="button" class="btn secondary" @onclick="AddPayment">Add payment</button>
                 @if (Shop.Features.Credit && customer is { CreditLimitMinor: > 0 })
@@ -204,6 +246,15 @@
     private readonly string saleKey = Guid.NewGuid().ToString("N");
     private Party? customer;
     private string customerQuery = "";
+    private IReadOnlyDictionary<long, long> pictures = new Dictionary<long, long>();
+    private IReadOnlyList<NextGenOS.Hub.Catalog.ItemGroup> groups = Array.Empty<NextGenOS.Hub.Catalog.ItemGroup>();
+    private IReadOnlyList<NextGenOS.Hub.Staff.Earner> salespeople = Array.Empty<NextGenOS.Hub.Staff.Earner>();
+    private IReadOnlyList<NextGenOS.Hub.Staff.Earner> brokers = Array.Empty<NextGenOS.Hub.Staff.Earner>();
+    private long? salespersonId;
+    private long? brokerId;
+    private string brokerValue = "";
+    private string brokerUnit = "percent";
+    private bool brokerWithTax;
     private string method = "cash";
     private string tender = "";
     private readonly List<PaymentInput> payments = new();
@@ -264,17 +315,53 @@
         }
         method = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
         categories = App.Catalog.Categories();
+        groups = App.Groups.List();
+        var earners = App.Earners.List();
+        salespeople = earners.Where(e => e.Kind == NextGenOS.Hub.Staff.EarnerKinds.Salesperson).ToList();
+        brokers = earners.Where(e => e.Kind == NextGenOS.Hub.Staff.EarnerKinds.Broker).ToList();
         drawerPrinter = App.PrinterProfiles.For("receipt") is not null;
         Search();
         return Task.CompletedTask;
     }
 
+    private DotNetObjectReference<Sell>? self;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender) await Js.InvokeVoidAsync("hub.focus", "scan");
+        if (!firstRender) return;
+        await Js.InvokeVoidAsync("hub.focus", "scan");
+        self = DotNetObjectReference.Create(this);
+        var map = TillKeys.Effective(Shop.Settings.ShortcutKeys).Where(k => TillKeys.Normalize(k.Value) is { Length: > 0 }).ToDictionary(k => TillKeys.Normalize(k.Value)!, k => k.Key);
+        await Js.InvokeVoidAsync("hub.keys.start", self, map);
     }
 
-    private void Search() => results = App.Catalog.Search(string.IsNullOrWhiteSpace(query) ? null : query, null, category, 60);
+    /// <summary>The keys in force, as the screen shows them: "F2 scan · F4 customer ...". Only what has a key.</summary>
+    private string KeyHint() => string.Join(" · ", TillKeys.Actions
+        .Select(a => (Key: TillKeys.Normalize(TillKeys.Effective(Shop.Settings.ShortcutKeys)[a.Id]), a.Short, a.Id))
+        .Where(x => !string.IsNullOrEmpty(x.Key) && (x.Id != "drawer" || drawerPrinter))
+        .Select(x => x.Key + " " + x.Short));
+
+    /// <summary>A key of the till was pressed (the shop chose which key does what). It does what a tap would do, as the person signed in.</summary>
+    [JSInvokable]
+    public async Task OnTillKey(string action)
+    {
+        using var scope = App.Access.As(() => Me?.Id);
+        switch (action)
+        {
+            case "scan": await Js.InvokeVoidAsync("hub.focus", "scan"); break;
+            case "customer": await Js.InvokeVoidAsync("hub.focus", "customer-search"); break;
+            case "amount": await Js.InvokeVoidAsync("hub.focus", "tender"); break;
+            case "drawer": if (drawerPrinter) await OpenDrawer(); break;
+            case "complete": if (cart is not null) Complete(false); break;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Search()
+    {
+        results = App.Catalog.Search(string.IsNullOrWhiteSpace(query) ? null : query, null, category, 60);
+        pictures = App.Images.FirstFor(results.Select(r => r.Id));
+    }
 
     private void PickCategory(string? c)
     {
@@ -301,27 +388,37 @@
                 Search();
                 if (results.Count == 1) item = results[0];
             }
+            if (item is null && App.Groups.FindByBarcode(text) is { } scannedGroup) { AddGroup(scannedGroup); return; }
             if (item is null) throw new HubException("not-found", $"Nothing is called \"{text}\".");
             Add(item);
         });
         await Js.InvokeVoidAsync("hub.focus", "scan");
     }
 
-    private void Add(Item item)
+    private void Add(Item item) => Run(() => { AddItem(item, 1000); query = ""; Search(); });
+
+    private void AddItem(Item item, long qtyMilli)
     {
-        Run(() =>
-        {
-            var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && !l.IsFree && l.Note is null && (l.DiscountSource is not null || (l.DiscountPctMilli == 0 && l.DiscountAmountMinor == 0)));
-            if (cart is null)
-                cart = App.Documents.CreateDraft(new DraftOptions { UserId = Me.Id, PartyId = customer?.Id, Lines = { new LineInput { ItemId = item.Id } } });
-            else if (existing is not null)
-                cart = App.Documents.UpdateLine(cart.Document.Id, existing.Id, existing.QtyMilli + 1000);
-            else
-                cart = App.Documents.AddLine(cart.Document.Id, new LineInput { ItemId = item.Id });
-            query = "";
-            Search();
-        });
+        var existing = cart?.Lines.FirstOrDefault(l => l.ItemId == item.Id && !l.IsFree && l.Note is null && (l.DiscountSource is not null || (l.DiscountPctMilli == 0 && l.DiscountAmountMinor == 0)));
+        if (cart is null)
+            cart = App.Documents.CreateDraft(new DraftOptions { UserId = Me.Id, PartyId = customer?.Id, Lines = { new LineInput { ItemId = item.Id, QtyMilli = qtyMilli } } });
+        else if (existing is not null)
+            cart = App.Documents.UpdateLine(cart.Document.Id, existing.Id, existing.QtyMilli + qtyMilli);
+        else
+            cart = App.Documents.AddLine(cart.Document.Id, new LineInput { ItemId = item.Id, QtyMilli = qtyMilli });
     }
+
+    /// <summary>A quick group: every item in it is added as a line of its own, at its own price, with its usual quantity.</summary>
+    private void AddGroup(NextGenOS.Hub.Catalog.ItemGroup group) => Run(() =>
+    {
+        foreach (var m in group.Members)
+        {
+            var item = App.Catalog.Get(m.ItemId) ?? throw new HubException("group-item", $"{m.Name} was not found.");
+            AddItem(item, m.QtyMilli);
+        }
+        query = "";
+        Search();
+    });
 
     private void Change(DocLine line, long delta)
     {
@@ -443,6 +540,39 @@
         });
     }
 
+    /// <summary>Choosing a broker fills in the broker's usual commission, to be changed for this bill.</summary>
+    private void ChooseBroker(string? text)
+    {
+        brokerId = long.TryParse(text, out var id) ? id : null;
+        var usual = brokers.FirstOrDefault(b => b.Id == brokerId)?.PctMilli ?? 0;
+        brokerValue = usual > 0 ? Qty(usual) : "";
+        brokerUnit = "percent";
+        brokerWithTax = false;
+    }
+
+    /// <summary>Names the salesperson and the broker on the bill just before it is made final (nothing is needed when the shop has none).</summary>
+    private void NameEarners()
+    {
+        if (cart is null || (salespeople.Count == 0 && brokers.Count == 0)) return;
+        if (salespeople.Count > 0) App.Earners.ChooseSalesperson(cart.Document.Id, salespersonId);
+        if (brokers.Count == 0) return;
+        if (brokerId is not { } broker) { App.Earners.ChooseBroker(cart.Document.Id, null); return; }
+        var value = brokerValue.Trim().TrimEnd('%').Trim();
+        if (value.Length == 0) throw new HubException("broker-how", "Please type the broker's commission, as a percent or as an amount.");
+        if (brokerUnit == "percent")
+        {
+            long pct;
+            try { pct = ShopContext.QtyMilli(value); }
+            catch (FormatException) { throw new HubException("earner-percent", "Please type the broker's commission as a percent, like 2.5."); }
+            App.Earners.ChooseBroker(cart.Document.Id, broker, brokerWithTax, pctMilli: pct);
+        }
+        else
+        {
+            if (!TryMoney(Shop, value, out var amount)) throw new HubException("broker-amount", "Please type the broker's commission as an amount, like 250 or 99.50.");
+            App.Earners.ChooseBroker(cart.Document.Id, broker, false, amountMinor: amount);
+        }
+    }
+
     private void OnPayKey(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") AddPayment();
@@ -468,6 +598,8 @@
             if (cart is null) return;
             if (!onAccount && tender.Trim().Length > 0) AddPayment();
             if (!onAccount && payments.All(p => p.Method == DocumentService.AccountCredit) && Remaining > 0) payments.Add(new PaymentInput { Method = method, AmountMinor = Remaining });   // nothing typed (or only the customer's credit): the rest is taken in the way chosen
+            try { NameEarners(); }
+            catch (HubException ex) when (ex.Code == "not-open") { /* pressed twice, or a retry after a dropped connection: the bill is already made, and the key below gives it back */ }
             var done = App.Documents.Issue(cart.Document.Id, new IssueOptions { Payments = payments.ToList(), UserId = Me.Id, OnCredit = onAccount, RequestKey = saleKey });
             finished = true;
             Nav.NavigateTo("/documents/" + done.Document.Id + "?new=true");
@@ -487,6 +619,8 @@
 
     public void Dispose()
     {
+        try { _ = Js.InvokeVoidAsync("hub.keys.stop"); } catch (Exception) { /* the connection is gone already */ }
+        self?.Dispose();
         // A sale left open by closing the page is thrown away, so it does not clutter the day.
         if (cart is not null && !finished)
         {

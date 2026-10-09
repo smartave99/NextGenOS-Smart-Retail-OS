@@ -9,6 +9,14 @@
 <Notice Error="@Error" />
 
 <div class="toolbar">
+    <div class="seg" role="group" aria-label="Which book">
+        <button type="button" id="b-tab-summary" class="@(view == "summary" ? "on" : "")" aria-pressed="@(view == "summary")" @onclick="@(() => Show("summary"))">Summary</button>
+        <button type="button" id="b-tab-day" class="@(view == "day" ? "on" : "")" aria-pressed="@(view == "day")" @onclick="@(() => Show("day"))">Day book</button>
+        <button type="button" id="b-tab-money" class="@(view == "money" ? "on" : "")" aria-pressed="@(view == "money")" @onclick="@(() => Show("money"))">Cash and bank</button>
+    </div>
+</div>
+
+<div class="toolbar">
     <div class="seg" role="group" aria-label="Period">
         @foreach (var (key, label) in Presets)
         {
@@ -21,70 +29,142 @@
     <input id="b-to" class="date" type="date" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" />
 </div>
 
-<div class="grid">
-    <div class="card stat"><span class="label">Came in</span><span class="value" id="b-income">@Money(profit.IncomeMinor)</span><span class="note">sales and other income, before tax</span></div>
-    <div class="card stat"><span class="label">Went out</span><span class="value" id="b-costs">@Money(profit.CostsMinor)</span><span class="note">what was bought and other costs</span></div>
-    <div class="card stat"><span class="label">Left over</span><span class="value" id="b-net">@Money(profit.NetMinor)</span><span class="note">@(profit.NetMinor < 0 ? "more went out than came in" : "")</span></div>
-</div>
-<p class="muted small">What goods cost is counted on the day they are sold, at the average of what was paid for them. Goods bought and still on the shelf are not a cost yet: they are in "Stock on the shelves". Other things bought (not kept in stock) are counted as costs on the day they are bought.</p>
+@if (view == "summary")
+{
+    <div class="grid">
+        <div class="card stat"><span class="label">Came in</span><span class="value" id="b-income">@Money(profit.IncomeMinor)</span><span class="note">sales and other income, before tax</span></div>
+        <div class="card stat"><span class="label">Went out</span><span class="value" id="b-costs">@Money(profit.CostsMinor)</span><span class="note">what was bought and other costs</span></div>
+        <div class="card stat"><span class="label">Left over</span><span class="value" id="b-net">@Money(profit.NetMinor)</span><span class="note">@(profit.NetMinor < 0 ? "more went out than came in" : "")</span></div>
+    </div>
+    <p class="muted small">What goods cost is counted on the day they are sold, at the average of what was paid for them. Goods bought and still on the shelf are not a cost yet: they are in "Stock on the shelves". Other things bought (not kept in stock) are counted as costs on the day they are bought.</p>
 
-<div class="cols">
+    <div class="cols">
+        <section class="card">
+            <h2>Came in and went out</h2>
+            @if (profit.Income.Count == 0 && profit.Costs.Count == 0) { <div class="empty">Nothing in these days.</div> }
+            else
+            {
+                <div class="tbl-wrap">
+                <table class="tbl" id="b-profit">
+                    <tbody>
+                    @foreach (var r in profit.Income) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+                    @foreach (var r in profit.Costs) { <tr><td>@r.Name</td><td class="num">−@Money(r.AmountMinor)</td></tr> }
+                    <tr><td><strong>Left over</strong></td><td class="num"><strong>@Money(profit.NetMinor)</strong></td></tr>
+                    </tbody>
+                </table>
+                </div>
+            }
+        </section>
+
+        <section class="card">
+            <h2>What the shop has and owes, at the end of @to.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</h2>
+            <div class="tbl-wrap">
+            <table class="tbl" id="b-position">
+                <tbody>
+                <tr><th colspan="2">The shop has</th></tr>
+                @foreach (var r in position.Assets) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+                <tr><td><strong>Total</strong></td><td class="num"><strong id="b-assets">@Money(position.AssetsMinor)</strong></td></tr>
+                <tr><th colspan="2">The shop owes</th></tr>
+                @foreach (var r in position.Liabilities) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+                <tr><td><strong>Total</strong></td><td class="num"><strong id="b-liab">@Money(position.LiabilitiesMinor)</strong></td></tr>
+                <tr><th colspan="2">The shop is worth</th></tr>
+                @foreach (var r in position.Equity) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
+                <tr><td>Left over since the books began</td><td class="num">@Money(position.ProfitSoFarMinor)</td></tr>
+                <tr><td><strong>Total</strong></td><td class="num"><strong id="b-worth">@Money(position.EquityMinor)</strong></td></tr>
+                </tbody>
+            </table>
+            </div>
+            <p class="muted small">What is owed plus what the shop is worth is always the same as what the shop has.</p>
+        </section>
+    </div>
+
     <section class="card">
-        <h2>Came in and went out</h2>
-        @if (profit.Income.Count == 0 && profit.Costs.Count == 0) { <div class="empty">Nothing in these days.</div> }
+        <h2>Every account</h2>
+        <div class="tbl-wrap">
+        <table class="tbl" id="b-trial">
+            <thead><tr><th>Number</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+            <tbody>
+            @foreach (var r in trial) { <tr><td>@r.Code</td><td>@r.Name</td><td class="num">@(r.DebitMinor > 0 ? Money(r.DebitMinor) : "")</td><td class="num">@(r.CreditMinor > 0 ? Money(r.CreditMinor) : "")</td></tr> }
+            <tr><td></td><td><strong>Total</strong></td><td class="num"><strong id="b-debit">@Money(trial.Sum(r => r.DebitMinor))</strong></td><td class="num"><strong id="b-credit">@Money(trial.Sum(r => r.CreditMinor))</strong></td></tr>
+            </tbody>
+        </table>
+        </div>
+        <p class="muted small">Debits and credits are always equal. If they are not, something is wrong and the shop's supplier should be told.</p>
+    </section>
+}
+else if (view == "day")
+{
+    <section class="card">
+        <div class="head"><h2>Day book</h2><a class="btn ghost small" href="export/daybook.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        <p class="muted small">Everything the books wrote down in these days, in the order it was written. What each entry takes from one account it gives to another, so its two sides are always equal. Nothing written is ever changed: a cancelled bill has a second entry that turns the first one round.</p>
+        @if (dayBook.Count == 0) { <div class="empty">Nothing was written in these days.</div> }
         else
         {
             <div class="tbl-wrap">
-            <table class="tbl" id="b-profit">
+            <table class="tbl" id="b-daybook">
+                <thead><tr><th>When</th><th>What</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+                @foreach (var e in dayBook)
+                {
+                    <tbody>
+                        <tr class="b-entry"><td>@When(e.At)</td><td colspan="4"><strong>@e.Kind</strong> @e.Memo</td></tr>
+                        @foreach (var l in e.Lines)
+                        {
+                            <tr><td></td><td></td><td>@l.Name</td><td class="num">@(l.DebitMinor > 0 ? Money(l.DebitMinor) : "")</td><td class="num">@(l.CreditMinor > 0 ? Money(l.CreditMinor) : "")</td></tr>
+                        }
+                    </tbody>
+                }
+            </table>
+            </div>
+            @if (dayBook.Count >= DayBookLimit) { <p class="muted small">The first @DayBookLimit entries of these days are shown. Choose fewer days, or download the file for all of them.</p> }
+        }
+    </section>
+}
+else
+{
+    <section class="card">
+        <div class="head"><h2 id="b-money-title">@money.Name</h2><a class="btn ghost small" href="export/moneybook.csv?way=@Uri.EscapeDataString(way)&from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+        <div class="toolbar">
+            <label for="b-way">Which book</label>
+            <select id="b-way" value="@way" @onchange="e => SetWay(e.Value?.ToString())">
+                @foreach (var w in ways) { <option value="@w.Key">@w.Name</option> }
+            </select>
+        </div>
+        <p class="muted small">Money that came in and went out, line by line, as the books wrote it. The last figure is what the books say this holds at the end of these days; count the till and compare.</p>
+        <div class="grid">
+            <div class="card stat"><span class="label">At the start</span><span class="value" id="b-money-open">@Money(money.OpeningMinor)</span><span class="note">before these days</span></div>
+            <div class="card stat"><span class="label">Came in</span><span class="value" id="b-money-in">@Money(money.InMinor)</span></div>
+            <div class="card stat"><span class="label">Went out</span><span class="value" id="b-money-out">@Money(money.OutMinor)</span></div>
+            <div class="card stat"><span class="label">At the end</span><span class="value" id="b-money-close">@Money(money.ClosingMinor)</span></div>
+        </div>
+        @if (money.Rows.Count == 0) { <div class="empty">Nothing came in or went out in these days.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="b-money">
+                <thead><tr><th>When</th><th>What</th><th class="num">In</th><th class="num">Out</th><th class="num">Left</th></tr></thead>
                 <tbody>
-                @foreach (var r in profit.Income) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
-                @foreach (var r in profit.Costs) { <tr><td>@r.Name</td><td class="num">−@Money(r.AmountMinor)</td></tr> }
-                <tr><td><strong>Left over</strong></td><td class="num"><strong>@Money(profit.NetMinor)</strong></td></tr>
+                    <tr><td></td><td>Before these days</td><td></td><td></td><td class="num">@Money(money.OpeningMinor)</td></tr>
+                    @foreach (var r in money.Rows)
+                    {
+                        <tr><td>@When(r.At)</td><td>@r.Memo</td><td class="num">@(r.InMinor > 0 ? Money(r.InMinor) : "")</td><td class="num">@(r.OutMinor > 0 ? Money(r.OutMinor) : "")</td><td class="num">@Money(r.BalanceMinor)</td></tr>
+                    }
                 </tbody>
             </table>
             </div>
         }
     </section>
-
-    <section class="card">
-        <h2>What the shop has and owes, at the end of @to.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</h2>
-        <div class="tbl-wrap">
-        <table class="tbl" id="b-position">
-            <tbody>
-            <tr><th colspan="2">The shop has</th></tr>
-            @foreach (var r in position.Assets) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
-            <tr><td><strong>Total</strong></td><td class="num"><strong id="b-assets">@Money(position.AssetsMinor)</strong></td></tr>
-            <tr><th colspan="2">The shop owes</th></tr>
-            @foreach (var r in position.Liabilities) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
-            <tr><td><strong>Total</strong></td><td class="num"><strong id="b-liab">@Money(position.LiabilitiesMinor)</strong></td></tr>
-            <tr><th colspan="2">The shop is worth</th></tr>
-            @foreach (var r in position.Equity) { <tr><td>@r.Name</td><td class="num">@Money(r.AmountMinor)</td></tr> }
-            <tr><td>Left over since the books began</td><td class="num">@Money(position.ProfitSoFarMinor)</td></tr>
-            <tr><td><strong>Total</strong></td><td class="num"><strong id="b-worth">@Money(position.EquityMinor)</strong></td></tr>
-            </tbody>
-        </table>
-        </div>
-        <p class="muted small">What is owed plus what the shop is worth is always the same as what the shop has.</p>
-    </section>
-</div>
-
-<section class="card">
-    <h2>Every account</h2>
-    <div class="tbl-wrap">
-    <table class="tbl" id="b-trial">
-        <thead><tr><th>Number</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
-        <tbody>
-        @foreach (var r in trial) { <tr><td>@r.Code</td><td>@r.Name</td><td class="num">@(r.DebitMinor > 0 ? Money(r.DebitMinor) : "")</td><td class="num">@(r.CreditMinor > 0 ? Money(r.CreditMinor) : "")</td></tr> }
-        <tr><td></td><td><strong>Total</strong></td><td class="num"><strong id="b-debit">@Money(trial.Sum(r => r.DebitMinor))</strong></td><td class="num"><strong id="b-credit">@Money(trial.Sum(r => r.CreditMinor))</strong></td></tr>
-        </tbody>
-    </table>
-    </div>
-    <p class="muted small">Debits and credits are always equal. If they are not, something is wrong and the shop's supplier should be told.</p>
-</section>
+}
 
 @code {
     private static readonly (string Key, string Label)[] Presets = { ("today", "Today"), ("yesterday", "Yesterday"), ("week", "7 days"), ("month", "30 days"), ("year", "This year") };
 
+    private const int DayBookLimit = 500;
+
+    private string view = "summary";
+    private string way = "cash";
+    private IReadOnlyList<BooksService.DayBookEntry> dayBook = Array.Empty<BooksService.DayBookEntry>();
+    private IReadOnlyList<BooksService.MoneyWay> ways = Array.Empty<BooksService.MoneyWay>();
+    private BooksService.MoneyBookPage money = new("Cash", 0, Array.Empty<BooksService.MoneyRow>(), 0);
     private string preset = "month";
     private DateOnly from, to;
     private BooksService.ProfitAndLoss profit = new(Array.Empty<BooksService.StatementRow>(), Array.Empty<BooksService.StatementRow>());
@@ -121,12 +201,33 @@
         if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Read(); }
     }
 
+    private void Show(string next)
+    {
+        view = next;
+        Read();
+    }
+
+    private void SetWay(string? key)
+    {
+        if (!string.IsNullOrEmpty(key)) { way = key; Read(); }
+    }
+
     private void Read()
     {
         var start = Shop.Time.StartOfDay(from);
         var end = Shop.Time.StartOfNextDay(to);
-        profit = App.Books.Profit(start, end);
-        position = App.Books.Position(end);
-        trial = App.Books.TrialBalance(start, end);
+        if (view == "day") dayBook = App.Books.DayBook(start, end, DayBookLimit);
+        else if (view == "money")
+        {
+            ways = App.Books.MoneyWays();
+            if (ways.All(w => w.Key != way)) way = "cash";
+            money = App.Books.MoneyBook(way, start, end);
+        }
+        else
+        {
+            profit = App.Books.Profit(start, end);
+            position = App.Books.Position(end);
+            trial = App.Books.TrialBalance(start, end);
+        }
     }
 }

@@ -1,0 +1,412 @@
+name: Real-use check on Windows
+
+# Opens the Windows files of a published release the way a person does, on a fresh Windows machine at GitHub, with none of the settings the other checks give their programs:
+# the Business Hub zip's "Start Business Hub", the Hub setup and the icon it puts on the desktop, the Setup Studio's one-click setup and its icon. For each one it says what window
+# came up and what that window shows (its title), takes a picture of the screen, and fails when a window did not come, or shows an error page.
+# It starts when .github/real-use-check.json changes on a claude/* branch (the same way a trial release starts), so a check takes minutes, not a whole release.
+# It does NOT click through the pages of a setup wizard (a quiet install is used), and it cannot show how Windows SmartScreen or an anti-virus program treats an unsigned file on a real PC.
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/real-use-check.json"]
+  # The Release workflow runs it on the files it has just built (a draft release), before anything is published.
+  workflow_call:
+    inputs:
+      release_id:
+        description: "The number of the release (draft or published) whose files are opened."
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows files opened the way a person opens them
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Take the release files
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GIVEN_RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          set -euo pipefail
+          ID="${GIVEN_RELEASE_ID:-}"
+          if [ -z "${ID}" ]; then
+            TAG="$(jq -r '.release_tag' .github/real-use-check.json)"
+            ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)"
+            echo "Release ${TAG} is number ${ID}."
+          fi
+          node scripts/release-assets.mjs download --release "${ID}" --out dist --match '^(SmartRetailPOS-Hub-|NextGenOS-Setup-Studio-|website-windows)'
+          ls -la dist
+
+      - name: Helpers for the checks
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path shots | Out-Null
+          @'
+          $ErrorActionPreference = 'Continue'
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $script:Results = Join-Path $env:RUNNER_TEMP 'results.txt'
+          function Say($m) { Write-Host $m }
+          function Result($name, $ok, $detail) {
+            $line = "{0}  {1}: {2}" -f ($(if ($ok) { 'PASS' } else { 'FAIL' })), $name, $detail
+            Write-Host $line
+            Add-Content -Path $script:Results -Value $line
+            if ($env:GITHUB_STEP_SUMMARY) { Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- " + $line) }
+          }
+          function Shot($name) {
+            try {
+              $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+              $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+              $bmp.Save((Join-Path (Join-Path (Get-Location).Path 'shots') "$name.png"))
+              $g.Dispose(); $bmp.Dispose()
+            } catch { Write-Host "No picture of the screen could be taken: $($_.Exception.Message)" }
+          }
+          function Titles() {
+            @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -and $_.MainWindowHandle -ne 0 } | ForEach-Object { "$($_.ProcessName): $($_.MainWindowTitle)" })
+          }
+          # Waits for a window of Edge whose title is not just an address, and returns its title ('' when none came).
+          function Wait-AppWindow($seconds) {
+            for ($i = 0; $i -lt $seconds; $i++) {
+              $found = @(Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -and $_.MainWindowHandle -ne 0 } | ForEach-Object { $_.MainWindowTitle })
+              $good = @($found | Where-Object { $_ -notmatch '^(about:blank|http://|https://|127\.0\.0\.1|localhost)' })
+              if ($good.Count -gt 0) { return ($good | Select-Object -First 1) }
+              Start-Sleep -Seconds 1
+            }
+            return ''
+          }
+          function Looks-Broken($title) { return ($title -match "can.t be reached|can.t connect|ERR_|refused|not found|404|500|error|Hmmm") }
+          function Close-Edge() { Get-Process msedge -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2 }
+          function Find-Icons($pattern) {
+            $roots = @("$env:PUBLIC\Desktop", "$env:USERPROFILE\Desktop", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs", "$env:APPDATA\Microsoft\Windows\Start Menu\Programs")
+            foreach ($r in $roots) { if (Test-Path $r) { Get-ChildItem $r -Recurse -Filter '*.lnk' -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pattern } } }
+          }
+          function Icon-Info($lnk) {
+            $s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk.FullName)
+            [pscustomobject]@{ Path = $lnk.FullName; Target = $s.TargetPath; Arguments = $s.Arguments; TargetExists = (Test-Path $s.TargetPath) }
+          }
+          function Longest-Paths($zip, $count) {
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $z = [System.IO.Compression.ZipFile]::OpenRead($zip)
+            try { $z.Entries | ForEach-Object { $_.FullName } | Sort-Object Length -Descending | Select-Object -First $count | ForEach-Object { [pscustomobject]@{ Length = $_.Length; Path = $_ } } }
+            finally { $z.Dispose() }
+          }
+          '@ | Set-Content -Path (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## What happened when each Windows file was opened`n"
+
+      - name: What the screen is like on this machine
+        shell: pwsh
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          Say "Windows: $([System.Environment]::OSVersion.VersionString)"
+          Say "Edge: $(((Get-Item "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" -ErrorAction SilentlyContinue).VersionInfo.ProductVersion))"
+          Say "Windows Defender real-time protection: $(try { (Get-MpComputerStatus).RealTimeProtectionEnabled } catch { 'unknown' })"
+          Say "Long paths switched on: $(try { (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem').LongPathsEnabled } catch { 'unknown' })"
+          Shot 'desktop-before'
+
+      - name: How long are the paths inside the Windows zips (Windows' Extract All stops at 260 characters in all)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          foreach ($zip in Get-ChildItem dist -Filter '*.zip' | Where-Object { $_.Name -match 'win|windows' }) {
+            $top = @(Longest-Paths $zip.FullName 3)
+            Say "$($zip.Name): longest paths"
+            $top | ForEach-Object { Say "  $($_.Length)  $($_.Path)" }
+            # Explorer's Extract All puts the files in a folder named like the zip beside it, usually under C:\Users\<name>\Downloads (about 45 to 60 characters, more for a long name or a deep folder).
+            $limit = 200
+            Result "Path length in $($zip.Name)" ($top[0].Length -le $limit) "the longest path inside is $($top[0].Length) characters; with a folder like C:\Users\<name>\Downloads\<zip name>\ in front it must stay under 260 (we ask for at most $limit inside)"
+          }
+
+      - name: Business Hub zip - double-click Start Business Hub
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          $zip = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-*-win-x64.zip' | Select-Object -First 1
+          if (-not $zip) { Result 'Hub zip' $false 'the zip is not on the release'; exit 0 }
+          $dir = Join-Path $env:RUNNER_TEMP 'hub zip folder'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force
+          Say "Files in the folder:"; Get-ChildItem $dir | ForEach-Object { Say "  $($_.Name)" }
+          $starter = Get-ChildItem $dir -Recurse -Filter 'Start*.exe' | Select-Object -First 1
+          if (-not $starter) { Result 'Hub zip' $false 'no "Start ..." program in the zip'; exit 0 }
+          Say "Starting $($starter.FullName)"
+          Start-Process -FilePath $starter.FullName -WorkingDirectory $starter.DirectoryName
+          $title = Wait-AppWindow 90
+          Shot 'hub-zip-window'
+          Say ("Windows now: " + ((Titles) -join ' | '))
+          $answer = ''
+          try { $answer = (Invoke-WebRequest 'http://127.0.0.1:5280/' -UseBasicParsing -Headers @{ Accept = 'text/html' } -SkipHttpErrorCheck).StatusCode } catch { $answer = $_.Exception.Message }
+          Result 'Hub zip: Start Business Hub opens a window' ($title -ne '' -and -not (Looks-Broken $title)) "window title: '$title'; the program answers: $answer"
+          Close-Edge
+          Get-Process -Name 'NextGenOS.Hub' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+
+      - name: Business Hub setup - install, then open it from its icon
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          $setup = Get-ChildItem dist -Filter 'SmartRetailPOS-Hub-Setup-*.exe' | Select-Object -First 1
+          if (-not $setup) { Result 'Hub setup' $false 'the setup is not on the release'; exit 0 }
+          # The setup checks the PC first: another program already holds the Hub's port (5280), so the Hub could not start. The setup must stop, and put nothing on the PC.
+          $holder = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, 5280)
+          $holder.Start()
+          $busy = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          $holder.Stop()
+          $hubExe = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\NextGenOS.Hub.exe'
+          $hasService = [bool](Get-Service NextGenOSHub -ErrorAction SilentlyContinue)
+          Result 'Hub setup with its port in use by another program: stops and installs nothing' ((-not (Test-Path $hubExe)) -and (-not $hasService)) "exit code $($busy.ExitCode); program installed: $(Test-Path $hubExe); service made: $hasService"
+          Start-Sleep -Seconds 2
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          Result 'Hub setup finishes' ($p.ExitCode -eq 0) "exit code $($p.ExitCode)"
+          for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub -ErrorAction SilentlyContinue).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 2 }
+          Result 'Hub service runs' ((Get-Service NextGenOSHub -ErrorAction SilentlyContinue).Status -eq 'Running') "state: $((Get-Service NextGenOSHub -ErrorAction SilentlyContinue).Status)"
+          $icons = @(Find-Icons '*Smart Retail POS*')
+          Say "Icons found:"; $icons | ForEach-Object { $i = Icon-Info $_; Say "  $($i.Path) -> $($i.Target) $($i.Arguments)  (target exists: $($i.TargetExists))" }
+          Result 'Hub setup made an icon' ($icons.Count -gt 0) "$($icons.Count) found"
+          $desktop = $icons | Where-Object { $_.FullName -like '*Desktop*' } | Select-Object -First 1
+          if (-not $desktop) { $desktop = $icons | Select-Object -First 1 }
+          if ($desktop) {
+            $info = Icon-Info $desktop
+            Result 'Hub icon points at a program that exists' $info.TargetExists "$($info.Target) $($info.Arguments)"
+            Start-Process -FilePath $desktop.FullName
+            $title = Wait-AppWindow 90
+            Shot 'hub-icon-window'
+            Say ("Windows now: " + ((Titles) -join ' | '))
+            $text = ''
+            try { $text = (Invoke-WebRequest 'http://127.0.0.1:5280/' -UseBasicParsing -Headers @{ Accept = 'text/html' } -SkipHttpErrorCheck).Content } catch { $text = $_.Exception.Message }
+            Result 'Hub icon opens a window with the licence page' ($title -ne '' -and -not (Looks-Broken $title)) "window title: '$title'; page says licence: $($text -match '(?i)licen')"
+            Close-Edge
+          }
+          # THE LIKELY REAL-PC FAILURE: the icon pressed (or the setup's Finish button) while the Hub, which Windows starts a minute or two after the PC starts, is not up yet. The window must not
+          # show "this site can't be reached"; a small window must say that it is starting, and the Hub's window must open by itself the moment the Hub answers.
+          $openerDir = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub'
+          $opener = Join-Path $openerDir 'Open Smart Retail POS.exe'
+          if ($desktop -and (Test-Path $opener)) {
+            Stop-Service NextGenOSHub -Force
+            for ($i = 0; $i -lt 30 -and (Get-Service NextGenOSHub).Status -ne 'Stopped'; $i++) { Start-Sleep -Seconds 1 }
+            Result 'Hub service stopped for the test (as it is just after the PC starts)' ((Get-Service NextGenOSHub).Status -eq 'Stopped') "state: $((Get-Service NextGenOSHub).Status)"
+            Start-Process -FilePath $desktop.FullName
+            Start-Sleep -Seconds 12
+            $waiting = @(Titles)
+            Shot 'hub-icon-while-starting'
+            Say ("While the Hub is not up: " + ($waiting -join ' | '))
+            $banner = @(Get-Process -Name 'Open Smart Retail POS' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle })
+            $edgeEarly = @(Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -and $_.MainWindowHandle -ne 0 })
+            Result 'Icon pressed before the Hub is up: a small window says it is starting' ($banner.Count -gt 0) "window: '$($banner[0].MainWindowTitle)'"
+            Result 'Icon pressed before the Hub is up: no browser window with an error page' ($edgeEarly.Count -eq 0) "browser windows: $(($edgeEarly | ForEach-Object { $_.MainWindowTitle }) -join ' | ')"
+            Result 'Icon pressed before the Hub is up: the launcher did not start a second copy of the Hub' (@(Get-Process -Name 'NextGenOS.Hub' -ErrorAction SilentlyContinue).Count -eq 0) 'no Hub program is running yet'
+            Start-Service NextGenOSHub
+            $title2 = Wait-AppWindow 150
+            Shot 'hub-icon-after-start'
+            Say ("After the Hub is up: " + ((Titles) -join ' | '))
+            Result 'Icon pressed before the Hub is up: its window opens by itself once the Hub answers' ($title2 -ne '' -and -not (Looks-Broken $title2)) "window title: '$title2'"
+            $hubCopies = @(Get-CimInstance Win32_Process -Filter "Name='NextGenOS.Hub.exe'")
+            Result 'Only the Windows service runs the Hub (one copy)' ($hubCopies.Count -eq 1) "$($hubCopies.Count) copy(ies) running"
+            Close-Edge
+            # The full-screen kind (a touch till): the same, with a full-screen window.
+            Start-Process -FilePath (Join-Path $openerDir 'Open Smart Retail POS (full screen).exe')
+            Start-Sleep -Seconds 12
+            $kiosk = @(Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -match '--kiosk' -and $_.CommandLine -notmatch '--type=' })
+            Result 'The full-screen icon opens the Hub full screen' ($kiosk.Count -gt 0) "$($kiosk.Count) full-screen window(s)"
+            Close-Edge
+            # Nothing of ours is ever opened as a page in the usual browser: a browser started on the Hub's address must be an app window or full screen.
+            Start-Process -FilePath $desktop.FullName
+            Start-Sleep -Seconds 12
+            $plain = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(msedge|chrome|firefox)\.exe$' -and $_.CommandLine -match '127\.0\.0\.1:5280' -and $_.CommandLine -notmatch '--app=|--kiosk|--type=' })
+            Result 'The Hub is never opened as a page in the usual web browser' ($plain.Count -eq 0) "$($plain.Count) plain browser tab(s) on the Hub's address"
+            Close-Edge
+          }
+          # The same address the setup's "Open Smart Retail POS now" button opens, asked for the way a browser does it.
+          $code = 0
+          try { $code = (Invoke-WebRequest 'http://127.0.0.1:5280/' -UseBasicParsing -SkipHttpErrorCheck).StatusCode } catch { $code = -1 }
+          Result 'Hub answers at the address the setup shows' ($code -eq 402) "HTTP $code (402 is right for a trial with no licence)"
+          $un = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub\Uninstall.exe'
+          if (Test-Path $un) { Start-Process -FilePath $un -ArgumentList '/S' -Wait }
+
+      - name: Setup Studio one-click setup - install, then open it from its icon
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          Add-Type -AssemblyName System.Web
+          $setup = Get-ChildItem dist -Filter 'NextGenOS-Setup-Studio-Setup-*.exe' | Select-Object -First 1
+          if (-not $setup) { Result 'Studio setup' $false 'the setup is not on the release'; exit 0 }
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          Result 'Studio setup finishes' ($p.ExitCode -eq 0) "exit code $($p.ExitCode)"
+          $icons = @(Find-Icons '*Setup Studio*' | Where-Object { $_.Name -notlike '*Uninstall*' })
+          Say "Icons found:"; $icons | ForEach-Object { $i = Icon-Info $_; Say "  $($i.Path) -> $($i.Target) $($i.Arguments)  (target exists: $($i.TargetExists))" }
+          Result 'Studio setup made an icon' ($icons.Count -gt 0) "$($icons.Count) found"
+          $icon = $icons | Where-Object { $_.FullName -like '*Desktop*' } | Select-Object -First 1
+          if (-not $icon) { $icon = $icons | Select-Object -First 1 }
+          if ($icon) {
+            $info = Icon-Info $icon
+            Result 'Studio icon points at a program that exists' $info.TargetExists "$($info.Target)"
+            $note = Join-Path (Join-Path $env:APPDATA 'NextGenOS Setup Studio') 'running.json'
+            Remove-Item $note -ErrorAction SilentlyContinue
+            Start-Process -FilePath $icon.FullName
+            for ($i = 0; $i -lt 90 -and -not (Test-Path $note); $i++) { Start-Sleep -Seconds 1 }
+            Result 'Studio starts from its icon (no settings given to it)' (Test-Path $note) $(if (Test-Path $note) { 'it wrote its note that it is running' } else { 'it did not start within 90 seconds' })
+            if (Test-Path $note) {
+              $info2 = Get-Content $note -Raw | ConvertFrom-Json
+              $title = Wait-AppWindow 60
+              Shot 'studio-icon-window'
+              Say ("Windows now: " + ((Titles) -join ' | '))
+              $uri = [Uri]$info2.url
+              $key = [System.Web.HttpUtility]::ParseQueryString($uri.Query)['k']
+              $base = "$($uri.Scheme)://$($uri.Authority)"
+              $state = $null
+              try { $state = Invoke-RestMethod -Uri "$base/api/state" -Headers @{ 'x-studio-key' = $key } } catch { Say "State: $($_.Exception.Message)" }
+              Result 'Studio opens a window and answers' ($title -ne '' -and -not (Looks-Broken $title) -and $state) "window title: '$title'; version: $($state.version); workspace: $($state.folder)"
+              try { Invoke-RestMethod -Method Post -Uri "$base/api/quit" -Headers @{ 'x-studio-key' = $key } -ContentType 'application/json' -Body '{}' | Out-Null } catch {}
+              Start-Sleep -Seconds 5
+            }
+            Close-Edge
+          }
+          $un = Get-ChildItem "$env:ProgramFiles\NextGenOS*" -Recurse -Filter 'Uninstall.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($un) { Start-Process -FilePath $un.FullName -ArgumentList '/S' -Wait }
+
+      - name: Website zip - double-click Start Website
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'helpers.ps1')
+          $zip = Get-ChildItem dist -Filter 'website-windows.zip' | Select-Object -First 1
+          if (-not $zip) { Result 'Website zip' $false 'the zip is not on the release'; exit 0 }
+          $dir = Join-Path $env:RUNNER_TEMP 'website folder'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          # Windows' own Expand-Archive is what a person's Extract All is closest to here; a path that is too long for Windows shows up as a failure.
+          try { Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force -ErrorAction Stop } catch { Result 'Website zip unpacks' $false $_.Exception.Message; exit 0 }
+          Result 'Website zip unpacks' $true 'all files extracted'
+          $starter = Get-ChildItem $dir -Recurse -Filter 'Start Website*.exe' | Select-Object -First 1
+          if (-not $starter) { Result 'Website zip' $false 'no "Start Website" program in the zip'; exit 0 }
+          Start-Process -FilePath $starter.FullName -WorkingDirectory $starter.DirectoryName
+          $title = Wait-AppWindow 120
+          Shot 'website-window'
+          Say ("Windows now: " + ((Titles) -join ' | '))
+          Result 'Website: Start Website opens a window' ($title -ne '' -and -not (Looks-Broken $title)) "window title: '$title'"
+          Close-Edge
+          Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Pictures of the screen
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: real-use-pictures
+          path: shots
+          if-no-files-found: ignore
+
+      - name: The answer
+        if: always()
+        shell: pwsh
+        run: |
+          $file = Join-Path $env:RUNNER_TEMP 'results.txt'
+          if (-not (Test-Path $file)) { throw 'No check wrote a result.' }
+          Get-Content $file
+          $failed = @(Get-Content $file | Where-Object { $_ -like 'FAIL*' })
+          if ($failed.Count -gt 0) { throw "$($failed.Count) check(s) failed." }
+          Write-Host 'Every Windows file opened the way a person opens it.'
+
+  android:
+    name: Android app installed and opened on a phone (an emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Take the Android file from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GIVEN_RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          set -euo pipefail
+          ID="${GIVEN_RELEASE_ID:-}"
+          if [ -z "${ID}" ]; then
+            TAG="$(jq -r '.release_tag' .github/real-use-check.json)"
+            ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)"
+          fi
+          node scripts/release-assets.mjs download --release "${ID}" --out dist --match '\.apk$'
+          ls -la dist
+
+      - name: The check that runs on the phone
+        run: |
+          mkdir -p shots
+          cat > "${RUNNER_TEMP}/on-phone.sh" <<'PHONE'
+          set -u
+          APK="$1"
+          BT="$(ls -d "${ANDROID_HOME}"/build-tools/* | sort -V | tail -1)"
+          PKG="$("${BT}/aapt2" dump badging "${APK}" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)"
+          SDK="$("${BT}/aapt2" dump badging "${APK}" | sed -n "s/^sdkVersion:'\([0-9]*\)'.*/\1/p" | head -1)"
+          TARGET="$("${BT}/aapt2" dump badging "${APK}" | sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p" | head -1)"
+          echo "Package ${PKG}, lowest Android ${SDK}, built for Android ${TARGET}"
+          say() { echo "$1"; echo "- $1" >> "${GITHUB_STEP_SUMMARY}"; }
+          adb shell getprop ro.build.version.release | sed 's/^/Phone runs Android /'
+          if ! OUT="$(adb install -r "${APK}" 2>&1)"; then say "FAIL  The app did not install: ${OUT}"; exit 0; fi
+          say "PASS  The app installed (${OUT})"
+          adb logcat -c
+          adb shell monkey -p "${PKG}" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+          sleep 25
+          PID="$(adb shell pidof "${PKG}" | tr -d '\r')"
+          FOCUS="$(adb shell dumpsys window | grep -i mCurrentFocus | head -1 | tr -d '\r')"
+          adb exec-out screencap -p > shots/android-open.png
+          adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+          adb pull /sdcard/ui.xml shots/ui.xml > /dev/null 2>&1
+          SHOWN="$(grep -o 'text="[^"]*"' shots/ui.xml 2>/dev/null | grep -v 'text=""' | head -12 | tr '\n' ' ')"
+          CRASH="$(adb logcat -d | grep -E 'FATAL EXCEPTION|ANR in|Process: '"${PKG}" | head -5)"
+          if [ -n "${PID}" ] && [ -z "${CRASH}" ]; then say "PASS  The app opened and is still running after 25 seconds (process ${PID}); on screen: ${FOCUS}"; else say "FAIL  The app did not stay open. Process: '${PID}'. Crash notes: ${CRASH}"; fi
+          say "      The app shows: ${SHOWN:-nothing readable}"
+          if [ "${PKG}" = "com.nextgenos.smartretail" ]; then
+            if echo "${SHOWN}" | grep -qi 'sample app'; then say "PASS  The sample app says that it is a sample (not a browser error page)"; else say "FAIL  The sample app does not show its own sample page"; fi
+          fi
+          adb logcat -d -s chromium:E Capacitor:E Capacitor/Console:V AndroidRuntime:E 2>/dev/null | tail -20
+          PHONE
+          chmod +x "${RUNNER_TEMP}/on-phone.sh"
+          echo "## Android" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Enable the phone's fast mode (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start a phone, install the app, open it
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash ${{ runner.temp }}/on-phone.sh dist/SmartRetailPOS-example-shop-1.0.0.apk
+
+      - name: Pictures of the phone's screen
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: real-use-android
+          path: shots
+          if-no-files-found: ignore
+
+      - name: The answer
+        run: |
+          if grep -q 'FAIL' "${GITHUB_STEP_SUMMARY}"; then echo "The Android app did not open as it should."; exit 1; fi
+          echo "The Android app installed and opened."

@@ -33,7 +33,7 @@ public static class ItemAttrs
 
 public sealed record Item(
     long Id, string Kind, string? Sku, string? Barcode, string Name, string? Category, string Unit, long PriceMinor, long? TradePriceMinor, long CostMinor,
-    string TaxCode, bool TrackStock, long ReorderMilli, string? Station, int? DurationMin, IReadOnlyDictionary<string, string> Attrs, bool Active)
+    string TaxCode, bool TrackStock, long ReorderMilli, string? Station, int? DurationMin, IReadOnlyDictionary<string, string> Attrs, bool Active, bool TrackBatches = false, long? PackItemId = null, long PerPackMilli = 0)
 {
     /// <summary>The price for a customer's price level: trade customers get the trade price when the item has one.</summary>
     public long PriceFor(string priceLevel) => priceLevel == "trade" && TradePriceMinor.HasValue ? TradePriceMinor.Value : PriceMinor;
@@ -54,6 +54,12 @@ public sealed class ItemInput
     public string TaxClass { get; set; } = "standard";
     /// <summary>Null: follow the item kind and the industry.</summary>
     public bool? TrackStock { get; set; }
+    /// <summary>Keep this item's stock in batches, with a batch number and an expiry date (medicines, food). Null: leave as it is (a new item: not kept). Only an item that keeps stock can keep batches.</summary>
+    public bool? TrackBatches { get; set; }
+    /// <summary>Sell this item loose from a pack: the item whose packs it is opened from (null: leave as it is; 0: no longer sold loose). A piece of a box is sold loose from the box.</summary>
+    public long? PackItemId { get; set; }
+    /// <summary>How many of this item one pack holds, in thousandths (12000 = twelve). Needed with <see cref="PackItemId"/>.</summary>
+    public long? PerPackMilli { get; set; }
     public long ReorderMilli { get; set; }
     public string? Station { get; set; }
     public int? DurationMin { get; set; }

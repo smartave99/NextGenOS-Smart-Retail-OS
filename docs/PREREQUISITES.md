@@ -13,13 +13,13 @@ The rule (`CLAUDE.md`, section 6): **every installer carries everything it needs
 
 | Item | System | Why it is allowed |
 |---|---|---|
-| `windows-10-22h2-or-11-x64` | Windows | The operating system itself. |
+| `windows-10-22h2-or-11-x64` | Windows | The operating system itself. The Hub setup checks that it is Windows 10 version 1809 (build 17763, which is also Windows Server 2019) or later, 64-bit, before it installs anything, and says so in plain words if not. |
 | `windows-system-dlls` | Windows | Our native files import only DLLs that every Windows 10/11 has in `System32` (kernel, user, security, networking, graphics). The audit lists each one; the Visual C++ runtime is **not** needed (our native files carry it inside themselves). |
-| `web-browser-edge` | Windows | Microsoft Edge is part of Windows 10/11. The Hub is used in a browser. |
+| `web-browser-edge` | Windows | Microsoft Edge is part of Windows 10/11 (Google Chrome also works). Our programs open in a window of their own, which is one of these two in "app" mode, never the usual web browser. The Hub setup checks that one is there and asks before it carries on without. It also checks 1 GB of free room and that port 5280 is free. |
 | `glibc-2.35-or-newer` | Linux | The C library every Linux has. Nothing we ship asks for a newer one. |
 | `libstdc++6-libgcc-s1` | Linux | The C++ runtime that comes with every Debian/Ubuntu desktop. |
 | `openssl-3` | Linux | Needed for secure connections (activating the licence over HTTPS). Every Debian 12 / Ubuntu 22.04+ desktop has it. The installer checks and says plainly if it is missing. |
-| `web-browser` | Linux | A desktop browser (Firefox is on Ubuntu; Chromium and Chrome also work). The installer checks. |
+| `web-browser` | Linux | Chromium or Google Chrome, to show a window of its own (Firefox cannot; the package asks for Chromium). The installer checks. |
 | `systemd` | Linux | Runs the Hub in the background and starts it with the PC. |
 
 ## What we carry inside the installer (never asked of the customer)
@@ -67,4 +67,4 @@ The start program also checks that the port is free and that there is room on th
 
 The small program a person double-clicks to open one of our programs with no terminal window (`Start Website.exe`, `Setup Studio.exe`, the Hub zip's `Start Business Hub.exe`, the dashboard package's `Start Smart Retail POS.exe`; made with NSIS by `scripts/lib/build-launcher.mjs`) is a **32-bit** Windows program. **Reason:** the free NSIS for Windows has no 64-bit stub, and every 64-bit Windows 10 and 11 runs 32-bit programs (WoW64 is part of Windows). It only starts the 64-bit program beside it. The audit accepts such a file only when `prerequisites.json` names it in `"launchers"` (a `.exe` at the top of the package), and it still checks that the launcher imports nothing but Windows' own libraries.
 
-The launcher of a *background program that is shown in a window* (the Hub, the dashboard: `-DOPEN_URL`) also makes one plain connection to `127.0.0.1` to ask whether the program already answers, so that it is started once and the window opens only when it can show something. It does this with Windows' own sockets library (`ws2_32.dll`, part of every Windows) through the one helper that NSIS carries inside the launcher itself; nothing is added to the package, and the launcher's own import list is the same as the other launchers'. It opens the window in Microsoft Edge (part of Windows 10 and 11), or Google Chrome when that is there instead, or the usual browser; no browser has to be installed first.
+The launcher of a *background program that is shown in a window* (the Hub, the dashboard: `-DOPEN_URL`) also makes one plain connection to `127.0.0.1` to ask whether the program already answers, so that it is started once and the window opens only when it can show something. It does this with Windows' own sockets library (`ws2_32.dll`, part of every Windows) through the one helper that NSIS carries inside the launcher itself; nothing is added to the package, and the launcher's own import list is the same as the other launchers'. It opens the window in Microsoft Edge (part of Windows 10 and 11), or Google Chrome when that is there instead. It never opens the usual web browser: when there is neither, it says so and tells the person what to install. A launcher made with `-DWAIT_ONLY` (the Hub's icons: the Hub is a Windows service) never starts the program, it only waits for it and shows a small "starting" window.

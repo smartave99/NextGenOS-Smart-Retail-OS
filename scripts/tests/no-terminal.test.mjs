@@ -92,13 +92,13 @@ test('the old Windows programs are window programs, or are started with no windo
 });
 
 test('every shortcut a setup makes opens a window program or Edge, never a console program', () => {
-  // The Hub: the shortcut is Edge in "app" mode ($R0), or the web address file; the program file is only the icon.
+  // The Hub: every shortcut is one of the two small launcher programs beside it (they wait until the Hub, a service, answers, and then open its window in Edge's "app" mode); the Hub's own program file is only the icon.
   const hub = read('apps/business-hub/installer/SmartRetailHub.nsi');
   const hubShortcuts = [...hub.matchAll(/CreateShortCut\s+"([^"]+)"\s+("[^"]+"|\S+)/gi)];
   assert.ok(hubShortcuts.length >= 4, 'the Hub setup makes its shortcuts');
-  for (const [line, , target] of hubShortcuts) assert.ok(!/EXE/.test(target), `a Hub shortcut starts the console program itself (that would show a black window): ${line}`);
-  assert.ok(hubShortcuts.some(([, , target]) => target.includes('$R0')), 'the Hub shortcuts start Edge');
-  assert.match(hub, /--app=\$\{ADDRESS\}/, 'in app mode: a window with no address bar');
+  for (const [line, , target] of hubShortcuts) assert.ok(!/\$\{EXE\}/.test(target), `a Hub shortcut starts the console program itself (that would show a black window): ${line}`);
+  assert.ok(hubShortcuts.every(([, , target]) => /\$\{OPENER(_FULL)?\}/.test(target)), 'the Hub shortcuts start the small launcher programs');
+  assert.doesNotMatch(hub, /--app=\$\{ADDRESS\}/, 'the setup itself opens no address: the launcher does, in app mode (a window with no address bar), once the Hub answers');
   // The AI add-on and the Windows POS: their shortcuts start the window program.
   assert.match(read('apps/pos-ai-companion/installer/SmartRetailAI.nsi'), /CreateShortcut "\$SMPROGRAMS\\\$\{APP\}\.lnk" "\$INSTDIR\\\$\{EXE\}"/);
   assert.match(read('apps/pos-ai-companion/installer/SmartRetailAI.nsi'), /!define EXE "SmartRetailAI\.exe"/);

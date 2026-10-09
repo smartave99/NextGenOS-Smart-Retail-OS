@@ -42,7 +42,7 @@ export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) 
       title: 'Programs open like programs, with no terminal (CLAUDE.md section 10): every script is a named window helper or an engineer\'s tool; the setups open window programs; the Hub zip and the dashboard get a hidden launcher; the launcher maker and its command line refuse bad input; the guides name no old way in',
       run: () => {
         if (!has('makensis')) return { status: 'SKIP', detail: 'makensis (NSIS) is not installed here, so the launchers cannot be made and read (apt-get install nsis): a skipped test is not a passed test' };
-        const r = runCmd('no-terminal', 'node', ['--test', 'scripts/tests/no-terminal.test.mjs', 'scripts/tests/launcher-open.test.mjs', 'scripts/tests/hub-zip-launcher.test.mjs']);
+        const r = runCmd('no-terminal', 'node', ['--test', 'scripts/tests/no-terminal.test.mjs', 'scripts/tests/own-window.test.mjs', 'scripts/tests/launcher-open.test.mjs', 'scripts/tests/hub-zip-launcher.test.mjs']);
         if (r.status !== 'PASS') return r;
         const skipped = /# skipped (\d+)/.exec(r.out);
         if (skipped && Number(skipped[1]) > 0) return { status: 'SKIP', detail: `${skipped[1]} test(s) were skipped: a skipped test is not a passed test` };

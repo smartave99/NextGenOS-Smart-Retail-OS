@@ -1,0 +1,270 @@
+@page "/reports/more"
+@attribute [Authorize(Policy = Perm.Reports)]
+@inherits HubPage
+@using NextGenOS.Hub.Reports
+
+<PageTitle>More reports</PageTitle>
+<p><a href="reports">&larr; Reports</a></p>
+<h1>More reports</h1>
+<p class="sub">Bill by bill, profit, what sells most and least, what you bought, and what is out of stock.</p>
+<Notice Error="@Error" />
+
+<div class="toolbar">
+    <div class="seg" role="group" aria-label="Period">
+        @foreach (var (key, label) in Presets)
+        {
+            <button type="button" class="@(preset == key ? "on" : "")" aria-pressed="@(preset == key)" @onclick="() => Pick(key)">@label</button>
+        }
+    </div>
+    <label class="sr" for="m-from">From</label>
+    <input id="m-from" class="date" type="date" value="@from.ToString("yyyy-MM-dd")" @onchange="e => SetFrom(e.Value?.ToString())" />
+    <label class="sr" for="m-to">To</label>
+    <input id="m-to" class="date" type="date" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" />
+</div>
+
+<div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-bills" class="@(tab == "bills" ? "on" : "")" aria-selected="@(tab == "bills")" @onclick='() => Open("bills")'>Bills</button>
+    <button type="button" role="tab" id="tab-profit" class="@(tab == "profit" ? "on" : "")" aria-selected="@(tab == "profit")" @onclick='() => Open("profit")'>Profit by @Shop.Singular("item").ToLowerInvariant()</button>
+    <button type="button" role="tab" id="tab-selling" class="@(tab == "selling" ? "on" : "")" aria-selected="@(tab == "selling")" @onclick='() => Open("selling")'>Most and least sold</button>
+    @if (Shop.Features.Purchases) { <button type="button" role="tab" id="tab-buying" class="@(tab == "buying" ? "on" : "")" aria-selected="@(tab == "buying")" @onclick='() => Open("buying")'>Bought</button> }
+    <button type="button" role="tab" id="tab-history" class="@(tab == "history" ? "on" : "")" aria-selected="@(tab == "history")" @onclick='() => Open("history")'>One @(Shop.Singular("item").ToLowerInvariant()) and its sales</button>
+    <button type="button" role="tab" id="tab-out" class="@(tab == "out" ? "on" : "")" aria-selected="@(tab == "out")" @onclick='() => Open("out")'>Out of stock</button>
+</div>
+
+@if (tab == "bills")
+{
+    <div class="toolbar">
+        <label for="b-cashier">Cashier</label>
+        <select id="b-cashier" @bind="cashier" @bind:after="Read">
+            <option value="">Everyone</option>
+            @foreach (var u in users) { <option value="@u.Id">@u.DisplayName</option> }
+        </select>
+        <span class="spacer"></span>
+        <a class="btn ghost small" href="@BillsFile()" download>Download</a>
+    </div>
+    <div class="card tbl-wrap">
+        @if (bills.Count == 0) { <div class="empty" id="bills-empty">No bills in these days.</div> }
+        else
+        {
+            <table class="tbl" id="bills-table">
+                <thead><tr><th>Bill</th><th>When</th><th>Customer</th><th>Cashier</th><th class="num">Total</th>@foreach (var m in methods) { <th class="num">@Cap(m)</th> }<th class="num">Owed</th><th class="num">Cost</th><th class="num">Profit</th></tr></thead>
+                <tbody>
+                @foreach (var b in bills)
+                {
+                    <tr class="@(b.IsReturn ? "muted" : "")">
+                        <td><a href="documents/@b.Id">@b.Number</a></td>
+                        <td>@When(b.At)</td>
+                        <td>@b.Customer</td>
+                        <td>@b.Cashier</td>
+                        <td class="num">@Signed(b.TotalMinor)</td>
+                        @foreach (var m in methods) { <td class="num">@(b.ByMethod.TryGetValue(m, out var v) && v != 0 ? Signed(v) : "")</td> }
+                        <td class="num">@(b.DueMinor > 0 ? Money(b.DueMinor) : "")</td>
+                        <td class="num">@Signed(b.CostMinor)</td>
+                        <td class="num">@Signed(b.ProfitMinor)</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="4">All of these</th><th class="num" id="bills-total">@Signed(bills.Sum(b => b.TotalMinor))</th>@foreach (var m in methods) { <th class="num">@Signed(bills.Sum(b => b.ByMethod.GetValueOrDefault(m)))</th> }<th class="num">@Money(bills.Sum(b => b.DueMinor))</th><th class="num">@Signed(bills.Sum(b => b.CostMinor))</th><th class="num" id="bills-profit">@Signed(bills.Sum(b => b.ProfitMinor))</th></tr>
+                </tfoot>
+            </table>
+        }
+    </div>
+    <p class="muted small">Profit is the bill before tax, after every discount, less what the goods cost (the average cost of the stock). Goods that keep no stock have no cost. A return is a line of its own, below nothing.</p>
+}
+else if (tab == "profit")
+{
+    <div class="toolbar"><span class="spacer"></span><a class="btn ghost small" href="export/profit.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+    <div class="card tbl-wrap">
+        @if (profit.Count == 0) { <div class="empty">Nothing sold in these days.</div> }
+        else
+        {
+            <table class="tbl" id="profit-table">
+                <thead><tr><th>@Shop.Singular("item")</th><th class="num">Sold</th><th class="num">Sales before tax</th><th class="num">Cost</th><th class="num">Profit</th></tr></thead>
+                <tbody>
+                @foreach (var p in profit)
+                {
+                    <tr><td>@p.Name</td><td class="num">@Qty(p.QtyMilli)</td><td class="num">@Signed(p.TaxableMinor)</td><td class="num">@Signed(p.CostMinor)</td><td class="num">@(p.ProfitMinor < 0 ? "Loss " : "")@Signed(p.ProfitMinor)</td></tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+else if (tab == "selling")
+{
+    <div class="cols">
+        <section class="card">
+            <div class="head"><h2>Sold the most</h2></div>
+            @if (best.Count == 0) { <div class="empty">Nothing sold in these days.</div> }
+            else { <div class="tbl-wrap"><table class="tbl" id="best-table"><thead><tr><th>@Shop.Singular("item")</th><th class="num">Sold</th></tr></thead><tbody>@foreach (var t in best) { <tr><td>@t.Name</td><td class="num">@Qty(t.QtyMilli)</td></tr> }</tbody></table></div> }
+        </section>
+        <section class="card">
+            <div class="head"><h2>Sold the least</h2></div>
+            @if (low.Count == 0) { <div class="empty">Nothing sold in these days.</div> }
+            else { <div class="tbl-wrap"><table class="tbl" id="low-table"><thead><tr><th>@Shop.Singular("item")</th><th class="num">Sold</th></tr></thead><tbody>@foreach (var t in low) { <tr><td>@t.Name</td><td class="num">@Qty(t.QtyMilli)</td></tr> }</tbody></table></div> }
+        </section>
+    </div>
+    <p class="muted small">By how many were sold, goods brought back taken off. Only things that sold at all are listed.</p>
+}
+else if (tab == "buying")
+{
+    <div class="toolbar"><span class="spacer"></span><a class="btn ghost small" href="export/purchase-list.csv?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")" download>Download</a></div>
+    <div class="card tbl-wrap">
+        @if (buying.Count == 0) { <div class="empty">Nothing bought in these days.</div> }
+        else
+        {
+            <table class="tbl" id="buying-table">
+                <thead><tr><th>Purchase</th><th>When</th><th>From</th><th class="num">Before tax</th><th class="num">Tax</th><th class="num">Total</th><th class="num">Paid</th><th class="num">To pay</th></tr></thead>
+                <tbody>
+                @foreach (var b in buying)
+                {
+                    <tr class="@(b.IsReturn ? "muted" : "")"><td><a href="documents/@b.Id">@b.Number</a>@(b.IsReturn ? " (sent back)" : "")</td><td>@When(b.At)</td><td>@b.Supplier</td><td class="num">@Signed(b.TaxableMinor)</td><td class="num">@Signed(b.TaxMinor)</td><td class="num">@Signed(b.TotalMinor)</td><td class="num">@Signed(b.PaidMinor)</td><td class="num">@(b.DueMinor > 0 ? Money(b.DueMinor) : "")</td></tr>
+                }
+                </tbody>
+                <tfoot><tr><th colspan="5">All of these</th><th class="num">@Signed(buying.Sum(b => b.TotalMinor))</th><th class="num">@Signed(buying.Sum(b => b.PaidMinor))</th><th class="num">@Money(buying.Sum(b => b.DueMinor))</th></tr></tfoot>
+            </table>
+        }
+    </div>
+}
+else if (tab == "history")
+{
+    <div class="card stack">
+        <label for="h-item">@Shop.Singular("item")</label>
+        <select id="h-item" value="@(historyItem?.ToString() ?? "")" @onchange="e => ChooseItem(e.Value?.ToString())">
+            <option value="">Choose…</option>
+            @foreach (var i in items) { <option value="@i.Id">@i.Name</option> }
+        </select>
+    </div>
+    @if (historyItem is not null)
+    {
+        <div class="card tbl-wrap">
+            @if (history.Count == 0) { <div class="empty">Never sold.</div> }
+            else
+            {
+                <table class="tbl" id="history-table">
+                    <thead><tr><th>Bill</th><th>When</th><th>Customer</th><th class="num">How many</th><th class="num">Price each</th><th class="num">Discount</th><th class="num">Tax</th><th class="num">Line total</th></tr></thead>
+                    <tbody>
+                    @foreach (var h in history)
+                    {
+                        <tr class="@(h.IsReturn ? "muted" : "")"><td><a href="documents/@h.DocumentId">@h.Number</a>@(h.IsReturn ? " (brought back)" : "")</td><td>@When(h.At)</td><td>@h.Customer</td><td class="num">@Qty(Math.Abs(h.QtyMilli))</td><td class="num">@Money(h.UnitMinor)</td><td class="num">@(h.DiscountMinor == 0 ? "" : Signed(h.DiscountMinor))</td><td class="num">@Signed(h.TaxMinor)</td><td class="num">@Signed(h.TotalMinor)</td></tr>
+                    }
+                    </tbody>
+                </table>
+                <p class="muted small">Price each is before discount and tax.</p>
+            }
+        </div>
+    }
+}
+else
+{
+    <div class="toolbar"><span class="spacer"></span><a class="btn ghost small" href="export/out-of-stock.csv" download>Download</a></div>
+    <div class="card tbl-wrap">
+        @if (outOfStock.Count == 0) { <div class="empty" id="out-empty">Nothing is out of stock.</div> }
+        else
+        {
+            <table class="tbl" id="out-table">
+                <thead><tr><th>@Shop.Singular("item")</th><th class="num">On the shelf</th></tr></thead>
+                <tbody>@foreach (var o in outOfStock) { <tr><td>@o.Name</td><td class="num">@Qty(o.OnHandMilli) @o.Unit</td></tr> }</tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Presets = { ("today", "Today"), ("yesterday", "Yesterday"), ("week", "7 days"), ("month", "30 days"), ("year", "This year") };
+
+    private string tab = "bills";
+    private string preset = "month";
+    private DateOnly from, to;
+    private string cashier = "";
+    private IReadOnlyList<NextGenOS.Hub.Security.User> users = Array.Empty<NextGenOS.Hub.Security.User>();
+    private IReadOnlyList<BillRow> bills = Array.Empty<BillRow>();
+    private IReadOnlyList<string> methods = Array.Empty<string>();
+    private IReadOnlyList<ProfitRow> profit = Array.Empty<ProfitRow>();
+    private IReadOnlyList<TopItem> best = Array.Empty<TopItem>(), low = Array.Empty<TopItem>();
+    private IReadOnlyList<PurchaseRow> buying = Array.Empty<PurchaseRow>();
+    private IReadOnlyList<NextGenOS.Hub.Catalog.Item> items = Array.Empty<NextGenOS.Hub.Catalog.Item>();
+    private long? historyItem;
+    private IReadOnlyList<ProductSale> history = Array.Empty<ProductSale>();
+    private IReadOnlyList<OutOfStockRow> outOfStock = Array.Empty<OutOfStockRow>();
+
+    private string BillsFile() => $"export/bills.csv?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}" + (cashier == "" ? "" : "&cashier=" + cashier);
+
+    private static string Cap(string m) => m.Length == 0 ? m : char.ToUpperInvariant(m[0]) + m[1..];
+
+    private string Signed(long minor) => minor < 0 ? "−" + Money(-minor) : Money(minor);
+
+    protected override Task LoadAsync()
+    {
+        if (from == default) Pick("month");
+        else Read();
+        return Task.CompletedTask;
+    }
+
+    private void Open(string which)
+    {
+        tab = which;
+        Error = null;
+        Read();
+    }
+
+    private void Pick(string key)
+    {
+        preset = key;
+        (from, to) = key switch
+        {
+            "today" => (Today, Today),
+            "yesterday" => (Today.AddDays(-1), Today.AddDays(-1)),
+            "week" => (Today.AddDays(-6), Today),
+            "year" => (new DateOnly(Today.Year, 1, 1), Today),
+            _ => (Today.AddDays(-29), Today),
+        };
+        Read();
+    }
+
+    private void SetFrom(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { from = d; if (to < from) to = from; preset = ""; Read(); }
+    }
+
+    private void SetTo(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { to = d; if (from > to) from = to; preset = ""; Read(); }
+    }
+
+    private void ChooseItem(string? text)
+    {
+        historyItem = long.TryParse(text, out var id) ? id : null;
+        Read();
+    }
+
+    private void Read()
+    {
+        switch (tab)
+        {
+            case "bills":
+                if (users.Count == 0) users = App.Users.List();
+                bills = App.Reports.Bills(from, to, long.TryParse(cashier, out var who) ? who : null);
+                methods = bills.SelectMany(b => b.ByMethod.Keys).Distinct().OrderBy(m => m).ToList();
+                break;
+            case "profit":
+                profit = App.Reports.ProfitByItem(from, to);
+                break;
+            case "selling":
+                best = App.Reports.TopItems(from, to, 20, byQuantity: true);
+                low = App.Reports.TopItems(from, to, 20, byQuantity: true, lowest: true);
+                break;
+            case "buying":
+                buying = App.Reports.PurchaseRegister(from, to);
+                break;
+            case "history":
+                if (items.Count == 0) items = App.Catalog.Search(null, null, null, 1000);
+                history = historyItem is { } id ? App.Reports.ProductHistory(id, 100) : Array.Empty<ProductSale>();
+                break;
+            default:
+                outOfStock = App.Reports.OutOfStock();
+                break;
+        }
+    }
+}

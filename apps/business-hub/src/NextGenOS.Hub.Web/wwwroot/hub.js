@@ -16,14 +16,40 @@
       if (set === 'light' || set === 'dark') return set;
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     },
-    // The look of this computer only (decision 30): "list" or "counter"; anything else goes back to the shop's choice. The page is drawn again with it.
+    // The look of this computer only (decision 30): "top", "list" or "counter"; anything else goes back to the shop's choice. The page is drawn again with it.
     setLook: function (value) {
-      try { if (value === 'list' || value === 'counter') localStorage.setItem('hub-look', value); else localStorage.removeItem('hub-look'); } catch (e) { /* storage may be off */ }
+      try { if (value === 'top' || value === 'list' || value === 'counter') localStorage.setItem('hub-look', value); else localStorage.removeItem('hub-look'); } catch (e) { /* storage may be off */ }
       location.reload();
     },
     print: function () { window.print(); },
     focus: function (id) { var el = document.getElementById(id); if (el) { el.focus(); if (el.select) el.select(); } },
-    csrf: token
+    csrf: token,
+    // Keys of the sell screen: the page hands over the keys in force (key text -> action) and is told when one is pressed. The map is the shop's own (Settings), never written here.
+    keys: {
+      _handler: null,
+      name: function (e) {
+        var key = null;
+        if (/^F([1-9]|1[0-2])$/.test(e.key)) key = e.key;
+        else if (e.code && /^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
+        else if (e.code && /^Digit[0-9]$/.test(e.code)) key = e.code.slice(5);
+        if (!key) return null;
+        return (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + key;
+      },
+      start: function (ref, map) {
+        window.hub.keys.stop();
+        window.hub.keys._handler = function (e) {
+          var action = map[window.hub.keys.name(e)];
+          if (!action) return;
+          e.preventDefault();
+          ref.invokeMethodAsync('OnTillKey', action).catch(function () { /* the page was closed */ });
+        };
+        document.addEventListener('keydown', window.hub.keys._handler, true);
+      },
+      stop: function () {
+        if (window.hub.keys._handler) document.removeEventListener('keydown', window.hub.keys._handler, true);
+        window.hub.keys._handler = null;
+      }
+    }
   };
   document.addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('[data-set-look]') : null;

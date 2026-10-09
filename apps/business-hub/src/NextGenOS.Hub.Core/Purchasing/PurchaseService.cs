@@ -12,7 +12,14 @@ public sealed class PurchaseLine
     public long QtyMilli { get; set; }
     /// <summary>What one costs, in minor units.</summary>
     public long CostMinor { get; set; }
+    /// <summary>For an item that keeps batches: the batch that arrives with this line, and its dates (they can also be given when the goods are received).</summary>
+    public string? BatchNo { get; set; }
+    public DateOnly? MfgOn { get; set; }
+    public DateOnly? ExpOn { get; set; }
 }
+
+/// <summary>What a delivery says about the batch of one line of an order, when the goods arrive.</summary>
+public sealed record ReceivedBatch(string? BatchNo, DateOnly? MfgOn, DateOnly? ExpOn);
 
 /// <summary>Buying from suppliers: a purchase order, receiving the goods into stock, and paying the supplier.</summary>
 public sealed class PurchaseService(DocumentService documents, CatalogService catalog, PartyService parties, Access access)
@@ -27,16 +34,18 @@ public sealed class PurchaseService(DocumentService documents, CatalogService ca
         return documents.CreateDraft(new DraftOptions
         {
             Type = DocTypes.Purchase, Direction = "in", PartyId = supplierId, UserId = userId, Notes = notes,
-            Lines = list.Select(l => new LineInput { ItemId = l.ItemId, QtyMilli = l.QtyMilli, UnitPriceMinor = l.CostMinor }).ToList(),
+            Lines = list.Select(l => new LineInput { ItemId = l.ItemId, QtyMilli = l.QtyMilli, UnitPriceMinor = l.CostMinor, BatchNo = l.BatchNo, MfgOn = l.MfgOn, ExpOn = l.ExpOn }).ToList(),
         });
     }
 
     /// <summary>The goods arrived: the order becomes final, stock goes up, and the cost price of each item is updated.</summary>
-    public DocumentView Receive(long orderId, long? userId = null)
+    public DocumentView Receive(long orderId, long? userId = null, IReadOnlyDictionary<long, ReceivedBatch>? batches = null)
     {
         access.Require(Perm.Purchases);
         var order = documents.Get(orderId) ?? throw new HubException("not-found", "That order was not found.");
         if (order.Document.Type != DocTypes.Purchase) throw new HubException("not-purchase", "That is not a purchase order.");
+        if (batches is not null)
+            foreach (var (lineId, batch) in batches) documents.SetLineBatch(orderId, lineId, batch.BatchNo, batch.MfgOn, batch.ExpOn);
         var view = documents.Issue(orderId, new IssueOptions { UserId = userId });
         foreach (var line in view.Lines.Where(l => l.ItemId is not null))
         {

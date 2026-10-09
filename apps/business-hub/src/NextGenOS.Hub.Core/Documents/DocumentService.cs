@@ -15,7 +15,7 @@ namespace NextGenOS.Hub.Documents;
 /// Invoices, quotes, orders, credit notes, purchases and progress bills. One place does the money: it builds the lines, asks the tax engine for the
 /// amounts (so every country is right to the last cent), keeps the answer with the document, takes payments, moves stock and numbers the document.
 /// </summary>
-public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Events.OutboxService outbox, Access access)
+public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Events.OutboxService outbox, Access access, NextGenOS.Hub.Staff.EarnerService? earners = null)
 {
     /// <summary>The "way of paying" that uses credit a customer already has with the shop (an advance, or a return kept as credit). It moves no money and is not in the shop's list of ways of paying.</summary>
     public const string AccountCredit = "account";
@@ -187,7 +187,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         string? discountSource = null;
         if (item is not null && discountPct == 0 && input.DiscountAmountMinor == 0 && input.RefLineId is null && !input.NoAutoDiscount
             && HubDb.Query(c, "SELECT type, direction FROM documents WHERE id = $id", r => (Type: r.Text("type"), Direction: r.Text("direction")), t, ("$id", documentId)).FirstOrDefault() is { Direction: "out", Type: DocTypes.Invoice or DocTypes.Order or DocTypes.Quote })
-            (discountPct, discountSource) = offers.AutoLineDiscount(c, t, item.Id, party?.Id);
+            (discountPct, discountSource) = offers.AutoLineDiscount(c, t, item.Id, party?.Id, input.QtyMilli);
         // What the country's tax asks for besides the rate: a code for what is sold and an extra tax. A country whose pack names neither gets neither (nothing is kept, nothing is passed on).
         var itemCode = context.Country.Tax.ItemCode is null ? null : Blank(input.ItemCode ?? item?.Attrs.GetValueOrDefault(ItemAttrs.Code));
         var extraTaxPct = context.Country.Tax.ExtraTax is null ? 0 : input.ExtraTaxPctMilli ?? PercentMilli(item?.Attrs.GetValueOrDefault(ItemAttrs.ExtraTax));
@@ -200,10 +200,28 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             throw new HubException("customer-discount", $"\"{input.CustomerDiscount}\" is not a discount of {context.Country.Name}.");
         var lineNo = Convert.ToInt32(HubDb.Scalar(c, "SELECT COALESCE(MAX(line_no), 0) + 1 FROM document_lines WHERE document_id = $id", t, ("$id", documentId)) ?? 1);
         HubDb.Exec(c,
-            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id, discount_source, item_code, extra_tax_pct_milli) " +
-            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq, $source, $icode, $extra)", t,
+            "INSERT INTO document_lines(document_id, line_no, item_id, description, qty_milli, unit, unit_price_minor, discount_pct_milli, discount_amount_minor, ref_line_id, tax_code, customer_discount, note, station, boq_id, discount_source, item_code, extra_tax_pct_milli, batch_no, mfg_on, exp_on) " +
+            "VALUES ($d, $n, $item, $desc, $q, $unit, $price, $disc, $damt, $refline, $tax, $cd, $note, $station, $boq, $source, $icode, $extra, $bno, $bmfg, $bexp)", t,
+            ("$bno", Blank(input.BatchNo)), ("$bmfg", input.MfgOn is { } bm ? StockBatches.DayText(bm) : null), ("$bexp", input.ExpOn is { } be ? StockBatches.DayText(be) : null),
             ("$d", documentId), ("$n", lineNo), ("$item", item?.Id), ("$desc", description), ("$q", input.QtyMilli), ("$unit", input.Unit ?? item?.Unit), ("$price", price),
             ("$disc", discountPct), ("$damt", input.DiscountAmountMinor), ("$source", discountSource), ("$icode", itemCode), ("$extra", extraTaxPct), ("$refline", input.RefLineId), ("$tax", taxCode), ("$cd", Blank(input.CustomerDiscount)), ("$note", Blank(input.Note)), ("$station", input.Station ?? item?.Station), ("$boq", input.BoqId));
+    }
+
+    /// <summary>Says which batch (and its dates) arrives with a line of a purchase that is still open: the goods are counted into that batch when the purchase is received.</summary>
+    public DocumentView SetLineBatch(long documentId, long lineId, string? batchNo, DateOnly? mfgOn, DateOnly? expOn)
+    {
+        access.RequireAny(DocumentWork);
+        if (mfgOn is { } m && expOn is { } e && e < m) throw new HubException("batch-dates", "The expiry date cannot be before the date it was made.");
+        var no = Blank(batchNo);
+        if (no is { Length: > 40 }) throw new HubException("batch-no", "A batch number can have at most 40 letters and digits.");
+        db.InTransaction((c, t) =>
+        {
+            RequireOpen(c, t, documentId);
+            if (HubDb.Exec(c, "UPDATE document_lines SET batch_no = $n, mfg_on = $m, exp_on = $e WHERE id = $id AND document_id = $d", t,
+                    ("$n", no), ("$m", mfgOn is { } mm ? StockBatches.DayText(mm) : null), ("$e", expOn is { } ee ? StockBatches.DayText(ee) : null), ("$id", lineId), ("$d", documentId)) == 0)
+                throw new HubException("not-found", "That line was not found.");
+        });
+        return Get(documentId)!;
     }
 
     public DocumentView UpdateLine(long documentId, long lineId, long? qtyMilli = null, long? discountPctMilli = null, string? note = null, string? customerDiscount = null, bool clearCustomerDiscount = false, long? discountAmountMinor = null)
@@ -228,6 +246,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 ("$q", qtyMilli), ("$d", discountPctMilli), ("$a", discountAmountMinor), ("$n", note), ("$cd", Blank(customerDiscount)), ("$clear", clearCustomerDiscount ? 1 : 0), ("$id", lineId), ("$doc", documentId));
             var now = HubDb.Query(c, "SELECT qty_milli, unit_price_minor, discount_amount_minor FROM document_lines WHERE id = $id AND document_id = $doc", r => (Qty: r.Int("qty_milli"), Price: r.Int("unit_price_minor"), Amount: r.Int("discount_amount_minor")), t, ("$id", lineId), ("$doc", documentId)).FirstOrDefault();
             if (now.Amount > Gross(now.Qty, now.Price)) throw new HubException("discount", "A discount cannot be more than the line comes to.");
+            // A new quantity can move the line into or out of a quantity band (the program's own discount only; a discount a person typed stays).
+            if (qtyMilli is not null && discountPctMilli is null && discountAmountMinor is null) offers.ReapplyLineDiscount(c, t, documentId, lineId);
             Recalculate(c, t, documentId);
             if (givesDiscount) EnforceDiscountLimit(c, t, documentId);
         });
@@ -579,6 +599,14 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             due = now.AddDays(party.TermsDays > 0 ? party.TermsDays : (int)context.Rule("creditDays", 30));
         }
 
+        // Goods bought on account (study 02 A3.3, SL1 to SL4): what the shop would owe the supplier after this purchase must not be more than the limit set on the supplier (equal is allowed, no limit means none).
+        if (type == DocTypes.Purchase && header.PartyId is { } supplierId && parties.Get(supplierId) is { CreditLimitMinor: > 0 } supplier)
+        {
+            var owedAfter = books.SupplierBalance(c, t, supplier.Id) + (payable - paid);
+            if (owedAfter > supplier.CreditLimitMinor)
+                throw new HubException("over-limit", $"Buying this would mean owing {supplier.Name} {context.Money(owedAfter)}, more than the limit of {context.Money(supplier.CreditLimitMinor)} set for them. Pay what is due first, or raise the limit under People.");
+        }
+
         HubDb.Exec(c,
             "UPDATE documents SET type = $type, number = $number, status = 'issued', issued_at = $at, due_at = $due, meta = $meta, user_id = COALESCE($user, user_id), request_key = $key WHERE id = $id", t,
             ("$type", type), ("$number", number), ("$at", Iso.Text(now)), ("$due", due is { } dv ? Iso.Text(dv) : null), ("$meta", JsonSerializer.Serialize(meta)), ("$user", options.UserId), ("$key", requestKey), ("$id", documentId));
@@ -598,6 +626,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         books.Sync(c, t, documentId, options.UserId);
         loyalty.OnIssued(c, t, documentId, options.UserId);
         offers.OnIssued(c, t, documentId, options.UserId);
+        earners?.OnIssued(c, t, documentId, options.UserId);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
         if (type is DocTypes.Invoice or DocTypes.ProgressBill) Announce(c, t, "sale.issued", documentId, options.UserId, requestKey);
         else if (type == DocTypes.Purchase) Announce(c, t, "purchase.received", documentId, options.UserId, null);
@@ -838,7 +867,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             }
             HubDb.Exec(c, "UPDATE documents SET status = 'void', notes = COALESCE(notes || char(10), '') || $why WHERE id = $id", t, ("$why", "Void: " + reason.Trim()), ("$id", documentId));
             books.Sync(c, t, documentId, userId);
-            if (header.Status == DocStatus.Issued) { loyalty.OnVoid(c, t, documentId, userId); offers.OnVoid(c, t, documentId, userId); }
+            if (header.Status == DocStatus.Issued) { loyalty.OnVoid(c, t, documentId, userId); offers.OnVoid(c, t, documentId, userId); earners?.OnVoid(c, t, documentId, userId); }
             audit.Log(c, t, userId, "void", "document", documentId, reason.Trim());
             if (header.Status == DocStatus.Issued && header.Type is DocTypes.Invoice or DocTypes.ProgressBill) Announce(c, t, "sale.voided", documentId, userId, null);
             else if (header.Status == DocStatus.Issued && header.Type == DocTypes.Purchase) Announce(c, t, "purchase.voided", documentId, userId, null);
@@ -908,6 +937,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             MoveStock(c, t, noteId, noteDocLines, +1, "return", userId, now, invoiceId);
             books.Sync(c, t, noteId, userId);
             loyalty.OnCreditNote(c, t, noteId, invoiceId, userId);
+            earners?.OnCreditNote(c, t, noteId, invoiceId, userId);
             audit.Log(c, t, userId, "credit-note", "document", noteId, number + " for " + invoice.Number + ": " + reason.Trim());
             Announce(c, t, "sale.returned", noteId, userId, null);
             return noteId;
@@ -1049,7 +1079,9 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             var tracked = Convert.ToInt64(HubDb.Scalar(c, "SELECT track_stock FROM items WHERE id = $i", t, ("$i", group.Key)) ?? 0L) != 0;
             if (!tracked) continue;
             var qty = group.Sum(l => l.QtyMilli) * direction;
-            if (qty < 0 && !context.Settings.AllowNegativeStock)
+            if (reason == "sale" && qty < 0) StockPacks.OpenFor(c, t, group.Key, -qty, documentId, "Opened for a sale", userId, at);   // an item sold loose from a pack: open the packs this sale needs
+            var batched = StockBatches.Keeps(c, t, group.Key);   // an item that keeps batches: the stock is shared among them below
+            if (qty < 0 && !context.Settings.AllowNegativeStock && !batched)
             {
                 var onHand = Convert.ToInt64(HubDb.Scalar(c, "SELECT COALESCE(SUM(qty_milli), 0) FROM stock_moves WHERE item_id = $i", t, ("$i", group.Key)) ?? 0L);
                 if (onHand + qty < 0)
@@ -1067,7 +1099,33 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 "void" => Undone(c, t, documentId, group.Key, qty),
                 _ => 0L,
             };
-            StockCost.Insert(c, t, group.Key, qty, reason, documentId, null, at, userId, value);
+            if (!batched) { StockCost.Insert(c, t, group.Key, qty, reason, documentId, null, at, userId, value); continue; }
+            var parts = BatchesOfMove(c, t, group.Key, Math.Abs(qty), reason, documentId, originId, at);
+            var shares = StockBatches.Share(value, parts);
+            for (var i = 0; i < parts.Count; i++)
+                StockCost.Insert(c, t, group.Key, parts[i].QtyMilli * Math.Sign(qty), reason, documentId, null, at, userId, shares[i], parts[i].BatchId);
+        }
+    }
+
+    /// <summary>The batches a move of an item that keeps batches is shared among (see <see cref="StockBatches"/>): by expiry for a sale, by what the purchase named for a delivery, and as the original moves went for goods that come back or are undone.</summary>
+    private List<StockBatches.Part> BatchesOfMove(SqliteConnection c, SqliteTransaction t, long itemId, long magnitude, string reason, long documentId, long? originId, DateTimeOffset at)
+    {
+        var name = Convert.ToString(HubDb.Scalar(c, "SELECT name FROM items WHERE id = $i", t, ("$i", itemId))) ?? "";
+        switch (reason)
+        {
+            case "sale":
+                return StockBatches.TakeOut(c, t, itemId, name, magnitude, shop.Current.Time.LocalDate(at), shop.Current.Settings.AllowNegativeStock);
+            case "purchase":
+                return StockBatches.Delivered(c, t, documentId, itemId, name, at);
+            case "return" when originId is { } invoice:
+                return StockBatches.Follow(c, t, invoice, itemId, "sale", "return", magnitude, documentId);
+            case "purchase-return" when originId is { } purchase:
+                return StockBatches.Follow(c, t, purchase, itemId, "purchase", "purchase-return", magnitude, documentId);
+            case "void":
+                var made = HubDb.Scalar(c, "SELECT reason FROM stock_moves WHERE document_id = $d AND item_id = $i AND reason IN ('sale', 'purchase') LIMIT 1", t, ("$d", documentId), ("$i", itemId)) as string;
+                return made is null ? [new StockBatches.Part(null, magnitude)] : StockBatches.Follow(c, t, documentId, itemId, made, "void", magnitude, documentId);
+            default:
+                return [new StockBatches.Part(null, magnitude)];
         }
     }
 

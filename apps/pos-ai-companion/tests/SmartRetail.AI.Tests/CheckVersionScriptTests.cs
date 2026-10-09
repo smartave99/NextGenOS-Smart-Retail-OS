@@ -196,7 +196,11 @@ namespace SmartRetail.AI.Tests
             Assert.Contains("node scripts/make-website-package.mjs", workflow);
             Assert.Contains("node scripts/smoke-website.mjs", workflow);
             Assert.Contains("--node-app", workflow);
-            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website\]\s*\n", workflow);
+            // Every file is then opened the way a person opens it (icons, one-click setups, the phone), after all the builds; the release is published only when that passed (or, for a build that
+            // lost a part, was skipped, which the release notes then say).
+            Assert.Matches(@"(?m)^  real-use:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website\]\s*\n(    .*\n)*?    uses: \./\.github/workflows/real-use-check\.yml\s*\n", workflow);
+            Assert.Matches(@"(?m)^  publish:\s*\n(    .*\n)*?    needs: \[gate, prepare, android, windows-build, windows, linux, studio, studio-windows, website, real-use\]\s*\n", workflow);
+            Assert.Contains("needs.real-use.result == 'success' || needs.real-use.result == 'skipped'", workflow);
             // The files travel on a draft release, not through the workflow's artifact storage (its quota is small and a release of this size fills it).
             // The draft and the tag are made at the very start, beside the gate (GitHub lets the token make them only at the newest commit of the branch), and taken away when the gate fails.
             var prepare = System.Text.RegularExpressions.Regex.Match(workflow, @"(?ms)^  prepare:\s*\n(.*?)^  cleanup:").Groups[1].Value;

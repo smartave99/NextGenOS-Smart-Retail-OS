@@ -92,7 +92,7 @@ if [ -z "$profile" ]; then echo "The prepared set-up file (smart-retail-profile-
 echo "Installing. Anything the program needs that this computer lacks is fetched for you, so be online for this step."
 apt-get install -y "./$hub" "./$profile"
 echo
-echo "Done. Open Smart Retail POS from the menu, or go to http://127.0.0.1:5280 in a web browser."
+echo "Done. Open Smart Retail POS from the applications menu: it opens in a window of its own."
 `;
 }
 
@@ -215,7 +215,7 @@ export async function buildPack({ customerId, parts, kit, out, company = {}, bui
           '',
           '1. Keep this whole folder together: the setup file and the folder called "profile" next to it.',
           `2. Double-click "${item.files[0].name}" and follow the steps. Say Yes when Windows asks for permission.`,
-          '3. When it finishes, the program opens in your web browser. The first time, type the licence key you were given.',
+          '3. When it finishes, open Smart Retail POS from the icon on the desktop. It opens in a window of its own. The first time, type the licence key you were given.',
           '4. Your business details are already filled in. Check them, choose your own sign-in name and password, and finish.',
           ...(extras.kiosk ? ['', 'This computer is a touch-screen till or a kiosk, so the program also opens full screen by itself when the computer starts.'] : []),
           '',

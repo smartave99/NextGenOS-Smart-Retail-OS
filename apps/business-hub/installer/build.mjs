@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { here, repo, flags, run, say, checkKeys, prerequisitesFor, updateProperties, OUR_PROGRAMS, NAMES_FROM } from './common.mjs';
-import { addZipLauncher } from './zip-launcher.mjs';
+import { addZipLauncher, addServiceLaunchers, removeServiceLaunchers } from './zip-launcher.mjs';
 
 const { flag, has } = flags(process.argv.slice(2));
 const version = flag('--version', '');
@@ -56,13 +56,20 @@ try {
   mkdirSync(dist, { recursive: true });
   const base = `SmartRetailPOS-Hub-${version}-${rid}`;
 
-  // 4a. The setup, from the folder as it was published (it installs a Windows service and the window shortcuts itself, so it needs no launcher).
+  // 4a. The setup, from the folder as it was published. It installs the Hub as a Windows service, and puts two small programs beside it that the icons use: they wait until the Hub
+  // (which Windows starts a minute or two after the PC starts) answers, and then open its window of its own. They never start a second copy of it and never use the web browser.
+  say('Adding the programs that open the Hub\'s window to the folder for the setup');
+  try { console.log(`  ${addServiceLaunchers(out, { version }).join('\n  ')}`); } catch (e) { console.error(`\n${e.message}`); process.exit(1); }
+  process.stdout.write(run('node', [join(repo, 'scripts', 'audit-prerequisites.mjs'), out, '--os', 'windows', '--arch', 'x64']));
+  audit(out);
   say('Writing the setup');
   const list = join(work, 'uninstall-files.nsh');
   process.stdout.write(run('node', [join(here, 'make-uninstall-list.mjs'), out, list]));
   const makensis = process.platform === 'win32' && existsSync('C:\\Program Files (x86)\\NSIS\\makensis.exe') ? 'C:\\Program Files (x86)\\NSIS\\makensis.exe' : 'makensis';
   const setup = join(dist, `SmartRetailPOS-Hub-Setup-${version}.exe`);
   process.stdout.write(run(makensis, ['-V2', `-DVERSION=${version}`, `-DSOURCE=${out}`, `-DUNINSTALL_LIST=${list}`, `-DOUTFILE=${setup}`, `-DEULA=${join(repo, 'EULA.txt')}`, `-DNOTICES=${join(repo, 'THIRD-PARTY-NOTICES.md')}`, join(here, 'SmartRetailHub.nsi')]));
+
+  removeServiceLaunchers(out);   // the zip has its own launcher below
 
   // 4b. The zip: the same folder, for a person who deploys by hand. Double-clicking NextGenOS.Hub.exe would show a black window, so the zip carries "Start Business Hub" beside it
   // (a small hidden launcher: it starts the Hub in the background and opens it in a window of its own), a helper with a window for finding a problem, and a read-me that says the

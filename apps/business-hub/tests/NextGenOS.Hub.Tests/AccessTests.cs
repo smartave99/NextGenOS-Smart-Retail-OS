@@ -210,6 +210,22 @@ public class AccessTests : IDisposable
         yield return new("Earners.Pay", new[] { Perm.Staff }, a => a.Earners.Pay(1, 100, "cash"));
         yield return new("Earners.Statement", new[] { Perm.Staff }, a => a.Earners.Statement(1));
         yield return new("Earners.Summary", new[] { Perm.Staff }, a => a.Earners.Summary(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
+        yield return new("Payroll.List", new[] { Perm.Staff }, a => a.Payroll.List());
+        yield return new("Payroll.Get", new[] { Perm.Staff }, a => a.Payroll.Get(1));
+        yield return new("Payroll.Save", new[] { Perm.Staff }, a => a.Payroll.Save(new NextGenOS.Hub.Staff.EmployeeInput { Name = "Test person", SalaryMinor = 1000 }));
+        yield return new("Payroll.SetActive", new[] { Perm.Staff }, a => a.Payroll.SetActive(1, true));
+        yield return new("Payroll.Days", new[] { Perm.Staff }, a => a.Payroll.Days(1, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30)));
+        yield return new("Payroll.Mark", new[] { Perm.Staff }, a => a.Payroll.Mark(1, new DateOnly(2026, 9, 1), true));
+        yield return new("Payroll.Change", new[] { Perm.Staff }, a => a.Payroll.Change(1, new DateOnly(2026, 9, 1), true));
+        yield return new("Payroll.Remove", new[] { Perm.Staff }, a => a.Payroll.Remove(1, new DateOnly(2026, 9, 1)));
+        yield return new("Payroll.GiveAdvance", new[] { Perm.Staff }, a => a.Payroll.GiveAdvance(1, 100, "cash"));
+        yield return new("Payroll.Outstanding", new[] { Perm.Staff }, a => a.Payroll.Outstanding(1));
+        yield return new("Payroll.Advances", new[] { Perm.Staff }, a => a.Payroll.Advances(1));
+        yield return new("Payroll.Preview", new[] { Perm.Staff }, a => a.Payroll.Preview(1, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30)));
+        yield return new("Payroll.Pay", new[] { Perm.Staff }, a => a.Payroll.Pay(1, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30), 0, 0, "cash"));
+        yield return new("Payroll.Slip", new[] { Perm.Staff }, a => a.Payroll.Slip(1));
+        yield return new("Payroll.Slips", new[] { Perm.Staff }, a => a.Payroll.Slips());
+        yield return new("Payroll.CancelSlip", new[] { Perm.Staff }, a => a.Payroll.CancelSlip(1, "test"));
 
         // Quantity discounts (merge, products tools B): setting them up needs the same right as the other discounts.
         yield return new("Offers.Bands", new[] { Perm.Discount }, a => a.Offers.Bands(itemId));

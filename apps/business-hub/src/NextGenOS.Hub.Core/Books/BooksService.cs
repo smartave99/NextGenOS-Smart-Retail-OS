@@ -440,6 +440,9 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         "commission" => "Commission earned",
         "commission-back" => "Commission taken back",
         "commission-paid" => "Commission paid",
+        "staff-advance" => "Paid to staff in advance",
+        "staff-pay" => "Staff pay",
+        "staff-pay-back" => "Staff pay cancelled",
         "stock-sale" or "stock-return" or "stock-purchase" or "stock-purchase-return" or "stock-void" => "Cost of stock",
         _ => "Entry",
     };

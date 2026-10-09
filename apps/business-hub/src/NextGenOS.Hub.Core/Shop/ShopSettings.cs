@@ -35,6 +35,10 @@ public sealed class ShopSettings
     public long LoyaltyDefaultValueMilli { get; set; }
     /// <summary>What one point is worth when used on a bill, in thousandths of a whole unit of the money (500 = half a unit).</summary>
     public long LoyaltyPointValueMilli { get; set; }
+    /// <summary>The days a month's pay is divided by to pay for the days present: 0 means the days of that month; a number such as 26 or 30 is used for every month.</summary>
+    public int PayrollDaysBasis { get; set; }
+    /// <summary>Whether leaving earlier than the usual working time takes pay away. Off: only time beyond the usual counts as overtime.</summary>
+    public bool PayrollPayShortTime { get; set; }
     public bool SetupDone { get; set; }
     /// <summary>Parts of the Hub the owner switched on or off, over the industry's defaults (name → on/off).</summary>
     public Dictionary<string, bool> FeatureOverrides { get; set; } = new();

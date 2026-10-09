@@ -1,0 +1,592 @@
+@page "/employees"
+@attribute [Authorize(Policy = Perm.Staff)]
+@inherits HubPage
+@using NextGenOS.Hub.Staff
+
+<PageTitle>Employees</PageTitle>
+<h1>Employees</h1>
+<p class="sub">The people who work for you: their days, pay in advance and monthly pay.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-emp" class="@(tab == "people" ? "on" : "")" aria-selected="@(tab == "people")" @onclick='() => Pick("people")'>People</button>
+    <button type="button" role="tab" id="tab-days" class="@(tab == "days" ? "on" : "")" aria-selected="@(tab == "days")" @onclick='() => Pick("days")'>Days</button>
+    <button type="button" role="tab" id="tab-advances" class="@(tab == "advances" ? "on" : "")" aria-selected="@(tab == "advances")" @onclick='() => Pick("advances")'>Pay in advance</button>
+    <button type="button" role="tab" id="tab-pay" class="@(tab == "pay" ? "on" : "")" aria-selected="@(tab == "pay")" @onclick='() => Pick("pay")'>Monthly pay</button>
+</div>
+
+@if (tab == "people")
+{
+    <div class="toolbar">
+        <span class="spacer"></span>
+        <button type="button" class="btn primary" id="add-employee" @onclick="NewPerson">Add an employee</button>
+    </div>
+    <div class="card tbl-wrap">
+        @if (all.Count == 0)
+        {
+            <div class="empty">Nobody here yet.</div>
+        }
+        else
+        {
+            <table class="tbl" id="employees">
+                <thead><tr><th>Name</th><th>Work</th><th class="num">Monthly pay</th><th class="num">To pay back</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var e in all)
+                {
+                    <tr>
+                        <td><strong>@e.Name</strong> <span class="muted small">@e.Code</span>@if (!e.Active) { <span class="chip">Left</span> }</td>
+                        <td>@string.Join(", ", new[] { e.Designation, e.Department }.Where(x => !string.IsNullOrWhiteSpace(x)))</td>
+                        <td class="num">@Money(e.SalaryMinor)</td>
+                        <td class="num">@(owedBack.GetValueOrDefault(e.Id) is > 0 and var o ? Money(o) : "")</td>
+                        <td class="right"><button type="button" class="btn ghost small" @onclick="() => Edit(e)" aria-label="Edit @e.Name">Edit</button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+else if (tab == "days")
+{
+    <div class="card stack">
+        <label for="day-date">Day</label>
+        <input id="day-date" class="date" type="date" value="@day.ToString("yyyy-MM-dd")" max="@Today.ToString("yyyy-MM-dd")" @onchange="e => SetDay(e.Value?.ToString())" />
+    </div>
+    <div class="card tbl-wrap">
+        @if (active.Count == 0)
+        {
+            <div class="empty">Nobody here yet.</div>
+        }
+        else
+        {
+            <table class="tbl" id="day-sheet">
+                <thead><tr><th>Name</th><th>That day</th><th>Came</th><th>Left</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var e in active)
+                {
+                    var d = dayRows.GetValueOrDefault(e.Id);
+                    var t = pairs[e.Id];
+                    <tr>
+                        <td><strong>@e.Name</strong></td>
+                        <td>@(d is null ? "Not written down" : d.Present ? "Present" : "Absent")@if (d is { Present: true, OvertimeMinutes: not 0 }) { <span class="muted small"> (@(d.OvertimeMinutes > 0 ? "overtime " : "short ")@Hours(Math.Abs(d.OvertimeMinutes)))</span> }</td>
+                        <td><input type="time" aria-label="Came, @e.Name" value="@t.In" @onchange="x => t.In = x.Value?.ToString() ?? string.Empty" /></td>
+                        <td><input type="time" aria-label="Left, @e.Name" value="@t.Out" @onchange="x => t.Out = x.Value?.ToString() ?? string.Empty" /></td>
+                        <td class="right">
+                            <button type="button" class="btn secondary small" id="present-@e.Id" @onclick="() => Mark(e, true)">Present</button>
+                            <button type="button" class="btn ghost small" id="absent-@e.Id" @onclick="() => Mark(e, false)">Absent</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+    <p class="muted small">Times are optional. When you give them, the time beyond the usual working day counts as overtime.</p>
+
+    <h3>One person's month</h3>
+    <div class="field-row">
+        <div>
+            <label for="m-person">Person</label>
+            <select id="m-person" value="@(monthPerson?.ToString() ?? "")" @onchange="e => ChooseMonthPerson(e.Value?.ToString())">
+                <option value="">Choose a person</option>
+                @foreach (var e in all) { <option value="@e.Id">@e.Name</option> }
+            </select>
+        </div>
+        <div><label for="m-month">Month</label><input id="m-month" type="month" value="@month.ToString("yyyy-MM")" @onchange="e => SetMonth(e.Value?.ToString())" /></div>
+    </div>
+    @if (monthPerson is not null)
+    {
+        <div class="card tbl-wrap">
+            @if (monthRows.Count == 0)
+            {
+                <div class="empty">Nothing written down for that month.</div>
+            }
+            else
+            {
+                <table class="tbl" id="month-table">
+                    <thead><tr><th>Day</th><th>State</th><th>Came</th><th>Left</th><th class="num">Overtime</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in monthRows)
+                    {
+                        <tr>
+                            <td>@r.Day.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</td>
+                            <td>@(r.Present ? "Present" : "Absent")</td>
+                            <td>@Clock(r.InMinute)</td>
+                            <td>@Clock(r.OutMinute)</td>
+                            <td class="num">@(r.Present && r.OvertimeMinutes != 0 ? (r.OvertimeMinutes < 0 ? "−" : "") + Hours(Math.Abs(r.OvertimeMinutes)) : "")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                <p class="muted small">Present: @monthRows.Count(r => r.Present) days. Absent: @monthRows.Count(r => !r.Present) days.</p>
+            }
+        </div>
+    }
+}
+else if (tab == "advances")
+{
+    <div class="card stack">
+        <label for="a-person">Person</label>
+        <select id="a-person" value="@(advPerson?.ToString() ?? "")" @onchange="e => ChooseAdvPerson(e.Value?.ToString())">
+            <option value="">Choose a person</option>
+            @foreach (var e in active) { <option value="@e.Id">@e.Name</option> }
+        </select>
+        @if (advPerson is not null)
+        {
+            <div class="field-row">
+                <div><label for="a-amount">Amount given</label><input id="a-amount" inputmode="decimal" @bind="advAmount" /></div>
+                <div>
+                    <label for="a-method">Given by</label>
+                    <select id="a-method" @bind="advMethod">
+                        @foreach (var m in Shop.PaymentMethods) { <option value="@m">@(char.ToUpperInvariant(m[0]) + m[1..])</option> }
+                    </select>
+                </div>
+            </div>
+            <label for="a-note">Note (optional)</label>
+            <input id="a-note" @bind="advNote" maxlength="120" />
+            <div class="row"><button type="button" class="btn primary" id="give-advance" @onclick="GiveAdvance">Give in advance</button></div>
+        }
+    </div>
+    @if (advPerson is not null)
+    {
+        <div class="card stat">
+            <span class="label">To be paid back by @NameOf(advPerson)</span>
+            <span class="value" id="advance-owed">@Money(Math.Max(0, advLines.LastOrDefault()?.BalanceMinor ?? 0))</span>
+        </div>
+        <div class="card tbl-wrap">
+            @if (advLines.Count == 0)
+            {
+                <div class="empty">Nothing yet.</div>
+            }
+            else
+            {
+                <table class="tbl" id="advance-table">
+                    <thead><tr><th>Day</th><th>What</th><th class="num">Amount</th><th class="num">To pay back</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in advLines)
+                    {
+                        <tr>
+                            <td>@l.Day.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                            <td>@l.Memo</td>
+                            <td class="num">@(l.AmountMinor >= 0 ? "+" : "−")@Money(Math.Abs(l.AmountMinor))</td>
+                            <td class="num">@Money(l.BalanceMinor)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+}
+else
+{
+    <div class="card stack">
+        <label for="p-person">Person</label>
+        <select id="p-person" value="@(payPerson?.ToString() ?? "")" @onchange="e => ChoosePayPerson(e.Value?.ToString())">
+            <option value="">Choose a person</option>
+            @foreach (var e in active) { <option value="@e.Id">@e.Name</option> }
+        </select>
+        @if (payPerson is not null)
+        {
+            <div class="field-row">
+                <div><label for="p-from">First day</label><input id="p-from" type="date" value="@from.ToString("yyyy-MM-dd")" @onchange="e => SetFrom(e.Value?.ToString())" /></div>
+                <div><label for="p-to">Last day</label><input id="p-to" type="date" value="@to.ToString("yyyy-MM-dd")" @onchange="e => SetTo(e.Value?.ToString())" /></div>
+            </div>
+            <div class="field-row">
+                <div><label for="p-rate">Overtime pay for each hour (if any)</label><input id="p-rate" inputmode="decimal" @bind="rateText" @bind:after="Work" /></div>
+                <div><label for="p-repay">Advance to take out of this pay</label><input id="p-repay" inputmode="decimal" @bind="repayText" @bind:after="Work" /></div>
+            </div>
+            <div class="field-row">
+                <div>
+                    <label for="p-method">Paid by</label>
+                    <select id="p-method" @bind="payMethod">
+                        @foreach (var m in Shop.PaymentMethods) { <option value="@m">@(char.ToUpperInvariant(m[0]) + m[1..])</option> }
+                    </select>
+                </div>
+                <div><label for="p-note">Note (optional)</label><input id="p-note" @bind="payNote" maxlength="120" /></div>
+            </div>
+        }
+    </div>
+
+    @if (preview is not null)
+    {
+        <div class="card" id="pay-summary">
+            <table class="tbl">
+                <tbody>
+                    <tr><td>Days present</td><td class="num" id="pv-days">@preview.PresentDays</td></tr>
+                    <tr><td>Pay for those days</td><td class="num" id="pv-earned">@Money(preview.EarnedMinor)</td></tr>
+                    <tr><td>Overtime (@Hours(Math.Abs(preview.OvertimeMinutes)))</td><td class="num" id="pv-overtime">@Money(preview.OvertimeMinor)</td></tr>
+                    <tr><td>Advance still to pay back</td><td class="num" id="pv-outstanding">@Money(Math.Max(0, preview.OutstandingMinor))</td></tr>
+                    <tr><td>Advance taken out of this pay</td><td class="num">−@Money(repay)</td></tr>
+                    <tr><td><strong>To pay out</strong></td><td class="num"><strong id="pv-net">@Money(preview.NetFor(repay))</strong></td></tr>
+                </tbody>
+            </table>
+            @if (preview.Problem is { } problem) { <p class="notice error" id="pv-problem">@problem</p> }
+            <p class="muted small">@(preview.DaysBasis > 0 ? $"A month's pay is divided by {preview.DaysBasis} days." : "A month's pay is divided by the days of that month.")</p>
+            <div class="row"><button type="button" class="btn primary" id="pay-employee" disabled="@(preview.Problem is not null)" @onclick="PayNow">Pay @preview.Name</button></div>
+        </div>
+    }
+
+    <h3>Pay slips</h3>
+    <div class="card tbl-wrap">
+        @if (slips.Count == 0)
+        {
+            <div class="empty">No pay slips yet.</div>
+        }
+        else
+        {
+            <table class="tbl" id="slips">
+                <thead><tr><th>Slip</th><th>Person</th><th>Days</th><th class="num">Paid out</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var s in slips)
+                {
+                    <tr>
+                        <td><a href="employees/slip/@s.Id">@s.Number</a>@if (s.Cancelled) { <span class="chip">Cancelled</span> }</td>
+                        <td>@s.EmployeeName</td>
+                        <td>@s.From.ToString("d MMM", System.Globalization.CultureInfo.InvariantCulture) to @s.To.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                        <td class="num">@Money(s.NetMinor)</td>
+                        <td class="right">@if (!s.Cancelled) { <button type="button" class="btn ghost small" @onclick="() => AskCancel(s)" aria-label="Cancel slip @s.Number">Cancel</button> }</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+    @if (cancelling is not null)
+    {
+        <div class="card stack" id="cancel-box">
+            <label for="cancel-why">Why is slip @cancelling.Number cancelled?</label>
+            <input id="cancel-why" @bind="cancelWhy" maxlength="120" />
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => cancelling = null">Keep it</button>
+                <button type="button" class="btn primary" id="cancel-slip" @onclick="CancelNow">Cancel the slip</button>
+            </div>
+        </div>
+    }
+
+    <h3>Pay rules</h3>
+    <div class="card stack">
+        <div class="field-row">
+            <div><label for="rule-basis">Days a month's pay is divided by (0 is the days of that month)</label><input id="rule-basis" type="number" min="0" max="31" @bind="basis" disabled="@(!Me.Can(Perm.Settings))" /></div>
+            <div><label class="check"><input id="rule-short" type="checkbox" @bind="payShort" disabled="@(!Me.Can(Perm.Settings))" /> Take pay away when someone leaves earlier than the usual day</label></div>
+        </div>
+        @if (Me.Can(Perm.Settings))
+        {
+            <div class="row"><button type="button" class="btn secondary" id="save-rules" @onclick="SaveRules">Save these rules</button></div>
+        }
+        else
+        {
+            <p class="muted small">Only the owner can change these.</p>
+        }
+    </div>
+}
+
+@if (form is not null)
+{
+    <div class="sheet-back" @onclick="() => form = null">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="@(form.Id is null ? "New" : "Edit") employee" @onclick:stopPropagation="true">
+            <h2>@(form.Id is null ? "New employee" : "Edit employee")</h2>
+            <Notice Error="@formError" />
+            <div class="stack">
+                <label for="emp-name">Name</label>
+                <input id="emp-name" @bind="form.Name" maxlength="120" />
+                <div class="field-row">
+                    <div><label for="emp-phone">Phone</label><input id="emp-phone" @bind="form.Phone" maxlength="40" inputmode="tel" /></div>
+                    <div><label for="emp-email">Email</label><input id="emp-email" @bind="form.Email" maxlength="120" inputmode="email" /></div>
+                </div>
+                <label for="emp-addr">Address</label>
+                <textarea id="emp-addr" rows="2" @bind="form.Address" maxlength="300"></textarea>
+                <div class="field-row">
+                    <div><label for="emp-city">Town or city</label><input id="emp-city" @bind="form.City" maxlength="80" /></div>
+                    <div><label for="emp-joined">Joined on</label><input id="emp-joined" type="date" value="@(form.JoinedOn?.ToString("yyyy-MM-dd") ?? "")" @onchange="e => form.JoinedOn = DateOnly.TryParse(e.Value?.ToString(), out var j) ? j : null" /></div>
+                </div>
+                <div class="field-row">
+                    <div><label for="emp-dept">Department</label><input id="emp-dept" @bind="form.Department" maxlength="80" /></div>
+                    <div><label for="emp-role">Job</label><input id="emp-role" @bind="form.Designation" maxlength="80" /></div>
+                </div>
+                <div class="field-row">
+                    <div><label for="emp-pay">Monthly pay</label><input id="emp-pay" inputmode="decimal" @bind="payText" /></div>
+                    <div><label for="emp-hours">Usual hours in a day</label><input id="emp-hours" inputmode="decimal" @bind="hoursText" /></div>
+                </div>
+                <label for="emp-notes">Notes</label>
+                <textarea id="emp-notes" rows="2" @bind="form.Notes" maxlength="500"></textarea>
+                @if (form.Id is not null)
+                {
+                    <label class="check"><input id="emp-active" type="checkbox" @bind="isActive" /> Still works here</label>
+                }
+            </div>
+            <div class="row">
+                <button type="button" class="btn secondary" @onclick="() => form = null">Cancel</button>
+                <button type="button" class="btn primary grow" id="save-employee" @onclick="Save">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private sealed class TimePair { public string In { get; set; } = ""; public string Out { get; set; } = ""; }
+
+    private string tab = "people";
+    private IReadOnlyList<Employee> all = Array.Empty<Employee>();
+    private IReadOnlyList<Employee> active = Array.Empty<Employee>();
+    private Dictionary<long, long> owedBack = new();
+    private EmployeeInput? form;
+    private string? formError;
+    private string payText = "";
+    private string hoursText = "8";
+    private bool isActive = true;
+
+    private DateOnly day;
+    private Dictionary<long, AttendanceDay> dayRows = new();
+    private Dictionary<long, TimePair> pairs = new();
+    private long? monthPerson;
+    private DateOnly month;
+    private IReadOnlyList<AttendanceDay> monthRows = Array.Empty<AttendanceDay>();
+
+    private long? advPerson;
+    private string advAmount = "";
+    private string advMethod = "cash";
+    private string advNote = "";
+    private IReadOnlyList<AdvanceLine> advLines = Array.Empty<AdvanceLine>();
+
+    private long? payPerson;
+    private DateOnly from, to;
+    private string rateText = "";
+    private string repayText = "";
+    private string payMethod = "cash";
+    private string payNote = "";
+    private PayPreview? preview;
+    private IReadOnlyList<PaySlip> slips = Array.Empty<PaySlip>();
+    private PaySlip? cancelling;
+    private string cancelWhy = "";
+    private int basis;
+    private bool payShort;
+
+    private long repay => TryMoney(Shop, repayText, out var r) && r > 0 ? r : 0;
+
+    private string NameOf(long? id) => all.FirstOrDefault(e => e.Id == id)?.Name ?? "";
+
+    private static string Hours(int minutes) => $"{minutes / 60}:{minutes % 60:00}";
+
+    private static string Clock(int? minute) => minute is { } m ? $"{m / 60:00}:{m % 60:00}" : "";
+
+    protected override Task LoadAsync()
+    {
+        advMethod = payMethod = Shop.PaymentMethods.Contains("cash") ? "cash" : Shop.PaymentMethods[0];
+        if (day == default)
+        {
+            day = Today;
+            month = new DateOnly(Today.Year, Today.Month, 1);
+            from = new DateOnly(Today.Year, Today.Month, 1);
+            to = Today;
+        }
+        var settings = App.Shop.Settings;
+        basis = settings.PayrollDaysBasis;
+        payShort = settings.PayrollPayShortTime;
+        ReadPeople();
+        ReadDays();
+        ReadMonth();
+        ReadAdvances();
+        slips = App.Payroll.Slips();
+        Work();
+        return Task.CompletedTask;
+    }
+
+    private void Pick(string t)
+    {
+        tab = t;
+        Error = null;
+        Info = null;
+    }
+
+    private void ReadPeople()
+    {
+        all = App.Payroll.List(true);
+        active = all.Where(e => e.Active).ToList();
+        owedBack = all.ToDictionary(e => e.Id, e => App.Payroll.Outstanding(e.Id));
+        foreach (var e in all) if (!pairs.ContainsKey(e.Id)) pairs[e.Id] = new TimePair();
+    }
+
+    // ---- people ----
+
+    private void NewPerson()
+    {
+        formError = null;
+        form = new EmployeeInput();
+        payText = "";
+        hoursText = "8";
+        isActive = true;
+    }
+
+    private void Edit(Employee e)
+    {
+        formError = null;
+        form = new EmployeeInput { Id = e.Id, Name = e.Name, Phone = e.Phone, Email = e.Email, Address = e.Address, City = e.City, Department = e.Department, Designation = e.Designation, JoinedOn = e.JoinedOn, SalaryMinor = e.SalaryMinor, BasicMinutes = e.BasicMinutes, Notes = e.Notes };
+        payText = Shop.Text(e.SalaryMinor);
+        hoursText = Qty(e.BasicMinutes * 1000L / 60);
+        isActive = e.Active;
+    }
+
+    private void Save()
+    {
+        formError = null;
+        try
+        {
+            if (form is null) return;
+            if (!TryMoney(Shop, payText, out var pay) || pay <= 0) throw new HubException("employee-pay", "Please type the monthly pay as a number, like 18000.");
+            form.SalaryMinor = pay;
+            try { form.BasicMinutes = (int)Math.Round(decimal.Parse(hoursText.Trim(), System.Globalization.CultureInfo.InvariantCulture) * 60); }
+            catch (FormatException) { throw new HubException("employee-hours", "Please type the usual hours in a day as a number, like 8 or 7.5."); }
+            var saved = App.Payroll.Save(form, Me.Id);
+            if (form.Id is not null && isActive != all.First(e => e.Id == saved.Id).Active) App.Payroll.SetActive(saved.Id, isActive, Me.Id);
+            form = null;
+            ReadPeople();
+            Info = "Saved.";
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    // ---- days ----
+
+    private void SetDay(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { day = d; Run(ReadDays); }
+    }
+
+    private void ReadDays()
+    {
+        dayRows = active.SelectMany(e => App.Payroll.Days(e.Id, day, day)).ToDictionary(x => x.EmployeeId);
+        foreach (var e in active)
+        {
+            var pair = pairs[e.Id];
+            if (dayRows.TryGetValue(e.Id, out var r)) (pair.In, pair.Out) = (Clock(r.InMinute), Clock(r.OutMinute));
+            else (pair.In, pair.Out) = ("", "");
+        }
+    }
+
+    private void Mark(Employee e, bool present) => Run(() =>
+    {
+        var pair = pairs[e.Id];
+        TimeOnly? came = null, left = null;
+        if (present && (pair.In.Length > 0 || pair.Out.Length > 0))
+        {
+            if (!TimeOnly.TryParse(pair.In, out var a) || !TimeOnly.TryParse(pair.Out, out var b)) throw new HubException("times", "Please give both the time they came and the time they left, or neither.");
+            (came, left) = (a, b);
+        }
+        if (dayRows.ContainsKey(e.Id)) App.Payroll.Change(e.Id, day, present, came, left, Me.Id);
+        else App.Payroll.Mark(e.Id, day, present, came, left, Me.Id);
+        ReadDays();
+        ReadMonth();
+    });
+
+    private void ChooseMonthPerson(string? text)
+    {
+        monthPerson = long.TryParse(text, out var id) ? id : null;
+        Run(ReadMonth);
+    }
+
+    private void SetMonth(string? text)
+    {
+        if (DateOnly.TryParse(text + "-01", out var d)) { month = d; Run(ReadMonth); }
+    }
+
+    private void ReadMonth() =>
+        monthRows = monthPerson is { } id ? App.Payroll.Days(id, month, month.AddMonths(1).AddDays(-1)) : Array.Empty<AttendanceDay>();
+
+    // ---- advances ----
+
+    private void ChooseAdvPerson(string? text)
+    {
+        advPerson = long.TryParse(text, out var id) ? id : null;
+        advAmount = "";
+        advNote = "";
+        Run(ReadAdvances);
+    }
+
+    private void ReadAdvances() => advLines = advPerson is { } id ? App.Payroll.Advances(id) : Array.Empty<AdvanceLine>();
+
+    private void GiveAdvance() => Run(() =>
+    {
+        if (advPerson is not { } id) return;
+        if (!TryMoney(Shop, advAmount, out var amount) || amount <= 0) throw new HubException("advance-amount", "Please type the amount as a number, like 2000 or 99.50.");
+        App.Payroll.GiveAdvance(id, amount, advMethod, null, advNote, Me.Id);
+        advAmount = "";
+        advNote = "";
+        ReadAdvances();
+        ReadPeople();
+        Work();
+    }, "Recorded.");
+
+    // ---- monthly pay ----
+
+    private void ChoosePayPerson(string? text)
+    {
+        payPerson = long.TryParse(text, out var id) ? id : null;
+        repayText = "";
+        Run(Work);
+    }
+
+    private void SetFrom(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { from = d; Run(Work); }
+    }
+
+    private void SetTo(string? text)
+    {
+        if (DateOnly.TryParse(text, out var d)) { to = d; Run(Work); }
+    }
+
+    private void Work()
+    {
+        preview = null;
+        if (payPerson is not { } id) return;
+        try
+        {
+            var rate = string.IsNullOrWhiteSpace(rateText) ? 0 : TryMoney(Shop, rateText, out var r) && r >= 0 ? r : throw new HubException("overtime-rate", "Please type the overtime pay for an hour as a number, like 100 or 12.50.");
+            preview = App.Payroll.Preview(id, from, to, rate);
+        }
+        catch (HubException ex) { Error = ex.Message; }
+    }
+
+    private void PayNow() => Run(() =>
+    {
+        if (payPerson is not { } id || preview is null) return;
+        var rate = string.IsNullOrWhiteSpace(rateText) ? 0 : TryMoney(Shop, rateText, out var r) ? r : 0;
+        if (repayText.Trim().Length > 0 && !TryMoney(Shop, repayText, out _)) throw new HubException("pay-repay", "Please type the advance to take out as a number, like 500, or leave it empty.");
+        var slip = App.Payroll.Pay(id, from, to, rate, repay, payMethod, payNote, Me.Id);
+        payNote = "";
+        repayText = "";
+        slips = App.Payroll.Slips();
+        ReadPeople();
+        ReadAdvances();
+        Work();
+        Info = $"Paid. Slip {slip.Number}: {Money(slip.NetMinor)} paid out.";
+    });
+
+    private void AskCancel(PaySlip s)
+    {
+        cancelling = s;
+        cancelWhy = "";
+    }
+
+    private void CancelNow() => Run(() =>
+    {
+        if (cancelling is null) return;
+        App.Payroll.CancelSlip(cancelling.Id, cancelWhy, Me.Id);
+        cancelling = null;
+        slips = App.Payroll.Slips();
+        ReadPeople();
+        ReadAdvances();
+        Work();
+    }, "The slip is cancelled.");
+
+    private void SaveRules() => Run(() =>
+    {
+        if (basis is < 0 or > 31) throw new HubException("rule-basis", "The days must be between 0 and 31.");
+        var s = App.Shop.Settings;
+        s.PayrollDaysBasis = basis;
+        s.PayrollPayShortTime = payShort;
+        App.Shop.Save(s);
+        Work();
+    }, "Saved.");
+}

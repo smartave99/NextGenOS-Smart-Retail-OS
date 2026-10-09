@@ -37,7 +37,7 @@ public class ImportLogTests
         using var f = new HubFixture();
         f.App.Catalog.Create(new NextGenOS.Hub.Catalog.ItemInput { Kind = "stock", Name = "Rice", PriceMinor = 42500, TaxClass = "standard" });
         f.App.Parties.Create(new NextGenOS.Hub.Catalog.PartyInput { Kind = "customer", Name = "Asha" });
-        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines", "loyalty_ledger", "offers", "vouchers", "document_offers", "party_discounts", "backup_runs", "network_devices", "network_pairing_codes", "outbox", "outbox_processed", "supply_terms", "insight_settings", "insight_runs", "insight_findings", "actions", "action_transitions", "ai_egress_log", "catalog_changes", "catalog_change_items", "item_qty_bands", "earners", "bill_earners", "earner_ledger" }).ToArray();
+        var before = Tables(f.App).Except(ImportTables).Except(new[] { "accounts", "journal_entries", "journal_lines", "loyalty_ledger", "offers", "vouchers", "document_offers", "party_discounts", "backup_runs", "network_devices", "network_pairing_codes", "outbox", "outbox_processed", "supply_terms", "insight_settings", "insight_runs", "insight_findings", "actions", "action_transitions", "ai_egress_log", "catalog_changes", "catalog_change_items", "item_qty_bands", "earners", "bill_earners", "earner_ledger", "employees", "attendance", "staff_payments", "staff_advances" }).ToArray();
 
         f.App.Db.Rollback(5);
 

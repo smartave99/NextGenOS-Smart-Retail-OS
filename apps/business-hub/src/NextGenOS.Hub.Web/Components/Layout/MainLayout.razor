@@ -72,6 +72,7 @@
         if (f.Purchases && Can(Perm.Purchases)) yield return new Link("purchases", "Buying", "truck");
         if (Can(Perm.Sell) || Can(Perm.Reports) || Can(Perm.Loans)) yield return new Link("documents", Shop.Plural("invoice"), "receipt");
         if (Can(Perm.Staff)) yield return new Link("staff", "Staff", "people");
+        if (Can(Perm.Staff)) yield return new Link("employees", "Employees", "people");
         if (Can(Perm.Reports)) yield return new Link("reports", "Reports", "chart");
         if (Can(Perm.Reports)) yield return new Link("books", "Books", "receipt");
         if (Can(Perm.Reports) && Shop.Settings.TaxRegistered && Shop.Country.Tax.Model != "none") yield return new Link("registers", Shop.Country.Tax.Name + " registers", "receipt");

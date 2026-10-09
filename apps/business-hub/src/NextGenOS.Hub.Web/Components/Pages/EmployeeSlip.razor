@@ -1,0 +1,58 @@
+@page "/employees/slip/{Id:long}"
+@attribute [Authorize(Policy = Perm.Staff)]
+@inherits HubPage
+@inject IJSRuntime Js
+@using NextGenOS.Hub.Staff
+
+<PageTitle>Pay slip</PageTitle>
+@if (slip is null)
+{
+    <h1>Pay slip</h1>
+    <div class="card"><div class="empty">That pay slip was not found.</div></div>
+}
+else
+{
+    <div class="no-print">
+        <a href="employees">&larr; Employees</a>
+        <div class="row" style="margin-top:8px"><button type="button" class="btn primary" id="print-slip" @onclick="Print">Print</button></div>
+    </div>
+    <div class="card paper" id="slip">
+        <h1>@Shop.Settings.Name</h1>
+        <h2>Pay slip @slip.Number</h2>
+        @if (slip.Cancelled) { <p class="notice error" id="slip-cancelled">Cancelled@(slip.CancelReason is { Length: > 0 } why ? ": " + why : "").</p> }
+        <p><strong>@slip.EmployeeName</strong> <span class="muted">@person?.Code</span>@if (person is { Designation: { Length: > 0 } job }) { <span class="muted"> · @job</span> }</p>
+        <p>For @slip.From.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) to @slip.To.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture). Paid on @Day(slip.PaidAt) by @slip.Method.</p>
+        <table class="tbl">
+            <tbody>
+                <tr><td>Days present</td><td class="num">@slip.PresentDays</td></tr>
+                <tr><td>Pay for those days</td><td class="num">@Money(slip.SalaryMinor)</td></tr>
+                @if (slip.OvertimeMinutes != 0)
+                {
+                    <tr><td>Overtime (@(slip.OvertimeMinutes < 0 ? "−" : "")@($"{Math.Abs(slip.OvertimeMinutes) / 60}:{Math.Abs(slip.OvertimeMinutes) % 60:00}") at @Money(slip.OvertimeRateMinor) an hour)</td><td class="num">@Money(slip.OvertimeMinor)</td></tr>
+                }
+                <tr><td><strong>Total pay</strong></td><td class="num"><strong>@Money(slip.GrossMinor)</strong></td></tr>
+                @if (slip.RepaidMinor > 0)
+                {
+                    <tr><td>Advance paid back</td><td class="num">−@Money(slip.RepaidMinor)</td></tr>
+                }
+                <tr><td><strong>Paid out</strong></td><td class="num"><strong>@Money(slip.NetMinor)</strong></td></tr>
+            </tbody>
+        </table>
+        @if (slip.Note is { Length: > 0 } note) { <p class="muted">@note</p> }
+    </div>
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+    private PaySlip? slip;
+    private Employee? person;
+
+    protected override Task LoadAsync()
+    {
+        slip = App.Payroll.Slip(Id);
+        person = slip is null ? null : App.Payroll.Get(slip.EmployeeId);
+        return Task.CompletedTask;
+    }
+
+    private async Task Print() => await Js.InvokeVoidAsync("hub.print");
+}

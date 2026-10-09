@@ -56,6 +56,7 @@ public sealed class HubApp
         Loyalty = new LoyaltyService(db, Shop, clock);
         Offers = new OffersService(db, Shop, clock, Audit, Access);
         Earners = new EarnerService(db, Shop, clock, Audit, Books, Access);
+        Payroll = new PayrollService(db, Shop, clock, Audit, Books, Access);
         Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Outbox, Access, Earners);
         Users = new UserService(db, clock, Audit, Access);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit, Access);
@@ -102,6 +103,7 @@ public sealed class HubApp
     public CatalogChangeService CatalogChanges { get; }
     public ItemSheetService ItemSheets { get; }
     public EarnerService Earners { get; }
+    public PayrollService Payroll { get; }
     public LoyaltyService Loyalty { get; }
     public OffersService Offers { get; }
     public DocumentService Documents { get; }

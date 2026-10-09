@@ -4,6 +4,11 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Employees and their pay
+- **A new screen, Employees** (owners and managers): add the people who work for you with their monthly pay and usual hours. **Days:** write down who was present or absent each day, with the time they came and left if you want overtime counted. **Pay in advance:** give someone money before payday and see what is still to be paid back. **Monthly pay:** choose the person and the days, give the overtime pay for an hour if any, and take part of an advance out of the pay; you see exactly what will be paid out before you pay. Each payment is a **pay slip** you can read and print.
+- **A month's pay is divided by the days of that month** (or by a number you choose, such as 26 or 30, under *Pay rules*). Leaving early does not take pay away unless you turn that on. A slip can cover a single day. **The days on a slip cannot be changed**; a slip made by mistake is cancelled (it stays on record) and the advance paid back out of it is owed again. The books show *Staff pay* and *Paid to staff in advance*.
+- There are no fines, provident fund, insurance or tax deductions yet (the older POS had none); they will come as rules of the country.
+
 ### Salespeople and brokers, and their commission
 - **A new screen, Staff** (owners and managers): add the salespeople who sell for you and the brokers who bring you customers. At the till, **name the salesperson and the broker on the sale** (a broker's commission is a percent or an amount you type for that sale).
 - **The commission is worked out from the bill before tax, after every discount,** so the same goods earn the same whether your prices include tax or not. It is written when the sale is made, with the percent of that moment. **Goods that are brought back take back only their share of the commission;** a cancelled sale takes all of it back. (The older POS took back the whole line's, and had two commission methods that never met.)

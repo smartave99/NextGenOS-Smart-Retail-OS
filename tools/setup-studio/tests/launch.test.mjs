@@ -236,7 +236,7 @@ test('a browser that ends at once but whose page appears (it handed the page to 
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });
 
-test('a browser that ends at once and whose page never appears: the Studio opens it in the usual browser and keeps running', { skip: process.platform === 'win32', timeout: 60_000 }, async () => {
+test('a browser that ends at once and whose page never appears: the usual web browser is NOT used; a note says what to do, and the Studio stops', { skip: process.platform === 'win32', timeout: 60_000 }, async () => {
   const home = temp('handoff');
   const bin = join(home, 'bin'); mkdirSync(bin);
   const standIn = join(bin, 'stand-in-browser');
@@ -248,8 +248,12 @@ test('a browser that ends at once and whose page never appears: the Studio opens
   try {
     const url = await run.url;
     for (let i = 0; i < 80 && !existsSync(join(home, 'opened.txt')); i += 1) await wait(100);
-    assert.equal(readFileSync(join(home, 'opened.txt'), 'utf8').trim(), url, 'the page was handed to the usual browser');
-    assert.equal(run.child.exitCode, null, 'the Studio is still running');
+    const opened = readFileSync(join(home, 'opened.txt'), 'utf8').trim();
+    assert.notEqual(opened, url, 'the page was NOT handed to the usual web browser');
+    assert.match(opened, /Setup Studio problem\.txt$/, 'what was opened is the note');
+    assert.match(readFileSync(opened, 'utf8'), /Microsoft Edge, Google Chrome or Chromium/, 'the note says what is missing');
+    for (let i = 0; i < 50 && run.child.exitCode === null; i += 1) await wait(100);
+    assert.notEqual(run.child.exitCode, null, 'the Studio stopped: it has no window to show');
   } finally { run.child.kill(); rmSync(home, { recursive: true, force: true }); }
 });
 

@@ -357,7 +357,8 @@ export function buildWebsite({ work, source = appDir, depsFrom = null, allowNoKe
 
 /** Which picture library parts belong to which system. Everything else under @img is for another system and goes. */
 const PICTURE_PARTS = { linux: ['sharp-linux-x64', 'sharp-libvips-linux-x64'], windows: ['sharp-win32-x64'] };
-const REMOVE_FILES = /\.(tsx?|jsx|map|log|bak)$/i;   // includes .d.ts: source and type files are not part of a running program
+const REMOVE_FILES = /\.(tsx?|jsx|map|log|bak)$/i;
+const LONG_UNUSED_PROTO_FOLDERS = /\/protos\/google\/protobuf\/(compiler|test_protos)$/;   // includes .d.ts: source and type files are not part of a running program
 
 /** Takes out of the server folder what is not for this system or not part of a running program. Returns what was removed. */
 export function pruneApp(app, os) {
@@ -373,11 +374,16 @@ export function pruneApp(app, os) {
   const walk = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (REMOVE_FILES.test(e.name)) { rmSync(full, { force: true }); removed.files += 1; }
+      if (e.isDirectory()) {
+        // The protocol-buffer tools bring the code generators' own examples and tests: never loaded by a running program, and some of their paths are the longest in the package (Windows'
+        // "Extract All" refuses a path over 260 characters in all, and the folder a person unpacks into is already 50 to 80).
+        if (LONG_UNUSED_PROTO_FOLDERS.test(full.split(sep).join('/'))) { rmSync(full, { recursive: true, force: true }); removed.other.push('protocol-buffer examples and tests'); continue; }
+        walk(full);
+      } else if (REMOVE_FILES.test(e.name)) { rmSync(full, { force: true }); removed.files += 1; }
     }
   };
   walk(app);
+  removed.other = [...new Set(removed.other)];
   return removed;
 }
 

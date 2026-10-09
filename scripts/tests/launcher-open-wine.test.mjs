@@ -39,7 +39,7 @@ let cmdExe = null;
 const wineEnv = (extra = {}) => ({ ...process.env, WINEPREFIX: prefix, WINEARCH: 'win64', WINEDEBUG: '-all', WINEDLLOVERRIDES: 'mscoree,mshtml=', DISPLAY: display, ...extra });
 
 /** One folder as a person would have it: the launcher and the program beside it, and the stand-in browser elsewhere. `variant.target` is makensis' way to build for 64-bit. */
-function folder(variant, { port, wait = 60 }) {
+function folder(variant, { port, wait = 60, open = {}, browser = true }) {
   const dir = mkdtempSync(join(root, 't-'));
   const app = join(dir, 'app');
   const web = join(dir, 'browser');
@@ -53,7 +53,7 @@ function folder(variant, { port, wait = 60 }) {
   assert.equal(stand.status, 0, stand.stdout + stand.stderr);
   const launcher = join(app, 'Start Hub.exe');
   // The same defines the shipped launcher gets.
-  const defines = launcherDefines({ outFile: launcher, name: 'Test Hub', program: 'hub.exe', args: '/c echo x>> started.txt', open: { url: `http://127.0.0.1:${port}`, waitSeconds: wait, profile: 'test-window', helper: 'Start Hub (with a window, for problems)' } });
+  const defines = launcherDefines({ outFile: launcher, name: 'Test Hub', program: 'hub.exe', args: '/c echo x>> started.txt', open: { url: `http://127.0.0.1:${port}`, waitSeconds: wait, profile: 'test-window', helper: 'Start Hub (with a window, for problems)', ...open } });
   const made = spawnSync('makensis', ['-V2', ...variant.target, ...defines, LAUNCHER_SCRIPT], { encoding: 'utf8' });
   assert.equal(made.status, 0, made.stdout + made.stderr);
   const lines = (file) => (existsSync(file) ? readFileSync(file, 'latin1').split(/\r?\n/).filter(Boolean) : []);
@@ -63,7 +63,7 @@ function folder(variant, { port, wait = 60 }) {
     windows: () => lines(join(web, 'browser.txt')),
     windowFile: join(web, 'browser.txt'),
     run: () => {
-      const child = spawn(variant.wine, [launcher], { env: wineEnv({ NEXTGENOS_APP_BROWSER: join(web, 'msedge.exe') }), stdio: 'ignore', detached: true });
+      const child = spawn(variant.wine, [launcher], { env: wineEnv({ NEXTGENOS_APP_BROWSER: browser ? join(web, 'msedge.exe') : join(web, 'no-such-browser.exe') }), stdio: 'ignore', detached: true });
       const done = new Promise((resolve) => child.once('exit', resolve));
       return { child, done, kill: () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* it is gone */ } } };
     },
@@ -189,6 +189,77 @@ for (const variant of variants) {
       assert.equal(f.started().length, 0);
       assert.equal(f.windows().length, 2);
     } finally { server.close(); }
+  });
+
+  // ---- a program that Windows itself starts (the Business Hub, a service): the launcher only waits ------------------------------------------------------------------------------------
+
+  t('wait only: the program is never started by the launcher; the window opens when the program (started by Windows) answers', {}, async () => {
+    const port = await freePort();
+    const f = folder(variant, { port, open: { waitOnly: true, startingText: 'Test Hub is starting.' } });
+    const run = f.run();
+    let server;
+    try {
+      await sleep(4000);
+      assert.equal(f.started().length, 0, 'the launcher did not start the program: Windows does that, and a second copy would run without the service\'s rights');
+      assert.equal(f.windows().length, 0, 'no window while the program does not answer');
+      server = await listen(port);
+      await until('the window', () => f.windows().length > 0);
+      await run.done;
+      assert.equal(f.started().length, 0, 'still not started by the launcher');
+      assert.equal(f.windows().length, 1);
+      assert.ok(f.windows()[0].includes(`--app=http://127.0.0.1:${port}`), f.windows()[0]);
+      assert.ok(!f.windows()[0].includes('--kiosk'));
+    } finally { run.kill(); server?.close(); }
+  });
+
+  t('wait only, and the program answers already: the window opens at once', {}, async () => {
+    const port = await freePort();
+    const server = await listen(port);
+    const f = folder(variant, { port, open: { waitOnly: true } });
+    const run = f.run();
+    try {
+      await until('the window', () => f.windows().length > 0);
+      await run.done;
+      assert.equal(f.started().length, 0);
+      assert.equal(f.windows().length, 1);
+    } finally { run.kill(); server.close(); }
+  });
+
+  t('wait only, and it never answers: nothing is started, no window opens, the person is told in a message', {}, async () => {
+    const port = await freePort();
+    const f = folder(variant, { port, wait: 3, open: { waitOnly: true } });
+    const run = f.run();
+    try {
+      await sleep(9000);
+      assert.equal(f.started().length, 0);
+      assert.equal(f.windows().length, 0);
+    } finally { run.kill(); }
+  });
+
+  t('full screen for a till: the window is the full-screen kind, not a window with edges', {}, async () => {
+    const port = await freePort();
+    const server = await listen(port);
+    const f = folder(variant, { port, open: { waitOnly: true, kiosk: true } });
+    const run = f.run();
+    try {
+      await until('the window', () => f.windows().length > 0);
+      await run.done;
+      const line = f.windows()[0];
+      assert.ok(line.includes(`--kiosk http://127.0.0.1:${port}`), line);
+      assert.ok(line.includes('--edge-kiosk-type=fullscreen'), line);
+      assert.ok(!line.includes('--app='), line);
+    } finally { run.kill(); server.close(); }
+  });
+
+  t('no Edge and no Chrome: nothing opens at all (the usual web browser is never used) and the person is told what to do', {}, async () => {
+    const port = await freePort();
+    const server = await listen(port);
+    const f = folder(variant, { port, browser: false, open: { waitOnly: true } });
+    const run = f.run();
+    try {
+      await sleep(6000);
+      assert.equal(f.windows().length, 0, 'the stand-in browser was not asked');
+    } finally { run.kill(); server.close(); }
   });
 }
 

@@ -8,10 +8,17 @@
 ;
 ; 2. A background program of the shop that has no window of its own and is used in a browser window (the Business Hub, the dashboard). Add -DOPEN_URL: the launcher starts
 ;    the program hidden only when nothing answers at that address yet (so there is one copy of it), waits until it answers, and opens the address in a window of its own
-;    (Microsoft Edge in "app" mode: no address bar, no tabs; Chrome when there is no Edge; the usual browser when there is neither). The program keeps running when that
-;    window is closed: it is a background program, on purpose. Starting the launcher twice at once starts the program once.
+;    (Microsoft Edge in "app" mode: no address bar, no tabs; Chrome when there is no Edge). The program keeps running when that window is closed: it is a background program,
+;    on purpose. Starting the launcher twice at once starts the program once. THE USUAL WEB BROWSER IS NEVER USED: the owner's rule is that our programs open in a window of their
+;    own, like any program on the PC. When there is neither Edge nor Chrome the launcher says so in plain words and tells the person what to do.
 ;      ... -DOPEN_URL="http://127.0.0.1:5280" -DOPEN_HOST=127.0.0.1 -DOPEN_PORT=5280 [-DOPEN_WAIT=60] [-DOPEN_PROFILE=smart-retail-pos-window] [-DOPEN_HELPER="Start Business Hub (with a window, for problems)"]
 ;    NEXTGENOS_APP_BROWSER names a Chromium-based browser by hand (the same setting scripts/lib/app-window.mjs reads).
+;
+;    Two more settings for a program that Windows itself starts (the Business Hub is a Windows service that starts with the PC, a minute or two after it, and the launcher must not
+;    start a second copy of it, which would run without the service's rights to the shop's data):
+;      -DWAIT_ONLY=1        never start the program; only wait for it. While it has not answered, a small window says that it is starting (-DSTARTING_TEXT="..."), and when the time is
+;                           up a plain message says what to do. The window of the program opens the moment it answers.
+;      -DKIOSK=1            open the program full screen with nothing else on the screen (a touch till), instead of in a window.
 Unicode true
 !ifndef OUTFILE
   !error "Pass the file to write: -DOUTFILE=..."
@@ -51,6 +58,9 @@ Unicode true
   !define /math OPEN_WAIT_MS ${OPEN_WAIT} * 1000
   !ifndef OPEN_PROFILE
     !define OPEN_PROFILE "app-window"
+  !endif
+  !ifndef STARTING_TEXT
+    !define STARTING_TEXT "${NAME} is starting."
   !endif
 !endif
 
@@ -159,11 +169,18 @@ Section
   ${If} $2 == 183
     Quit
   ${EndIf}
+  StrCpy $9 0
   Call Answers
   ${If} $0 == 0
+!ifndef WAIT_ONLY
     ClearErrors
     ExecShell "open" "$EXEDIR\${PROGRAM}" "${ARGS}" SW_HIDE
     IfErrors notstarted
+!else
+    ; Windows starts the program (a service): this launcher only shows that it is on its way.
+    Banner::show /NOUNLOAD /set 76 "${STARTING_TEXT}" /set 54 "Please wait. This window closes by itself." "${NAME}"
+    StrCpy $9 1
+!endif
     System::Call 'kernel32::GetTickCount() i .r8'
     waiting:
       Sleep 500
@@ -176,7 +193,12 @@ Section
       ${If} $7 < ${OPEN_WAIT_MS}
         Goto waiting
       ${EndIf}
-    !ifdef OPEN_HELPER
+    ${If} $9 == 1
+      Banner::destroy
+    ${EndIf}
+    !ifdef WAIT_ONLY
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${NAME} has not started yet.$\r$\n$\r$\nIt starts by itself a minute or two after the PC starts, and the first time after it is installed. Wait a little, then open it again.$\r$\n$\r$\nIf it still does not open, restart the PC. If that does not help, call the person who looks after your computers."
+    !else ifdef OPEN_HELPER
       MessageBox MB_OK|MB_ICONSTOP "${NAME} did not start within ${OPEN_WAIT} seconds.$\r$\n$\r$\nTry again in a moment. If it still does not open, open $\"${OPEN_HELPER}$\" in this folder and read what it says, or call the person who gave you the program."
     !else
       MessageBox MB_OK|MB_ICONSTOP "${NAME} did not start within ${OPEN_WAIT} seconds.$\r$\n$\r$\nTry again in a moment. If it still does not open, call the person who gave you the program."
@@ -184,17 +206,26 @@ Section
     Quit
   ${EndIf}
   ready:
+  ${If} $9 == 1
+    Banner::destroy
+  ${EndIf}
   Call FindBrowser
   ${If} $R0 != ""
+!ifdef KIOSK
+    Exec '"$R0" --kiosk ${OPEN_URL} --edge-kiosk-type=fullscreen --user-data-dir="$LOCALAPPDATA\NextGenOS\${OPEN_PROFILE}" --no-first-run --no-default-browser-check'
+!else
     Exec '"$R0" --app=${OPEN_URL} --user-data-dir="$LOCALAPPDATA\NextGenOS\${OPEN_PROFILE}" --no-first-run --no-default-browser-check'
+!endif
   ${Else}
-    ; Neither Edge nor Chrome: the usual browser, as a page of its own.
-    ExecShell "open" "${OPEN_URL}"
+    ; Neither Edge nor Chrome. NOT the usual browser (the owner's rule: our programs open in a window of their own): say what is missing and what to do.
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${NAME} opens in a window of its own, and that needs Microsoft Edge or Google Chrome on this PC. Neither was found.$\r$\n$\r$\nMicrosoft Edge is free and comes with Windows 10 and 11 (run Windows Update), or it can be installed from microsoft.com/edge. Then open ${NAME} again."
   ${EndIf}
   Quit
+!ifndef WAIT_ONLY
   notstarted:
   MessageBox MB_OK|MB_ICONSTOP "${NAME} could not be started: Windows would not run $EXEDIR\${PROGRAM}.$\r$\n$\r$\nA virus checker may have stopped it. Unpack the zip file again, all of it, into a new folder."
   Quit
+!endif
 !endif
 missing:
   MessageBox MB_OK|MB_ICONSTOP "${NAME}'s files are not all here.$\r$\n$\r$\nUnpack the whole zip file into a folder (Right-click, Extract All) and open it from that folder, not from inside the zip."

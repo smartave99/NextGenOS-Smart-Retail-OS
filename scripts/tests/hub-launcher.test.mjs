@@ -1,5 +1,4 @@
-// The Business Hub's Linux menu entry: it opens the Hub as a window of its own (a Chromium-based browser in app mode), full screen for a touch till, or in the usual browser
-// when there is no such browser. The program itself is a background service: the window is only a window.
+// The Business Hub's Linux menu entry: it opens the Hub as a window of its own (a Chromium-based browser in app mode), or full screen for a touch till; never in the usual browser tab. The program itself is a background service: the window is only a window.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -49,10 +48,10 @@ test('Chrome and Edge do the same; Chromium is tried first', { skip }, async () 
   assert.ok((await run(['microsoft-edge'])).asked.startsWith('microsoft-edge --app='));
 });
 
-test('with no browser that can open a window of its own, it opens the address in the usual browser', { skip }, async () => {
+test('with no browser that can open a window of its own, the usual web browser is NOT used: it says so and stops', { skip }, async () => {
   const r = await run(['xdg-open']);
-  assert.equal(r.code, 0);
-  assert.equal(r.asked, `xdg-open ${r.url}`);
+  assert.equal(r.code, 1);
+  assert.equal(r.asked, '', 'the address was not handed to the usual web browser');
 });
 
 test('a touch till still opens full screen', { skip }, async () => {

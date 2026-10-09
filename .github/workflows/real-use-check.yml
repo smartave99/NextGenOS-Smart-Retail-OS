@@ -10,9 +10,16 @@ on:
   push:
     branches: ["claude/**"]
     paths: [".github/real-use-check.json"]
+  # The Release workflow runs it on the files it has just built (a draft release), before anything is published.
+  workflow_call:
+    inputs:
+      release_id:
+        description: "The number of the release (draft or published) whose files are opened."
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows:
@@ -30,11 +37,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
+          GIVEN_RELEASE_ID: ${{ inputs.release_id }}
         run: |
           set -euo pipefail
-          TAG="$(jq -r '.release_tag' .github/real-use-check.json)"
-          ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)"
-          echo "Release ${TAG} is number ${ID}."
+          ID="${GIVEN_RELEASE_ID:-}"
+          if [ -z "${ID}" ]; then
+            TAG="$(jq -r '.release_tag' .github/real-use-check.json)"
+            ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)"
+            echo "Release ${TAG} is number ${ID}."
+          fi
           node scripts/release-assets.mjs download --release "${ID}" --out dist --match '^(SmartRetailPOS-Hub-|NextGenOS-Setup-Studio-|website-windows)'
           ls -la dist
 
@@ -172,6 +183,45 @@ jobs:
             Result 'Hub icon opens a window with the licence page' ($title -ne '' -and -not (Looks-Broken $title)) "window title: '$title'; page says licence: $($text -match '(?i)licen')"
             Close-Edge
           }
+          # THE LIKELY REAL-PC FAILURE: the icon pressed (or the setup's Finish button) while the Hub, which Windows starts a minute or two after the PC starts, is not up yet. The window must not
+          # show "this site can't be reached"; a small window must say that it is starting, and the Hub's window must open by itself the moment the Hub answers.
+          $openerDir = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub'
+          $opener = Join-Path $openerDir 'Open Smart Retail POS.exe'
+          if ($desktop -and (Test-Path $opener)) {
+            Stop-Service NextGenOSHub -Force
+            for ($i = 0; $i -lt 30 -and (Get-Service NextGenOSHub).Status -ne 'Stopped'; $i++) { Start-Sleep -Seconds 1 }
+            Result 'Hub service stopped for the test (as it is just after the PC starts)' ((Get-Service NextGenOSHub).Status -eq 'Stopped') "state: $((Get-Service NextGenOSHub).Status)"
+            Start-Process -FilePath $desktop.FullName
+            Start-Sleep -Seconds 12
+            $waiting = @(Titles)
+            Shot 'hub-icon-while-starting'
+            Say ("While the Hub is not up: " + ($waiting -join ' | '))
+            $banner = @(Get-Process -Name 'Open Smart Retail POS' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle })
+            $edgeEarly = @(Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -and $_.MainWindowHandle -ne 0 })
+            Result 'Icon pressed before the Hub is up: a small window says it is starting' ($banner.Count -gt 0) "window: '$($banner[0].MainWindowTitle)'"
+            Result 'Icon pressed before the Hub is up: no browser window with an error page' ($edgeEarly.Count -eq 0) "browser windows: $(($edgeEarly | ForEach-Object { $_.MainWindowTitle }) -join ' | ')"
+            Result 'Icon pressed before the Hub is up: the launcher did not start a second copy of the Hub' (@(Get-Process -Name 'NextGenOS.Hub' -ErrorAction SilentlyContinue).Count -eq 0) 'no Hub program is running yet'
+            Start-Service NextGenOSHub
+            $title2 = Wait-AppWindow 150
+            Shot 'hub-icon-after-start'
+            Say ("After the Hub is up: " + ((Titles) -join ' | '))
+            Result 'Icon pressed before the Hub is up: its window opens by itself once the Hub answers' ($title2 -ne '' -and -not (Looks-Broken $title2)) "window title: '$title2'"
+            $hubCopies = @(Get-CimInstance Win32_Process -Filter "Name='NextGenOS.Hub.exe'")
+            Result 'Only the Windows service runs the Hub (one copy)' ($hubCopies.Count -eq 1) "$($hubCopies.Count) copy(ies) running"
+            Close-Edge
+            # The full-screen kind (a touch till): the same, with a full-screen window.
+            Start-Process -FilePath (Join-Path $openerDir 'Open Smart Retail POS (full screen).exe')
+            Start-Sleep -Seconds 12
+            $kiosk = @(Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -match '--kiosk' -and $_.CommandLine -notmatch '--type=' })
+            Result 'The full-screen icon opens the Hub full screen' ($kiosk.Count -gt 0) "$($kiosk.Count) full-screen window(s)"
+            Close-Edge
+            # Nothing of ours is ever opened as a page in the usual browser: a browser started on the Hub's address must be an app window or full screen.
+            Start-Process -FilePath $desktop.FullName
+            Start-Sleep -Seconds 12
+            $plain = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(msedge|chrome|firefox)\.exe$' -and $_.CommandLine -match '127\.0\.0\.1:5280' -and $_.CommandLine -notmatch '--app=|--kiosk|--type=' })
+            Result 'The Hub is never opened as a page in the usual web browser' ($plain.Count -eq 0) "$($plain.Count) plain browser tab(s) on the Hub's address"
+            Close-Edge
+          }
           # The same address the setup's "Open Smart Retail POS now" button opens, asked for the way a browser does it.
           $code = 0
           try { $code = (Invoke-WebRequest 'http://127.0.0.1:5280/' -UseBasicParsing -SkipHttpErrorCheck).StatusCode } catch { $code = -1 }
@@ -262,3 +312,92 @@ jobs:
           $failed = @(Get-Content $file | Where-Object { $_ -like 'FAIL*' })
           if ($failed.Count -gt 0) { throw "$($failed.Count) check(s) failed." }
           Write-Host 'Every Windows file opened the way a person opens it.'
+
+  android:
+    name: Android app installed and opened on a phone (an emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Take the Android file from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GIVEN_RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          set -euo pipefail
+          ID="${GIVEN_RELEASE_ID:-}"
+          if [ -z "${ID}" ]; then
+            TAG="$(jq -r '.release_tag' .github/real-use-check.json)"
+            ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)"
+          fi
+          node scripts/release-assets.mjs download --release "${ID}" --out dist --match '\.apk$'
+          ls -la dist
+
+      - name: The check that runs on the phone
+        run: |
+          mkdir -p shots
+          cat > "${RUNNER_TEMP}/on-phone.sh" <<'PHONE'
+          set -u
+          APK="$1"
+          BT="$(ls -d "${ANDROID_HOME}"/build-tools/* | sort -V | tail -1)"
+          PKG="$("${BT}/aapt2" dump badging "${APK}" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)"
+          SDK="$("${BT}/aapt2" dump badging "${APK}" | sed -n "s/^sdkVersion:'\([0-9]*\)'.*/\1/p" | head -1)"
+          TARGET="$("${BT}/aapt2" dump badging "${APK}" | sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p" | head -1)"
+          echo "Package ${PKG}, lowest Android ${SDK}, built for Android ${TARGET}"
+          say() { echo "$1"; echo "- $1" >> "${GITHUB_STEP_SUMMARY}"; }
+          adb shell getprop ro.build.version.release | sed 's/^/Phone runs Android /'
+          if ! OUT="$(adb install -r "${APK}" 2>&1)"; then say "FAIL  The app did not install: ${OUT}"; exit 0; fi
+          say "PASS  The app installed (${OUT})"
+          adb logcat -c
+          adb shell monkey -p "${PKG}" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+          sleep 25
+          PID="$(adb shell pidof "${PKG}" | tr -d '\r')"
+          FOCUS="$(adb shell dumpsys window | grep -i mCurrentFocus | head -1 | tr -d '\r')"
+          adb exec-out screencap -p > shots/android-open.png
+          adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+          adb pull /sdcard/ui.xml shots/ui.xml > /dev/null 2>&1
+          SHOWN="$(grep -o 'text="[^"]*"' shots/ui.xml 2>/dev/null | grep -v 'text=""' | head -12 | tr '\n' ' ')"
+          CRASH="$(adb logcat -d | grep -E 'FATAL EXCEPTION|ANR in|Process: '"${PKG}" | head -5)"
+          if [ -n "${PID}" ] && [ -z "${CRASH}" ]; then say "PASS  The app opened and is still running after 25 seconds (process ${PID}); on screen: ${FOCUS}"; else say "FAIL  The app did not stay open. Process: '${PID}'. Crash notes: ${CRASH}"; fi
+          say "      The app shows: ${SHOWN:-nothing readable}"
+          if [ "${PKG}" = "com.nextgenos.smartretail" ]; then
+            if echo "${SHOWN}" | grep -qi 'sample app'; then say "PASS  The sample app says that it is a sample (not a browser error page)"; else say "FAIL  The sample app does not show its own sample page"; fi
+          fi
+          adb logcat -d -s chromium:E Capacitor:E Capacitor/Console:V AndroidRuntime:E 2>/dev/null | tail -20
+          PHONE
+          chmod +x "${RUNNER_TEMP}/on-phone.sh"
+          echo "## Android" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Enable the phone's fast mode (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start a phone, install the app, open it
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash ${{ runner.temp }}/on-phone.sh dist/SmartRetailPOS-example-shop-1.0.0.apk
+
+      - name: Pictures of the phone's screen
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: real-use-android
+          path: shots
+          if-no-files-found: ignore
+
+      - name: The answer
+        run: |
+          if grep -q 'FAIL' "${GITHUB_STEP_SUMMARY}"; then echo "The Android app did not open as it should."; exit 1; fi
+          echo "The Android app installed and opened."

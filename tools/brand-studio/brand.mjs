@@ -79,6 +79,10 @@ function showProblem(message) {
     openWithSystem(file);
   } catch { /* nothing more can be done */ }
 }
+/** The Brand Studio shows itself in a window of its own. When none can be opened the usual web browser is NOT used (the owner's rule: our programs open like programs); a note says what to do. */
+function explainNoWindow() {
+  showProblem('The Brand Studio opens in a window of its own, and that needs Microsoft Edge, Google Chrome or Chromium on this PC. None could be opened.\r\n\r\nMicrosoft Edge is free and comes with Windows 10 and 11 (run Windows Update), or it can be installed from microsoft.com/edge. Then open the Brand Studio again.');
+}
 const answers = async (url) => {
   const u = new URL(url);
   const res = await fetch(`${u.origin}/api/options`, { headers: { 'x-brand-studio': u.searchParams.get('k') ?? '' }, signal: AbortSignal.timeout(3000) });
@@ -139,7 +143,7 @@ try {
       if (opts.app) {
         const running = await findRunning(configDir(), { answers });
         if (running) {
-          if (!opts.nowindow && !openAppWindow(running.url, { profileDir: join(configDir(), 'window') })) openWithSystem(running.url);
+          if (!opts.nowindow && !openAppWindow(running.url, { profileDir: join(configDir(), 'window') })) explainNoWindow();
           process.exit(0);
         }
       }
@@ -169,7 +173,7 @@ try {
         if (opts.nowindow) watchForTheTab();
         else {
           appWindow = openAppWindow(url, { profileDir: join(configDir(), 'window') });
-          if (!appWindow) { openWithSystem(url); watchForTheTab(); }
+          if (!appWindow) { explainNoWindow(); await stop(); }
           else {
             const { started } = appWindow;
             appWindow.closed.then(async (ended) => {
@@ -177,9 +181,9 @@ try {
               if (next === 'stop') return stop();
               appWindow = null;
               if (next === 'handed-off') { watchForTheTab(HANDED_OFF_IDLE_MS); return undefined; }   // the window is open in a browser we cannot watch: do not open it a second time
-              // The browser could not start, or the page never appeared: show it in the usual browser instead.
-              openWithSystem(url);
-              watchForTheTab();
+              // The browser could not start, or the page never appeared: there is no window to show. The usual web browser is not used; a note says what to do, and the Brand Studio stops.
+              explainNoWindow();
+              await stop();
               return undefined;
             });
           }

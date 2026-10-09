@@ -41,6 +41,9 @@ RequestExecutionLevel admin
 !define ADDRESS "http://127.0.0.1:5280"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NextGenOS.SmartRetailPOS.Hub"
 !define MENU_FOLDER "Smart Retail POS"
+; The two small programs beside the Hub (made by zip-launcher.mjs, addServiceLaunchers): they wait until the Hub, which Windows starts, answers, and then open its window (full screen for a till).
+!define OPENER "Open Smart Retail POS.exe"
+!define OPENER_FULL "Open Smart Retail POS (full screen).exe"
 
 !include MUI2.nsh
 !include LogicLib.nsh
@@ -64,7 +67,7 @@ VIAddVersionKey "LegalCopyright" "(c) 2026 ${COMPANY}"
 !define MUI_ABORTWARNING
 
 !define MUI_WELCOMEPAGE_TITLE "Install ${APP}"
-!define MUI_WELCOMEPAGE_TEXT "This installs the ${APP} on this PC.$\r$\n$\r$\nIt runs quietly in the background and starts with the PC. You use it in your web browser, at ${ADDRESS}$\r$\n$\r$\nClick Next to continue."
+!define MUI_WELCOMEPAGE_TEXT "This installs the ${APP} on this PC.$\r$\n$\r$\nIt runs quietly in the background and starts with the PC. You open it from the Smart Retail POS icon, in a window of its own.$\r$\n$\r$\nClick Next to continue."
 !insertmacro MUI_PAGE_WELCOME
 
 !insertmacro MUI_PAGE_LICENSE "${EULA}"
@@ -74,7 +77,7 @@ VIAddVersionKey "LegalCopyright" "(c) 2026 ${COMPANY}"
 !insertmacro MUI_PAGE_INSTFILES
 
 !define MUI_FINISHPAGE_TITLE "${APP} is installed"
-!define MUI_FINISHPAGE_TEXT "Open it in your web browser to set up your business. The first time, you will be asked for your licence key.$\r$\n$\r$\nAddress: ${ADDRESS}$\r$\n$\r$\nYour shop's information is kept safe in its own folder and is never removed when you uninstall."
+!define MUI_FINISHPAGE_TEXT "Open it from the Smart Retail POS icon on your desktop. It opens in a window of its own. The first time, you will be asked for your licence key.$\r$\n$\r$\nRight after the PC starts, or right after this setup, it can take a minute to be ready: a small window says so and the program opens by itself.$\r$\n$\r$\nYour shop's information is kept safe in its own folder and is never removed when you uninstall."
 !define MUI_FINISHPAGE_TEXT_LARGE
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Open Smart Retail POS now"
@@ -87,24 +90,9 @@ VIAddVersionKey "LegalCopyright" "(c) 2026 ${COMPANY}"
 
 !insertmacro MUI_LANGUAGE "English"
 
+; The Finish button: the same small program as the icon, so the program opens in a window of its own once it is ready (never in the usual web browser, never as a page that says "this site can't be reached").
 Function OpenHub
-  ExecShell "open" "${ADDRESS}"
-FunctionEnd
-
-; Where Microsoft Edge is: it lives in the 32-bit Program Files folder of 64-bit Windows. Leaves the path in $R0, or nothing when it is not found.
-Function FindEdge
-  StrCpy $R0 ""
-  ReadEnvStr $R1 "ProgramFiles(x86)"
-  ${If} $R1 != ""
-  ${AndIf} ${FileExists} "$R1\Microsoft\Edge\Application\msedge.exe"
-    StrCpy $R0 "$R1\Microsoft\Edge\Application\msedge.exe"
-    Return
-  ${EndIf}
-  ${If} ${FileExists} "$PROGRAMFILES32\Microsoft\Edge\Application\msedge.exe"
-    StrCpy $R0 "$PROGRAMFILES32\Microsoft\Edge\Application\msedge.exe"
-  ${ElseIf} ${FileExists} "$PROGRAMFILES64\Microsoft\Edge\Application\msedge.exe"
-    StrCpy $R0 "$PROGRAMFILES64\Microsoft\Edge\Application\msedge.exe"
-  ${EndIf}
+  Exec '"$INSTDIR\${OPENER}"'
 FunctionEnd
 
 ; Copies one file of the prepared set-up, when it is there.
@@ -206,32 +194,23 @@ Section "Smart Retail POS Hub" SecMain
     nsExec::ExecToLog 'sc.exe config ${SERVICE} binPath= "\"$INSTDIR\${EXE}\"" start= delayed-auto obj= "NT AUTHORITY\LocalService" DisplayName= "${APP}"'
     Pop $0
   ${EndIf}
-  nsExec::ExecToLog 'sc.exe description ${SERVICE} "Smart Retail POS Hub by ${COMPANY}: the counter, stock, bills and reports of the business. Open ${ADDRESS} in a web browser, or use the Smart Retail POS shortcut."'
+  nsExec::ExecToLog 'sc.exe description ${SERVICE} "Smart Retail POS Hub by ${COMPANY}: the counter, stock, bills and reports of the business. Open it from the Smart Retail POS icon."'
   nsExec::ExecToLog 'sc.exe failure ${SERVICE} reset= 86400 actions= restart/5000/restart/10000/restart/30000'
   nsExec::ExecToLog 'sc.exe start ${SERVICE}'
   Pop $0
 
-  ; The shortcut people use: it opens the Hub in a window of its own (Microsoft Edge, which is part of Windows 10 and 11, in "app" mode: no address bar, no tabs).
-  ; The Hub is a service and keeps running in the background when that window is closed. Where Edge cannot be found, the shortcut opens the address in the usual browser instead.
-  WriteINIStr "$INSTDIR\Open Smart Retail POS.url" "InternetShortcut" "URL" "${ADDRESS}"
+  ; The icon people use: a small program that waits until the Hub is ready (Windows starts it a minute or two after the PC starts, and the first time after this setup) and then opens
+  ; it in a window of its own (Microsoft Edge in "app" mode: no address bar, no tabs; Chrome when there is no Edge). It never opens the usual web browser. The Hub is a service and keeps
+  ; running in the background when that window is closed.
   CreateDirectory "$SMPROGRAMS\${MENU_FOLDER}"
-  Call FindEdge
-  ${If} $R0 != ""
-    CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$R0" "--app=${ADDRESS} --no-first-run --no-default-browser-check" "$INSTDIR\${EXE}" 0
-    CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$R0" "--app=${ADDRESS} --no-first-run --no-default-browser-check" "$INSTDIR\${EXE}" 0
-  ${Else}
-    CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
-    CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$INSTDIR\Open Smart Retail POS.url"
-  ${EndIf}
+  CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Open Smart Retail POS.lnk" "$INSTDIR\${OPENER}" "" "$INSTDIR\${EXE}" 0
+  CreateShortCut "$DESKTOP\Smart Retail POS.lnk" "$INSTDIR\${OPENER}" "" "$INSTDIR\${EXE}" 0
 
-  ; A touch-screen till or a kiosk opens the Hub full screen by itself when the PC starts (Microsoft Edge is part of Windows 10 and 11).
+  ; A touch-screen till or a kiosk opens the Hub full screen by itself when the PC starts, once it is ready.
   ReadINIStr $0 "$EXEDIR\profile\install.ini" "install" "kiosk"
   ${If} $0 == "yes"
-    Call FindEdge
-    ${If} $R0 != ""
-      CreateShortCut "$SMSTARTUP\Smart Retail POS (full screen).lnk" "$R0" "--kiosk ${ADDRESS} --edge-kiosk-type=fullscreen --no-first-run"
-      CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Smart Retail POS (full screen).lnk" "$R0" "--kiosk ${ADDRESS} --edge-kiosk-type=fullscreen --no-first-run"
-    ${EndIf}
+    CreateShortCut "$SMSTARTUP\Smart Retail POS (full screen).lnk" "$INSTDIR\${OPENER_FULL}" "" "$INSTDIR\${EXE}" 0
+    CreateShortCut "$SMPROGRAMS\${MENU_FOLDER}\Smart Retail POS (full screen).lnk" "$INSTDIR\${OPENER_FULL}" "" "$INSTDIR\${EXE}" 0
   ${EndIf}
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"

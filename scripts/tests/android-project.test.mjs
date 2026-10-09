@@ -53,6 +53,8 @@ function copyOfProject() {
   cpSync(join(app, 'android', 'app', 'build.gradle'), join(root, 'android', 'app', 'build.gradle'), { recursive: true });
   cpSync(join(app, 'android', 'app', 'src', 'main', 'java'), join(root, 'android', 'app', 'src', 'main', 'java'), { recursive: true });
   mkdirSync(join(root, 'android', 'app', 'src', 'main', 'res', 'values'), { recursive: true });
+  mkdirSync(join(root, 'android-shell'), { recursive: true });
+  cpSync(join(app, 'android-shell', 'index.html'), join(root, 'android-shell', 'index.html'));
   return root;
 }
 const configure = (root, ...a) => spawnSync('node', [join(root, 'scripts', 'android-config.mjs'), ...a], { encoding: 'utf8' });
@@ -74,6 +76,26 @@ test('setting the app up for a customer changes its id, name, address and versio
     assert.match(readFileSync(join(root, 'android/app/src/main/res/values/strings.xml'), 'utf8'), /Luzon Fresh/);
     assert.ok(existsSync(join(root, 'android/app/src/main/java/com/luzonfresh/shop/MainActivity.java')));
     assert.doesNotMatch(readFileSync(join(root, 'android/app/src/main/java/com/luzonfresh/shop/MainActivity.java'), 'utf8'), new RegExp('nextgenos|smart' + 'avenue', 'i'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the sample app (built for a made-up address) shows its own page that says it is a sample, not a browser\'s "offline" page; a real address changes nothing of that', () => {
+  const root = copyOfProject();
+  try {
+    const original = readFileSync(join(root, 'android-shell', 'index.html'), 'utf8');
+    const real = configure(root, '--app-id', 'com.luzonfresh.shop', '--app-name', 'Luzon Fresh', '--url', 'https://shop.luzonfresh.example');
+    assert.equal(real.status, 0, real.stderr);
+    assert.equal(readFileSync(join(root, 'android-shell', 'index.html'), 'utf8'), original, 'a real shop\'s app keeps the offline page for when the phone has no connection');
+    assert.equal(JSON.parse(readFileSync(join(root, 'capacitor.config.json'), 'utf8')).server.url, 'https://shop.luzonfresh.example');
+
+    const sample = configure(root, '--app-id', 'com.nextgenos.smartretail', '--app-name', 'Smart Retail POS', '--url', 'https://shop.example.com');
+    assert.equal(sample.status, 0, sample.stderr);
+    const cap = JSON.parse(readFileSync(join(root, 'capacitor.config.json'), 'utf8'));
+    assert.equal(cap.server, undefined, 'the sample app opens no address');
+    const page = readFileSync(join(root, 'android-shell', 'index.html'), 'utf8');
+    assert.match(page, /<h1>Smart Retail POS<\/h1>/);
+    assert.match(page, /sample app/i);
+    assert.doesNotMatch(page, /offline|Internet connection|Try again/i, 'not the offline page');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

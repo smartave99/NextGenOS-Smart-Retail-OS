@@ -29,7 +29,19 @@ if (!/^\d+(\.\d+){0,2}$/.test(versionName) || !Number.isInteger(versionCode) || 
 const host = new URL(url).hostname;
 const cap = JSON.parse(readFileSync(join(root, 'capacitor.config.json'), 'utf8'));
 Object.assign(cap, { appId, appName });
-cap.server = { url, cleartext: false, allowNavigation: [host, `*.${host}`] };
+// The address of the sample app is a made-up one (example.com, example.org or example.net are reserved for examples and never hold a shop). An app built for it must not open that address and
+// show a browser's "offline" or "not found" page, which looks like a broken app: it shows its own page that says it is a sample and is not connected to a shop.
+const isSample = /(^|\.)example\.(com|org|net)$/i.test(host);
+if (isSample) {
+  delete cap.server;
+  const page = join(root, 'android-shell', 'index.html');
+  const html = readFileSync(page, 'utf8');
+  const sample = html
+    .replace('<title>Smart Retail POS</title>', `<title>${appName}</title>`)
+    .replace(/<h1>[\s\S]*?<\/p>\s*<button[\s\S]*?<\/button>/, `<h1>${appName}</h1>\n    <p>This is the sample app. It is not connected to a shop, so there is nothing to show yet.</p>\n    <p>A customer's own app opens that customer's own shop.</p>`);
+  if (sample === html) fail('The page of the sample app was not found in android-shell/index.html.');
+  writeFileSync(page, sample);
+} else cap.server = { url, cleartext: false, allowNavigation: [host, `*.${host}`] };
 writeFileSync(join(root, 'capacitor.config.json'), JSON.stringify(cap, null, 2) + '\n');
 
 const android = join(root, 'android', 'app');
@@ -60,4 +72,4 @@ if (found[0] !== join(target, 'MainActivity.java')) {
 }
 writeFileSync(join(target, 'MainActivity.java'), `package ${appId};\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {}\n`);
 
-console.log(`Android app set up: ${appName} (${appId}) -> ${url}, version ${versionName} (${versionCode}).`);
+console.log(`Android app set up: ${appName} (${appId}) -> ${isSample ? 'no shop (the sample app shows its own page)' : url}, version ${versionName} (${versionCode}).`);

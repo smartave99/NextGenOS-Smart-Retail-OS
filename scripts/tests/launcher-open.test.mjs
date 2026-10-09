@@ -127,3 +127,30 @@ test('the dashboard\'s build script gives the launcher maker only settings it kn
     assert.ok(has(readFileSync(exe), 'did not start within 90 seconds'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a launcher for a program that Windows starts (a service) only waits: it carries the words of its "starting" window, and a till gets the full-screen kind', () => {
+  const waiting = launcherDefines({ ...base, open: { ...open, waitOnly: true, startingText: 'Smart Retail POS is starting.' } });
+  assert.ok(waiting.includes('-DWAIT_ONLY=1'));
+  assert.ok(waiting.includes('-DSTARTING_TEXT=Smart Retail POS is starting.'));
+  assert.ok(!waiting.includes('-DKIOSK=1'));
+  assert.ok(launcherDefines({ ...base, open: { ...open, waitOnly: true, kiosk: true } }).includes('-DKIOSK=1'));
+  assert.ok(!launcherDefines({ ...base, open }).includes('-DWAIT_ONLY=1'), 'the launcher of the zip still starts its program');
+  assert.throws(() => launcherDefines({ ...base, open: { ...open, startingText: 'x' } }), /only waits/);
+  assert.throws(() => launcherDefines({ ...base, open: { ...open, waitOnly: true, startingText: 'a "quote"' } }), /no quote or line break/);
+  assert.throws(() => launcherDefines({ ...base, open: { ...open, waitOnly: true, startingText: 'x'.repeat(121) } }), /1 to 120/);
+});
+
+test('the launcher program never opens the usual web browser: its script has no ExecShell on the address, and it says in words what to do when there is no Edge or Chrome', { skip }, () => {
+  const script = readFileSync(LAUNCHER_SCRIPT, 'utf8');
+  assert.ok(!/ExecShell\s+"open"\s+"\$\{OPEN_URL\}"/.test(script), 'the address is never handed to the usual browser');
+  assert.match(script, /needs Microsoft Edge or Google Chrome/);
+  const dir = mkdtempSync(join(tmpdir(), 'wait-launcher-'));
+  try {
+    const out = join(dir, 'Open.exe');
+    buildLauncher({ outFile: out, name: 'Example', program: 'app\\run.exe', icon, open: { ...open, waitOnly: true, startingText: 'Example is starting.' } });
+    const bytes = readFileSync(out);
+    assert.ok(has(bytes, 'Example is starting.'), 'the words of the "starting" window are in the program');
+    assert.ok(has(bytes, 'needs Microsoft Edge or Google Chrome'), 'and what to do when there is no such browser');
+    assert.ok(!has(bytes, 'This installs'), 'nothing of a setup');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

@@ -230,3 +230,7 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 > continue start from where stopped and have you tested the intaller and software you are releasing on github because i tested its not completley functional some dont even open
 
 (The owner tried the trial files on a real PC and says some do not open. Which files, and what was seen, were not said. This is the first real-PC report; it comes before new features.)
+
+### 2026-10-09 (about; sent while the assistant was reading the Windows installer; about the Hub's setup opening the web browser)
+
+> continue start from where stopped why is it opening on web browser it should have its own how other great local running software have i have told you still you did the mistake

@@ -2,7 +2,7 @@
 # Checks the Hub's Windows setup (SmartRetailHub.nsi) under Wine, with a stand-in for the program, because the real program needs Windows to run:
 #   - a quiet install puts every file in Program Files, with the licence agreement, and makes the shop's data folder (readable by the service only);
 #   - it registers the Windows service "NextGenOSHub" (own process, starts with the PC, Local Service account, restarts after a crash), a Start menu
-#     entry and a desktop shortcut that open the Hub in the browser, and the uninstall entry;
+#     entry and a desktop shortcut that open the Hub in a window of its own (through a small program that waits until the Hub is ready), and the uninstall entry;
 #   - installing again over it (an update) works and keeps one service;
 #   - uninstalling removes exactly the installed files, the service, the shortcuts and the entry, and leaves the shop's data and any other
 #     file in the install folder alone.
@@ -46,6 +46,9 @@ mkdir -p "$src/sub"
 printf 'MZ stand-in' > "$src/NextGenOS.Hub.exe"
 printf 'x' > "$src/NextGenOS.Hub.dll"
 printf 'y' > "$src/sub/helper.dll"
+# the two small programs that open the Hub's window (the shortcuts point at them)
+printf 'MZ stand-in' > "$src/Open Smart Retail POS.exe"
+printf 'MZ stand-in' > "$src/Open Smart Retail POS (full screen).exe"
 node "$here/make-uninstall-list.mjs" "$src" "$work/uninstall-files.nsh" > /dev/null
 setup="$work/setup.exe"
 makensis -V1 -DVERSION=1.2.3 -DSOURCE="$src" -DUNINSTALL_LIST="$work/uninstall-files.nsh" -DOUTFILE="$setup" -DEULA="$repo/EULA.txt" -DNOTICES="$repo/THIRD-PARTY-NOTICES.md" "$here/SmartRetailHub.nsi"
@@ -61,7 +64,7 @@ check "the licence agreement and the third-party notices are installed" test -f 
 check "the uninstaller is installed" test -f "$app/Uninstall.exe"
 check "the shop's data folder was made" test -d "$data"
 check "the licence folder shared by the suite was made" test -d "$c/ProgramData/NextGenOS/SmartRetailPOS"
-check "the browser shortcut points at this PC's port 5280" grep -q "URL=http://127.0.0.1:5280" "$app/Open Smart Retail POS.url"
+check "the small programs that open the Hub's window are installed (normal and full screen)" test -f "$app/Open Smart Retail POS.exe" -a -f "$app/Open Smart Retail POS (full screen).exe"
 check "a Start menu entry and a desktop shortcut exist" test -f "$c/ProgramData/Microsoft/Windows/Start Menu/Programs/Smart Retail POS/Open Smart Retail POS.lnk" -a -f "$c/users/Public/Desktop/Smart Retail POS.lnk"
 reg() { { "$WINE" reg query "$1" 2>&1 || true; } | tr -d '\r'; }
 svc="$(reg 'HKLM\SYSTEM\CurrentControlSet\Services\NextGenOSHub')"
@@ -113,13 +116,14 @@ for _ in $(seq 1 60); do [ -e "$app/NextGenOS.Hub.exe" ] || break; sleep 1; done
 sleep 3
 check "uninstalling takes the profile files and the full screen shortcuts away" bash -c "! test -e '$app/profile' && ! test -e '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/Smart Retail POS (full screen).lnk'"
 check "the shop's data is still there after that too" test -f "$data/shop.db"
-echo "== the shortcut opens the Hub as a window of its own when Edge is there, and in the usual browser when it is not"
-# (the first install above had no Edge: its shortcuts point at the address file; this one had a stand-in Edge)
+echo "== the icons open the Hub in a window of its own, through the small program that waits until the Hub is ready (never the usual web browser)"
 timeout 240 "$WINE" "$setup" /S > /dev/null 2>&1 || true
 text_of() { tr -d '\0' < "$1"; }
-check "the desktop shortcut starts Edge in app mode at this PC's port 5280" bash -c "$(declare -f text_of); text_of '$c/users/Public/Desktop/Smart Retail POS.lnk' | grep -aq -- '--app=http://127.0.0.1:5280'"
-check "the Start menu shortcut does too" bash -c "$(declare -f text_of); text_of '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/Smart Retail POS/Open Smart Retail POS.lnk' | grep -aq -- '--app=http://127.0.0.1:5280'"
-check "the shortcut has no terminal and no address bar to type in: it is Edge's app mode, not a tab" bash -c "$(declare -f text_of); ! text_of '$c/users/Public/Desktop/Smart Retail POS.lnk' | grep -aq -- '--kiosk'"
+check "the desktop icon is the small program that waits and opens the window" bash -c "$(declare -f text_of); text_of '$c/users/Public/Desktop/Smart Retail POS.lnk' | grep -aq -- 'Open Smart Retail POS.exe'"
+check "the Start menu icon is too" bash -c "$(declare -f text_of); text_of '$c/ProgramData/Microsoft/Windows/Start Menu/Programs/Smart Retail POS/Open Smart Retail POS.lnk' | grep -aq -- 'Open Smart Retail POS.exe'"
+check "the icon does not open Edge or a web address by itself (the small program does, once the Hub answers)" bash -c "$(declare -f text_of); ! text_of '$c/users/Public/Desktop/Smart Retail POS.lnk' | grep -aqi -- 'msedge\|http://\|--app=\|\.url'"
+check "the small program is installed beside the Hub" test -f "$app/Open Smart Retail POS.exe"
+check "no address file is left for the usual web browser" test ! -e "$app/Open Smart Retail POS.url"
 timeout 240 "$WINE" "$app/Uninstall.exe" /S > /dev/null 2>&1 || true
 for _ in $(seq 1 60); do [ -e "$app/NextGenOS.Hub.exe" ] || break; sleep 1; done
 sleep 3

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Opens Smart Retail POS as a window of its own: no address bar, no tabs, no terminal.
-#   smart-retail-pos                 opens it in its own window. The program runs in the background as a service and keeps running when the window is closed.
+#   smart-retail-pos                 opens it in its own window (never in the usual web browser). The program runs in the background as a service and keeps running when the window is closed.
 #   smart-retail-pos --fullscreen    opens it full screen, like an appliance (touch-screen tills and kiosks)
 # The address is http://127.0.0.1:5280 (SMART_RETAIL_POS_URL can name another one, for a test).
 url="${SMART_RETAIL_POS_URL:-http://127.0.0.1:5280}"
@@ -31,7 +31,10 @@ for browser in $browsers; do
     exec "$browser" --app="$url" --user-data-dir="$profile" --no-first-run --no-default-browser-check
   fi
 done
-# No browser that can do that: the usual browser, as a tab.
-if command -v xdg-open > /dev/null 2>&1; then exec xdg-open "$url"; fi
-echo "Open a web browser and go to $url"
+# No browser that can show a window of its own. The usual web browser is NOT used (our programs open like programs, in a window of their own): say what to do.
+message="Smart Retail POS opens in a window of its own, and that needs Chromium, Google Chrome or Microsoft Edge on this computer. None was found. Install Chromium (in Ubuntu: open Software and search for Chromium), then open Smart Retail POS again."
+if command -v zenity > /dev/null 2>&1; then zenity --error --no-markup --title="Smart Retail POS" --text="$message" 2> /dev/null
+elif command -v notify-send > /dev/null 2>&1; then notify-send "Smart Retail POS" "$message"
+fi
+echo "$message" >&2
 exit 1

@@ -35,9 +35,11 @@ PART B: the Windows setup on a real Windows 10 or 11 PC (about 10 minutes)
 --------------------------------------------------------------------------
 1. In the pack, open "1 - Shop PC (Windows)". Keep the setup file and the "profile" folder together.
 2. Double-click the setup. Say Yes to the permission question. Windows warns about an unknown publisher until the setup is signed: "More info", "Run anyway".
-3. When it finishes, your browser should open http://127.0.0.1:5280 and show a page that says the program needs a licence, with a place to type a key.
-   That is the correct result for a trial. Tell us if it shows anything else, or if it asked you to install something first.
-4. Restart the PC. The page should be there again without you starting anything (it runs as a Windows service).
+3. On the last page leave "Open Smart Retail POS now" ticked and press Finish. A small window says "Smart Retail POS is starting" (it can take up to a minute), and then Smart Retail POS opens
+   in a window of its own, with no address bar, showing a page that says the program needs a licence, with a place to type a key.
+   That is the correct result for a trial. It must NOT open in your usual web browser. Tell us if it does, or if it shows anything else, or if it asked you to install something first.
+4. Restart the PC. Right after the restart, press the Smart Retail POS icon on the desktop at once, before the PC has settled: the small "starting" window should appear and the program should
+   open by itself when it is ready. It must never show "This site can't be reached".
 5. For a "touch-screen till" customer the program should also open full screen by itself after the restart.
 6. Uninstall it (Settings, Apps). The folder C:\ProgramData\NextGenOS stays on purpose: the shop's information is kept.
 
@@ -45,7 +47,7 @@ PART C: Linux (Ubuntu 22.04/24.04, Mint 21+ or Debian 12+)
 -----------------------------------------------------------
 1. Make the customer's machine "Linux" in the Studio and make a new pack. Copy "1 - Shop PC (Linux)" to the Linux PC.
 2. In a terminal there: sudo ./install.sh   (be online for this step)
-3. Open http://127.0.0.1:5280: the "needs a licence" page. Reboot: it should still be there.
+3. Open Smart Retail POS from the applications menu: it opens in a window of its own and shows the "needs a licence" page. Reboot: it should still be there.
 4. Remove it with the Software app. /var/lib/nextgenos stays on purpose.
 
 WHAT TO TELL US

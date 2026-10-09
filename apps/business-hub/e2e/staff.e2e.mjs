@@ -73,7 +73,8 @@ try {
   step(`Asha is owed ${owed} (2.5 percent of the sale before tax)`);
 
   await page.locator('#o-person').selectOption({ label: 'Ravi (broker)' });
-  await page.locator('#statement tbody tr', { hasText: 'Commission on bill' }).waitFor();
+  // the screen is redrawn for the other person a moment later: wait for the broker's figure, not just for any statement
+  await page.waitForFunction(() => document.querySelector('#owed-now')?.textContent.replace(/[^0-9.]/g, '') === '10.00', null, { timeout: 15000 });
   assert.strictEqual(money(await page.locator('#owed-now').innerText()), 10, 'the broker is owed the amount typed for the bill');
   step('Ravi is owed exactly the 10 typed for the bill');
 

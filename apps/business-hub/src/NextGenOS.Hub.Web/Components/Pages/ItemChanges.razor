@@ -1,0 +1,368 @@
+@page "/items/changes"
+@attribute [Authorize(Policy = Perm.Catalog)]
+@inherits HubPage
+@using NextGenOS.Hub.Catalog
+@using NextGenOS.Tax
+
+<PageTitle>Change many at once</PageTitle>
+<h1>Change many at once</h1>
+<p class="sub">Change the price, the tax or whether an item is on sale, for many items together. You see what would change before anything is saved, and you can take a change back. Bills already made are never changed.</p>
+<Notice Error="@Error" Info="@Info" />
+
+<div class="toolbar">
+    <a class="btn ghost" href="/items">Back to @Shop.Plural("item").ToLowerInvariant()</a>
+</div>
+
+<div class="card">
+    <h2>1. Which items</h2>
+    <div class="toolbar">
+        <input class="search" id="ch-search" type="search" placeholder="Search" aria-label="Search" @bind="text" @bind:event="oninput" @bind:after="Find" />
+        <select class="narrow" id="ch-category" aria-label="Category" @bind="category" @bind:after="Find">
+            <option value="">All categories</option>
+            @foreach (var c in categories) { <option value="@c">@c</option> }
+        </select>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost small" id="ch-all" @onclick="ChooseAll">Choose all shown</button>
+        <button type="button" class="btn ghost small" id="ch-none" @onclick="ChooseNone">Choose none</button>
+    </div>
+    <p class="muted" id="ch-count">@chosen.Count chosen@(rows.Count >= Limit ? $" (showing the first {Limit}; narrow the search to see others)" : "")</p>
+    <div class="tbl-wrap">
+        <table class="tbl" id="ch-items">
+            <thead><tr><th></th><th>Name</th><th>Category</th><th class="num">Price</th>@if (tradeLabel.Length > 0) { <th class="num">@tradeLabel</th> }<th>Tax</th>@if (tab == "price" && how == "type") { <th class="num">New @FieldLabel().ToLowerInvariant()</th> }@if (tab == "labels") { <th class="num">Labels</th> }</tr></thead>
+            <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td><input type="checkbox" aria-label="Choose @r.Name" checked="@chosen.Contains(r.Id)" @onchange="e => Toggle(r.Id, e.Value is true)" /></td>
+                    <td><strong>@r.Name</strong>@if (!r.Active) { <span class="chip">Not sold</span> }</td>
+                    <td>@r.Category</td>
+                    <td class="num">@Money(r.PriceMinor)</td>
+                    @if (tradeLabel.Length > 0) { <td class="num">@(r.TradePriceMinor is { } t ? Money(t) : "")</td> }
+                    <td>@TaxLabel(r.TaxCode)</td>
+                    @if (tab == "price" && how == "type")
+                    {
+                        <td class="num"><input class="narrow" inputmode="decimal" aria-label="New @FieldLabel().ToLowerInvariant() for @r.Name" value="@Typed(r.Id)" @onchange="e => SetTyped(r.Id, e.Value?.ToString() ?? string.Empty)" /></td>
+                    }
+                    @if (tab == "labels")
+                    {
+                        <td class="num"><input class="narrow" inputmode="numeric" aria-label="Labels of @r.Name" value="@(copies.GetValueOrDefault(r.Id, 1))" @onchange="e => SetCopies(r.Id, e.Value?.ToString())" /></td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>2. What to change</h2>
+    <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="ch-tab-price" class="@(tab == "price" ? "on" : "")" aria-selected="@(tab == "price")" @onclick='() => Pick("price")'>Price</button>
+        <button type="button" role="tab" id="ch-tab-tax" class="@(tab == "tax" ? "on" : "")" aria-selected="@(tab == "tax")" @onclick='() => Pick("tax")'>Tax</button>
+        <button type="button" role="tab" id="ch-tab-sale" class="@(tab == "sale" ? "on" : "")" aria-selected="@(tab == "sale")" @onclick='() => Pick("sale")'>On sale</button>
+        <button type="button" role="tab" id="ch-tab-labels" class="@(tab == "labels" ? "on" : "")" aria-selected="@(tab == "labels")" @onclick='() => Pick("labels")'>Labels</button>
+    </div>
+
+    @if (tab == "price")
+    {
+        <div class="stack">
+            @if (tradeLabel.Length > 0)
+            {
+                <label for="ch-field">Which price</label>
+                <select id="ch-field" @bind="field" @bind:after="ClearPreview">
+                    <option value="price">Price</option>
+                    <option value="trade">@tradeLabel</option>
+                </select>
+            }
+            <label for="ch-how">How</label>
+            <select id="ch-how" @bind="how" @bind:after="ClearPreview">
+                <option value="percent">Raise or lower by a percent</option>
+                <option value="amount">Raise or lower by an amount</option>
+                <option value="type">Type a new price beside each item</option>
+            </select>
+            @if (how != "type")
+            {
+                <label for="ch-value">@(how == "percent" ? "Percent (like 5 to raise, -10 to lower)" : $"Amount in {Shop.CurrencyCode} (like 10 to add, -2.50 to take off)")</label>
+                <input id="ch-value" inputmode="decimal" autocomplete="off" @bind="value" />
+                <label for="ch-round">Round the result to the nearest (optional)</label>
+                <input id="ch-round" inputmode="decimal" autocomplete="off" placeholder="for example 0.50" @bind="roundText" />
+            }
+            <div class="row"><button type="button" class="btn primary" id="ch-preview-price" @onclick="PreviewPrice">Show what would change</button></div>
+        </div>
+    }
+    else if (tab == "tax")
+    {
+        <div class="stack">
+            <p class="muted">Only items that have exactly the first tax change. Items with any other tax are left alone. @(chosen.Count > 0 ? "Only the items you chose are looked at." : "With none chosen, every item that has it is looked at (narrowed by the category above, if you chose one).")</p>
+            <div class="field-row">
+                <div>
+                    <label for="ch-from">Change from</label>
+                    <select id="ch-from" @bind="fromTax" @bind:after="ClearPreview"><option value="">Choose</option>@foreach (var r in Rates()) { <option value="@r.Code">@r.Label</option> }</select>
+                </div>
+                <div>
+                    <label for="ch-to">Change to</label>
+                    <select id="ch-to" @bind="toTax" @bind:after="ClearPreview"><option value="">Choose</option>@foreach (var r in Rates()) { <option value="@r.Code">@r.Label</option> }</select>
+                </div>
+            </div>
+            @if (Shop.Country.Tax.ItemCode is { } codeRule)
+            {
+                <label for="ch-code">Only items with this @codeRule.Label.ToLowerInvariant() (optional)</label>
+                <input id="ch-code" autocomplete="off" @bind="codeFilter" />
+            }
+            <div class="row"><button type="button" class="btn primary" id="ch-preview-tax" @onclick="PreviewTaxChange">Show what would change</button></div>
+        </div>
+    }
+    else if (tab == "labels")
+    {
+        <div class="stack">
+            @if (labelPrinters.Count == 0)
+            {
+                <p class="muted" id="ch-no-label-printer">No label printer is set up yet. Add one in Settings, under Printers; then the labels of the items you choose print here.</p>
+            }
+            else
+            {
+                <p class="muted">One label for each unit unless you change the number beside an item. @(deliveryName is not null ? $"The numbers are what came with {deliveryName}." : "")</p>
+                @if (labelPrinters.Count > 1)
+                {
+                    <label for="ch-printer">Printer</label>
+                    <select id="ch-printer" @bind="printerId">@foreach (var p in labelPrinters) { <option value="@p.Id">@p.Name</option> }</select>
+                }
+                <div class="row"><button type="button" class="btn primary" id="ch-print-labels" @onclick="PrintLabels">Print the labels of the @chosen.Count chosen @(chosen.Count == 1 ? "item" : "items")</button></div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <button type="button" class="btn primary" id="ch-off" @onclick="() => Sale(false)">Take the chosen items off sale</button>
+            <button type="button" class="btn ghost" id="ch-on" @onclick="() => Sale(true)">Put the chosen items back on sale</button>
+        </div>
+        <p class="muted">An item that is off sale is not offered at the till. Nothing is deleted.</p>
+    }
+</div>
+
+@if (pricePreview is not null || taxPreview is not null)
+{
+    <div class="card" id="ch-preview">
+        <h2>3. What would change</h2>
+        <p><strong id="ch-summary">@(pricePreview?.Summary ?? taxPreview!.Summary)</strong></p>
+        @if (pricePreview is not null)
+        {
+            @if (pricePreview.Changes.Count == 0) { <div class="empty">Nothing would change.</div> }
+            else
+            {
+                <div class="tbl-wrap"><table class="tbl" id="ch-preview-table">
+                    <thead><tr><th>Name</th><th class="num">Now</th><th class="num">Would be</th></tr></thead>
+                    <tbody>@foreach (var c in pricePreview.Changes) { <tr><td>@c.Name</td><td class="num">@(c.OldMinor is { } o ? Money(o) : "none")</td><td class="num">@Money(c.NewMinor)</td></tr> }</tbody>
+                </table></div>
+            }
+            @if (pricePreview.Left.Count > 0)
+            {
+                <details><summary>@pricePreview.Left.Count left as they are</summary><ul id="ch-left">@foreach (var l in pricePreview.Left) { <li><strong>@l.Name</strong>: @l.Why</li> }</ul></details>
+            }
+        }
+        else
+        {
+            @if (taxPreview!.Changes.Count == 0) { <div class="empty">No item has that tax, so nothing would change.</div> }
+            else
+            {
+                <div class="tbl-wrap"><table class="tbl" id="ch-preview-table">
+                    <thead><tr><th>Name</th><th>Now</th><th>Would be</th></tr></thead>
+                    <tbody>@foreach (var c in taxPreview.Changes) { <tr><td>@c.Name</td><td>@TaxLabel(c.OldCode)</td><td>@TaxLabel(c.NewCode)</td></tr> }</tbody>
+                </table></div>
+            }
+        }
+        <div class="row">
+            @if ((pricePreview?.Changes.Count ?? taxPreview!.Changes.Count) > 0) { <button type="button" class="btn primary" id="ch-save" @onclick="SaveChange">Save this change</button> }
+            <button type="button" class="btn ghost" id="ch-cancel" @onclick="ClearPreview">Cancel</button>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <h2>Earlier changes</h2>
+    @if (history.Count == 0)
+    {
+        <div class="empty">No changes yet.</div>
+    }
+    else
+    {
+        <div class="tbl-wrap"><table class="tbl" id="ch-history">
+            <thead><tr><th>When</th><th>What</th><th>Who</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var h in history)
+            {
+                <tr>
+                    <td class="nowrap">@When(h.At)</td>
+                    <td>@h.Summary@if (h.Undone) { <span class="chip">Taken back</span> }</td>
+                    <td>@h.Who</td>
+                    <td class="right nowrap">
+                        <button type="button" class="btn ghost small" @onclick="() => Details(h.Id)">Details</button>
+                        @if (!h.Undone && h.Kind != "undo") { <button type="button" class="btn ghost small" aria-label="Take back: @h.Summary" @onclick="() => TakeBack(h.Id)">Take it back</button> }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    }
+    @if (detail is not null)
+    {
+        <h3>What that change did</h3>
+        <div class="tbl-wrap"><table class="tbl" id="ch-detail">
+            <thead><tr><th>Name</th><th>What</th><th>Before</th><th>After</th></tr></thead>
+            <tbody>@foreach (var l in detail) { <tr><td>@l.Name</td><td>@l.Field</td><td>@l.Before</td><td>@l.After</td></tr> }</tbody>
+        </table></div>
+    }
+</div>
+
+@code {
+    private const int Limit = 300;
+
+    /// <summary>A received purchase whose items are to be labelled (from the purchase's own screen).</summary>
+    [SupplyParameterFromQuery(Name = "delivery")] public long? Delivery { get; set; }
+
+    private string text = "", category = "", tab = "price", field = "price", how = "percent", value = "", roundText = "", fromTax = "", toTax = "", codeFilter = "", tradeLabel = "";
+    private IReadOnlyList<Item> rows = Array.Empty<Item>();
+    private IReadOnlyList<string> categories = Array.Empty<string>();
+    private readonly HashSet<long> chosen = new();
+    private readonly Dictionary<long, string> typed = new();
+    private PricePreview? pricePreview;
+    private TaxPreview? taxPreview;
+    private IReadOnlyList<ChangeEntry> history = Array.Empty<ChangeEntry>();
+    private IReadOnlyList<ChangeLine>? detail;
+    private readonly Dictionary<long, int> copies = new();
+    private IReadOnlyList<NextGenOS.Devices.Printing.PrinterProfile> labelPrinters = Array.Empty<NextGenOS.Devices.Printing.PrinterProfile>();
+    private string printerId = "";
+    private string? deliveryName;
+    private bool deliveryLoaded;
+
+    protected override Task LoadAsync()
+    {
+        tradeLabel = Shop.Industry.RuleText("tradePriceLabel", "");
+        categories = App.Catalog.Categories();
+        rows = App.Catalog.Search(text, null, category.Length > 0 ? category : null, Limit, includeInactive: true);
+        history = App.CatalogChanges.Recent(30);
+        labelPrinters = App.PrinterProfiles.List().Where(p => p.Role == "label").ToList();
+        if (printerId.Length == 0) printerId = labelPrinters.FirstOrDefault()?.Id ?? "";
+        if (Delivery is { } id && !deliveryLoaded)
+        {
+            deliveryLoaded = true;
+            tab = "labels";
+            var number = App.Documents.GetHeader(id)?.Number;
+            deliveryName = number is null ? "that delivery" : "delivery " + number;
+            var wishes = App.Printing.LabelsFor(id);
+            foreach (var w in wishes) { copies[w.ItemId] = w.Copies; chosen.Add(w.ItemId); }
+            // the delivery's items first, then the rest of the list
+            var first = wishes.Select(w => App.Catalog.Get(w.ItemId)).Where(i => i is not null).Select(i => i!).ToList();
+            rows = first.Concat(rows.Where(r => first.All(f => f.Id != r.Id))).ToList();
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task Find() => Reload();
+
+    private string FieldLabel() => field == "trade" && tradeLabel.Length > 0 ? tradeLabel : "Price";
+
+    private IEnumerable<TaxRate> Rates() => Shop.Country.Tax.Rates.Where(r => !r.Legacy).Concat(Shop.Country.Tax.Rates.Where(r => r.Legacy));
+
+    private string TaxLabel(string code) => Shop.Country.Tax.Rates.FirstOrDefault(r => r.Code == code)?.Label ?? code;
+
+    private void Pick(string name)
+    {
+        tab = name;
+        ClearPreview();
+        if (name != "price" || how != "type") typed.Clear();
+    }
+
+    private void Toggle(long id, bool on)
+    {
+        if (on) chosen.Add(id); else chosen.Remove(id);
+        ClearPreview();
+    }
+
+    private void ChooseAll() { foreach (var r in rows) chosen.Add(r.Id); ClearPreview(); }
+
+    private void ChooseNone() { chosen.Clear(); ClearPreview(); }
+
+    private string Typed(long id) => typed.GetValueOrDefault(id, "");
+
+    private void SetTyped(long id, string v)
+    {
+        typed[id] = v;
+        if (v.Trim().Length > 0) chosen.Add(id);
+        ClearPreview();
+    }
+
+    private void ClearPreview()
+    {
+        pricePreview = null;
+        taxPreview = null;
+    }
+
+    private Task PreviewPrice() => Run(() =>
+    {
+        detail = null;
+        taxPreview = null;
+        if (how == "type")
+        {
+            pricePreview = App.CatalogChanges.PreviewSetPrices(typed.Where(x => chosen.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value), field);
+            return;
+        }
+        long step = 1;
+        if (roundText.Trim().Length > 0)
+        {
+            if (!TryMoney(Shop, roundText, out step) || step < 1) throw new HubException("round", "Please type the rounding as an amount, like 0.50, or leave it empty.");
+        }
+        pricePreview = App.CatalogChanges.PreviewPrices(chosen.ToList(), field, how, value, step);
+    });
+
+    private Task PreviewTaxChange() => Run(() =>
+    {
+        detail = null;
+        pricePreview = null;
+        taxPreview = App.CatalogChanges.PreviewTax(fromTax, toTax, chosen.Count > 0 ? chosen.ToList() : null, category.Length > 0 ? category : null, codeFilter);
+    });
+
+    private Task SaveChange() => Run(async () =>
+    {
+        ChangeResult result;
+        if (pricePreview is not null) result = App.CatalogChanges.ApplyPrices(pricePreview);
+        else if (taxPreview is not null) result = App.CatalogChanges.ApplyTax(taxPreview);
+        else return;
+        ClearPreview();
+        typed.Clear();
+        await Reload();
+        Info = result.Changed == 0 ? "Nothing needed changing." : $"Saved: {result.Changed} {(result.Changed == 1 ? "item" : "items")} changed." + (result.Left.Count > 0 ? $" {result.Left.Count} left as they were." : "");
+    });
+
+    private Task Sale(bool onSale) => Run(async () =>
+    {
+        var result = App.CatalogChanges.SetOnSale(chosen.ToList(), onSale);
+        ClearPreview();
+        await Reload();
+        Info = result.Changed == 0 ? "Nothing needed changing." : $"{result.Changed} {(result.Changed == 1 ? "item" : "items")} {(onSale ? "put back on sale" : "taken off sale")}.";
+    });
+
+    private void SetCopies(long id, string? text)
+    {
+        copies[id] = int.TryParse((text ?? "").Trim(), out var n) ? Math.Clamp(n, 1, 500) : 1;
+        if (!chosen.Contains(id)) chosen.Add(id);
+    }
+
+    private Task PrintLabels() => Run(async () =>
+    {
+        var wanted = chosen.Select(id => (id, copies.GetValueOrDefault(id, 1))).ToList();
+        var printed = await App.Printing.PrintLabelBatchAsync(wanted, printerId.Length > 0 ? printerId : null, Me.Id);
+        Info = $"{printed} {(printed == 1 ? "label" : "labels")} printed.";
+    });
+
+    private Task Details(long id) => Run(() => { detail = App.CatalogChanges.Lines(id); });
+
+    private Task TakeBack(long id) => Run(async () =>
+    {
+        var result = App.CatalogChanges.Undo(id);
+        detail = null;
+        await Reload();
+        Info = $"Taken back: {result.Changed} {(result.Changed == 1 ? "item" : "items")} put as they were." + (result.Left.Count > 0 ? $" {result.Left.Count} left as they are, because they were changed again since." : "");
+    });
+}

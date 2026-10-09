@@ -15,7 +15,7 @@ namespace NextGenOS.Hub.Documents;
 /// Invoices, quotes, orders, credit notes, purchases and progress bills. One place does the money: it builds the lines, asks the tax engine for the
 /// amounts (so every country is right to the last cent), keeps the answer with the document, takes payments, moves stock and numbers the document.
 /// </summary>
-public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Events.OutboxService outbox, Access access)
+public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock clock, Numbering numbering, CatalogService catalog, PartyService parties, AuditService audit, NextGenOS.Hub.Books.BooksService books, NextGenOS.Hub.Loyalty.LoyaltyService loyalty, NextGenOS.Hub.Offers.OffersService offers, NextGenOS.Hub.Events.OutboxService outbox, Access access, NextGenOS.Hub.Staff.EarnerService? earners = null)
 {
     /// <summary>The "way of paying" that uses credit a customer already has with the shop (an advance, or a return kept as credit). It moves no money and is not in the shop's list of ways of paying.</summary>
     public const string AccountCredit = "account";
@@ -187,7 +187,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         string? discountSource = null;
         if (item is not null && discountPct == 0 && input.DiscountAmountMinor == 0 && input.RefLineId is null && !input.NoAutoDiscount
             && HubDb.Query(c, "SELECT type, direction FROM documents WHERE id = $id", r => (Type: r.Text("type"), Direction: r.Text("direction")), t, ("$id", documentId)).FirstOrDefault() is { Direction: "out", Type: DocTypes.Invoice or DocTypes.Order or DocTypes.Quote })
-            (discountPct, discountSource) = offers.AutoLineDiscount(c, t, item.Id, party?.Id);
+            (discountPct, discountSource) = offers.AutoLineDiscount(c, t, item.Id, party?.Id, input.QtyMilli);
         // What the country's tax asks for besides the rate: a code for what is sold and an extra tax. A country whose pack names neither gets neither (nothing is kept, nothing is passed on).
         var itemCode = context.Country.Tax.ItemCode is null ? null : Blank(input.ItemCode ?? item?.Attrs.GetValueOrDefault(ItemAttrs.Code));
         var extraTaxPct = context.Country.Tax.ExtraTax is null ? 0 : input.ExtraTaxPctMilli ?? PercentMilli(item?.Attrs.GetValueOrDefault(ItemAttrs.ExtraTax));
@@ -228,6 +228,8 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
                 ("$q", qtyMilli), ("$d", discountPctMilli), ("$a", discountAmountMinor), ("$n", note), ("$cd", Blank(customerDiscount)), ("$clear", clearCustomerDiscount ? 1 : 0), ("$id", lineId), ("$doc", documentId));
             var now = HubDb.Query(c, "SELECT qty_milli, unit_price_minor, discount_amount_minor FROM document_lines WHERE id = $id AND document_id = $doc", r => (Qty: r.Int("qty_milli"), Price: r.Int("unit_price_minor"), Amount: r.Int("discount_amount_minor")), t, ("$id", lineId), ("$doc", documentId)).FirstOrDefault();
             if (now.Amount > Gross(now.Qty, now.Price)) throw new HubException("discount", "A discount cannot be more than the line comes to.");
+            // A new quantity can move the line into or out of a quantity band (the program's own discount only; a discount a person typed stays).
+            if (qtyMilli is not null && discountPctMilli is null && discountAmountMinor is null) offers.ReapplyLineDiscount(c, t, documentId, lineId);
             Recalculate(c, t, documentId);
             if (givesDiscount) EnforceDiscountLimit(c, t, documentId);
         });
@@ -598,6 +600,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
         books.Sync(c, t, documentId, options.UserId);
         loyalty.OnIssued(c, t, documentId, options.UserId);
         offers.OnIssued(c, t, documentId, options.UserId);
+        earners?.OnIssued(c, t, documentId, options.UserId);
         audit.Log(c, t, options.UserId, "issue", "document", documentId, number);
         if (type is DocTypes.Invoice or DocTypes.ProgressBill) Announce(c, t, "sale.issued", documentId, options.UserId, requestKey);
         else if (type == DocTypes.Purchase) Announce(c, t, "purchase.received", documentId, options.UserId, null);
@@ -838,7 +841,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             }
             HubDb.Exec(c, "UPDATE documents SET status = 'void', notes = COALESCE(notes || char(10), '') || $why WHERE id = $id", t, ("$why", "Void: " + reason.Trim()), ("$id", documentId));
             books.Sync(c, t, documentId, userId);
-            if (header.Status == DocStatus.Issued) { loyalty.OnVoid(c, t, documentId, userId); offers.OnVoid(c, t, documentId, userId); }
+            if (header.Status == DocStatus.Issued) { loyalty.OnVoid(c, t, documentId, userId); offers.OnVoid(c, t, documentId, userId); earners?.OnVoid(c, t, documentId, userId); }
             audit.Log(c, t, userId, "void", "document", documentId, reason.Trim());
             if (header.Status == DocStatus.Issued && header.Type is DocTypes.Invoice or DocTypes.ProgressBill) Announce(c, t, "sale.voided", documentId, userId, null);
             else if (header.Status == DocStatus.Issued && header.Type == DocTypes.Purchase) Announce(c, t, "purchase.voided", documentId, userId, null);
@@ -908,6 +911,7 @@ public sealed class DocumentService(HubDb db, ShopContextProvider shop, IClock c
             MoveStock(c, t, noteId, noteDocLines, +1, "return", userId, now, invoiceId);
             books.Sync(c, t, noteId, userId);
             loyalty.OnCreditNote(c, t, noteId, invoiceId, userId);
+            earners?.OnCreditNote(c, t, noteId, invoiceId, userId);
             audit.Log(c, t, userId, "credit-note", "document", noteId, number + " for " + invoice.Number + ": " + reason.Trim());
             Announce(c, t, "sale.returned", noteId, userId, null);
             return noteId;

@@ -234,3 +234,9 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 ### 2026-10-09 (about; sent while the assistant was reading the Windows installer; about the Hub's setup opening the web browser)
 
 > continue start from where stopped why is it opening on web browser it should have its own how other great local running software have i have told you still you did the mistake
+
+### 2026-10-09 (about; sent while trial 16 was running, after the assistant said trials 14 and 15 had stopped at the gate)
+
+> Ok continue and complete all of what I discussed since I think you might have forgotten specially what happened to learning from old and adding in new one
+
+(The owner means the rule to learn from the older programs once, write it down, and add it into the new one: `CLAUDE.md` section 17 and decisions 25, 26 and 29. The assistant reads `docs/MERGE-PLAN.md` and `docs/old-programs/` against the Hub and finishes what is left.)

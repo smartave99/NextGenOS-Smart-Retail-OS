@@ -38,11 +38,13 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         ["stock"] = ("asset", 1200, "Stock on the shelves"),
         ["retention-receivable"] = ("asset", 1150, "Held back by customers"),
         ["supplier-advances"] = ("asset", 1160, "Paid to suppliers in advance"),
+        ["staff-advances"] = ("asset", 1170, "Paid to staff in advance"),
         ["tax-input"] = ("asset", 1300, " paid on purchases"),            // one for each part of the tax: ref = its name
         ["payable"] = ("liability", 2000, "We owe suppliers"),
         ["customer-advances"] = ("liability", 2100, "Customers' money kept for them"),
         ["tips-payable"] = ("liability", 2150, "Tips to hand on"),
         ["retention-payable"] = ("liability", 2160, "Held back from suppliers"),
+        ["commission-payable"] = ("liability", 2300, "Commission to pay"),
         ["tax-output"] = ("liability", 2200, " collected"),                 // one for each part of the tax: ref = its name
         ["opening-balance"] = ("equity", 3000, "Opening balances"),
         ["sales"] = ("income", 4000, "Sales"),
@@ -50,6 +52,8 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         ["purchases"] = ("expense", 5000, "Purchases"),
         ["cogs"] = ("expense", 5100, "Cost of goods sold"),
         ["stock-adjust"] = ("expense", 5200, "Stock lost, damaged or gained"),
+        ["commission"] = ("expense", 5300, "Sales commission"),
+        ["staff-pay"] = ("expense", 5400, "Staff pay"),
         ["suspense"] = ("asset", 9999, "Needs checking"),
     };
 
@@ -174,6 +178,19 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
             HubDb.Exec(c, "INSERT INTO journal_lines(tenant_id, site_id, entry_id, account_id, party_id, debit_minor, credit_minor) VALUES ($t, $s, $e, $a, $p, $d, $cr)", t,
                 ("$t", Tenant), ("$s", Site), ("$e", entry), ("$a", Account(c, t, l.Role, l.Ref)), ("$p", l.Party), ("$d", l.Debit), ("$cr", l.Credit));
         return entry;
+    }
+
+    /// <summary>One line of an entry another part of the program posts: a role of account (and a reference where the role has one), and a debit or a credit.</summary>
+    public readonly record struct EntryLine(string Role, string? Ref, long DebitMinor, long CreditMinor);
+
+    /// <summary>
+    /// Posts an entry for something the Hub records elsewhere (commission earned, commission paid, an advance to a member of staff, a month's pay), inside the caller's transaction. It is posted once for
+    /// each source and its number: asking again does nothing and gives 0. Lines that do not add up are made to, as for a bill.
+    /// </summary>
+    public long PostEntry(SqliteConnection c, SqliteTransaction t, DateTimeOffset at, string source, long sourceId, string memo, long? userId, IReadOnlyList<EntryLine> lines)
+    {
+        if (Exists(c, t, source, sourceId)) return 0;
+        return Post(c, t, at, source, sourceId, memo, userId, lines.Select(l => new Line(l.Role, l.Ref, null, l.DebitMinor, l.CreditMinor)).ToList());
     }
 
     // ---- posting a bill and its payments ------------------------------------------------------------------------------------------
@@ -420,6 +437,9 @@ public sealed class BooksService(HubDb db, IClock clock, Access access)
         "payment" => "Payment",
         "opening" => "Balance brought across",
         "stock-move" => "Stock change",
+        "commission" => "Commission earned",
+        "commission-back" => "Commission taken back",
+        "commission-paid" => "Commission paid",
         "stock-sale" or "stock-return" or "stock-purchase" or "stock-purchase-return" or "stock-void" => "Cost of stock",
         _ => "Entry",
     };

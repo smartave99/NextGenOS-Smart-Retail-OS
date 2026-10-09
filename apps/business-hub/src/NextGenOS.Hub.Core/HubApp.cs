@@ -21,6 +21,7 @@ using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Restaurant;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
+using NextGenOS.Hub.Staff;
 using NextGenOS.Hub.Diagnostics;
 using NextGenOS.Hub.Updates;
 
@@ -51,9 +52,11 @@ public sealed class HubApp
         Outbox = new OutboxService(db, clock, Ai.Flags, Events, Audit, Access);
         Books = new BooksService(db, clock, Access);
         Catalog = new CatalogService(db, Shop, clock, Access, Books, Outbox);
+        CatalogChanges = new CatalogChangeService(db, Shop, clock, Audit, Access);
         Loyalty = new LoyaltyService(db, Shop, clock);
         Offers = new OffersService(db, Shop, clock, Audit, Access);
-        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Outbox, Access);
+        Earners = new EarnerService(db, Shop, clock, Audit, Books, Access);
+        Documents = new DocumentService(db, Shop, clock, Numbering, Catalog, Parties, Audit, Books, Loyalty, Offers, Outbox, Access, Earners);
         Users = new UserService(db, clock, Audit, Access);
         Restaurant = new RestaurantService(db, Shop, clock, Documents, Audit, Access);
         Library = new LibraryService(db, Shop, clock, Catalog, Parties, Documents, Audit, Access);
@@ -73,6 +76,7 @@ public sealed class HubApp
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
+        ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
         // The shop's own copies, made every night to a second place the owner chose (Settings, Backups), and putting one back.
         Backups = new BackupService(db, Shop, SettingsStore, clock, Audit, Access);
         // Updates through the main PC: looks for a signed newer version, keeps it checked on this PC, and waits for the owner's yes. Nothing is installed by it. A copy built without a place to look never looks.
@@ -95,6 +99,9 @@ public sealed class HubApp
     public CatalogService Catalog { get; }
     public BooksService Books { get; }
     public OutboxService Outbox { get; }
+    public CatalogChangeService CatalogChanges { get; }
+    public ItemSheetService ItemSheets { get; }
+    public EarnerService Earners { get; }
     public LoyaltyService Loyalty { get; }
     public OffersService Offers { get; }
     public DocumentService Documents { get; }

@@ -4,6 +4,17 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Labels for many items
+- **Products → Change many at once → Labels:** choose items, say how many labels of each, and print them in one go on your label printer. On a received purchase, **Print labels for what came** fills in one label for each unit that arrived.
+
+### Items in a spreadsheet, and discounts by quantity
+- **Products → Spreadsheet:** send all your items to a spreadsheet, change them there and bring the file back, or fill in an empty sheet to bring in a whole list at once. You see exactly what would be added and changed (and every row that is wrong, with its row number) before anything is written; a copy of your shop's data is made first. An item that is there is found by its barcode, then its SKU, then its name; a column left empty leaves that field as it is. Opening stock is counted for new items.
+- **Offers → By quantity:** set a percent off for an item by how many are bought (for example 5 to 9 give 5%, 10 or more give 10%). The till gives it by itself and works it out again when the quantity changes; a discount you typed is left alone. A quantity in no band gets no discount.
+
+### Change many items at once
+- **Products → Change many at once:** choose items, then raise or lower their price by a percent or an amount (rounded to a step you choose), type a new price beside each item, change the trade price, move items from one tax rate to another (only items that have exactly the old rate are touched), or take them off and back on sale. **You see exactly what would change before anything is saved**; bills already made are never changed.
+- **Every change is kept** (who, when, and what each item was and became) and **a change can be taken back** while the items are still as it left them. (From the older POS's bulk price and bulk tax change, which had no record and no undo.)
+
 ### The setup checks the PC first
 - **Before it installs, the Hub setup checks, and says in plain words what is wrong and what to do:** Windows 10 (version 1809) or later, 1 GB of free room on the drive, Microsoft Edge or Google Chrome on the PC, and that nothing else on the PC already uses the Hub's place (port 5280). If another program holds it, the setup stops and installs nothing, instead of leaving a Hub that cannot start with no word of why.
 - **After it installs, the setup says so if the program file was removed (an anti-virus program that does not know it yet) or if Windows could not start the Hub,** with the steps to take, instead of finishing as if all was well.

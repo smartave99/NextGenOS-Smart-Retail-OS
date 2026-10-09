@@ -62,18 +62,24 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
     public Item Update(long id, ItemInput input)
     {
         access.Require(Perm.Catalog);
+        db.InTransaction((c, t) => Update(c, t, id, input));
+        return Get(id)!;
+    }
+
+    /// <summary>Changes an item inside the caller's transaction (so that a bigger action, such as bringing items in from a spreadsheet, is all or nothing).</summary>
+    public void Update(SqliteConnection connection, SqliteTransaction transaction, long id, ItemInput input)
+    {
         var (taxCode, track) = Validate(input);
         try
         {
-            var changed = db.InTransaction((c, t) => HubDb.Exec(c,
+            var changed = HubDb.Exec(connection,
                 "UPDATE items SET kind=$kind, sku=$sku, barcode=$barcode, name=$name, category=$category, unit=$unit, price_minor=$price, trade_price_minor=$trade, cost_minor=$cost, " +
-                "tax_code=$tax, track_stock=$track, reorder_milli=$reorder, station=$station, duration_min=$dur, attrs=$attrs WHERE id=$id", t,
+                "tax_code=$tax, track_stock=$track, reorder_milli=$reorder, station=$station, duration_min=$dur, attrs=$attrs WHERE id=$id", transaction,
                 ("$id", id), ("$kind", input.Kind), ("$sku", Blank(input.Sku)), ("$barcode", Blank(input.Barcode)), ("$name", input.Name.Trim()), ("$category", Blank(input.Category)),
                 ("$unit", string.IsNullOrWhiteSpace(input.Unit) ? "pc" : input.Unit.Trim()), ("$price", input.PriceMinor), ("$trade", input.TradePriceMinor), ("$cost", input.CostMinor),
                 ("$tax", taxCode), ("$track", track ? 1 : 0), ("$reorder", input.ReorderMilli), ("$station", Blank(input.Station)), ("$dur", input.DurationMin),
-                ("$attrs", JsonSerializer.Serialize(input.Attrs))));
+                ("$attrs", JsonSerializer.Serialize(input.Attrs)));
             if (changed == 0) throw new HubException("not-found", "That item was not found.");
-            return Get(id)!;
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
         {
@@ -160,6 +166,13 @@ public sealed class CatalogService(HubDb db, ShopContextProvider shop, IClock cl
                 return new StockRow(r.Int("id"), r.Text("name"), r.TextOrNull("category"), r.Text("unit"), onHand, r.Int("reorder_milli"), average, value);
             });
         return lowOnly ? rows.Where(x => x.OnHandMilli <= x.ReorderMilli).ToList() : rows;
+    }
+
+    /// <summary>Why this would be refused as an item, in words, or null when it is fine. Nothing is written.</summary>
+    public string? Problem(ItemInput input)
+    {
+        try { Validate(input); return null; }
+        catch (HubException ex) { return ex.Message; }
     }
 
     // ---- rules ---------------------------------------------------------------------------------------------------------------------

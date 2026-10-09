@@ -265,6 +265,50 @@ public static class Csv
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Reads a file a spreadsheet saved as text: rows of cells separated by commas, semicolons (the way some countries' spreadsheets save) or tabs, cells in quotes when they hold the separator,
+    /// a quote or a line break. A mark at the start of the file is ignored, and so is an empty line. A cell that <see cref="Build"/> protected from being run as a formula (a quote in front) is given back as typed.
+    /// </summary>
+    public static List<string[]> Read(string text)
+    {
+        text = text.TrimStart('﻿');
+        var first = text.Split('\n', 2)[0];
+        var separator = new[] { ',', ';', '\t' }.OrderByDescending(ch => first.Count(x => x == ch)).First();
+        if (first.Count(x => x == separator) == 0) separator = ',';
+        var rows = new List<string[]>();
+        var row = new List<string>();
+        var cell = new System.Text.StringBuilder();
+        var quoted = false;
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (quoted)
+            {
+                if (ch == '"' && i + 1 < text.Length && text[i + 1] == '"') { cell.Append('"'); i++; }
+                else if (ch == '"') quoted = false;
+                else cell.Append(ch);
+            }
+            else if (ch == '"' && cell.Length == 0) quoted = true;
+            else if (ch == separator) { row.Add(Unprotect(cell.ToString())); cell.Clear(); }
+            else if (ch == '\n' || ch == '\r')
+            {
+                if (ch == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                row.Add(Unprotect(cell.ToString())); cell.Clear();
+                if (row.Any(x => x.Length > 0)) rows.Add(row.ToArray());
+                row.Clear();
+            }
+            else cell.Append(ch);
+        }
+        if (cell.Length > 0 || row.Count > 0)
+        {
+            row.Add(Unprotect(cell.ToString()));
+            if (row.Any(x => x.Length > 0)) rows.Add(row.ToArray());
+        }
+        return rows;
+    }
+
+    private static string Unprotect(string cell) => cell.Length > 1 && cell[0] == '\'' && "=+-@".Contains(cell[1]) ? cell[1..] : cell.Trim();
+
     private static string Cell(object? value)
     {
         var text = value switch { null => "", IFormattable f => f.ToString(null, CultureInfo.InvariantCulture), _ => value.ToString() ?? "" };

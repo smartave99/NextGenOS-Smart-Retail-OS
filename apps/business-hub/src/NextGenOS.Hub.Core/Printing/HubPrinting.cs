@@ -71,6 +71,49 @@ public sealed class HubPrinting(PrinterStore printers, PrintService service, Doc
         audit.Log(userId, "labels-printed", "item", itemId, $"{copies} on {printer.Name}");
     }
 
+    /// <summary>An item and how many labels to print for it.</summary>
+    public sealed record LabelWish(long ItemId, string Name, int Copies);
+
+    /// <summary>
+    /// Labels for many items in one go (the older POS's label printing: tick the rows, say how many of each): each item with its own number of copies, on one label printer. Everything is checked
+    /// before the first label is printed, so a wrong row prints nothing; if the printer fails part-way, the message says which item it was. Returns how many labels were printed.
+    /// </summary>
+    public async Task<int> PrintLabelBatchAsync(IReadOnlyList<(long ItemId, int Copies)> wanted, string? printerId = null, long? userId = null, CancellationToken ct = default)
+    {
+        if (wanted.Count == 0) throw new HubException("nothing-chosen", "Please choose the items to print labels for.");
+        if (wanted.Count > 300) throw new HubException("too-many", "Print labels for up to 300 items at a time.");
+        var items = new List<(Item Item, int Copies)>();
+        foreach (var (itemId, copies) in wanted)
+        {
+            var item = catalog.Get(itemId) ?? throw new HubException("item-not-found", "One of those items was not found.");
+            if (copies is < 1 or > 500) throw new HubException("copies", $"Print between 1 and 500 labels of each item ({item.Name}).");
+            items.Add((item, copies));
+        }
+        var printer = Choose(PrinterRole.Label, printerId);
+        var printed = 0;
+        foreach (var (item, copies) in items)
+        {
+            try { await service.PrintLabelAsync(printer, ReceiptLayout.Label(item, shop.Current, printer.LabelWidthMm, printer.LabelHeightMm, printer.Dpi, copies), ct); }
+            catch (PrinterException ex) { throw new HubException("printer-failed", $"{item.Name}: {ex.Message}" + (printed > 0 ? $" ({printed} labels were printed before this.)" : "")); }
+            catch (NotSupportedException ex) { throw new HubException("printer-failed", ex.Message); }
+            printed += copies;
+        }
+        audit.Log(userId, "labels-printed", "item", null, $"{printed} labels for {items.Count} item(s) on {printer.Name}");
+        return printed;
+    }
+
+    /// <summary>The labels a delivery needs: for each stocked item on a received purchase, one label for each unit that came (at least one, at most 500).</summary>
+    public IReadOnlyList<LabelWish> LabelsFor(long documentId)
+    {
+        var view = documents.Get(documentId) ?? throw new HubException("not-found", "That purchase was not found.");
+        return view.Lines.Where(l => l.ItemId is not null && !l.IsFree)
+            .Select(l => (Line: l, Item: catalog.Get(l.ItemId!.Value)))
+            .Where(x => x.Item is { TrackStock: true })
+            .GroupBy(x => x.Item!.Id)
+            .Select(g => new LabelWish(g.Key, g.First().Item!.Name, (int)Math.Clamp((g.Sum(x => x.Line.QtyMilli) + 500) / 1000, 1, 500)))
+            .ToList();
+    }
+
     public async Task TestAsync(string printerId, CancellationToken ct = default)
     {
         var printer = printers.Get(printerId) ?? throw new HubException("no-printer", "That printer was not found.");

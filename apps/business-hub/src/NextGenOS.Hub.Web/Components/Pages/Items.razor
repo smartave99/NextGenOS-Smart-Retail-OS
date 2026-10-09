@@ -23,6 +23,7 @@
     <span class="spacer"></span>
     @if (Me.Can(Perm.Catalog))
     {
+        @if (!lending) { <a class="btn ghost" id="change-many" href="/items/changes">Change many at once</a> <a class="btn ghost" id="items-sheet" href="/items/sheet">Spreadsheet</a> }
         <button type="button" class="btn primary" id="add-item" @onclick="NewItem">Add @Shop.Singular("item").ToLowerInvariant()</button>
     }
 </div>

@@ -31,6 +31,7 @@ else
             @if (d is { Type: DocTypes.Quote, Status: DocStatus.Issued, ProjectId: null } && !d.Meta.ContainsKey("billedAs") && Me.Can(Perm.Sell)) { <a class="btn secondary" id="make-bill" href="sell?estimate=@d.Id">Make a bill from this quote</a> }
             @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn">Take something back</button> }
             @if (CanSendBack()) { <button type="button" class="btn secondary" id="send-back" @onclick="OpenSendBack">Send goods back</button> }
+            @if (CanPrintLabels()) { <a class="btn secondary" id="delivery-labels" href="/items/changes?delivery=@Id">Print labels for what came</a> }
             @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)">Cancel this bill</button> }
         </div>
 
@@ -172,6 +173,8 @@ else
     };
 
     private bool CanReturn() => view!.Document is { Type: DocTypes.Invoice, Status: DocStatus.Issued } && Me.Can(Perm.Sell);
+
+    private bool CanPrintLabels() => view!.Document is { Type: DocTypes.Purchase, Status: DocStatus.Issued } && Me.Can(Perm.Catalog);
 
     private bool CanSendBack() => view!.Document is { Type: DocTypes.Purchase, Status: DocStatus.Issued } && Me.Can(Perm.Purchases);
 

@@ -1,6 +1,7 @@
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
 using NextGenOS.Hub.Documents;
+using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Offers;
 using NextGenOS.Hub.Ontology;
 using NextGenOS.Hub.Security;
@@ -178,6 +179,42 @@ public class AccessTests : IDisposable
         yield return new("Updates.Approve", new[] { Perm.Settings }, a => a.Updates.Approve(null));
         yield return new("Updates.Skip", new[] { Perm.Settings }, a => a.Updates.Skip(null));
         yield return new("Outbox.Replay", new[] { Perm.Ai }, a => a.Outbox.Replay(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, null));
+
+        // Changing many items at once (merge, products tools A): a person who may not change the catalog may not preview it, save it, take it back or read the record of it.
+        yield return new("CatalogChanges.PreviewPrices", new[] { Perm.Catalog }, a => a.CatalogChanges.PreviewPrices(new[] { itemId }, "price", "percent", "5"));
+        yield return new("CatalogChanges.PreviewSetPrices", new[] { Perm.Catalog }, a => a.CatalogChanges.PreviewSetPrices(new Dictionary<long, string> { [itemId] = "120" }, "price"));
+        yield return new("CatalogChanges.ApplyPrices", new[] { Perm.Catalog }, a => a.CatalogChanges.ApplyPrices(new PricePreview("x", Array.Empty<PriceChange>(), Array.Empty<LeftAlone>())));
+        yield return new("CatalogChanges.PreviewTax", new[] { Perm.Catalog }, a => a.CatalogChanges.PreviewTax("GST18", "GST5"));
+        yield return new("CatalogChanges.ApplyTax", new[] { Perm.Catalog }, a => a.CatalogChanges.ApplyTax(new TaxPreview("x", Array.Empty<TaxChange>())));
+        yield return new("CatalogChanges.SetOnSale", new[] { Perm.Catalog }, a => a.CatalogChanges.SetOnSale(new[] { itemId }, true));
+        yield return new("CatalogChanges.Undo", new[] { Perm.Catalog }, a => a.CatalogChanges.Undo(1));
+        yield return new("CatalogChanges.Recent", new[] { Perm.Catalog }, a => a.CatalogChanges.Recent());
+        yield return new("CatalogChanges.Lines", new[] { Perm.Catalog }, a => a.CatalogChanges.Lines(1));
+
+        // Items as a spreadsheet (merge, products tools F): the same right as changing the catalog.
+        yield return new("ItemSheets.Export", new[] { Perm.Catalog }, a => a.ItemSheets.Export());
+        yield return new("ItemSheets.Template", new[] { Perm.Catalog }, a => a.ItemSheets.Template());
+        yield return new("ItemSheets.Check", new[] { Perm.Catalog }, a => a.ItemSheets.Check("x.csv", "Name\nX\n"));
+        yield return new("ItemSheets.Import", new[] { Perm.Catalog }, a => a.ItemSheets.Import(new SheetCheck("x.csv", 0, 0, 0, 0, Array.Empty<SheetProblem>(), Array.Empty<SheetLine>(), Array.Empty<string>(), "x"), null));
+
+        // Commission people (merge, staff part 1): the master and the money are for the people who run the shop; naming one on a bill is for whoever makes the bill.
+        var namers = new[] { Perm.Staff, Perm.Sell, Perm.Orders };
+        yield return new("Earners.List", namers, a => a.Earners.List());
+        yield return new("Earners.Get", namers, a => a.Earners.Get(1));
+        yield return new("Earners.ForBill", namers, a => a.Earners.ForBill(draftId));
+        yield return new("Earners.ChooseSalesperson", namers, a => a.Earners.ChooseSalesperson(draftId, null));
+        yield return new("Earners.ChooseBroker", namers, a => a.Earners.ChooseBroker(draftId, null));
+        yield return new("Earners.Save", new[] { Perm.Staff }, a => a.Earners.Save(new NextGenOS.Hub.Staff.EarnerInput { Name = "Test person" }));
+        yield return new("Earners.SetActive", new[] { Perm.Staff }, a => a.Earners.SetActive(1, true));
+        yield return new("Earners.Owed", new[] { Perm.Staff }, a => a.Earners.Owed(1));
+        yield return new("Earners.Pay", new[] { Perm.Staff }, a => a.Earners.Pay(1, 100, "cash"));
+        yield return new("Earners.Statement", new[] { Perm.Staff }, a => a.Earners.Statement(1));
+        yield return new("Earners.Summary", new[] { Perm.Staff }, a => a.Earners.Summary(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
+
+        // Quantity discounts (merge, products tools B): setting them up needs the same right as the other discounts.
+        yield return new("Offers.Bands", new[] { Perm.Discount }, a => a.Offers.Bands(itemId));
+        yield return new("Offers.AddBand", new[] { Perm.Discount }, a => a.Offers.AddBand(itemId, 5_000, 9_000, 5_000));
+        yield return new("Offers.RemoveBand", new[] { Perm.Discount }, a => a.Offers.RemoveBand(1));
 
         // Reading the shop's numbers (blueprint SEC-004, reads): the same Hub-side check, so a new screen or a counter PC cannot see more than the role allows.
         var from = new DateOnly(2026, 10, 1);

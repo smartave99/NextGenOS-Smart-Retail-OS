@@ -136,6 +136,17 @@ try {
   await page.locator('#preview-frame').waitFor();
   const frame = page.frameLocator('#preview-frame');
   await frame.locator('.shell').waitFor();
+  // a new customer opens in the top menu look; each look is one card, and the picture follows it
+  assert.strictEqual(await frame.locator('html').getAttribute('data-look'), 'top');
+  assert.strictEqual(await frame.locator('html').getAttribute('data-nav'), 'top');
+  assert.strictEqual(await frame.locator('html').getAttribute('data-density'), 'touch');
+  await page.locator('[data-path="look.layout"] [data-value="list"]').click();
+  await frame.locator('html[data-look="list"]').waitFor();
+  assert.strictEqual(await frame.locator('html').getAttribute('data-density'), 'comfortable');
+  await page.locator('[data-path="look.layout"] [data-value="counter"]').click();
+  await frame.locator('html[data-nav="left"]').waitFor();
+  await page.locator('[data-path="look.layout"] [data-value="standard"]').click();
+  await frame.locator('html[data-look="standard"]').waitFor();
   assert.strictEqual(await frame.locator('html').getAttribute('data-density'), 'comfortable');
   await page.locator('[data-path="device.kind"] [data-value="touch-pos"]').click();
   await page.locator('[data-path="look.style"] [data-value="friendly"]').click();

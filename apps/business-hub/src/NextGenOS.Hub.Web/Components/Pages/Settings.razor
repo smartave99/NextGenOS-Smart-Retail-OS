@@ -206,8 +206,8 @@ else if (tab == "look")
         }
     </section>
     <section class="card" id="look-card">
-        <h2>The two looks</h2>
-        <p class="muted">The <strong>list look</strong> is for a PC or laptop. The <strong>counter look</strong> is for a touch screen at the counter. Choose one for the whole shop, or let each screen decide: a touch screen gets the counter look and any other screen gets the list look.</p>
+        <h2>The looks</h2>
+        <p class="muted">The <strong>top menu look</strong> is the one every shop starts with: it works with a finger or a mouse. The <strong>list look</strong> is for a PC or laptop, the <strong>counter look</strong> for a touch screen with the menu down the left. Choose one for the whole shop, or let each screen decide: a touch screen gets the counter look and any other screen gets the list look.</p>
         <div class="look-choices" role="group" aria-label="The look of the shop">
             @foreach (var (id, name, text) in LookChoices)
             {
@@ -220,6 +220,7 @@ else if (tab == "look")
         <p class="muted">This computer can use its own look whatever the shop chose. It is kept in this browser.</p>
         <div class="row">
             <button type="button" class="btn secondary" id="here-shop" data-set-look="">Same as the shop</button>
+            <button type="button" class="btn secondary" id="here-top" data-set-look="top">Top menu look</button>
             <button type="button" class="btn secondary" id="here-list" data-set-look="list">List look</button>
             <button type="button" class="btn secondary" id="here-counter" data-set-look="counter">Counter look</button>
         </div>
@@ -583,7 +584,7 @@ else if (tab == "activity")
         look = Looks.Current is { } mine ? LocalBrandCopy(mine) : new NextGenOS.Licensing.LocalBrand();
         // What the form shows is what is in force now (the profile's and the owner's choices together), so a change is a change from what the person sees.
         layout = Themes.Current;
-        shopLook = ShopLook.Current;
+        shopLook = Themes.ShopLook(ShopLook);
         scaleText = Math.Round((layout.FontScale ?? 1) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
         s = App.Shop.Settings;
         payText = string.Join(", ", s.PaymentMethods.Count > 0 ? s.PaymentMethods : Shop.PaymentMethods);
@@ -661,6 +662,7 @@ else if (tab == "activity")
 
     private static readonly (string Id, string Name, string Text)[] LookChoices =
     [
+        (NextGenOS.Hub.Web.Branding.ShopLooks.Top.Id, NextGenOS.Hub.Web.Branding.ShopLooks.Top.Name, NextGenOS.Hub.Web.Branding.ShopLooks.Top.Text),
         ("standard", "As it was", "The layout you set below, the same on every screen."),
         ("auto", "Each screen decides", "A touch screen gets the counter look, any other screen gets the list look."),
         (NextGenOS.Hub.Web.Branding.ShopLooks.List.Id, NextGenOS.Hub.Web.Branding.ShopLooks.List.Name, NextGenOS.Hub.Web.Branding.ShopLooks.List.Text),

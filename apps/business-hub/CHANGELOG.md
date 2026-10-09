@@ -4,6 +4,10 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### A new starting look: one bar along the top
+- **The program now opens with one bar along the top**: the name, the menu as big pictures with the words under them, then who is signed in, a light/dark switch and Sign out. Buttons are big enough for a finger, and on the sell screen the items and the bill sit side by side. On a wide screen the shop's name shows in the bar too. It works with a finger or a mouse. **A shop that had already set its own layout keeps it**, and *Settings → Look* still lets the owner choose the list look, the counter look (menu down the left), each screen deciding, or the old layout ("As it was").
+- **A customer's folder can name the look** the shop starts with (`theme.json`, `"look"`); the Setup Studio's page *Look* has a card for each, with a live picture.
+- The bill's buttons (Print, Receipt, Full page, Take something back, Cancel) have small pictures.
 ### The most you may owe a supplier
 - **A limit on each supplier** (*People → Suppliers → the supplier*, "Most you may owe this supplier"; empty means no limit). When goods arrive, what you would then owe that supplier (what you owe now plus this bill) may not be more than the limit; exactly the limit is allowed. If it would be more, the goods are not received and the screen says what would be owed and what the limit is. Pay what is due first, or raise the limit.
 ### The bill as a full page

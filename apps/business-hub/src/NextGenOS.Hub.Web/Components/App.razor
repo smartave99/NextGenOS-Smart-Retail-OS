@@ -6,7 +6,7 @@
 @inject IAntiforgery Antiforgery
 <!DOCTYPE html>
 @{ var theme = Themes.Current; }
-<html lang="en" data-mode="@theme.Mode" data-surface="@theme.Surface" data-shape="@theme.Shape" data-density="@theme.Density" data-font="@theme.Font" data-scale="@Scale(theme.FontScale)" data-nav="@theme.Nav" data-nav-labels="@theme.NavLabels" data-cart="@theme.Cart" data-depth="@theme.Depth" data-look-shop="@ShopLook.Current">
+<html lang="en" data-mode="@theme.Mode" data-surface="@theme.Surface" data-shape="@theme.Shape" data-density="@theme.Density" data-font="@theme.Font" data-scale="@Scale(theme.FontScale)" data-nav="@theme.Nav" data-nav-labels="@theme.NavLabels" data-cart="@theme.Cart" data-depth="@theme.Depth" data-look-shop="@Themes.ShopLook(ShopLook)">
 
 <head>
     <meta charset="utf-8" />

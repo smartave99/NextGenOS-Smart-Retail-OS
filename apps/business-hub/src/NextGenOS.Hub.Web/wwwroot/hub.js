@@ -16,9 +16,9 @@
       if (set === 'light' || set === 'dark') return set;
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     },
-    // The look of this computer only (decision 30): "list" or "counter"; anything else goes back to the shop's choice. The page is drawn again with it.
+    // The look of this computer only (decision 30): "top", "list" or "counter"; anything else goes back to the shop's choice. The page is drawn again with it.
     setLook: function (value) {
-      try { if (value === 'list' || value === 'counter') localStorage.setItem('hub-look', value); else localStorage.removeItem('hub-look'); } catch (e) { /* storage may be off */ }
+      try { if (value === 'top' || value === 'list' || value === 'counter') localStorage.setItem('hub-look', value); else localStorage.removeItem('hub-look'); } catch (e) { /* storage may be off */ }
       location.reload();
     },
     print: function () { window.print(); },

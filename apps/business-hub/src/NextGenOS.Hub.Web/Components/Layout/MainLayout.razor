@@ -12,9 +12,11 @@
             <span class="brand-name">@Brand.Name</span>
             @if (Brand.By is { } by) { <span class="brand-by">@by</span> }
         </div>
+        <span class="bar-shop" aria-hidden="true"><Icon Name="store" /><span>@Shop.Settings.Name</span></span>
         <ul>
             @foreach (var link in Links())
             {
+                @if (link.Href == "people") { <li class="nav-gap" aria-hidden="true"></li> }
                 <li><NavLink href="@link.Href" title="@link.Label" Match="@(link.Href == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><Icon Name="@link.Icon" /><span>@link.Label</span></NavLink></li>
             }
         </ul>
@@ -26,10 +28,10 @@
             <span class="spacer"></span>
             @if (me is not null)
             {
-                <span class="who" title="@Roles.Label(me.Role)">@me.Name</span>
+                <span class="who" title="@me.Name, @Roles.Label(me.Role)"><Icon Name="user" /><span class="who-text"><span class="who-name">@me.Name</span><small class="who-role">@Roles.Label(me.Role)</small></span></span>
             }
-            <button type="button" class="btn ghost small" @onclick="ToggleTheme" aria-label="Switch between light and dark">@(dark ? "Light" : "Dark")</button>
-            <button type="button" class="btn ghost small" @onclick="SignOut">Sign out</button>
+            <button type="button" class="btn ghost small theme-toggle" @onclick="ToggleTheme" aria-label="Switch between light and dark"><Icon Name="@(dark ? "sun" : "moon")" /><span>@(dark ? "Light" : "Dark")</span><i class="switch @(dark ? "on" : "")" aria-hidden="true"></i></button>
+            <button type="button" class="btn ghost small sign-out" @onclick="SignOut" aria-label="Sign out" title="Sign out"><Icon Name="logout" /><span>Sign out</span></button>
         </header>
         @* A trial, a PC that could not check in, or a paid licence that has ended and keeps working (decision 15): said in words across every screen, never a reason to stop the till. *@
         @if (Licence.State.Banner is { } licenceBanner)

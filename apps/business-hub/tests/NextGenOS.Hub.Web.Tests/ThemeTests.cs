@@ -55,6 +55,26 @@ public class ThemeTests : IDisposable
     }
 
     [Fact]
+    public void A_customers_profile_can_name_the_look_the_shop_starts_with_and_a_word_that_is_not_a_look_is_left_out()
+    {
+        var shopLook = ShopLookStore.Over(app);
+        foreach (var look in new[] { "top", "list", "counter", "auto", "standard" })
+        {
+            var profile = Profile(theme: "{\"look\":\"" + look + "\"}");
+            Assert.Equal(look, profile.Look);
+            Assert.Equal(look, Service(null, profile).ShopLook(shopLook));       // no owner's choice yet: the customer's profile decides
+        }
+        Assert.Null(Profile(theme: "{\"look\":\"poster\"}").Look);
+        Assert.Null(Profile(theme: "{\"look\":5}").Look);
+        Assert.Null(Profile(theme: "{ not json").Look);
+        Assert.Equal("top", Service(null, Profile(theme: "{}")).ShopLook(shopLook));      // an empty profile: the starting look
+        Assert.Equal("standard", Service(null, Profile(theme: "{\"nav\":\"left\"}")).ShopLook(shopLook));   // a profile that sets the layout itself keeps it
+        Assert.Equal("list", Service(null, Profile(theme: "{\"look\":\"list\",\"nav\":\"left\"}")).ShopLook(shopLook));   // unless it also names a look
+        shopLook.Save("counter", userId: null);
+        Assert.Equal("counter", Service(null, Profile(theme: "{\"look\":\"list\"}")).ShopLook(shopLook));   // the owner's own choice is above the profile's
+    }
+
+    [Fact]
     public void A_profile_file_that_is_far_too_big_is_not_read()
     {
         var profile = Profile(theme: "{\"density\":\"touch\"}" + new string(' ', 2_100_000));

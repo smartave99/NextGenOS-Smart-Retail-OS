@@ -25,19 +25,19 @@ else
         </p>
         <Notice Error="@Error" Info="@Info" />
         <div class="row wrap">
-            <button type="button" class="btn primary" id="print" @onclick="Print">Print</button>
+            <button type="button" class="btn primary" id="print" @onclick="Print"><Icon Name="print" />Print</button>
             <span class="layout-choice" role="group" aria-label="How the bill looks">
-                <a class="chip-btn @(Layout == "receipt" ? "on" : "")" id="layout-receipt" href="documents/@Id?layout=receipt">Receipt</a>
-                <a class="chip-btn @(Layout == "a4" ? "on" : "")" id="layout-a4" href="documents/@Id?layout=a4">Full page A4</a>
-                <a class="chip-btn @(Layout == "a5" ? "on" : "")" id="layout-a5" href="documents/@Id?layout=a5">Full page A5</a>
+                <a class="chip-btn @(Layout == "receipt" ? "on" : "")" id="layout-receipt" href="documents/@Id?layout=receipt"><Icon Name="receipt" />Receipt</a>
+                <a class="chip-btn @(Layout == "a4" ? "on" : "")" id="layout-a4" href="documents/@Id?layout=a4"><Icon Name="page" />Full page A4</a>
+                <a class="chip-btn @(Layout == "a5" ? "on" : "")" id="layout-a5" href="documents/@Id?layout=a5"><Icon Name="page" />Full page A5</a>
             </span>
             @if (receiptPrinter is not null) { <button type="button" class="btn secondary" id="print-receipt" @onclick="PrintReceipt">Print on @receiptPrinter.Name</button> }
             @if (d.BalanceMinor > 0 && Me.Can(Perm.Sell)) { <button type="button" class="btn secondary" id="take-payment" @onclick="() => Toggle(PayPanel)">Take payment (@Money(d.BalanceMinor) owed)</button> }
             @if (d is { Type: DocTypes.Quote, Status: DocStatus.Issued, ProjectId: null } && !d.Meta.ContainsKey("billedAs") && Me.Can(Perm.Sell)) { <a class="btn secondary" id="make-bill" href="sell?estimate=@d.Id">Make a bill from this quote</a> }
-            @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn">Take something back</button> }
+            @if (CanReturn()) { <button type="button" class="btn secondary" id="give-back" @onclick="OpenReturn"><Icon Name="undo" />Take something back</button> }
             @if (CanSendBack()) { <button type="button" class="btn secondary" id="send-back" @onclick="OpenSendBack">Send goods back</button> }
             @if (CanPrintLabels()) { <a class="btn secondary" id="delivery-labels" href="/items/changes?delivery=@Id">Print labels for what came</a> }
-            @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)">Cancel this bill</button> }
+            @if (CanVoid()) { <button type="button" class="btn danger" id="void" @onclick="() => Toggle(VoidPanel)"><Icon Name="cross" />Cancel this bill</button> }
         </div>
 
         @if (panel == PayPanel)

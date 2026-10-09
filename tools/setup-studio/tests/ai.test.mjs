@@ -92,7 +92,7 @@ test('Claude Code is asked in bare mode with the key only (never a subscription)
     assert.equal(r.explanation, 'Local words and wallets.');
     const out = reconcile(baseline, r.candidate, { merge: true });
     assert.equal(out.ok, true);
-    assert.equal(out.proposal.theme.density, 'touch', 'what the tool did not mention stays as it was');
+    assert.equal(out.proposal.theme.look, 'top', 'what the tool did not mention stays as it was');
     assert.equal(out.proposal.setup.settings.receiptFooter, 'Salamat po!');
     assert.deepEqual(out.proposal.setup.vocabulary.customer, ['Suki', 'Sukis']);
     assert.equal(out.proposal.theme.shape, 'pill');

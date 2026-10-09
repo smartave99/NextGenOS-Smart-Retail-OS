@@ -240,3 +240,21 @@ A new message from the owner is added at the bottom **in the same session** (`CL
 > Ok continue and complete all of what I discussed since I think you might have forgotten specially what happened to learning from old and adding in new one
 
 (The owner means the rule to learn from the older programs once, write it down, and add it into the new one: `CLAUDE.md` section 17 and decisions 25, 26 and 29. The assistant reads `docs/MERGE-PLAN.md` and `docs/old-programs/` against the Hub and finishes what is left.)
+
+### 2026-10-09 (about; sent while the assistant was making the full-page bill and checking every screen in both looks; a picture was attached)
+
+> its great with you ui ux and frontened but i wanted default as the one i attaged horizontal type many pos are touch screen
+
+(The picture shows the bill screen with **one bar along the top**: the program's name, the shop's name, the menu as big pictures with the words under them, then the signed-in person, a light/dark switch and "Sign out". The owner means this is the **starting look**, because many counters are touch screens. Decision 30 is changed in `docs/PLATFORM-DECISIONS.md`. The picture itself could not be saved into the repository.)
+
+### 2026-10-09 (about; sent while the assistant was changing the starting look; two pictures were attached)
+
+> see these are some other option our platform idea is from studio my staff with least resource and time can give what user aka clients want
+
+(Two more pictures. **First:** a colourful top bar (the shop's switcher, the menu, a light/dark switch and the person's name with their role) over a row of coloured number tiles, with the bill below and a side panel of "digital" boxes (gift card balance, store credit, loyalty points, QR payment, e-receipt, download invoice, recent activity). **Second:** a quiet top bar with a search box, a bell and the person's name, plus a column of big picture buttons down the left. The owner's point is the platform idea: **the Studio lets staff, with the least effort and time, give each client the look the client wants.** So the look of the program is a choice made per client in the Studio. The boxes for gift card balance, e-receipts, QR payment, search and the bell are **features the program does not have**; they are not drawn until they are built, because no screen may show what the program does not do (`CLAUDE.md` section 11). The two layouts themselves are looks that can be added to the choice.)
+
+### 2026-10-09 (about; sent while the assistant was changing the starting look)
+
+> continue start from where stopped but before that tell me explicitly what was completed and whats left i dont know what you are doing how much done and are you doing what i said or just wasting my time
+
+(The assistant gave a plain account of what is done, what is left, and what only the owner can do, in its answer, and from now on says at the start of each answer what is done, what is next and what it is waiting for. `CLAUDE.md` section 13 already asks for this; it was not done often enough.)

@@ -5,7 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { repoRoot, countryPack, industryPack } from './packs.mjs';
 import { resolveTheme, usableColour } from './rules.mjs';
-import { themeFor, STYLES, deviceTokens } from './template.mjs';
+import { themeFor, STYLES, deviceTokens, layoutTokens } from './template.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +33,7 @@ export function previewInput(d) {
     accent: usableColour(o.accent) ?? null,
     style: pick(o.style, Object.keys(STYLES), 'modern'),
     appearance: pick(o.appearance, ['auto', 'light', 'dark'], 'auto'),
+    layout: pick(o.layout, ['top', 'list', 'counter', 'auto', 'standard'], 'top'),
     kind: pick(o.kind, ['laptop', 'touch-pos', 'tablet', 'kiosk'], 'laptop'),
     screen: pick(o.screen, ['small', 'standard', 'large'], 'standard'),
     level: pick(o.level, ['none', 'theme', 'full'], 'none'),
@@ -44,8 +45,14 @@ export function previewInput(d) {
 
 /** The look the Hub would show for these details and licence level (the same resolve the Hub does). */
 export function previewTheme(p) {
-  const wanted = { ...STYLES[p.style], mode: p.appearance, ...deviceTokens({ kind: p.kind, screen: p.screen }) };
+  const wanted = { ...STYLES[p.style], mode: p.appearance, ...layoutTokens(p.layout, { kind: p.kind, screen: p.screen }) };
   return resolveTheme(p.level, wanted, null);
+}
+
+/** The look word the page carries: "each screen decides" is a touch machine's counter look or another machine's list look; "by machine" is the plain layout. */
+export function previewLook(p) {
+  if (p.layout === 'auto') return p.kind === 'laptop' ? 'list' : 'counter';
+  return p.layout;
 }
 
 /** The brand colour as the Hub writes it into the page (BrandService), or nothing when the licence's own look applies. */
@@ -67,6 +74,8 @@ const ICONS = {
   box: '<path d="m12 3.5 8 4.2v8.6L12 20.5l-8-4.2V7.7Z"/><path d="m4 7.7 8 4.3 8-4.3M12 12v8.5"/>',
   people: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.4-3 2.6-4.8 5.5-4.8s5.1 1.8 5.5 4.8"/><path d="M16 5.8a3 3 0 0 1 0 5.6M17.5 14.4c1.7.5 2.8 2 3 4.1"/>',
   chart: '<path d="M4 19.5h16"/><path d="M7 16v-4.5M12 16V7.5M17 16v-7"/>',
+  store: '<path d="M4 9.5 5.5 4.5h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12.5v7h13v-7M10 19.5v-4h4v4"/>',
+  user: '<circle cx="12" cy="8.5" r="3.4"/><path d="M5 19.5c.6-3.4 3.2-5.2 7-5.2s6.4 1.8 7 5.2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"/>',
 };
 const icon = (n) => `<svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -103,11 +112,11 @@ export function previewHtml(p, { cssHref, logoSrc }) {
          <h3>Payment</h3><div class="pay-methods">${(industry?.defaults?.paymentMethods ?? ['cash', 'card']).slice(0, 3).map((m, i) => `<button type="button" class="chips-btn ${i === 0 ? 'on' : ''}" tabindex="-1">${esc(m[0].toUpperCase() + m.slice(1))}</button>`).join('')}</div>
          <div class="row"><button type="button" class="btn primary grow" tabindex="-1">Complete ${esc(word('sale', 0, 'sale').toLowerCase())}</button><button type="button" class="btn ghost" tabindex="-1">Cancel</button></div></div></div>`;
   return `<!doctype html>
-<html lang="en" data-mode="${esc(t.mode)}" data-surface="${esc(t.surface)}" data-shape="${esc(t.shape)}" data-density="${esc(t.density)}" data-font="${esc(t.font)}" data-scale="${scaleAttr(t.fontScale)}" data-nav="${esc(t.nav)}" data-nav-labels="${esc(t.navLabels)}" data-cart="${esc(t.cart)}" data-depth="${esc(t.depth)}">
+<html lang="en" data-mode="${esc(t.mode)}" data-surface="${esc(t.surface)}" data-shape="${esc(t.shape)}" data-density="${esc(t.density)}" data-font="${esc(t.font)}" data-scale="${scaleAttr(t.fontScale)}" data-nav="${esc(t.nav)}" data-nav-labels="${esc(t.navLabels)}" data-cart="${esc(t.cart)}" data-depth="${esc(t.depth)}" data-look="${esc(previewLook(p))}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>Preview</title>
 <link rel="stylesheet" href="/assets/tokens.css"><link rel="stylesheet" href="/assets/hub.css"><link rel="stylesheet" href="${esc(cssHref)}"></head>
-<body><div class="shell"><nav class="side" aria-label="Main"><div class="brand">${brand}</div>
-<ul>${nav.map(([ic, label], i) => `<li><a href="#" tabindex="-1" class="${i === active ? 'active' : ''}" title="${esc(label)}">${icon(ic)}<span>${esc(label)}</span></a></li>`).join('')}</ul></nav>
-<div class="main"><header class="top"><span class="top-brand">${esc(p.name)}${by ? '<small>by NextGenOS</small>' : ''}</span><span class="shop-name">${esc(p.name)}</span><span class="spacer"></span><span class="who">Your name</span></header>
+<body><div class="shell"><nav class="side" aria-label="Main"><div class="brand">${brand}</div><span class="bar-shop" aria-hidden="true">${icon('store')}<span>${esc(p.name)}</span></span>
+<ul>${nav.map(([ic, label], i) => `${i === 3 ? '<li class="nav-gap" aria-hidden="true"></li>' : ''}<li><a href="#" tabindex="-1" class="${i === active ? 'active' : ''}" title="${esc(label)}">${icon(ic)}<span>${esc(label)}</span></a></li>`).join('')}</ul></nav>
+<div class="main"><header class="top"><span class="top-brand">${esc(p.name)}${by ? '<small>by NextGenOS</small>' : ''}</span><span class="shop-name">${esc(p.name)}</span><span class="spacer"></span><span class="who">${icon('user')}<span class="who-text"><span class="who-name">Your name</span><small class="who-role">Owner</small></span></span></header>
 <main id="content">${body}</main></div></div></body></html>`;
 }

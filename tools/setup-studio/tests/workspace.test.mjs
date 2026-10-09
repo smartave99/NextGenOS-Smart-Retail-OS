@@ -67,7 +67,7 @@ test('a customer goes from details to an approved release, and approval needs a 
     ws.setLogo(sam, c.id, PNG);
     const proposed = ws.makeProposal(sam, c.id);
     assert.equal(proposed.state, 'proposed');
-    assert.equal(proposed.proposal.theme.density, 'touch');
+    assert.equal(proposed.proposal.theme.look, 'top');
     assert.match(proposed.proposal.brand.logo, /^data:image\/png;base64,/);
     assert.throws(() => ws.approve(rita, c.id), /not waiting for approval/);
     assert.throws(() => ws.submit(rita, 'luzon-fresh-mart-2'), /not a customer|not found/i);

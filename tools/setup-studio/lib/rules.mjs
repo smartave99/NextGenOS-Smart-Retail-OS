@@ -160,6 +160,8 @@ export const THEME = {
   density: ['compact', 'comfortable', 'touch'], nav: ['left', 'top', 'bottom'], navLabels: ['full', 'icons'], cart: ['right', 'left', 'bottom'],
   mode: ['auto', 'light', 'dark'], surface: ['neutral', 'warm', 'cool', 'paper'], shape: ['square', 'soft', 'rounded', 'pill'], font: ['system', 'humanist', 'serif', 'rounded', 'mono'], depth: ['flat', 'soft', 'lifted'],
 };
+/** The looks of the shop program (the Hub's ShopLooks): a named bundle of the layout choices. A profile may name one in theme.json ("look"); the owner can still choose another. */
+export const LOOKS = ['top', 'list', 'counter', 'auto', 'standard'];
 export const THEME_DEFAULTS = { mode: 'auto', surface: 'neutral', shape: 'rounded', density: 'comfortable', font: 'system', fontScale: 1, nav: 'left', navLabels: 'full', cart: 'right', depth: 'soft' };
 /** The choices about the device (screen and layout), which every licence lets through; the others are the brand's identity and need a "theme" or "full" licence. */
 export const DEVICE_TOKENS = ['density', 'nav', 'navLabels', 'cart', 'fontScale'];
@@ -198,6 +200,9 @@ export function parseTheme(input) {
       const s = scale(v);
       if (s === null) problems.push('The letter size must be a number from 0.85 to 1.35; it was left out.');
       else value.fontScale = s;
+    } else if (token === 'look') {
+      if (typeof v === 'string' && LOOKS.includes(v)) value.look = v;
+      else problems.push(`"look" must be one of: ${LOOKS.join(', ')}; it was left out.`);
     } else if (THEME[token]) {
       if (typeof v === 'string' && THEME[token].includes(v)) value[token] = v;
       else problems.push(`"${token}" must be one of: ${THEME[token].join(', ')}; it was left out.`);

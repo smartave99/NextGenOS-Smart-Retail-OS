@@ -4,7 +4,7 @@ const PLAIN = {
   'settings.pricesIncludeTax': 'Prices include tax', 'settings.taxRegistered': 'Registered for tax', 'settings.roundTotal': 'Round the total', 'settings.allowNegativeStock': 'Allow selling below zero stock',
   'settings.receiptFooter': 'Words at the bottom of a bill', 'settings.paymentMethods': 'Ways of paying', notes: 'Notes',
 };
-const THEME_WORDS = { mode: 'Light or dark', surface: 'Background tint', shape: 'Corner shape', density: 'Button size', font: 'Letters', fontScale: 'Letter size', nav: 'Menu position', navLabels: 'Menu words', cart: 'Basket position', depth: 'Shadows' };
+const THEME_WORDS = { look: 'Look of the program', mode: 'Light or dark', surface: 'Background tint', shape: 'Corner shape', density: 'Button size', font: 'Letters', fontScale: 'Letter size', nav: 'Menu position', navLabels: 'Menu words', cart: 'Basket position', depth: 'Shadows' };
 
 function flatten(value, prefix = '', out = {}) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) { out[prefix] = value; return out; }

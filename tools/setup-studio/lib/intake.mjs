@@ -15,6 +15,14 @@ export const OPTIONS = {
     { id: 'tablet', label: 'Tablet', hint: 'A small touch screen used standing up or at a table.' },
     { id: 'kiosk', label: 'Self-service kiosk', hint: 'Customers use it themselves; big buttons, no sign-out needed.' },
   ],
+  // How the shop program is laid out: the Hub's looks (apps/business-hub/.../ShopLook.cs keeps the same words; a test compares the ids).
+  layouts: [
+    { id: 'top', label: 'Top menu', hint: 'One bar along the top with big picture buttons. Works with a finger or a mouse. The starting choice.' },
+    { id: 'list', label: 'List', hint: 'For a PC or laptop: items as a list you scroll down, the bill below.' },
+    { id: 'counter', label: 'Counter', hint: 'For a touch counter: the menu down the left, the items in the middle and the bill on the right.' },
+    { id: 'auto', label: 'Each screen decides', hint: 'A touch screen gets the counter look, any other screen gets the list look.' },
+    { id: 'standard', label: 'By machine', hint: 'The older way: button size and menu place follow the kind of machine chosen below.' },
+  ],
   systems: [
     { id: 'windows', label: 'Windows 10 or 11 (64-bit)' },
     { id: 'linux', label: 'Linux (Ubuntu, Mint, Debian)' },
@@ -76,7 +84,7 @@ export function blankIntake(overrides = {}) {
     schema: 1,
     business: { name: '', legalName: '', tagline: '', country: 'IN', region: '', industry: 'retail', taxRegistered: true, pricesIncludeTax: null, contact: { phone: '', email: '', address: '' } },
     money: { paymentMethods: [], receiptFooter: '', roundTotal: null },
-    look: { primaryColor: '#0f6cbd', accentColor: '', style: 'modern', appearance: 'auto', logo: null, poweredBy: null },
+    look: { primaryColor: '#0f6cbd', accentColor: '', style: 'modern', appearance: 'auto', layout: 'top', logo: null, poweredBy: null },
     device: { kind: 'laptop', os: 'windows', screen: 'standard', printer: 'thermal-80', scanner: true, drawer: false },
     words: {},
     features: {},
@@ -149,6 +157,7 @@ export function checkIntake(input) {
   }
   value.look.style = ids(OPTIONS.styles).includes(l.style) ? l.style : 'modern';
   value.look.appearance = ids(OPTIONS.appearances).includes(l.appearance) ? l.appearance : 'auto';
+  value.look.layout = ids(OPTIONS.layouts).includes(l.layout) ? l.layout : 'top';
   value.look.logo = typeof l.logo === 'string' && /^logo\.(png|jpg|svg)$/.test(l.logo) ? l.logo : null;
   value.look.poweredBy = typeof l.poweredBy === 'boolean' ? l.poweredBy : null;
   if (!value.look.logo) warn('look.logo', 'There is no logo yet. Without one, the screens show the name only.');

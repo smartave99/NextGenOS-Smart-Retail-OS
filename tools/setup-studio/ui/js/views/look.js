@@ -62,6 +62,8 @@ export async function render(ctx) {
       h('div', { class: 'col mt' }, colour('look.primaryColor', 'Main colour', { required: true }), colour('look.accentColor', 'Second colour (optional)', { required: false })),
       ctx.warnings.find((w) => w.field === 'licence.whiteLabel') ? h('div', { class: 'notice warn mt-s' }, icon('warn'), ctx.warnings.find((w) => w.field === 'licence.whiteLabel').message) : null),
     section('Style', null, styleCards, h('div', { class: 'mt-s' }, seg(ctx, 'look.appearance', ctx.opts.options.appearances.map((a) => ({ value: a.id, label: a.label })), { label: 'Light or dark' }))),
+    section('How the program is laid out', 'The look the shop program opens in. The owner can still choose another one in Settings.',
+      cards(ctx, 'look.layout', ctx.opts.options.layouts, { label: 'Look of the program', minWidth: 190 })),
     section('The machine it runs on', 'The screens are laid out for it: big buttons for a finger, the menu where it is easiest to reach.',
       cards(ctx, 'device.kind', ctx.opts.options.deviceKinds.map((k) => ({ ...k, icon: { laptop: 'laptop', 'touch-pos': 'till', tablet: 'tablet', kiosk: 'kiosk' }[k.id] })), { label: 'Kind of machine', minWidth: 190 }),
       h('div', { class: 'col mt-s' }, seg(ctx, 'device.os', ctx.opts.options.systems.map((s) => ({ value: s.id, label: s.label })), { label: 'System' }), seg(ctx, 'device.screen', ctx.opts.options.screens.map((s) => ({ value: s.id, label: s.label })), { label: 'Screen size' })),
@@ -90,7 +92,7 @@ function previewStage(ctx) {
     frameEl.style.setProperty('width', w + 'px'); frameEl.style.setProperty('height', hgt + 'px'); frameEl.style.setProperty('transform', `scale(${scale || 0.5})`);
   };
   const update = debounce(() => {
-    const payload = { name: d.business.name || 'Your business', country: d.business.country, industry: d.business.industry, primary: d.look.primaryColor, accent: d.look.accentColor, style: d.look.style, appearance: d.look.appearance, kind: d.device.kind, screen: d.device.screen, level: d.licence.whiteLabel, screenName, logo: ctx.customer.hasLogo ? ctx.id : null, poweredBy: d.look.poweredBy };
+    const payload = { name: d.business.name || 'Your business', country: d.business.country, industry: d.business.industry, primary: d.look.primaryColor, accent: d.look.accentColor, style: d.look.style, appearance: d.look.appearance, layout: d.look.layout, kind: d.device.kind, screen: d.device.screen, level: d.licence.whiteLabel, screenName, logo: ctx.customer.hasLogo ? ctx.id : null, poweredBy: d.look.poweredBy };
     frameEl.src = `/preview?k=${encodeURIComponent(sessionStorage.getItem('studio-key'))}&d=${b64url(JSON.stringify(payload))}`;
     const level = d.licence.whiteLabel;
     caption.textContent = level === 'none' ? 'With a "fixed look" licence the colours, shapes and letters come from the licence\'s own brand. Only the layout for the machine shows.' : level === 'theme' ? 'Their licence shows these colours, shapes and letters. The owner can change them.' : 'Their licence shows this look and name in full. The owner can change them.';

@@ -38,3 +38,6 @@ jobs:
       publish_trial: true
     permissions:
       contents: write
+      # The Release workflow's last job (publish-update) asks GitHub for a signed statement, so it asks for this; a called workflow cannot ask for more than its caller gives, and GitHub
+      # refuses to start the run at all if it does. That job runs only for a real version tag, never for a trial (scripts/tests/release-workflow-permissions.test.mjs keeps the two in step).
+      id-token: write

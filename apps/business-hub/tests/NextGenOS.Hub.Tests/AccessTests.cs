@@ -216,6 +216,13 @@ public class AccessTests : IDisposable
         yield return new("Earners.Statement", new[] { Perm.Staff }, a => a.Earners.Statement(1));
         yield return new("Earners.Summary", new[] { Perm.Staff }, a => a.Earners.Summary(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
         yield return new("Catalog.OpenPacks", new[] { Perm.Stock }, a => a.Catalog.OpenPacks(itemId, 1));
+        var imageViewers = new[] { Perm.Sell, Perm.Orders, Perm.Catalog };
+        yield return new("Images.ForItem", imageViewers, a => a.Images.ForItem(itemId));
+        yield return new("Images.FirstFor", imageViewers, a => a.Images.FirstFor(new[] { itemId }));
+        yield return new("Images.Get", imageViewers, a => a.Images.Get(1));
+        yield return new("Images.Add", new[] { Perm.Catalog }, a => a.Images.Add(itemId, new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0 }, null));
+        yield return new("Images.Remove", new[] { Perm.Catalog }, a => a.Images.Remove(1));
+        yield return new("Images.MakeFirst", new[] { Perm.Catalog }, a => a.Images.MakeFirst(1));
         var groupPickers = new[] { Perm.Sell, Perm.Orders, Perm.Catalog };
         yield return new("Groups.List", groupPickers, a => a.Groups.List());
         yield return new("Groups.Get", groupPickers, a => a.Groups.Get(1));

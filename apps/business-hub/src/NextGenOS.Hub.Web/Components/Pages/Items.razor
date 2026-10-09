@@ -174,6 +174,31 @@
                             @if (packItem != "") { <span class="muted small">When a sale needs more than are on the shelf, whole boxes are opened by themselves and the pieces take their share of the box's cost.</span> }
                         }
                     }
+                    @if (!lending)
+                    {
+                        <label>Pictures</label>
+                        @if (editing is null) { <span class="muted small">Save the @Shop.Singular("item").ToLowerInvariant() first, then open it again to add pictures.</span> }
+                        else
+                        {
+                            <div class="thumbs" id="thumbs">
+                                @foreach (var img in images)
+                                {
+                                    <div class="thumb">
+                                        <img src="/item-images/@img.Id" alt="Picture of @editing.Name" />
+                                        <span>
+                                            @if (img.Id != images[0].Id) { <button type="button" class="btn ghost small" @onclick="() => FirstPicture(img)">Show first</button> }
+                                            <button type="button" class="btn ghost small" @onclick="() => TakePicture(img)" aria-label="Take this picture away">Take away</button>
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                            @if (images.Count < NextGenOS.Hub.Catalog.ImageService.MaxPerItem)
+                            {
+                                <InputFile id="f-picture" OnChange="PictureChosen" accept="image/png,image/jpeg,image/webp,image/gif" />
+                                <span class="muted small">A PNG, JPEG, WebP or GIF picture, up to @(NextGenOS.Hub.Catalog.ImageService.MaxBytes / 1024) KB. Up to @NextGenOS.Hub.Catalog.ImageService.MaxPerItem pictures; the first shows on the till.</span>
+                            }
+                        }
+                    }
                     @if (App.Loyalty.Enabled && !lending)
                     {
                         <div class="field-row">
@@ -411,6 +436,7 @@
         track = first?.TracksStock == true && Shop.Industry.Features.StockTracking == "always";
         batches = false;
         packItem = perPack = "";
+        images = Array.Empty<NextGenOS.Hub.Catalog.ItemImage>();
         ReadPackChoices(null);
     }
 
@@ -433,9 +459,45 @@
         packItem = i.PackItemId?.ToString() ?? "";
         perPack = i.PackItemId is null ? "" : Qty(i.PerPackMilli);
         ReadPackChoices(i.Id);
+        images = lending ? Array.Empty<NextGenOS.Hub.Catalog.ItemImage>() : App.Images.ForItem(i.Id);
         duration = i.DurationMin;
         author = i.Attrs.GetValueOrDefault("author") ?? "";
         isbn = i.Attrs.GetValueOrDefault("isbn") ?? "";
+    }
+
+    private IReadOnlyList<NextGenOS.Hub.Catalog.ItemImage> images = Array.Empty<NextGenOS.Hub.Catalog.ItemImage>();
+
+    private async Task PictureChosen(InputFileChangeEventArgs e)
+    {
+        formError = null;
+        try
+        {
+            if (editing is null) return;
+            var file = e.File;
+            if (file.Size > NextGenOS.Hub.Catalog.ImageService.MaxBytes) throw new HubException("image-big", $"That picture is too big ({file.Size / 1024} KB). Please use one under {NextGenOS.Hub.Catalog.ImageService.MaxBytes / 1024} KB.");
+            using var stream = file.OpenReadStream(NextGenOS.Hub.Catalog.ImageService.MaxBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            using var scope = App.Access.As(() => Me?.Id);
+            App.Images.Add(editing.Id, memory.ToArray(), Me.Id);
+            images = App.Images.ForItem(editing.Id);
+            Find();
+        }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void TakePicture(NextGenOS.Hub.Catalog.ItemImage img)
+    {
+        formError = null;
+        try { App.Images.Remove(img.Id, Me.Id); images = App.Images.ForItem(img.ItemId); Find(); }
+        catch (HubException ex) { formError = ex.Message; }
+    }
+
+    private void FirstPicture(NextGenOS.Hub.Catalog.ItemImage img)
+    {
+        formError = null;
+        try { App.Images.MakeFirst(img.Id, Me.Id); images = App.Images.ForItem(img.ItemId); }
+        catch (HubException ex) { formError = ex.Message; }
     }
 
     private bool batches;

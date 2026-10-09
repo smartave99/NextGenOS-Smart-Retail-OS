@@ -539,6 +539,7 @@ Status of this topic: written (first pass). Covers the product master and its st
 
 - `Product_Join(ProductID, Photo)`: several JPEG blobs per product (`B/frmProduct.vb:7418-7440`); `Category.CPhoto` and `SubCategory.SCPhoto`; the till shows the first image on touch tiles (`Product_Join.Photo` is joined at `B/frmPOSNewTuch.vb:14123`). A product can get images from the web through `DevNet.QImage` ("Online Image Library" link, `frmOnlineImage`, `frmProductImageMaker`, `frmProductImageUpdator`). Limit "Image Limit" per product is a screen setting.
 - **Hub today:** none in Core. **Port:** store images as files with a path column, not blobs; online image search needs the owner's permission (rule 15: nothing leaves the shop unasked).
+- **Hub now (9 October 2026):** built (`docs/OPEN-WORK.md` item 12l), kept in the shop's database rather than as files so that backups carry them; online image search is not ported.
 
 #### A2.11 Porting notes for products
 

@@ -44,6 +44,7 @@
                     @foreach (var item in results)
                     {
                         <button type="button" class="item-btn" @onclick="() => Add(item)">
+                            @if (pictures.TryGetValue(item.Id, out var pic)) { <img class="pic" src="/item-images/@pic" alt="" loading="lazy" /> }
                             <span class="nm">@item.Name</span>
                             <span class="pr">@Money(item.PriceFor(customer?.PriceLevel ?? "retail"))@(item.Unit is "pc" ? "" : " / " + item.Unit)</span>
                         </button>
@@ -245,6 +246,7 @@
     private readonly string saleKey = Guid.NewGuid().ToString("N");
     private Party? customer;
     private string customerQuery = "";
+    private IReadOnlyDictionary<long, long> pictures = new Dictionary<long, long>();
     private IReadOnlyList<NextGenOS.Hub.Catalog.ItemGroup> groups = Array.Empty<NextGenOS.Hub.Catalog.ItemGroup>();
     private IReadOnlyList<NextGenOS.Hub.Staff.Earner> salespeople = Array.Empty<NextGenOS.Hub.Staff.Earner>();
     private IReadOnlyList<NextGenOS.Hub.Staff.Earner> brokers = Array.Empty<NextGenOS.Hub.Staff.Earner>();
@@ -355,7 +357,11 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private void Search() => results = App.Catalog.Search(string.IsNullOrWhiteSpace(query) ? null : query, null, category, 60);
+    private void Search()
+    {
+        results = App.Catalog.Search(string.IsNullOrWhiteSpace(query) ? null : query, null, category, 60);
+        pictures = App.Images.FirstFor(results.Select(r => r.Id));
+    }
 
     private void PickCategory(string? c)
     {

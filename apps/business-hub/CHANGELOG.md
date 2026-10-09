@@ -4,6 +4,9 @@ The Business Hub is the part of the Smart Retail AI Ecosystem that runs any kind
 
 ## Unreleased
 
+### Pictures of products
+- **On a product, add up to four pictures** (PNG, JPEG, WebP or GIF, up to 400 KB each). The first one shows on the till's tile for that product. A file that is not a picture is refused, whatever its name says. The pictures are kept with your shop's data, so a backup carries them.
+
 ### Keys at the till, and quick groups
 - **Keys at the till:** the sell screen shows its keys (starting with F2 to scan, F4 for the customer, F6 for the cash drawer, F8 for the amount received and F12 to complete the sale). **Settings → Keys at the till** lets you choose your own for each (a function key, or Ctrl or Alt with a letter or number; a key can do only one thing).
 - **Products → Quick groups:** make a group such as "Breakfast" (1 bread, 2 milk). One press at the till, or one scan of the group's own barcode, adds every item at its own price. A group has no price of its own.

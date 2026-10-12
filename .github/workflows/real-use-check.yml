@@ -192,8 +192,8 @@ jobs:
             Result 'Hub icon opens a window with the licence page' ($title -ne '' -and -not (Looks-Broken $title)) "window title: '$title'; page says licence: $($text -match '(?i)licen')"
             Close-Edge
           }
-          # THE LIKELY REAL-PC FAILURE: the icon pressed (or the setup's Finish button) while the Hub, which Windows starts a minute or two after the PC starts, is not up yet. The window must not
-          # show "this site can't be reached"; a small window must say that it is starting, and the Hub's window must open by itself the moment the Hub answers.
+          # THE REAL-PC FAILURE (the owner's screenshot, 9 October 2026): the icon pressed while the Hub's Windows service is not running. The icon switches the service on itself (nobody has to start it, and
+          # it is the one service, never a second copy), and the Hub's window opens by itself the moment the Hub answers. The window must never show "this site can't be reached".
           $openerDir = Join-Path $env:ProgramFiles 'NextGenOS\Smart Retail POS Hub'
           $opener = Join-Path $openerDir 'Open Smart Retail POS.exe'
           if ($desktop -and (Test-Path $opener)) {
@@ -201,19 +201,12 @@ jobs:
             for ($i = 0; $i -lt 30 -and (Get-Service NextGenOSHub).Status -ne 'Stopped'; $i++) { Start-Sleep -Seconds 1 }
             Result 'Hub service stopped for the test (as it is just after the PC starts)' ((Get-Service NextGenOSHub).Status -eq 'Stopped') "state: $((Get-Service NextGenOSHub).Status)"
             Start-Process -FilePath $desktop.FullName
-            Start-Sleep -Seconds 12
-            $waiting = @(Titles)
-            Shot 'hub-icon-while-starting'
-            Say ("While the Hub is not up: " + ($waiting -join ' | '))
-            $banner = @(Get-Process -Name 'Open Smart Retail POS' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle })
-            $edgeEarly = @(Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -and $_.MainWindowHandle -ne 0 })
-            Result 'Icon pressed before the Hub is up: a small window says it is starting' ($banner.Count -gt 0) "window: '$($banner[0].MainWindowTitle)'"
-            Result 'Icon pressed before the Hub is up: no browser window with an error page' ($edgeEarly.Count -eq 0) "browser windows: $(($edgeEarly | ForEach-Object { $_.MainWindowTitle }) -join ' | ')"
-            Result 'Icon pressed before the Hub is up: the launcher did not start a second copy of the Hub' (@(Get-Process -Name 'NextGenOS.Hub' -ErrorAction SilentlyContinue).Count -eq 0) 'no Hub program is running yet'
-            Start-Service NextGenOSHub
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            for ($i = 0; $i -lt 60 -and (Get-Service NextGenOSHub).Status -ne 'Running'; $i++) { Start-Sleep -Seconds 1 }
+            Result 'Icon pressed before the Hub is up: the icon switched the program on by itself' ((Get-Service NextGenOSHub).Status -eq 'Running') "state: $((Get-Service NextGenOSHub).Status) after $([int]$clock.Elapsed.TotalSeconds) seconds; nobody started it"
             $title2 = Wait-AppWindow 150
             Shot 'hub-icon-after-start'
-            Say ("After the Hub is up: " + ((Titles) -join ' | '))
+            Say ("After the icon switched the Hub on: " + ((Titles) -join ' | '))
             Result 'Icon pressed before the Hub is up: its window opens by itself once the Hub answers' ($title2 -ne '' -and -not (Looks-Broken $title2)) "window title: '$title2'"
             $hubCopies = @(Get-CimInstance Win32_Process -Filter "Name='NextGenOS.Hub.exe'")
             Result 'Only the Windows service runs the Hub (one copy)' ($hubCopies.Count -eq 1) "$($hubCopies.Count) copy(ies) running"

@@ -13,7 +13,7 @@ import { auditFolder } from '../audit-package.mjs';
 import { peImports } from '../lib/binary-imports.mjs';
 import { buildLauncher } from '../lib/build-launcher.mjs';
 import { prerequisitesFor } from '../../apps/business-hub/installer/common.mjs';
-import { addZipLauncher, HUB_ADDRESS, HUB_PROGRAM, LAUNCHER_FILE, PROBLEM_HELPER, README_FILE, problemHelperText, readMeText } from '../../apps/business-hub/installer/zip-launcher.mjs';
+import { addZipLauncher, HUB_ADDRESS, HUB_PROGRAM, HUB_SERVICE, LAUNCHER_FILE, PROBLEM_HELPER, README_FILE, problemHelperText, readMeText } from '../../apps/business-hub/installer/zip-launcher.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const skip = spawnSync('makensis', ['-VERSION']).error ? 'makensis (NSIS) is not installed here' : false;
@@ -123,6 +123,36 @@ test('the helper with a window says it is for problems and runs the Hub in that 
   const kestrel = JSON.parse(readFileSync(join(repo, 'apps/business-hub/src/NextGenOS.Hub.Web/appsettings.json'), 'utf8')).Kestrel.Endpoints.Http.Url;
   assert.equal(HUB_ADDRESS, kestrel, 'the launcher waits at the address the Hub listens on');
   assert.equal(/!define ADDRESS "([^"]+)"/.exec(readFileSync(join(repo, 'apps/business-hub/installer/SmartRetailHub.nsi'), 'utf8'))[1], HUB_ADDRESS, 'the setup opens the same address');
+});
+
+test('the icon, the setup and the Hub name the same Windows service, so the icon can switch on the one the setup made', () => {
+  const nsi = readFileSync(join(repo, 'apps/business-hub/installer/SmartRetailHub.nsi'), 'utf8');
+  assert.equal(/!define SERVICE "([^"]+)"/.exec(nsi)[1], HUB_SERVICE, 'the setup makes the service the icon asks about');
+  assert.match(readFileSync(join(repo, 'apps/business-hub/src/NextGenOS.Hub.Web/HubHost.cs'), 'utf8'), new RegExp(`ServiceName = "${HUB_SERVICE}"`), 'the Hub answers to the same name');
+  assert.equal(/!define PORT "(\d+)"/.exec(nsi)[1], new URL(HUB_ADDRESS).port, 'the setup waits at the port the Hub listens on');
+});
+
+test('the setup makes a service that is on early, that the people at the PC may switch ON and nothing more, and the setup waits until the Hub answers (and says in words when it does not)', () => {
+  const nsi = readFileSync(join(repo, 'apps/business-hub/installer/SmartRetailHub.nsi'), 'utf8').replace(/^\s*;.*$/gm, '');
+  assert.match(nsi, /sc\.exe create \$\{SERVICE\}[^\n]*start= auto /, 'it starts with the PC at once');
+  assert.match(nsi, /sc\.exe config \$\{SERVICE\}[^\n]*start= auto /, 'an update sets the same');
+  assert.doesNotMatch(nsi, /delayed-auto/, 'not "delayed": a till must be ready as early as the PC is');
+  assert.match(nsi, /sc\.exe failureflag \$\{SERVICE\} 1/, 'Windows also restarts it when it stops with an error');
+  const sd = /sc\.exe sdset \$\{SERVICE\} "(D:[^"]+)"/.exec(nsi)?.[1];
+  assert.ok(sd, 'the rights on the service are set');
+  const aces = [...sd.matchAll(/\(A;;([A-Z]+);;;([A-Z]{2})\)/g)].map((m) => ({ who: m[2], rights: m[1].match(/../g) }));
+  const of = (who) => aces.filter((a) => a.who === who).flatMap((a) => a.rights);
+  assert.ok(of('IU').includes('RP'), 'the people at the PC may start it');
+  for (const bad of ['WP', 'DT', 'DC', 'SD', 'WD', 'WO']) assert.ok(!of('IU').includes(bad), `the people at the PC may not (${bad}): stop it, pause it, change it, delete it or change who may`);
+  assert.ok(!aces.some((a) => ['WD', 'AU', 'BU', 'AN', 'LS', 'NS'].includes(a.who)), 'nobody else is given a right');
+  assert.ok(of('SU').every((r) => ['CC', 'LC', 'SW', 'LO', 'CR', 'RC'].includes(r)), 'other service accounts may only look');
+  assert.match(nsi, /Function VerifyStarted[\s\S]*Call WaitForHub[\s\S]*Call HubWriteNote/, 'it waits for the Hub to answer, and writes the note when it does not');
+  assert.match(nsi, /sc\.exe start \$\{SERVICE\}'\s+Pop \$0\s+Call VerifyStarted/, 'right after it asks Windows to start the service');
+  assert.match(nsi, /\$\{Silent\}[\s\S]*SetErrorLevel 3/, 'a quiet install ends with code 3 when the Hub does not answer');
+  assert.match(nsi, /icacls\.exe "\$APPDATA\\\$\{COMPANY\}\\Logs" \/grant "\*S-1-5-19:\(OI\)\(CI\)M"/, 'the service may write the notes about how it started');
+  assert.match(nsi, /Call PortBind\s+\$\{If\} \$0 == 10013/, 'the setup says so when Windows keeps the Hub\'s place (port) for itself');
+  assert.match(nsi, /icacls\.exe "\$APPDATA\\\$\{COMPANY\}\\Hub\\\*" \/reset \/T \/C \/Q/, 'files an earlier copy left take the folder\'s rights again');
+  assert.ok(!/powershell|wscript|cscript|mshta/i.test(nsi), 'no script host');
 });
 
 test('the build writes the setup first and adds the launcher to the folder only for the zip; and the setup itself never starts the console program', () => {

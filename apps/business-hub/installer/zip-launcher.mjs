@@ -10,6 +10,7 @@ import { repo } from './common.mjs';
 /** Where the Hub answers (apps/business-hub/src/NextGenOS.Hub.Web/appsettings.json, Kestrel; the setup's shortcuts use the same address). */
 export const HUB_ADDRESS = 'http://127.0.0.1:5280';
 export const HUB_PROGRAM = 'NextGenOS.Hub.exe';
+export const HUB_SERVICE = 'NextGenOSHub';   // the Windows service the setup makes (SmartRetailHub.nsi)
 export const LAUNCHER_FILE = 'Start Business Hub.exe';
 export const PROBLEM_HELPER = 'Start Business Hub (with a window, for problems)';
 export const README_FILE = 'READ ME FIRST.txt';
@@ -90,9 +91,10 @@ export function addZipLauncher(folder, { version, makensis = findMakensis() } = 
 }
 
 /**
- * The setup's two launchers, put into the folder before the setup is written. Unlike the zip's launcher they never start the Hub (Windows starts it, as a service, a minute or two after
- * the PC starts; a second copy started by a person would run without the service's rights to the shop's data): they show a small "starting" window until the Hub answers, then open its
- * window of its own (never the usual web browser). Returns the names written.
+ * The setup's two launchers, put into the folder before the setup is written. Unlike the zip's launcher they never start the Hub themselves (Windows starts it, as a service, with the PC; a
+ * second copy started by a person would run without the service's rights to the shop's data). They ask Windows to start the service when it is switched off, show a small "starting" window
+ * until the Hub answers, then open its window of its own (never the usual web browser); when it does not answer they say in one sentence what is wrong and open a note (service: HUB_SERVICE).
+ * Returns the names written.
  */
 export function addServiceLaunchers(folder, { version, makensis = findMakensis() } = {}) {
   if (!/^\d+\.\d+\.\d+$/.test(String(version ?? ''))) throw new Error('Say the version as three numbers, like 1.0.0.');
@@ -100,7 +102,7 @@ export function addServiceLaunchers(folder, { version, makensis = findMakensis()
   const manifestFile = join(folder, 'prerequisites.json');
   if (!existsSync(manifestFile)) throw new Error('prerequisites.json is missing: write it before adding the launchers.');
   const common = { name: 'Smart Retail POS', program: HUB_PROGRAM, check: HUB_PROGRAM, version, icon: join(repo, 'scripts', 'launcher', 'product.ico'), makensis };
-  const open = { url: HUB_ADDRESS, waitSeconds: 180, profile: 'smart-retail-pos-window', waitOnly: true, startingText: 'Smart Retail POS is starting.' };
+  const open = { url: HUB_ADDRESS, waitSeconds: 180, profile: 'smart-retail-pos-window', waitOnly: true, service: HUB_SERVICE, startingText: 'Smart Retail POS is starting.' };
   buildLauncher({ ...common, outFile: join(folder, OPENER_FILE), open });
   buildLauncher({ ...common, outFile: join(folder, OPENER_FULL_FILE), open: { ...open, kiosk: true } });
   const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));

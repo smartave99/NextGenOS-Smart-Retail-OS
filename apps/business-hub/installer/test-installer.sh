@@ -68,7 +68,7 @@ check "on a Windows older than 10 nothing is installed" test ! -e "$app/NextGenO
 # (Another program on the Hub's port: Wine's own netstat does not list the programs that are waiting for a connection, so this one cannot be made to happen here. The Real-use check makes it
 # happen on a real Windows machine: a program holds the port, the setup must stop and put nothing on the PC.)
 # The words people read for the checks that Wine cannot make happen (a full disk, no browser, a program removed by anti-virus, a service that will not start).
-for phrase in "not enough free room" "Neither Microsoft Edge nor Google Chrome" "removed right after it was copied" "could not start it just now" "needs Windows 10" "already using the place"; do
+for phrase in "not enough free room" "Neither Microsoft Edge nor Google Chrome" "removed right after it was copied" "could not start it just now" "needs Windows 10" "already using the place" "is keeping the place"; do
   check "the setup has the plain words '$phrase'" grep -q "$phrase" "$here/SmartRetailHub.nsi"
 done
 

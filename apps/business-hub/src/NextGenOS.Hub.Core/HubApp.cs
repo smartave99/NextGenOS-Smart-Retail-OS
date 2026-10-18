@@ -10,6 +10,7 @@ using NextGenOS.Hub.Documents;
 using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Insights;
+using NextGenOS.Hub.Intelligence;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Loyalty;
 using NextGenOS.Hub.Offers;
@@ -78,6 +79,10 @@ public sealed class HubApp
         Printing = new HubPrinting(PrinterProfiles, print ?? new NextGenOS.Devices.Printing.PrintService(), Documents, Catalog, Shop, Audit, Offers, Loyalty);
         // The business map: what things there are and how they connect. The shop's own records are read in place, never copied.
         Ontology = new OntologyService(db, clock, Audit, Ai.Flags, Access);
+        // What is true now about one thing or place, read from the event history (nothing copied, nothing written).
+        State = new StateService(db, clock, Access);
+        // Automatic rules over the event history: a rule can only propose an event for a person to check. Off until the owner switches on "Advanced automatic rules" and the rule itself.
+        Rules = new RuleService(db, clock, Audit, Ai.Flags, Events, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
@@ -132,6 +137,8 @@ public sealed class HubApp
     public RetentionService Retention { get; }
     public EventStore Events { get; }
     public OntologyService Ontology { get; }
+    public StateService State { get; }
+    public RuleService Rules { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public UpdateService Updates { get; }
@@ -153,6 +160,7 @@ public sealed class HubApp
         Actions.Sweep();
         try { Insights.RunIfDue(); } catch (HubException) { /* a forecast that cannot be made today is made tomorrow; it never stops the rest of the upkeep */ }
         Outbox.DispatchAll();   // messages left by sales and stock changes since the last time are handed to the event history (nothing happens while it is switched off)
+        try { Rules.Run(); } catch (HubException) { /* a rule that cannot be looked at now is looked at the next time; it never stops the rest of the upkeep */ }
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
         Retention.Prune(null);
         Backups.RunIfDue();   // the night's copy, when it is due (a failed try is written down and shown to the owner; it never stops the till)

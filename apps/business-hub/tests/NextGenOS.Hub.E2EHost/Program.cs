@@ -47,6 +47,24 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
         return Results.Ok(new { events = hub.Events.Counts().Confirmed });
     }).AllowAnonymous().DisableAntiforgery();
 
+    // Automatic rules: the switch for them, and three door events recorded now (a rule switched on earlier sees them, one switched on later does not).
+    app.MapPost("/__e2e/seed-rules", (NextGenOS.Hub.HubApp hub) =>
+    {
+        using var asTheProgram = hub.Access.AsSystem();
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.EventEngine, true, null);
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.AdvancedRules, true, null);
+        return Results.Ok(new { running = hub.Rules.Running });
+    }).AllowAnonymous().DisableAntiforgery();
+
+    app.MapPost("/__e2e/door-events", (NextGenOS.Hub.HubApp hub) =>
+    {
+        using var asTheProgram = hub.Access.AsSystem();
+        var now = DateTimeOffset.UtcNow;
+        for (var i = 3; i >= 1; i--)
+            hub.Events.Append(new NextGenOS.Hub.Events.EventInput("door.opened", "model", "door-model", "INTERNAL", now.AddMinutes(-i), 0.9, "1.0", SubjectRef: "device:door-1", ZoneRef: "zone:back"));
+        return Results.Ok(new { events = hub.Events.Counts().Confirmed });
+    }).AllowAnonymous().DisableAntiforgery();
+
     // A sale made now (with the history on it leaves its messages in the outbox, as in the shop), and one message that failed for good, as if the history had been busy eight times.
     app.MapPost("/__e2e/seed-outbox", (NextGenOS.Hub.HubApp hub) =>
     {

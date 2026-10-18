@@ -44,7 +44,6 @@
    "apps/pos-dashboard-service/owner-app/owner.css": 1,
    "apps/pos-dashboard-service/src/SmartRetail.Pos.Core/Analytics/GrowthPlanPrompt.cs": 5,
    "apps/pos-dashboard-service/src/SmartRetail.Pos.Core/Analytics/ShopQuestionPrompt.cs": 2,
-   "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Components/Pages/Ask.razor": 1,
    "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Components/Pages/Panel.razor": 1,
    "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/Components/Pages/Plan.razor": 8,
    "apps/pos-dashboard-service/src/SmartRetail.Pos.Web/wwwroot/app.css": 3,

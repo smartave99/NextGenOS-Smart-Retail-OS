@@ -1,0 +1,532 @@
+@page "/work"
+@using SmartRetail.AI.Work
+@implements IDisposable
+@inject WorkService Work
+@inject ILogger<WorkPlan> Log
+@inject BrandService Brand
+@inject TimeProvider Clock
+@inject AiEnvironment Ai
+@inject NavigationManager Nav
+
+<PageTitle>Plan &amp; tasks · @Brand.Name</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Plan &amp; tasks</h1>
+        <p class="sub">Projects, tasks and reminders. Ask the assistant in <a href="ask">Ask AI</a> (“Make a project for…”, “Remind me to…”), or add them here. They are kept in the data folder, never in the POS. The assistant only suggests: what it suggests waits for your Save. Reminders show here; they are not sent to anyone.</p>
+    </div>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (book.Pending.Count > 0)
+{
+    <section class="panel memory-waiting" aria-label="Waiting for your Save">
+        <div class="panel-head">
+            <h2>Suggested by the assistant <span class="count">@book.Pending.Count</span></h2>
+            <span class="pill warn">Waiting for your Save</span>
+        </div>
+        @foreach (var proposal in book.Pending)
+        {
+            <div class="work-proposal" @key="proposal.Id">
+                @if (!string.IsNullOrWhiteSpace(proposal.Summary))
+                {
+                    <p class="m-text">@Short(proposal.Summary)</p>
+                }
+                <ul class="memory-list">
+                    @foreach (var change in proposal.Changes)
+                    {
+                        <li class="memory-item" @key="change.Id">
+                            <div class="m-text">@WorkExtraction.Line(change)</div>
+                            @if (!string.IsNullOrWhiteSpace(change.Why))
+                            {
+                                <div class="m-meta">@change.Why</div>
+                            }
+                        </li>
+                    }
+                </ul>
+                @if (proposal.LeftOut.Count > 0)
+                {
+                    <p class="muted small">Left out: @string.Join("; ", proposal.LeftOut)</p>
+                }
+                <div class="f-actions">
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => Approve(proposal)">Save all</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => Reject(proposal)">Don’t save</button>
+                </div>
+            </div>
+        }
+    </section>
+}
+
+@if (due.Count > 0)
+{
+    <section class="panel" aria-label="Due soon">
+        <div class="panel-head">
+            <h2>Due soon <span class="count">@due.Count</span></h2>
+            <span class="muted small">Today and the next 7 days, and what is late</span>
+        </div>
+        <ul class="memory-list">
+            @foreach (var item in due)
+            {
+                <li class="memory-item" @key="item.Id">
+                    <div class="m-text">
+                        <input type="checkbox" class="work-check" title="Mark done" aria-label="@("Mark done: " + item.Title)" @onchange="() => Move(item, WorkOp.Complete)" />
+                        <strong>@item.Title</strong>
+                        <span class="pill @(IsLate(item) ? "bad" : "")">@DueText(item)</span>
+                    </div>
+                    <div class="m-meta">@KindName(item.Kind)@(ProjectName(item) is { Length: > 0 } project ? " · " + project : "")</div>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+<div class="memory-parts">
+    @foreach (var project in book.Projects.Where(p => p.Status == WorkStatus.Open))
+    {
+        var inside = book.In(project.Id).Where(i => i.Kind != WorkKind.Record).ToList();
+        var numbers = book.In(project.Id).Count(i => i.Kind == WorkKind.Record && i.Status == WorkStatus.Open);
+        <section class="panel memory-part" aria-label="@project.Title" @key="project.Id">
+            <div class="panel-head">
+                <h2><a href="work/@project.Id">@project.Title</a></h2>
+                <span class="muted small">@(inside.Count(i => i.Status == WorkStatus.Open)) open@(inside.Count(i => i.Status == WorkStatus.Done) is > 0 and var done ? ", " + done + " done" : "")</span>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(project.Detail))
+            {
+                <p class="muted small part-hint">@project.Detail</p>
+            }
+            <div class="m-meta">
+                @(project.Budget is { } budget ? "Budget you set: " + Formats.Price(budget) : "No budget set")@(project.Starts is { } from ? " · from " + Formats.Date(from) : "")@(project.Due is { } by ? " · by " + Formats.Date(by) : "")@(string.IsNullOrWhiteSpace(project.Channel) ? "" : " · " + project.Channel)@(string.IsNullOrWhiteSpace(project.Area) ? "" : " · " + project.Area)@(string.IsNullOrEmpty(project.ActionId) ? "" : " · sales tracked")
+            </div>
+            <ul class="memory-list">
+                @foreach (var item in inside.Where(i => i.Status == WorkStatus.Open))
+                {
+                    <li class="memory-item" @key="item.Id">
+                        <div class="m-text">
+                            <input type="checkbox" class="work-check" title="Mark done" aria-label="@("Mark done: " + item.Title)" @onchange="() => Move(item, WorkOp.Complete)" />
+                            @item.Title
+                            @if (item.Due is not null)
+                            {
+                                <span class="pill @(IsLate(item) ? "bad" : "")">@DueText(item)</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(item.Detail))
+                        {
+                            <div class="m-meta">@item.Detail</div>
+                        }
+                        <div class="m-meta">@KindName(item.Kind)@(item.Budget is { } b ? " · " + Formats.Price(b) : "")@(item.Source == "Chat" ? " · suggested by the assistant" : "")</div>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Move(item, WorkOp.Drop)">Drop</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+            @if (numbers > 0)
+            {
+                <p class="muted small">@(numbers == 1 ? "1 number" : numbers + " numbers") you entered. Open the campaign to see them.</p>
+            }
+            <div class="f-actions">
+                <a class="btn btn-sm btn-soft" href="work/@project.Id">Open: numbers, sales and details</a>
+                <button type="button" class="btn btn-sm btn-soft" @onclick="() => Move(project, WorkOp.Complete)">Project done</button>
+                <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Move(project, WorkOp.Drop)">Drop the project</button>
+            </div>
+        </section>
+    }
+
+    @if (loose.Count > 0)
+    {
+        <section class="panel memory-part" aria-label="Tasks, reminders and notes">
+            <div class="panel-head">
+                <h2>Tasks, reminders and notes</h2>
+                <span class="muted small">@loose.Count open</span>
+            </div>
+            <ul class="memory-list">
+                @foreach (var item in loose)
+                {
+                    <li class="memory-item" @key="item.Id">
+                        <div class="m-text">
+                            @if (item.Kind is WorkKind.Task or WorkKind.Reminder)
+                            {
+                                <input type="checkbox" class="work-check" title="Mark done" aria-label="@("Mark done: " + item.Title)" @onchange="() => Move(item, WorkOp.Complete)" />
+                            }
+                            @(item.Kind == WorkKind.Record ? WorkRules.RecordText(item) : item.Title)
+                            @if (item.Due is not null && item.Kind != WorkKind.Record)
+                            {
+                                <span class="pill @(IsLate(item) ? "bad" : "")">@DueText(item)</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(item.Detail))
+                        {
+                            <div class="m-meta">@item.Detail</div>
+                        }
+                        <div class="m-meta">@KindName(item.Kind)@(item.Source == "Chat" ? " · suggested by the assistant" : "")</div>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Move(item, WorkOp.Drop)">@(item.Kind is WorkKind.Note or WorkKind.Record ? "Remove" : "Drop")</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</div>
+
+@if (book.Items.Count == 0 && book.Pending.Count == 0)
+{
+    <p class="muted memory-empty">Nothing yet. Add something below, or ask the assistant to make a plan with you.</p>
+}
+
+<section class="panel" aria-label="Plan a campaign">
+    <div class="panel-head"><h2>Plan a campaign</h2></div>
+    <p class="muted small">A starting plan with steps on the right days and the signs to watch, which you change afterwards. It holds no prices and promises no results. You can also ask the assistant to make a plan with you.</p>
+    <form class="work-add" @onsubmit="MakeCampaign">
+        <label>
+            <span class="small muted">Which plan</span>
+            <select class="form-control" value="@(Template?.Id)" @onchange="ChooseTemplate">
+                @foreach (var template in Ai.CampaignTemplates)
+                {
+                    <option value="@template.Id">@template.Name</option>
+                }
+            </select>
+        </label>
+        <label class="work-title"><span class="small muted">Name (optional)</span><input class="form-control" maxlength="@WorkRules.TitleLimit" placeholder="@(Template?.Name)" @bind="templateName" /></label>
+        <label><span class="small muted">Starts</span><input type="date" class="form-control" @bind="templateStart" placeholder="@Today.AddDays(7).ToString("yyyy-MM-dd")" /></label>
+        <label><span class="small muted">Days it runs</span><input type="number" min="1" max="365" class="form-control" @bind="templateDays" /></label>
+        <label><span class="small muted">Budget you set (optional)</span><input type="number" min="0" step="any" class="form-control" @bind="templateBudget" /></label>
+        <label><span class="small muted">Where (optional)</span><input class="form-control" maxlength="@WorkRules.ChannelLimit" @bind="templateArea" /></label>
+        <button type="submit" class="btn btn-soft"><Icon Name="plus" /> Make this plan</button>
+    </form>
+    @if (Template is { } chosen)
+    {
+        <p class="muted small">@chosen.Summary</p>
+        <ul class="memory-list">
+            @foreach (var step in chosen.Steps)
+            {
+                <li class="memory-item"><div class="m-text">@step.Title</div><div class="m-meta">@StepWhen(step.AfterDays)</div></li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="panel" aria-label="Add">
+    <div class="panel-head"><h2>Add</h2></div>
+    <form class="work-add" @onsubmit="Add">
+        <label>
+            <span class="small muted">What</span>
+            <select class="form-control" @bind="newKind">
+                <option value="@WorkKind.Task">Task</option>
+                <option value="@WorkKind.Project">Project</option>
+                <option value="@WorkKind.Reminder">Reminder</option>
+                <option value="@WorkKind.Note">Note</option>
+            </select>
+        </label>
+        <label class="work-title">
+            <span class="small muted">Title</span>
+            <input class="form-control" maxlength="@WorkRules.TitleLimit" @bind="newTitle" @bind:event="oninput" />
+        </label>
+        @if (newKind != WorkKind.Project && newKind != WorkKind.Reminder && book.Projects.Any(p => p.Status == WorkStatus.Open))
+        {
+            <label>
+                <span class="small muted">In project</span>
+                <select class="form-control" @bind="newProject">
+                    <option value="">None</option>
+                    @foreach (var project in book.Projects.Where(p => p.Status == WorkStatus.Open))
+                    {
+                        <option value="@project.Id">@project.Title</option>
+                    }
+                </select>
+            </label>
+        }
+        @if (newKind != WorkKind.Note)
+        {
+            <label>
+                <span class="small muted">@(newKind == WorkKind.Reminder ? "Remind me on" : "Due (optional)")</span>
+                <input type="date" class="form-control" @bind="newDue" />
+            </label>
+        }
+        @if (newKind == WorkKind.Project || newKind == WorkKind.Task)
+        {
+            <label>
+                <span class="small muted">Budget you set (optional)</span>
+                <input type="number" min="0" step="any" class="form-control" @bind="newBudget" />
+            </label>
+        }
+        @if (newKind == WorkKind.Project)
+        {
+            <label>
+                <span class="small muted">Starts (optional)</span>
+                <input type="date" class="form-control" @bind="newStarts" />
+            </label>
+            <label>
+                <span class="small muted">How it reaches people (optional)</span>
+                <input class="form-control" maxlength="@WorkRules.ChannelLimit" @bind="newChannel" />
+            </label>
+            <label>
+                <span class="small muted">Where (optional)</span>
+                <input class="form-control" maxlength="@WorkRules.ChannelLimit" @bind="newArea" />
+            </label>
+        }
+        <button type="submit" class="btn btn-soft" disabled="@string.IsNullOrWhiteSpace(newTitle)"><Icon Name="plus" /> Add</button>
+    </form>
+</section>
+
+@if (finished.Count > 0)
+{
+    <section class="panel" aria-label="Finished">
+        <div class="panel-head">
+            <h2>Done and dropped <span class="count">@finished.Count</span></h2>
+            <button type="button" class="link-button" @onclick="() => showFinished = !showFinished">@(showFinished ? "Hide" : "Show")</button>
+        </div>
+        @if (showFinished)
+        {
+            <ul class="memory-list">
+                @foreach (var item in finished)
+                {
+                    <li class="memory-item" @key="item.Id">
+                        <div class="m-text">@item.Title</div>
+                        <div class="m-meta">@KindName(item.Kind) · @(item.Status == WorkStatus.Done ? "done" : "dropped") @Formats.Date(item.Updated)</div>
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => Move(item, WorkOp.Reopen)">Open again</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+<section class="panel memory-journey" aria-label="What changed">
+    <div class="panel-head"><h2>What changed</h2></div>
+    @if (book.Journey.Count == 0)
+    {
+        <p class="muted memory-empty">Nothing yet. Every change is listed here, and a saved one can be undone.</p>
+    }
+    else
+    {
+        <ul class="memory-list">
+            @foreach (var change in book.Journey.Take(JourneyShown))
+            {
+                <li class="memory-item" @key="change.Id">
+                    <div class="m-text"><strong>@Verb(change)</strong> @WorkExtraction.Line(change)</div>
+                    <div class="m-meta">@(change.Source == "Chat" ? "Suggested by the assistant" : "You") · @Formats.DateAndTime(change.At)</div>
+                    @if (change.Status == WorkChangeStatus.Saved)
+                    {
+                        <div class="f-actions">
+                            <button type="button" class="btn btn-sm btn-link" @onclick="() => Undo(change)"><Icon Name="undo" /> Undo</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private const int JourneyShown = 10;
+
+    private WorkBook book = new();
+    private List<WorkItem> due = new();
+    private List<WorkItem> loose = new();
+    private List<WorkItem> finished = new();
+    private string? error;
+    private bool showFinished;
+
+    private WorkKind newKind = WorkKind.Task;
+    private string newTitle = "";
+    private string newProject = "";
+    private DateTime? newDue;
+    private decimal? newBudget;
+    private DateTime? newStarts;
+    private string newChannel = "";
+    private string newArea = "";
+
+    private string templateId = "";
+    private string templateName = "";
+    private DateTime? templateStart;
+    private int templateDays;
+    private decimal? templateBudget;
+    private string templateArea = "";
+
+    private DateTime Today => Clock.GetLocalNow().DateTime.Date;
+
+    protected override void OnInitialized()
+    {
+        Work.Changed += OnChanged;
+        templateDays = Template?.Days ?? 14;
+        Reload();
+    }
+
+    private void Reload()
+    {
+        book = Work.Load();
+        var soon = Today.AddDays(7);
+        due = book.Open
+            .Where(i => i.Kind is WorkKind.Task or WorkKind.Reminder && i.Due is { } by && by.Date <= soon)
+            .OrderBy(i => i.Due)
+            .ToList();
+        loose = book.Open
+            .Where(i => i.Kind != WorkKind.Project && string.IsNullOrEmpty(i.ProjectId) && !due.Contains(i))
+            .OrderBy(i => i.Due ?? DateTime.MaxValue)
+            .ThenBy(i => i.Created)
+            .ToList();
+        finished = book.Items.Where(i => i.Status != WorkStatus.Open).OrderByDescending(i => i.Updated).Take(100).ToList();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Reload();
+        StateHasChanged();
+    });
+
+    private void Add()
+    {
+        var item = new WorkItem
+        {
+            Kind = newKind,
+            Title = newTitle,
+            ProjectId = newKind is WorkKind.Project or WorkKind.Reminder ? "" : newProject,
+            Due = newKind == WorkKind.Note ? null : newDue,
+            Budget = newKind is WorkKind.Project or WorkKind.Task ? newBudget : null,
+            Starts = newKind == WorkKind.Project ? newStarts : null,
+            Channel = newKind == WorkKind.Project ? newChannel : "",
+            Area = newKind == WorkKind.Project ? newArea : "",
+        };
+        if (Run(() => Work.Change(new WorkChange { Op = WorkOp.Add, Item = item })))
+        {
+            newTitle = "";
+            newDue = null;
+            newBudget = null;
+            newStarts = null;
+            newChannel = "";
+            newArea = "";
+        }
+    }
+
+    private CampaignTemplate? Template => Ai.CampaignTemplates.FirstOrDefault(t => t.Id == templateId) ?? Ai.CampaignTemplates.FirstOrDefault();
+
+    private void ChooseTemplate(ChangeEventArgs e)
+    {
+        templateId = e.Value as string ?? "";
+        templateName = "";
+        templateDays = Template?.Days ?? 14;
+    }
+
+    private void MakeCampaign()
+    {
+        var template = Template;
+        if (template is null)
+        {
+            return;
+        }
+
+        var start = templateStart ?? Today.AddDays(7);
+        var days = templateDays > 0 ? templateDays : template.Days;
+        try
+        {
+            var result = Work.AddPlan(template.Plan(templateName, start, days, templateBudget, templateArea, Today));
+            if (result.Saved == 0)
+            {
+                error = "Nothing was added: " + string.Join("; ", result.Problems);
+                Reload();
+                return;
+            }
+
+            error = result.Problems.Count > 0 ? "Added, except: " + string.Join("; ", result.Problems) : null;
+            var project = Work.Load().Projects.OrderByDescending(p => p.Created).FirstOrDefault();
+            if (project is not null && result.Problems.Count == 0)
+            {
+                Nav.NavigateTo("work/" + project.Id);
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Making the campaign plan failed.");
+            error = "It was not saved: " + ex.Message;
+        }
+
+        Reload();
+    }
+
+    private void Move(WorkItem item, WorkOp op) => Run(() => Work.Change(new WorkChange { Op = op, ItemId = item.Id }));
+
+    private void Approve(WorkProposal proposal)
+    {
+        try
+        {
+            var result = Work.Approve(proposal.Id);
+            error = result.Problems.Count > 0 ? "Not everything could be saved: " + string.Join("; ", result.Problems) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Saving the assistant's suggestion failed.");
+            error = "It was not saved: " + ex.Message;
+        }
+
+        Reload();
+    }
+
+    private void Reject(WorkProposal proposal) => Run(() =>
+    {
+        Work.Reject(proposal.Id);
+        return null;
+    });
+
+    private void Undo(WorkChange change) => Run(() => Work.Undo(change.Id));
+
+    /// <summary>Runs a change; true when it was made. A problem is shown in plain words.</summary>
+    private bool Run(Func<string?> change)
+    {
+        try
+        {
+            var problem = change();
+            error = problem;
+            Reload();
+            return problem is null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing the plan failed.");
+            error = "It was not saved: " + ex.Message;
+            return false;
+        }
+    }
+
+    private static string StepWhen(int afterDays) => afterDays == 0 ? "On the first day" : afterDays < 0 ? $"{-afterDays} day{(afterDays == -1 ? "" : "s")} before it starts" : $"{afterDays} day{(afterDays == 1 ? "" : "s")} after it starts";
+
+    private bool IsLate(WorkItem item) => item.Due is { } by && by.Date < Today;
+
+    private string DueText(WorkItem item)
+    {
+        var by = item.Due!.Value.Date;
+        var days = (by - Today).Days;
+        return days < 0 ? "late: " + Formats.Date(by) : days == 0 ? "today" : days == 1 ? "tomorrow" : Formats.Date(by);
+    }
+
+    private string ProjectName(WorkItem item) => string.IsNullOrEmpty(item.ProjectId) ? "" : book.Find(item.ProjectId)?.Title ?? "";
+
+    private static string KindName(WorkKind kind) => kind switch
+    {
+        WorkKind.Project => "Project",
+        WorkKind.Task => "Task",
+        WorkKind.Reminder => "Reminder",
+        _ => "Note",
+    };
+
+    private static string Verb(WorkChange change) => change.Status switch
+    {
+        WorkChangeStatus.Rejected => "Not saved:",
+        WorkChangeStatus.Undone => "Saved, then undone:",
+        _ => "Saved:",
+    };
+
+    private static string Short(string text)
+    {
+        var line = text.Replace('\n', ' ').Trim();
+        return line.Length <= 240 ? line : line[..240] + "…";
+    }
+
+    public void Dispose() => Work.Changed -= OnChanged;
+}

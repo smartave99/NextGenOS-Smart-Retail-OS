@@ -1,6 +1,8 @@
 // Release-gate checks for the Windows products: the licence check is wired into every entry point (a tripwire against someone
 // removing it), and the AI add-on and the dashboard build and pass their tests.
 
+import { browserProblem } from '../lib/playwright.mjs';
+
 export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) {
   const mustContain = (file, needles) => {
     const path = join(root, file);
@@ -56,6 +58,20 @@ export function checks({ root, sh, has, runCmd, read, join, existsSync, tail }) 
         const unexpected = skipped.filter((n) => !/\.SqlServer\.|\.Vision\./.test(n));
         if (unexpected.length) return { status: 'FAIL', detail: `tests skipped that should have run:\n  ${unexpected.slice(0, 10).join('\n  ')}` };
         return { status: 'PASS', detail: `${tail({ stdout: r.out, stderr: '' }, 1)} (${skipped.length} need a SQL Server or the DINOv2 model: listed under NOT VERIFIED)` };
+      },
+    },
+    {
+      name: 'ask-layout',
+      title: 'Ask AI screen in a real browser: no empty band under the question box, in the app window, a browser and the side panel, at several sizes',
+      full: true,
+      run: () => {
+        if (!has('node')) return { status: 'SKIP', detail: 'node is not installed here' };
+        const why = browserProblem({ sh, join, existsSync, dir: join(root, 'apps', 'business-hub', 'e2e') });
+        if (why) return { status: 'SKIP', detail: why };
+        const r = runCmd('ask-layout', 'node', ['--test', 'scripts/tests/ask-layout.test.mjs'], { timeout: 300_000 });
+        if (r.status !== 'PASS') return r;
+        const n = /# pass (\d+)/.exec(r.out);
+        return { status: 'PASS', detail: `${n ? n[1] : 'all'} layout checks passed in Chromium` };
       },
     },
   ];

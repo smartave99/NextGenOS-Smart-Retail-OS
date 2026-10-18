@@ -1434,6 +1434,12 @@ details > summary { color: var(--accent-ink); font-weight: 550; cursor: pointer;
 /* ----- Ask AI ----- */
 
 .chat { display: flex; flex-direction: column; min-height: calc(100vh - 72px - var(--frame)); }
+/* The chat page uses the whole window: the page's own bottom padding (44px on a wide window, less on a narrow one) is not left empty under the
+   question box, which used to be 88 px or more from the bottom edge and jumped by 44 px when a long chat was read. The page is a column that is
+   at least one window tall, the chat grows to fill it (no sum of paddings to get wrong), and the question box rests on the bottom edge with
+   one small margin of its own (.composer-wrap). */
+.content:has(> .chat) { display: flex; flex-direction: column; min-height: calc(100vh - var(--frame)); padding-bottom: 0; }
+.content:has(> .chat) > .chat { flex: 1 1 auto; min-height: 0; }
 .chat-head { margin-bottom: 8px; }
 .privacy { display: inline-flex; align-items: center; gap: 6px; }
 .privacy .icon { width: 15px; height: 15px; color: var(--good); }
@@ -1525,7 +1531,7 @@ details > summary { color: var(--accent-ink); font-weight: 550; cursor: pointer;
 .chip.accent { background: var(--accent-soft); box-shadow: none; color: var(--accent-ink); font-weight: 600; }
 .chip.accent .icon { color: var(--accent-ink); }
 
-.composer-wrap { position: sticky; bottom: 0; width: 100%; max-width: 760px; margin: 0 auto; padding: 12px 0 18px; background: linear-gradient(transparent, var(--bg) 28%); }
+.composer-wrap { position: sticky; bottom: 0; width: 100%; max-width: 760px; margin: 0 auto; padding: 12px 0 12px; background: linear-gradient(transparent, var(--bg) 28%); }
 .jump-latest {
     position: absolute;
     top: -34px;
@@ -2512,3 +2518,15 @@ a.past-title { display: block; font-weight: 600; }
 /* ----- Listings: the one name for the website and Amazon ----- */
 
 .listing-pos-name { margin: 2px 0 0; }
+
+/* Plan & tasks: the add forms, a suggestion from the assistant waiting for the owner, and the line under an answer that offers to save it. */
+.work-add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 14px; }
+.work-add label { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.work-add .work-title { flex: 1 1 240px; }
+.work-add .form-control { min-height: 36px; }
+.work-proposal { padding: 8px 0 4px; border-top: 1px solid var(--line); }
+.work-proposal:first-of-type { border-top: 0; }
+.work-waiting { align-items: center; padding: 6px 10px; border-radius: 10px; background: var(--field); }
+.work-waiting .act-meta { color: var(--ink-2); }
+.work-check { width: 18px; height: 18px; margin: 0 8px 0 0; vertical-align: -3px; accent-color: var(--accent, #0a6cde); cursor: pointer; }
+.work-check:disabled { cursor: default; }

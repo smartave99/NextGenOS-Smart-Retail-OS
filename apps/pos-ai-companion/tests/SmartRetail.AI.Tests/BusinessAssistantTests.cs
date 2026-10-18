@@ -117,15 +117,19 @@ namespace SmartRetail.AI.Tests
         }
 
         [Fact]
-        public async Task A_question_without_a_query_returns_the_explanation()
+        public async Task A_question_without_a_query_is_answered_as_a_conversation_and_not_refused()
         {
-            _codex.Answers("{\"sql\": null, \"explanation\": \"I can only answer questions about this shop's data.\"}");
+            // The query-writing step says no query is needed; the question is then answered as a conversation (it used to end there, with that sentence as the answer).
+            _codex.Answers("{\"sql\": null, \"explanation\": \"I can only answer questions about this shop's data.\"}",
+                "That is outside what I can help with here. I can help with the shop: sales, stock, ideas and plans.");
 
             var answer = await Assistant.AskAsync("Who won the cricket match?", ProviderIds.Auto, null, CancellationToken.None);
 
-            Assert.Equal("I can only answer questions about this shop's data.", answer.Answer);
+            Assert.StartsWith("That is outside what I can help with here.", answer.Answer);
             Assert.Null(answer.Sql);
-            Assert.Single(_codex.Requests);
+            Assert.Equal(2, _codex.Requests.Count);
+            Assert.Equal(RequestKind.General, answer.Route);
+            Assert.DoesNotContain(_database.Queries, q => !q.Contains("INFORMATION_SCHEMA"));
         }
 
         [Fact]

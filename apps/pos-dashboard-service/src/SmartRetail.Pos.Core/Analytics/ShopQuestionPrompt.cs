@@ -10,7 +10,8 @@ public static class ShopQuestionPrompt
         + "- Answer from the figures given only. Never invent numbers, products or customers.\n"
         + "- If the figures do not answer the question, say so in one sentence and say what would.\n"
         + "- Keep it short: two to five sentences, or a short list. Put the key figures in **bold**.\n"
-        + "- Reply in the language of the question: English, Hindi (Devanagari script) or Hinglish.";
+        + "- Reply in the language of the question: English, Hindi (Devanagari script) or Hinglish.\n"
+        + "- The conversation so far may be given before the question. The question may refer to it (\"yes\", \"that\", \"compare both\"): answer what the owner means, and do not repeat the conversation back.";
 
     public const int MaxQuestionLength = 1000;
 
@@ -20,7 +21,8 @@ public static class ShopQuestionPrompt
     /// <param name="memory">What the assistant remembers (the owner saved or approved it), or empty.</param>
     /// <param name="photos">How many photos the owner sent with the question (attached to the request).</param>
     /// <param name="voice">The owner asked by voice (a recording is attached).</param>
-    public static string UserPrompt(string brief, string question, string? memory = null, int photos = 0, bool voice = false)
+    /// <param name="conversation">The chat so far, put before the question so that a follow-up ("yes", "and last week?") is understood; empty for a first question.</param>
+    public static string UserPrompt(string brief, string question, string? memory = null, int photos = 0, bool voice = false, string? conversation = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(brief);
         var asked = (question ?? "").Trim();
@@ -50,6 +52,7 @@ public static class ShopQuestionPrompt
 
         return "THE SHOP'S FIGURES\n" + brief.TrimEnd() + "\n\n"
             + GrowthPlanPrompt.MemoryBlock(memory)
+            + (string.IsNullOrWhiteSpace(conversation) ? "" : "THE CONVERSATION SO FAR\n" + conversation.TrimEnd() + "\n\n")
             + sent
             + "THE OWNER'S QUESTION\n" + (asked.Length > 0 ? asked : voice ? "(asked by voice)" : "(only the photo: say what it shows and what the figures say about it)");
     }

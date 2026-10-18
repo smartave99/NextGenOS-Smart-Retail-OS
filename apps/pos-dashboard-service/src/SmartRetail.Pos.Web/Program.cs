@@ -71,6 +71,8 @@ builder.Services.AddSingleton<FixNowService>();
 builder.Services.AddSingleton<PlaybookService>();
 builder.Services.AddSingleton<PriceCheckService>();
 builder.Services.AddSingleton<MemoryService>();
+// The assistant's own plan: projects, tasks, reminders and notes, kept in the add-on's data folder and never in the POS.
+builder.Services.AddSingleton<WorkService>();
 builder.Services.AddSingleton<ActionService>();
 builder.Services.AddSingleton<ReviewService>();
 builder.Services.AddLicensedWorker<ReviewWorker>();
@@ -93,15 +95,24 @@ builder.Services.AddLicensedWorker<WebsiteWorker>();
 // (SqlGuard, a transaction that is rolled back, contact details hidden from the AI); on the demo shop the AI answers
 // from the sales figures. Both are given what the assistant remembers, and "Remember that…" and "Forget…" change
 // memory without an AI.
+if (posData.Mode == PosDataMode.SqlServer)
+{
+    // The chat's one way to the POS database (read-only: see SqlClientQueryExecutor), and the check of what its login may do.
+    builder.Services.AddSingleton(new SqlClientQueryExecutor(posData.ConnectionString!, Math.Max(30, posData.CommandTimeoutSeconds)));
+    builder.Services.AddSingleton(services => new SmartRetail.AI.Data.PosAccessMonitor(services.GetRequiredService<SqlClientQueryExecutor>(), () => DateTime.Now));
+}
+
 builder.Services.AddSingleton<IChatBackend>(services =>
 {
     var memory = services.GetRequiredService<MemoryService>();
     IChatBackend chat = posData.Mode == PosDataMode.SqlServer
         ? new BusinessChatBackend(
             () => services.GetRequiredService<AiEnvironment>().CreateRouter(AiJob.Ask),
-            new SqlClientQueryExecutor(posData.ConnectionString!, Math.Max(30, posData.CommandTimeoutSeconds)),
+            services.GetRequiredService<SqlClientQueryExecutor>(),
             () => services.GetRequiredService<AiEnvironment>().LoadSettings(),
-            memory: memory.Snapshot)
+            memory: memory.Snapshot,
+            work: services.GetRequiredService<WorkService>(),
+            access: services.GetRequiredService<SmartRetail.AI.Data.PosAccessMonitor>())
         : ActivatorUtilities.CreateInstance<DemoChatBackend>(services);
     return new MemoryChatBackend(chat, memory);
 });
@@ -109,21 +120,29 @@ builder.Services.AddSingleton<IChatBackend>(services =>
 builder.Services.AddSingleton(_ => new ChatAttachmentStore());
 builder.Services.AddSingleton(services =>
 {
-    var chat = new Conversation(services.GetRequiredService<IChatBackend>());
+    // Each question is asked with the chat so far in its prompt (the AI tools keep no chat of their own), and a question that goes back to
+    // an earlier chat ("what did we discuss last week?") is given words from the kept chats.
+    Conversation? created = null;
+    var chat = new Conversation(services.GetRequiredService<IChatBackend>(),
+        recall: question => services.GetRequiredService<ChatHistoryService>().Recall(question, created?.Key ?? ""),
+        words: () => services.GetRequiredService<AiEnvironment>().Shop.ChatWords);
+    created = chat;
     var log = services.GetRequiredService<ILogger<Conversation>>();
     chat.Failed += (_, exception) => log.LogError(exception, "A chat question failed.");
+    // What went into each prompt, in numbers and never in words (no question, answer or customer detail reaches the log).
+    chat.ContextBuilt += (_, report) => log.LogInformation("Ask AI prompt: {Report}", report);
     // Kept after every answer, so closing the app, even suddenly (the desktop app stops the dashboard at once), loses
     // nothing of the chat.
     chat.Changed += (_, _) =>
     {
         if (!chat.Busy)
         {
-            services.GetRequiredService<ChatHistoryService>().KeepSoFar(chat.Messages);
+            services.GetRequiredService<ChatHistoryService>().KeepSoFar(chat.Messages, chat.Key);
         }
     };
     chat.Ended += (_, ended) =>
     {
-        services.GetRequiredService<ChatHistoryService>().Keep(ended);
+        services.GetRequiredService<ChatHistoryService>().Keep(ended, chat.EndedKey);
         services.GetRequiredService<ChatAttachmentStore>().Delete(ended.SelectMany(message => message.Attachments));
     };
     return chat;
@@ -156,14 +175,16 @@ var app = builder.Build();
 // Photos and voice notes left from a chat of an earlier run (the app stopped suddenly) go: the chat went with it.
 app.Services.GetRequiredService<ChatAttachmentStore>().DeleteLeftOver();
 
-// The chat going on when the app closes is kept with the past chats, as if a new one had started, and its photos and
-// voice notes go.
+// The chat going on when the app closes is kept with the past chats (under its own key), and its photos and voice notes go. When the app
+// starts again within a day the chat goes on from where it was: closing the app does not end a discussion (New chat does).
 app.Lifetime.ApplicationStopping.Register(() =>
 {
-    var chat = app.Services.GetRequiredService<Conversation>().Messages;
-    app.Services.GetRequiredService<ChatHistoryService>().Keep(chat);
+    var conversation = app.Services.GetRequiredService<Conversation>();
+    var chat = conversation.Messages;
+    app.Services.GetRequiredService<ChatHistoryService>().Keep(chat, conversation.Key);
     app.Services.GetRequiredService<ChatAttachmentStore>().Delete(chat.SelectMany(message => message.Attachments));
 });
+app.Services.GetRequiredService<ChatHistoryService>().ResumeLatest(app.Services.GetRequiredService<Conversation>(), TimeSpan.FromHours(24));
 
 // First of all: nothing is served, not even a static file, without a usable licence.
 app.UseLicenceGate();

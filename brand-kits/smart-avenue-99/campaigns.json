@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "templates": [
+    {
+      "id": "e-rickshaw-posters",
+      "name": "Posters on e-rickshaws",
+      "channel": "posters on e-rickshaws",
+      "summary": "A small pilot: posters on a few e-rickshaws that pass the shop's market, with a way to count what comes of it. A starting point: change the steps to fit.",
+      "days": 14,
+      "steps": [
+        {
+          "title": "Get at least three written quotations for the posters",
+          "afterDays": -12,
+          "detail": "Ask each for the full price, the poster size and material, and when it can be ready. Enter each as a quotation."
+        },
+        {
+          "title": "Ask the e-rickshaw owners what they charge and for how many weeks",
+          "afterDays": -12,
+          "detail": "Get it in writing. Enter each figure as a quotation."
+        },
+        {
+          "title": "Decide the one message and the offer on the poster",
+          "afterDays": -9,
+          "detail": "One clear line, the shop's name, and what a person should do next."
+        },
+        {
+          "title": "Get the poster artwork made and check it",
+          "afterDays": -6,
+          "detail": "The Posters page can make a draft."
+        },
+        {
+          "title": "Agree the routes and the hours with the riders",
+          "afterDays": -3
+        },
+        {
+          "title": "Put the posters up, and photograph each rickshaw",
+          "afterDays": 0
+        },
+        {
+          "title": "Count the people at the shop on the days before and on the days during",
+          "afterDays": 0,
+          "detail": "At least three days on each side, at the same hours."
+        },
+        {
+          "title": "Ask every new customer how they heard of the shop",
+          "afterDays": 0,
+          "detail": "Enter the enquiries you can count."
+        }
+      ],
+      "signs": [
+        "people counted at the shop before and during",
+        "customers who say they saw a rickshaw",
+        "the sales figures for the same days (shown apart from your counts)"
+      ]
+    },
+    {
+      "id": "pamphlets",
+      "name": "Pamphlets near the market",
+      "channel": "pamphlets",
+      "summary": "Hand out pamphlets with one offer for a short time, and count what comes of it. A starting point: change the steps to fit.",
+      "days": 10,
+      "steps": [
+        {
+          "title": "Get at least three written quotations for printing the pamphlets",
+          "afterDays": -10,
+          "detail": "Ask each for the full price for the number you want, and when it can be ready. Enter each as a quotation."
+        },
+        {
+          "title": "Decide the one offer and a way to tell which pamphlet brought a customer",
+          "afterDays": -8,
+          "detail": "For example a code on the pamphlet."
+        },
+        {
+          "title": "Get the pamphlet made and check it",
+          "afterDays": -5
+        },
+        {
+          "title": "Brief whoever hands them out and agree where and when",
+          "afterDays": -2
+        },
+        {
+          "title": "Start handing them out, and photograph the place",
+          "afterDays": 0
+        },
+        {
+          "title": "Count the people at the shop on the days before and on the days during",
+          "afterDays": 0,
+          "detail": "At least three days on each side, at the same hours."
+        },
+        {
+          "title": "Count the pamphlets that come back with the code",
+          "afterDays": 5,
+          "detail": "Enter them as enquiries."
+        }
+      ],
+      "signs": [
+        "people counted at the shop before and during",
+        "pamphlets brought back with the code",
+        "the sales figures for the same days (shown apart from your counts)"
+      ]
+    }
+  ]
+}

@@ -119,6 +119,26 @@ public sealed class ActionService
         });
     }
 
+    /// <summary>Saves a new action and says which one it is, so that a campaign in the plan can be linked to it; the problem is null when saved.</summary>
+    public (string? Problem, string Id) Create(ShopAction action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        var id = "";
+        var problem = Write(book =>
+        {
+            var clean = Clean(action) with { Id = NewId(), Added = Now };
+            if (clean.Problem() is { } found)
+            {
+                return found;
+            }
+
+            id = clean.Id;
+            book.Actions.Add(clean);
+            return null;
+        });
+        return (problem, problem is null ? id : "");
+    }
+
     /// <summary>Tracks an action heard in a chat, as the owner checked it on the form.</summary>
     public string? Track(string suggestionId, ShopAction action)
     {

@@ -111,7 +111,7 @@ public sealed record ActionResult
     /// <summary>The season: how the same dates did last year against the days before them.</summary>
     public decimal? Season { get; init; }
 
-    /// <summary>The change beyond the season: what the action seems to have done.</summary>
+    /// <summary>The change beyond the season (a comparison, not proof of what caused it).</summary>
     public decimal? Lift { get; init; }
 
     public decimal? ExtraSales { get; init; }
@@ -137,6 +137,10 @@ public sealed record ActionResult
 /// </summary>
 public static class ActionMeasure
 {
+    /// <summary>What a comparison of sales can and cannot show, in plain words, for every screen that shows a verdict.</summary>
+    public const string Limits = "This compares the days of the action with the days just before it, allowing for last year's season when the POS has those bills. "
+        + "It cannot show that the action caused any change: weather, festivals, pay days, a competitor, a product running out and many other things move sales too.";
+
     /// <summary>Fewer days than this say too little.</summary>
     public const int MinDays = 7;
 
@@ -228,16 +232,16 @@ public static class ActionMeasure
             : "The POS has no bills from these dates last year, so the season is not allowed for. ";
         summary += verdict switch
         {
-            ActionVerdict.Rose => $"So it seems to have added about {Percent(lift)}.",
+            ActionVerdict.Rose => $"So sales were about {Percent(lift)} above {(season is null ? "the days before" : "what the season alone would bring")}. That is a comparison, not proof that it caused them.",
             ActionVerdict.Fell => $"So sales were about {Percent(-lift)} lower than {(season is null ? "before" : "the season would bring")}.",
             _ => "So no clear change came from it.",
         };
 
         if (verdict == ActionVerdict.Rose)
         {
-            summary += $" About {Rupees(extraSales)} more in sales" + (extraProfit is { } more ? $" and {Rupees(more)} more profit" : "");
+            summary += $" About {Rupees(extraSales)} more in sales" + (extraProfit is { } more ? $" and {Rupees(more)} more profit" : "") + " than the days before would have given";
             summary += action.Cost > 0
-                ? $", for {Rupees(action.Cost)} spent: " + (paidBack == true ? "it paid for itself." : running ? "it has not paid for itself yet." : "it did not pay for itself.")
+                ? $", for {Rupees(action.Cost)} spent: on these figures " + (paidBack == true ? "it paid for itself." : running ? "it has not paid for itself yet." : "it did not pay for itself.")
                 : ".";
         }
         else if (action.Cost > 0)
@@ -299,7 +303,7 @@ public static class ActionMeasure
         {
             ActionVerdict.Rose => $"sales about {Percent(lift)} above {than}"
                 + (extraProfit is { } profit ? $", about {Rupees(profit)} more profit" : "")
-                + (paidBack switch { true => "; it paid for itself.", false => "; it did not pay for itself.", _ => "." }),
+                + (paidBack switch { true => "; on these figures it paid for itself.", false => "; on these figures it did not pay for itself.", _ => "." }),
             ActionVerdict.Fell => $"sales about {Percent(-lift)} below {than}.",
             _ => "no clear change in sales.",
         };

@@ -46,7 +46,7 @@ These NuGet packages are built into the Windows app (`SmartRetailAI.exe`) and th
 | System.Numerics.Tensors | 9.0.0 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Numerics.Vectors | 4.6.1 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Runtime.CompilerServices.Unsafe | 6.1.2 | MIT | © Microsoft Corporation. All rights reserved. |
-| System.Security.Cryptography.Pkcs | 9.0.18 | MIT | © Microsoft Corporation. All rights reserved. |
+| System.Security.Cryptography.Pkcs | 9.0.21 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Security.Cryptography.ProtectedData | 9.0.18 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Text.Encodings.Web | 10.0.6 | MIT | © Microsoft Corporation. All rights reserved. |
 | System.Text.Json | 10.0.6 | MIT | © Microsoft Corporation. All rights reserved. |

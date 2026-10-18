@@ -1,9 +1,11 @@
 @page "/settings"
 @implements IDisposable
 @using System.Reflection
+@using SmartRetail.AI.Data
 @using SmartRetail.AI.Providers
 @using SmartRetail.AI.Settings
 @inject AiSetupService Setup
+@inject IServiceProvider Services
 @inject AiEnvironment Ai
 @inject DataSourceInfo Source
 @inject PosConnectionReport Connection
@@ -64,6 +66,16 @@
                 <p>@privacy</p>
             </div>
             <button type="button" class="btn host-only" @onclick="OpenAdvancedAsync">Change</button>
+        </div>
+        <div class="setting" id="database-login">
+            <div>
+                <h3>Database login</h3>
+                <p>@AccessText</p>
+            </div>
+            @if (access is not null)
+            {
+                <button type="button" class="btn" disabled="@checkingAccess" @onclick="CheckAccessAsync">@(checkingAccess ? "Checking…" : "Check now")</button>
+            }
         </div>
     </section>
 
@@ -212,6 +224,9 @@
     private string theme = "auto";
     private string aiChoice = "";
     private string privacy = "";
+    private PosAccessMonitor? access;
+    private bool checkingAccess;
+    private bool requireReadOnly;
     private int maxOffer = PosterSettings.DefaultMaxOfferPercent;
     private string shortcut = "";
     private bool startWithWindows;
@@ -237,7 +252,10 @@
             ? "No AI tool is set up."
             : first.DisplayName + " first" + (settings.FallbackToOtherProviders ? ", then any other that is ready." : ".");
         privacy = (settings.Privacy.MaskContactDetails ? "Phone numbers, e-mail and addresses are hidden from the AI." : "Contact details are shared with the AI.")
-            + (settings.Privacy.AllowAiWrittenQueries ? " The AI may write its own read-only queries." : " Only the built-in reports run.");
+            + (settings.Privacy.AllowAiWrittenQueries ? " The AI may write its own read-only queries." : " Only the built-in reports run.")
+            + (settings.Privacy.RequireReadOnlyAccount ? " The shop's data is read only when the database login can only read." : "");
+        requireReadOnly = settings.Privacy.RequireReadOnlyAccount;
+        access = Services.GetService<PosAccessMonitor>();
         shortcut = settings.Panel.Shortcut ?? "";
         // The setup ticks "Start with Windows" and writes the sign-in entry; the settings file may not say so yet. Windows' own list of
         // start-up apps (Task Manager) may have it switched off, and then it does not start although the entry is there.
@@ -273,6 +291,50 @@
     {
         theme = key;
         await Js.InvokeVoidAsync("srpos.setTheme", key);
+    }
+
+    private string AccessText
+    {
+        get
+        {
+            if (access is null)
+            {
+                return "This is demo data, so there is no shop database to read.";
+            }
+
+            var report = access.Last;
+            if (report is null)
+            {
+                return "Not checked yet. “Check now” asks the database what the login the assistant reads with is allowed to do.";
+            }
+
+            if (!report.Checked)
+            {
+                return "Could not be checked: " + report.Problem;
+            }
+
+            if (report.IsReadOnly)
+            {
+                return "The login the assistant reads with can only read. The assistant also never writes: its queries are checked and rolled back.";
+            }
+
+            return "The login the assistant reads with is not read-only: " + string.Join("; ", report.Reasons) + ". The assistant never writes (its queries are checked and rolled back), but a login that can only read adds protection at the database itself."
+                + " Ask whoever set up this computer to run the read-only login script (sql/create_readonly_login.sql), then choose that login under Settings → Database."
+                + (requireReadOnly ? " Because “read only with a read-only login” is on, the assistant will not read the shop's data until this is done." : " In the settings window (Privacy → “Change”) you can make the assistant refuse to read the shop's data unless the login can only read.");
+        }
+    }
+
+    private async Task CheckAccessAsync()
+    {
+        checkingAccess = true;
+        try
+        {
+            await access!.CheckAsync(CancellationToken.None, force: true);
+        }
+        finally
+        {
+            checkingAccess = false;
+        }
     }
 
     private async Task OpenAdvancedAsync() => await Js.InvokeAsync<bool>("srpos.send", "settings", "");

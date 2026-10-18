@@ -5,8 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartRetail.AI.Data;
+using SmartRetail.AI.Memory;
 using SmartRetail.AI.Providers;
 using SmartRetail.AI.Settings;
+using SmartRetail.AI.Work;
 
 namespace SmartRetail.AI.Assistant
 {
@@ -107,6 +109,9 @@ namespace SmartRetail.AI.Assistant
             At = at;
         }
 
+        /// <summary>This message's own id, the same when the chat is kept and resumed, so the turns keep their order and their names.</summary>
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
         public ChatRole Role { get; }
 
         public string Text { get; }
@@ -124,8 +129,15 @@ namespace SmartRetail.AI.Assistant
 
         public bool IsProblem { get; set; }
 
+        /// <summary>For an answer: whether it came from the shop's figures, from a conversation, or both (see <see cref="RequestRouter"/>);
+        /// null when it was not worked out (a report, a memory change, a failure).</summary>
+        public RequestKind? Route { get; set; }
+
         /// <summary>The owner pressed Stop before the answer came.</summary>
         public bool WasStopped { get; set; }
+
+        /// <summary>For an answer that suggested work for the assistant's plan: the suggestion that was made (it may still be waiting for the owner on the Plan page).</summary>
+        public string WorkProposalId { get; set; }
 
         /// <summary>Photos and voice notes sent with a question.</summary>
         public IReadOnlyList<ChatAttachment> Attachments { get; set; } = new ChatAttachment[0];
@@ -156,6 +168,7 @@ namespace SmartRetail.AI.Assistant
                 Sql = string.IsNullOrWhiteSpace(answer.Sql) ? null : answer.Sql,
                 Source = Describe(sourceName, answer.Duration),
                 Heard = string.IsNullOrWhiteSpace(answer.Heard) ? null : answer.Heard.Trim(),
+                Route = answer.Route,
             };
         }
 
@@ -261,6 +274,9 @@ namespace SmartRetail.AI.Assistant
 
         private readonly IChatBackend _backend;
         private readonly Func<DateTime> _now;
+        private readonly ContextBudget _budget;
+        private readonly Func<string, string> _recall;
+        private readonly Func<ChatVocabulary> _words;
         private readonly object _gate = new object();
         private readonly List<ChatMessage> _messages = new List<ChatMessage>();
         private CancellationTokenSource _running;
@@ -271,11 +287,27 @@ namespace SmartRetail.AI.Assistant
         private ChatTable _draftTable;
         private int _draftUpdatePending;
 
-        public Conversation(IChatBackend backend, Func<DateTime> now = null)
+        /// <param name="budget">How much of the chat goes into each prompt; the default when null.</param>
+        /// <param name="recall">Gives words from earlier chats when the owner asks to go back to them; may be null.</param>
+        public Conversation(IChatBackend backend, Func<DateTime> now = null, ContextBudget budget = null, Func<string, string> recall = null, Func<ChatVocabulary> words = null)
         {
             _backend = backend ?? throw new ArgumentNullException(nameof(backend));
             _now = now ?? (() => DateTime.Now);
+            _budget = budget ?? ContextBudget.Default;
+            _recall = recall;
+            _words = words;
+            Key = ChatHistory.NewKey();
         }
+
+        /// <summary>This chat's own key (six hex digits), the same for as long as the chat goes on, and the one a kept copy is saved under:
+        /// a new chat has another, and a resumed chat has the key of the chat it was kept as.</summary>
+        public string Key { get; private set; }
+
+        /// <summary>The key of the chat that <see cref="Ended"/> was last raised for; valid while that event is handled.</summary>
+        public string EndedKey { get; private set; } = "";
+
+        /// <summary>Raised on any thread with what went into each question's prompt, in numbers and never in words.</summary>
+        public event EventHandler<ContextReport> ContextBuilt;
 
         /// <summary>Raised on any thread when the messages, the status or <see cref="Busy"/> change.</summary>
         public event EventHandler Changed;
@@ -380,14 +412,19 @@ namespace SmartRetail.AI.Assistant
                 question = question.Substring(0, MaxQuestionLength);
             }
 
+            // The backend is given the chat so far with the question, when it takes it (IContextChat); otherwise the question alone, as before.
             if (sent.Count == 0)
             {
-                return Start(question, null, (progress, token) => _backend.AskAsync(question, progress, token));
+                return Start(question, null, (context, progress, token) => _backend is IContextChat withContext
+                    ? withContext.AskAsync(new AskRequest { Question = question, Context = context }, progress, token)
+                    : _backend.AskAsync(question, progress, token));
             }
 
-            return Start(question, sent, (progress, token) => _backend is IAttachmentChat withAttachments
-                ? withAttachments.AskAsync(question, sent, progress, token)
-                : Task.FromResult(Problem("This chat cannot read photos or voice notes. Type the question instead.")));
+            return Start(question, sent, (context, progress, token) => _backend is IContextChat withContext
+                ? withContext.AskAsync(new AskRequest { Question = question, Attachments = sent, Context = context }, progress, token)
+                : _backend is IAttachmentChat withAttachments
+                    ? withAttachments.AskAsync(question, sent, progress, token)
+                    : Task.FromResult(Problem("This chat cannot read photos or voice notes. Type the question instead.")));
         }
 
         public bool Run(ChatStarter starter)
@@ -397,7 +434,10 @@ namespace SmartRetail.AI.Assistant
                 throw new ArgumentNullException(nameof(starter));
             }
 
-            return Start(starter.Question, null, (progress, token) => _backend.RunAsync(starter, progress, token));
+            // A report that is not a built-in one is a question like any other, so it too is asked with the chat so far.
+            return Start(starter.Question, null, (context, progress, token) => starter.Report == null && _backend is IContextChat withContext
+                ? withContext.AskAsync(new AskRequest { Question = starter.Question, Context = context }, progress, token)
+                : _backend.RunAsync(starter, progress, token));
         }
 
         public void Stop()
@@ -408,30 +448,64 @@ namespace SmartRetail.AI.Assistant
             }
         }
 
-        /// <summary>A new chat: forgets the messages, and stops a question that is still running.</summary>
-        public void Clear()
+        /// <summary>A new chat: forgets the messages, and stops a question that is still running. The next question starts
+        /// with nothing of this chat in its prompt.</summary>
+        public void Clear() => Replace(null, null);
+
+        /// <summary>
+        /// Goes on with a chat that was kept: its messages are the chat again, under the key it was kept as, and the next
+        /// question is answered with them in its prompt. The chat that was going on ends first (and is kept). A question
+        /// still running is stopped.
+        /// </summary>
+        public void Resume(string key, IReadOnlyList<ChatMessage> messages)
+        {
+            if (messages == null)
+            {
+                throw new ArgumentNullException(nameof(messages));
+            }
+
+            Replace(string.IsNullOrWhiteSpace(key) ? null : key, messages);
+        }
+
+        private void Replace(string resumeKey, IReadOnlyList<ChatMessage> resumeWith)
         {
             ChatMessage[] ended;
+            string endedKey;
             lock (_gate)
             {
                 _generation++;
                 _running?.Cancel();
                 ended = _messages.ToArray();
+                endedKey = Key;
                 _messages.Clear();
+                if (resumeWith != null)
+                {
+                    _messages.AddRange(resumeWith);
+                    Key = resumeKey ?? ChatHistory.NewKey();
+                }
+                else
+                {
+                    Key = ChatHistory.NewKey();
+                }
+
+                _draft = "";
+                _draftTable = null;
             }
 
-            if (ended.Length > 0)
+            if (ended.Length > 0 && endedKey != resumeKey)
             {
+                EndedKey = endedKey;
                 Ended?.Invoke(this, ended);
             }
 
             RaiseChanged();
         }
 
-        private bool Start(string question, IReadOnlyList<ChatAttachment> attachments, Func<IProgress<string>, CancellationToken, Task<ChatMessage>> work)
+        private bool Start(string question, IReadOnlyList<ChatAttachment> attachments, Func<ConversationContext, IProgress<string>, CancellationToken, Task<ChatMessage>> work)
         {
             CancellationTokenSource running;
             int generation;
+            ConversationContext context;
             lock (_gate)
             {
                 if (_running != null)
@@ -439,26 +513,29 @@ namespace SmartRetail.AI.Assistant
                     return false;
                 }
 
+                // The chat so far, taken before the new question is added to it: this is what the AI is told about it.
+                context = ConversationContextBuilder.Build(_messages, question, Key, _budget, _recall, _words?.Invoke());
                 running = _running = new CancellationTokenSource();
                 generation = _generation;
                 _status = "Thinking…";
                 _draft = "";
                 _draftTable = null;
                 _messages.Add(new ChatMessage(ChatRole.Owner, question, _now()) { Attachments = attachments ?? new ChatAttachment[0] });
-                _work = Task.Run(() => RunAsync(work, running, generation));
+                _work = Task.Run(() => RunAsync(work, context, running, generation));
             }
 
+            ContextBuilt?.Invoke(this, context.Report());
             RaiseChanged();
             return true;
         }
 
-        private async Task RunAsync(Func<IProgress<string>, CancellationToken, Task<ChatMessage>> work, CancellationTokenSource running, int generation)
+        private async Task RunAsync(Func<ConversationContext, IProgress<string>, CancellationToken, Task<ChatMessage>> work, ConversationContext context, CancellationTokenSource running, int generation)
         {
             var progress = new StatusProgress(this, generation);
             ChatMessage reply;
             try
             {
-                reply = await work(progress, running.Token).ConfigureAwait(false);
+                reply = await work(context, progress, running.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (running.IsCancellationRequested)
             {
@@ -584,18 +661,24 @@ namespace SmartRetail.AI.Assistant
     /// <see cref="SqlGuard"/> checks it, and it runs in a transaction that is rolled back. The built-in reports run
     /// their fixed queries, even with no AI tool set up.
     /// </summary>
-    public sealed class BusinessChatBackend : IChatBackend, IAttachmentChat
+    public sealed class BusinessChatBackend : IChatBackend, IAttachmentChat, IContextChat
     {
         private readonly Func<ProviderRouter> _router;
         private readonly IQueryExecutor _database;
         private readonly Func<AssistantSettings> _settings;
         private readonly Func<DateTime> _now;
         private readonly Func<string> _memory;
+        private readonly IWork _work;
+        private readonly PosAccessMonitor _access;
 
         /// <param name="router">Made fresh for each question, so an AI tool set up a minute ago is used.</param>
         /// <param name="memory">What the assistant remembers, taken for each question; may be null.</param>
-        public BusinessChatBackend(Func<ProviderRouter> router, IQueryExecutor database, Func<AssistantSettings> settings, Func<DateTime> now = null, Func<string> memory = null)
+        /// <param name="access">What the database account may do, asked when the owner requires a read-only account; null: that cannot be checked.</param>
+        /// <param name="work">The assistant's own plan (projects, tasks, reminders): where work the owner asks to keep is proposed. Null: the chat can talk about work but keeps none.</param>
+        public BusinessChatBackend(Func<ProviderRouter> router, IQueryExecutor database, Func<AssistantSettings> settings, Func<DateTime> now = null, Func<string> memory = null, IWork work = null, PosAccessMonitor access = null)
         {
+            _work = work;
+            _access = access;
             _router = router ?? throw new ArgumentNullException(nameof(router));
             _database = database ?? throw new ArgumentNullException(nameof(database));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -607,16 +690,24 @@ namespace SmartRetail.AI.Assistant
         public IReadOnlyList<ChatStarter> Starters { get; }
 
         public Task<ChatMessage> AskAsync(string question, IProgress<string> progress, CancellationToken cancellationToken) =>
-            AskAsync(question, null, progress, cancellationToken);
+            AskAsync(new AskRequest { Question = question }, progress, cancellationToken);
 
-        public async Task<ChatMessage> AskAsync(string question, IReadOnlyList<ChatAttachment> attachments, IProgress<string> progress, CancellationToken cancellationToken)
+        public Task<ChatMessage> AskAsync(string question, IReadOnlyList<ChatAttachment> attachments, IProgress<string> progress, CancellationToken cancellationToken) =>
+            AskAsync(new AskRequest { Question = question, Attachments = attachments ?? new ChatAttachment[0] }, progress, cancellationToken);
+
+        /// <summary>Answers with the chat so far in the prompt, so that a follow-up is understood.</summary>
+        public async Task<ChatMessage> AskAsync(AskRequest request, IProgress<string> progress, CancellationToken cancellationToken)
         {
             var router = _router();
             var settings = _settings();
             var memory = _memory();
-            var answer = await new BusinessAssistant(router, _database, () => settings, _now, () => memory)
-                .AskAsync(question, ProviderIds.Auto, progress, cancellationToken, attachments).ConfigureAwait(false);
-            return ChatMessage.FromAnswer(answer, NameOf(router, answer.ProviderId), _now());
+            var plan = WorkKeeper.PlanText(_work, _now());
+            var answer = await new BusinessAssistant(router, _database, () => settings, _now, () => memory, () => plan, _access)
+                .AskAsync(request.Question, ProviderIds.Auto, progress, cancellationToken, request.Attachments, request.Context).ConfigureAwait(false);
+            var proposalId = WorkKeeper.Keep(answer, _work, settings.Memory.AskBeforeSaving);
+            var message = ChatMessage.FromAnswer(answer, NameOf(router, answer.ProviderId), _now());
+            message.WorkProposalId = proposalId;
+            return message;
         }
 
         public async Task<ChatMessage> RunAsync(ChatStarter starter, IProgress<string> progress, CancellationToken cancellationToken)
@@ -630,7 +721,7 @@ namespace SmartRetail.AI.Assistant
             var settings = _settings();
             var summarize = await AnyReadyAsync(router, cancellationToken).ConfigureAwait(false);
             var memory = _memory();
-            var answer = await new BusinessAssistant(router, _database, () => settings, _now, () => memory)
+            var answer = await new BusinessAssistant(router, _database, () => settings, _now, () => memory, null, _access)
                 .RunInsightAsync(starter.Report, ProviderIds.Auto, summarize, progress, cancellationToken).ConfigureAwait(false);
             return ChatMessage.FromAnswer(answer, answer.ProviderId == null ? "Report" : NameOf(router, answer.ProviderId), _now());
         }

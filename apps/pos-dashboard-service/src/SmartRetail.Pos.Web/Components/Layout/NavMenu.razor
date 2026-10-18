@@ -6,6 +6,7 @@
 @inject AiSetupService Setup
 @inject FixNowService Checks
 @inject MemoryService Memory
+@inject WorkService Work
 @inject ActionService Actions
 @inject WhatsNewService News
 @inject ProductPhotoService Photos
@@ -49,6 +50,13 @@
         @if (waiting > 0)
         {
             <span class="count" title="Learned from your chats, waiting for your Save">@waiting</span>
+        }
+    </NavLink>
+    <NavLink class="nav-item" href="work">
+        <Icon Name="calendar" /> Plan &amp; tasks
+        @if (planWaiting > 0)
+        {
+            <span class="count" title="Suggested by the assistant, waiting for your Save">@planWaiting</span>
         }
     </NavLink>
 
@@ -133,6 +141,7 @@
     private string query = "";
     private int lowStock;
     private int waiting;
+    private int planWaiting;
     private int heard;
     private int photosLeft;
 
@@ -143,9 +152,11 @@
         Setup.Changed += OnSetupChanged;
         Checks.Changed += OnSetupChanged;
         Memory.Changed += OnMemoryChanged;
+        Work.Changed += OnWorkChanged;
         Actions.Changed += OnActionsChanged;
         News.Changed += OnSetupChanged;
         waiting = Memory.Load().Pending.Count;
+        planWaiting = Work.Load().Pending.Count;
         heard = Actions.Load().Suggested.Count;
         _ = Setup.RefreshIfStaleAsync();
         _ = Checks.CheckAsync();
@@ -192,6 +203,12 @@
         StateHasChanged();
     });
 
+    private void OnWorkChanged() => _ = InvokeAsync(() =>
+    {
+        planWaiting = Work.Load().Pending.Count;
+        StateHasChanged();
+    });
+
     private void OnActionsChanged() => _ = InvokeAsync(() =>
     {
         heard = Actions.Load().Suggested.Count;
@@ -203,6 +220,7 @@
         Setup.Changed -= OnSetupChanged;
         Checks.Changed -= OnSetupChanged;
         Memory.Changed -= OnMemoryChanged;
+        Work.Changed -= OnWorkChanged;
         Actions.Changed -= OnActionsChanged;
         News.Changed -= OnSetupChanged;
         Photos.Changed -= OnPhotosChanged;

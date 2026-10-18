@@ -69,6 +69,7 @@ namespace SmartRetail.AI.Desktop
 
         private CheckBox _mask;
         private CheckBox _allowSql;
+        private CheckBox _requireReadOnly;
         private NumericUpDown _maxRows;
         private TextBox _extraTables;
 
@@ -281,6 +282,8 @@ namespace SmartRetail.AI.Desktop
             FormLayout.Span(grid, _mask);
             _allowSql = new CheckBox { Text = "Let the AI write its own read-only queries (needed for typed questions)", AutoSize = true, Checked = privacy.AllowAiWrittenQueries };
             FormLayout.Span(grid, _allowSql);
+            _requireReadOnly = new CheckBox { Text = "Read the shop's data only with a read-only database login (the assistant checks what the login may do and refuses if it could change data)", AutoSize = true, Checked = privacy.RequireReadOnlyAccount };
+            FormLayout.Span(grid, _requireReadOnly);
             _maxRows = FormLayout.Row(grid, "Rows shared per answer", FormLayout.Number(privacy.MaxRowsSharedWithAi, 5, 500));
             _extraTables = FormLayout.Row(grid, "Extra tables", FormLayout.Text(string.Join(", ", privacy.ExtraAllowedTables)));
             FormLayout.Note(grid, "The AI can read sales, purchases, stock, customers, suppliers, payments and expenses. Tables holding passwords, API keys, licence data or logs are never shared, and bank account numbers are hidden. Every query is checked to be a single read-only SELECT before it runs.");
@@ -777,6 +780,7 @@ namespace SmartRetail.AI.Desktop
 
             _settings.Privacy.MaskContactDetails = _mask.Checked;
             _settings.Privacy.AllowAiWrittenQueries = _allowSql.Checked;
+            _settings.Privacy.RequireReadOnlyAccount = _requireReadOnly.Checked;
             _settings.Privacy.MaxRowsSharedWithAi = (int)_maxRows.Value;
             _settings.Privacy.ExtraAllowedTables = _extraTables.Text
                 .Split(new[] { ',', ';', '\n', '\r', ' ' }, StringSplitOptions.RemoveEmptyEntries)

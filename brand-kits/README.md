@@ -36,3 +36,13 @@ look on their own is decided by their licence (`white.level`: `none`, `theme` or
 ## ai.json (optional, schema 1)
 
 What the AI assistant's pictures and posters need to know about this customer: the country's name, the kind of business, who the three model photos show, the festivals of its shoppers and the second language of its posters (with ready-made lines). It is plain data of the same format the Setup Studio writes (see `docs/SETUP-STUDIO.md`, "The AI assistant's own settings"), and the program reads it from `profile\ai.json` beside the AI assistant's setup. With none, the assistant is neutral. It holds no secrets.
+
+## chat-words.json and campaigns.json (optional, schema 1)
+
+What the assistant recognises in the owner's own words, and the campaign plans the owner can start from. The program itself holds English only, with no language, currency or trade written into it (`CLAUDE.md`, section 8); the words of this customer's language, money and trade, and its own campaign templates, are plain data here. Both are read from `profile\` beside the AI assistant's setup, like `ai.json`. With none, the assistant still works in plain English and offers one neutral campaign plan. Neither holds a secret, a price or a promised result.
+
+- `chat-words.json`: `{"schema": 1, "words": {...}}` with lists named `figures`, `asksForFigures`, `advice`, `work`, `continue`, `recall`, `money`, `limits`, `topics`, `wishes`. Words are plain text matched as whole words, never patterns (`apps/pos-ai-companion/src/SmartRetail.AI.Core/Assistant/ChatVocabulary.cs`).
+- `campaigns.json`: `{"schema": 1, "templates": [{"id", "name", "channel", "summary", "days", "steps": [{"title", "afterDays", "detail"}], "signs": [...]}]}`; `afterDays` counts from the first day (before it is negative) (`.../Work/CampaignTemplates.cs`).
+
+*Not yet carried by the Setup Studio or the AI add-on's setup program, which copy `ai.json` only: until they do, copy these two files into `profile\` next to `ai.json` by hand (`docs/OPEN-WORK.md`).*
+

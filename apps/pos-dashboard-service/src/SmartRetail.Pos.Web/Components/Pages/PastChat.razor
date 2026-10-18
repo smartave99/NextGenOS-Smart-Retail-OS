@@ -5,6 +5,7 @@
 @inject Conversation Chat
 @inject NavigationManager Nav
 @inject ILogger<PastChat> Log
+@inject IJSRuntime Js
 @inject BrandService Brand
 
 <PageTitle>Past chat · @Brand.Name</PageTitle>
@@ -23,11 +24,25 @@ else
 {
     <div class="page-head">
         <div>
-            <h1>@chat.Title</h1>
+            @if (renaming)
+            {
+                <form class="work-add" @onsubmit="SaveName">
+                    <label class="work-title"><span class="small muted">Name of this chat</span><input class="form-control" maxlength="@ChatHistory.TitleLength" aria-label="Name of this chat" @bind="newName" @bind:event="oninput" /></label>
+                    <button type="submit" class="btn btn-primary">Save name</button>
+                    <button type="button" class="btn btn-link" @onclick="() => renaming = false">Cancel</button>
+                </form>
+            }
+            else
+            {
+                <h1>@chat.Title <button type="button" class="link-button" title="Give this chat a name" aria-label="Give this chat a name" @onclick="StartRename"><Icon Name="edit" /></button></h1>
+            }
             <p class="sub">@Formats.DateAndTime(chat.Started). The figures are as they were then; ask again for today's.</p>
         </div>
         <div class="actions">
             <a class="btn btn-soft" href="ask/past">Past chats</a>
+            <button type="button" class="btn btn-soft" title="Copy this chat as plain words" @onclick="CopyAsync"><Icon Name="@(copied ? "check" : "copy")" /> @(copied ? "Copied" : "Copy")</button>
+            <button type="button" class="btn btn-soft" title="Save this chat as a text file" @onclick="SaveFileAsync"><Icon Name="download" /> Save as file</button>
+            <button type="button" class="btn" title="Go on with this chat: what was said is in front of the AI again" disabled="@Chat.Busy" @onclick="Continue"><Icon Name="history" /> Continue this chat</button>
             @if (deleting)
             {
                 <button type="button" class="btn btn-danger" @onclick="Delete">Delete this chat</button>
@@ -91,7 +106,67 @@ else
 
     private SavedChat? chat;
     private bool deleting;
+    private bool renaming;
+    private bool copied;
+    private string newName = "";
     private string? error;
+
+    private void StartRename()
+    {
+        newName = chat?.Title ?? "";
+        renaming = true;
+    }
+
+    private void SaveName()
+    {
+        try
+        {
+            if (!Chats.Rename(Id, newName))
+            {
+                error = "That name could not be kept.";
+                return;
+            }
+
+            error = null;
+            renaming = false;
+            chat = Chats.History.Get(Id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Renaming a past chat failed.");
+            error = "The name was not saved: " + ex.Message;
+        }
+    }
+
+    private string AsText() => ChatExport.ToText(chat!.Title, chat.ToMessages());
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", AsText());
+            copied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            copied = false;
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            copied = false;
+        }
+    }
+
+    private async Task SaveFileAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.download", "chat-" + chat!.Started.ToString("yyyy-MM-dd") + ".txt", AsText(), "text/plain");
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            error = "The file could not be saved: " + ex.Message;
+        }
+    }
 
     protected override void OnParametersSet()
     {
@@ -104,6 +179,18 @@ else
             Log.LogWarning(ex, "Reading a past chat failed.");
             chat = null;
         }
+    }
+
+    /// <summary>Goes on with this chat in Ask AI: what was said is the chat again, and the next question is answered with it in front of the AI.</summary>
+    private void Continue()
+    {
+        if (!Chats.Resume(Id, Chat))
+        {
+            error = Chat.Busy ? "A question is being answered in Ask AI. Try again when it is done." : "That chat could not be opened again.";
+            return;
+        }
+
+        Nav.NavigateTo("ask");
     }
 
     /// <summary>Asks it in the chat now, as a new question, and goes there.</summary>

@@ -4,6 +4,7 @@
 @inject ProductPhotoService Photos
 @inject PosterArtworkWorker Artwork
 @inject MemoryService Memory
+@inject WorkService Work
 @inject ActionService Actions
 @inject ChatHistoryService Chats
 @inject SmartRetail.AI.Memory.MemoryReviewer Reviewer
@@ -54,7 +55,7 @@
                 <div class="stat"><div class="stat-value">@DataFolderMover.Describe(use.FreeBytes)</div><div class="stat-label">free on this drive</div></div>
             </div>
         }
-        <p class="small muted">Inside it: <strong>@DataFolders.ProductsFolderName</strong>, with a folder per product such as “1006 Sunflower Oil 1 L”, <strong>@DataFolders.PlansFolderName</strong>, <strong>@DataFolders.PostersFolderName</strong>, <strong>@DataFolders.ChecksFolderName</strong> (Fix now notes) and <strong>@DataFolders.MemoryFolderName</strong> (what the assistant remembers, the actions and past chats), <strong>@DataFolders.CreativesFolderName</strong> and <strong>@DataFolders.PriceChecksFolderName</strong> (the online prices found and the pages you confirmed). The side panel's settings and saved keys stay in <span class="path">@Storage.SettingsFolder</span> for this Windows user.</p>
+        <p class="small muted">Inside it: <strong>@DataFolders.ProductsFolderName</strong>, with a folder per product such as “1006 Sunflower Oil 1 L”, <strong>@DataFolders.PlansFolderName</strong>, <strong>@DataFolders.PostersFolderName</strong>, <strong>@DataFolders.ChecksFolderName</strong> (Fix now notes) and <strong>@DataFolders.MemoryFolderName</strong> (what the assistant remembers, its plan and tasks, the actions and past chats), <strong>@DataFolders.CreativesFolderName</strong> and <strong>@DataFolders.PriceChecksFolderName</strong> (the online prices found and the pages you confirmed). The side panel's settings and saved keys stay in <span class="path">@Storage.SettingsFolder</span> for this Windows user.</p>
     </section>
 
     <section class="panel">
@@ -167,7 +168,7 @@
     private string? WorkInProgress => !Photos.Maker.IsIdle
         ? (Photos.Maker.IsPaused ? "Photos are waiting for Codex's usage limit to lift (they can be stopped on their page)." : "Photos are being made (they can be stopped on their page).")
         : !Artwork.IsIdle ? "A poster's artwork is being made."
-        : Reviewer.Busy || Memory.IsWriting || Actions.IsWriting || Chats.IsWriting ? "The assistant is saving what it learned from a chat."
+        : Reviewer.Busy || Memory.IsWriting || Work.IsWriting || Actions.IsWriting || Chats.IsWriting ? "The assistant is saving what it learned from a chat."
         : CameraSearch.IsWriting ? "Camera search is learning the products' photos."
         : !Creatives.IsIdle ? (Creatives.IsWaitingForLimit ? "A creative's picture is waiting for Codex's usage limit to lift." : "A creative's picture is being made.")
         : Reviews.IsWriting ? "A decision from the Monday review is being saved."

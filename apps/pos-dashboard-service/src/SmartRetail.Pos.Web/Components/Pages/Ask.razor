@@ -7,6 +7,8 @@
 @inject AiEnvironment Ai
 @inject AiSetupService Setup
 @inject MemoryService Memory
+@inject WorkService Plan
+@inject IJSRuntime Js
 @inject BrandService Brand
 
 <PageTitle>Ask AI · @Brand.Name</PageTitle>
@@ -29,6 +31,12 @@
             <AiChoice Job="AiJob.Ask" />
             <a class="btn btn-soft btn-sm" href="ask/past" title="Find a chat from before and ask it again"><Icon Name="history" /> Past chats</a>
             <a class="btn btn-soft btn-sm memory-link" href="memory" title="What the assistant remembers"><Icon Name="memory" /> Memory@(waiting > 0 ? $" · {waiting} to save" : "")</a>
+            <a class="btn btn-soft btn-sm" href="work" title="Your projects, tasks and reminders"><Icon Name="calendar" /> Plan &amp; tasks@(planWaiting > 0 ? $" · {planWaiting} to save" : "")</a>
+            @if (messages.Count > 0)
+            {
+                <button type="button" class="btn btn-soft btn-sm" title="Copy this chat as plain words" @onclick="CopyChatAsync"><Icon Name="@(copied ? "check" : "copy")" /> @(copied ? "Copied" : "Copy chat")</button>
+                <button type="button" class="btn btn-soft btn-sm" title="Save this chat as a text file" @onclick="SaveChatAsync"><Icon Name="download" /> Save as file</button>
+            }
             <button class="btn" @onclick="Chat.Clear" disabled="@(messages.Count == 0 && !busy)"><Icon Name="plus" /> New chat</button>
         </div>
     </div>
@@ -39,8 +47,8 @@
             <div class="chat-empty">
                 <AppMark Size="56" />
                 <h2>Ask anything about your shop</h2>
-                <p class="muted">In English, Hindi or Hinglish, for example “Aaj kitna cash aaya?” or “Which products sold most this month?”</p>
-                <p class="muted small">It remembers what you tell it, for example “Remember that I like short answers”, and learns from your chats. See <a href="memory">Memory</a>.</p>
+                <p class="muted">@SampleWords.AskIntro(Ai.Shop)</p>
+                <p class="muted small">It remembers what you tell it, for example “Remember that I like short answers”, and learns from your chats. See <a href="memory">Memory</a>. It can also keep a plan with you: “Make a project for…”, “Remind me to…”. See <a href="work">Plan &amp; tasks</a>.</p>
             </div>
         }
         <ChatThread Messages="messages" Busy="busy" Status="@status" Draft="@draft" DraftTable="draftTable" AskAgain="Chat.Ask" />
@@ -66,13 +74,17 @@
     private ChatTable? draftTable;
     private string privacy = "";
     private int waiting;
+    private int planWaiting;
+    private bool copied;
 
     protected override void OnInitialized()
     {
         Chat.Changed += OnChatChanged;
         Setup.Changed += OnSetupChanged;
         Memory.Changed += OnMemoryChanged;
+        Plan.Changed += OnPlanChanged;
         waiting = Memory.Load().Pending.Count;
+        planWaiting = Plan.Load().Pending.Count;
         _ = Setup.RefreshIfStaleAsync();
 
         privacy = Source.IsDemo
@@ -106,8 +118,45 @@
         StateHasChanged();
     });
 
+    private void OnPlanChanged() => _ = InvokeAsync(() =>
+    {
+        planWaiting = Plan.Load().Pending.Count;
+        StateHasChanged();
+    });
+
+    private string ChatText() => ChatExport.ToText(null, messages);
+
+    private async Task CopyChatAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.copy", ChatText());
+            copied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            copied = false;
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            copied = false;
+        }
+    }
+
+    private async Task SaveChatAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("srpos.download", "chat-" + DateTime.Now.ToString("yyyy-MM-dd") + ".txt", ChatText(), "text/plain");
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            // Nothing to save to: the buttons stay.
+        }
+    }
+
     public void Dispose()
     {
+        Plan.Changed -= OnPlanChanged;
         Chat.Changed -= OnChatChanged;
         Setup.Changed -= OnSetupChanged;
         Memory.Changed -= OnMemoryChanged;

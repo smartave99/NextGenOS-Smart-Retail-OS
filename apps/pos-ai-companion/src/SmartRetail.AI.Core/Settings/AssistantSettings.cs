@@ -344,6 +344,13 @@ namespace SmartRetail.AI.Settings
 
         public int MaxRowsSharedWithAi { get; set; } = 50;
 
+        /// <summary>
+        /// Answer questions from the shop's data only when the database account is one that can only read (see <c>sql/create_readonly_login.sql</c>). The assistant never
+        /// writes whatever this says (its queries are checked and rolled back); this adds the database's own protection as a condition. Off by default so that a shop
+        /// that has not made the read-only account yet keeps working; the screens say so when the account could change data.
+        /// </summary>
+        public bool RequireReadOnlyAccount { get; set; }
+
         /// <summary>Extra POS tables the AI may query, beyond the built-in business tables.</summary>
         public List<string> ExtraAllowedTables { get; set; } = new List<string>();
     }

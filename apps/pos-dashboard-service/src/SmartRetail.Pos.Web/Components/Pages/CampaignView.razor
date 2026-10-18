@@ -1,0 +1,419 @@
+@page "/work/{Id}"
+@using SmartRetail.AI.Work
+@using SmartRetail.Pos.Core.Actions
+@implements IDisposable
+@inject WorkService Work
+@inject ActionService Actions
+@inject ILogger<CampaignView> Log
+@inject BrandService Brand
+@inject TimeProvider Clock
+
+<PageTitle>@(project?.Title ?? "Campaign") · @Brand.Name</PageTitle>
+
+@if (project is null)
+{
+    <div class="page-head"><div><h1>Not in the plan</h1><p class="sub">That project is not in the plan any more. <a href="work">Back to Plan &amp; tasks</a>.</p></div></div>
+    return;
+}
+
+<div class="page-head">
+    <div>
+        <h1>@project.Title</h1>
+        <p class="sub">@Summary(project)</p>
+        @if (!string.IsNullOrWhiteSpace(project.Detail))
+        {
+            <p class="sub muted">@project.Detail</p>
+        }
+    </div>
+    <div class="actions">
+        <a class="btn btn-soft btn-sm" href="work">Plan &amp; tasks</a>
+        <a class="btn btn-soft btn-sm" href="posters">Make a poster</a>
+        <a class="btn btn-soft btn-sm" href="ask">Ask the assistant</a>
+    </div>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+<section class="panel" aria-label="Where it stands">
+    <div class="panel-head"><h2>Where it stands</h2><span class="pill">@(project.Status == WorkStatus.Open ? "Open" : project.Status == WorkStatus.Done ? "Done" : "Dropped")</span></div>
+    <div class="stat-list">
+        <div class="stat"><div class="stat-value">@(report.Budget is { } budget ? Formats.Price(budget) : "–")</div><div class="stat-label">Budget you set</div></div>
+        <div class="stat"><div class="stat-value @(report.OverBudget ? "trend-down" : "")">@(report.ExpenseEntries == 0 ? "–" : Formats.Price(report.Spent))</div><div class="stat-label">Spent, as you entered it@(report.OverBudget ? " (over the budget)" : "")</div></div>
+        <div class="stat"><div class="stat-value">@report.TasksOpen open, @report.TasksDone done</div><div class="stat-label">Steps@(report.TasksLate > 0 ? $", {report.TasksLate} late" : "")</div></div>
+        <div class="stat"><div class="stat-value">@(report.Enquiries == 0 ? "–" : report.Enquiries.ToString("0.##"))</div><div class="stat-label">Enquiries you entered@(report.SpentPerEnquiry is { } each ? $", about {Formats.Price(each)} spent for each" : "")</div></div>
+    </div>
+    <p class="muted small">Money and counts here are what you entered. They are not read from the POS, a bank or a bill, and the assistant never estimates them.</p>
+</section>
+
+<section class="panel" aria-label="The plan">
+    <div class="panel-head"><h2>The plan</h2></div>
+    @if (steps.Count == 0)
+    {
+        <p class="muted memory-empty">No steps yet.</p>
+    }
+    else
+    {
+        <ul class="memory-list">
+            @foreach (var step in steps)
+            {
+                <li class="memory-item" @key="step.Id">
+                    <div class="m-text">
+                        @if (step.Status == WorkStatus.Open)
+                        {
+                            <input type="checkbox" class="work-check" title="Mark done" aria-label="@("Mark done: " + step.Title)" @onchange="() => Move(step, WorkOp.Complete)" />
+                        }
+                        else
+                        {
+                            <input type="checkbox" class="work-check" checked disabled aria-label="@("Done: " + step.Title)" />
+                        }
+                        <span class="@(step.Status == WorkStatus.Open ? "" : "muted")">@step.Title</span>
+                        @if (step.Due is not null && step.Status == WorkStatus.Open)
+                        {
+                            <span class="pill @(step.Due.Value.Date < Today ? "bad" : "")">@(step.Due.Value.Date < Today ? "late: " : "")@Formats.Date(step.Due.Value)</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(step.Detail))
+                    {
+                        <div class="m-meta">@step.Detail</div>
+                    }
+                    @if (step.Status == WorkStatus.Open)
+                    {
+                        <div class="f-actions"><button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Move(step, WorkOp.Drop)">Drop</button></div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+    <form class="work-add" @onsubmit="AddStep">
+        <label class="work-title"><span class="small muted">Add a step</span><input class="form-control" maxlength="@WorkRules.TitleLimit" @bind="stepTitle" @bind:event="oninput" /></label>
+        <label><span class="small muted">Due (optional)</span><input type="date" class="form-control" @bind="stepDue" /></label>
+        <button type="submit" class="btn btn-soft" disabled="@string.IsNullOrWhiteSpace(stepTitle)"><Icon Name="plus" /> Add</button>
+    </form>
+</section>
+
+<section class="panel" aria-label="Numbers you entered">
+    <div class="panel-head"><h2>Numbers you entered</h2><span class="pill">Not from the POS</span></div>
+    <p class="muted small">People you counted, enquiries, money you spent and quotations you were given. Keep them honest: a guess is worse than a blank.</p>
+    @if (records.Count == 0)
+    {
+        <p class="muted memory-empty">Nothing yet.</p>
+    }
+    else
+    {
+        <ul class="memory-list">
+            @foreach (var record in showAllRecords ? records : records.Take(RecordsShown))
+            {
+                <li class="memory-item" @key="record.Id">
+                    <div class="m-text"><strong>@RecordLabels.Name(record.Label)</strong>: @(record.Amount is { } amount ? (record.Label is RecordLabels.Expense or RecordLabels.Quote ? Formats.Price(amount) : amount.ToString("0.##")) : "–") · @record.Title</div>
+                    <div class="m-meta">@(record.Due is { } day ? Formats.Date(day) : "") · entered @(record.Source == "Chat" ? "from your chat, saved by you" : "by you")</div>
+                    <div class="f-actions"><button type="button" class="btn btn-sm btn-link danger-link" @onclick="() => Move(record, WorkOp.Drop)">Remove</button></div>
+                </li>
+            }
+        </ul>
+        @if (!showAllRecords && records.Count > RecordsShown)
+        {
+            <button type="button" class="link-button show-all" @onclick="() => showAllRecords = true">Show all @records.Count</button>
+        }
+    }
+    <form class="work-add" @onsubmit="AddRecord">
+        <label>
+            <span class="small muted">What</span>
+            <select class="form-control" @bind="recordLabel">
+                @foreach (var label in RecordLabels.All.Where(l => l != RecordLabels.Other))
+                {
+                    <option value="@label">@RecordLabels.Name(label)</option>
+                }
+            </select>
+        </label>
+        <label class="work-title"><span class="small muted">About (for example “Printer A” or “Saturday at the stall”)</span><input class="form-control" maxlength="@WorkRules.TitleLimit" @bind="recordTitle" @bind:event="oninput" /></label>
+        <label><span class="small muted">Day</span><input type="date" class="form-control" @bind="recordDay" max="@Today.ToString("yyyy-MM-dd")" /></label>
+        <label><span class="small muted">Number</span><input type="number" min="0" step="any" class="form-control" @bind="recordAmount" /></label>
+        <button type="submit" class="btn btn-soft" disabled="@(string.IsNullOrWhiteSpace(recordTitle) || recordAmount is null)"><Icon Name="plus" /> Add</button>
+    </form>
+</section>
+
+@if (report.Quotes.Count > 0)
+{
+    <section class="panel" aria-label="Quotations">
+        <div class="panel-head"><h2>Quotations you were given</h2><span class="muted small">Cheapest first</span></div>
+        <ul class="memory-list">
+            @foreach (var quote in report.Quotes)
+            {
+                <li class="memory-item" @key="quote.Id"><div class="m-text"><strong>@Formats.Price(quote.Amount!.Value)</strong> · @quote.Title</div><div class="m-meta">@(quote.Due is { } day ? Formats.Date(day) : "")</div></li>
+            }
+        </ul>
+        <p class="muted small">Compare what each one includes, not only the price.</p>
+    </section>
+}
+
+<section class="panel" aria-label="People counted">
+    <div class="panel-head"><h2>People counted: before and during</h2><span class="pill">Counted by you</span></div>
+    @if (report.Footfall is null)
+    {
+        <p class="muted">Count the people who come to the shop (or stop at the stall) on at least three days before the campaign starts and three days during it, at the same hours, and add each count above as “People counted”.</p>
+    }
+    else
+    {
+        <p><span class="pill @(report.Footfall.Verdict == "Higher" ? "good" : report.Footfall.Verdict == "Lower" ? "bad" : "")">@report.Footfall.Verdict</span> @report.Footfall.Words</p>
+    }
+    <p class="muted small">@CampaignReport.Limits</p>
+</section>
+
+<section class="panel" aria-label="Sales around it">
+    <div class="panel-head"><h2>Sales around it</h2><span class="pill">From the POS</span></div>
+    @if (action is null)
+    {
+        <p class="muted">The POS's sales for the days of the campaign, set against the days just before them. This is kept apart from the numbers you entered.</p>
+        @if (project.Starts is null)
+        {
+            <p class="muted">Give the campaign a start day below first.</p>
+        }
+        else
+        {
+            <button type="button" class="btn btn-soft" @onclick="TrackSales">Track sales around this campaign</button>
+            <p class="muted small">This adds it to <a href="actions">Actions and results</a>, where the figures are read from the POS. Nothing is changed in the POS.</p>
+        }
+    }
+    else if (result is null)
+    {
+        <p class="muted small"><span class="spinner"></span> Reading the figures…</p>
+    }
+    else
+    {
+        <p><span class="pill @result.Verdict.Tone()">@result.Verdict.Name()</span> @result.Summary</p>
+        <p class="small"><a href="actions">Open it in Actions and results</a></p>
+    }
+    <p class="muted small">@ActionMeasure.Limits</p>
+</section>
+
+<section class="panel" aria-label="Campaign details">
+    <div class="panel-head"><h2>Campaign details</h2></div>
+    <form class="work-add" @onsubmit="SaveDetails">
+        <label class="work-title"><span class="small muted">How it reaches people (your words)</span><input class="form-control" maxlength="@WorkRules.ChannelLimit" @bind="detailChannel" /></label>
+        <label class="work-title"><span class="small muted">Where (your words)</span><input class="form-control" maxlength="@WorkRules.ChannelLimit" @bind="detailArea" /></label>
+        <label><span class="small muted">Starts</span><input type="date" class="form-control" @bind="detailStarts" /></label>
+        <label><span class="small muted">Ends</span><input type="date" class="form-control" @bind="detailEnds" /></label>
+        <label><span class="small muted">Budget you set</span><input type="number" min="0" step="any" class="form-control" @bind="detailBudget" /></label>
+        <button type="submit" class="btn btn-soft">Save</button>
+    </form>
+</section>
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private WorkBook book = new();
+    private WorkItem? project;
+    private CampaignReport report = new();
+    private List<WorkItem> steps = new();
+    private List<WorkItem> records = new();
+    private ShopAction? action;
+    private ActionResult? result;
+    private string? error;
+    private const int RecordsShown = 8;
+    private bool showAllRecords;
+
+    private string stepTitle = "";
+    private DateTime? stepDue;
+    private string recordLabel = RecordLabels.Footfall;
+    private string recordTitle = "";
+    private DateTime? recordDay;
+    private decimal? recordAmount;
+    private string detailChannel = "";
+    private string detailArea = "";
+    private DateTime? detailStarts;
+    private DateTime? detailEnds;
+    private decimal? detailBudget;
+    private string loadedFor = "";
+
+    private DateTime Today => Clock.GetLocalNow().DateTime.Date;
+
+    protected override void OnInitialized() => Work.Changed += OnChanged;
+
+    protected override void OnParametersSet()
+    {
+        if (loadedFor != Id)
+        {
+            loadedFor = Id;
+            Reload(readDetails: true);
+        }
+    }
+
+    private void Reload(bool readDetails = false)
+    {
+        book = Work.Load();
+        project = book.Find(Id) is { Kind: WorkKind.Project } found ? found : null;
+        if (project is null)
+        {
+            return;
+        }
+
+        report = CampaignReport.For(book, project, Clock.GetLocalNow().DateTime);
+        var inside = book.In(project.Id).ToList();
+        steps = inside.Where(i => i.Kind is WorkKind.Task or WorkKind.Reminder or WorkKind.Note && i.Status != WorkStatus.Dropped)
+            .OrderBy(i => i.Status).ThenBy(i => i.Due ?? DateTime.MaxValue).ThenBy(i => i.Created).ToList();
+        records = inside.Where(i => i.Kind == WorkKind.Record && i.Status == WorkStatus.Open).OrderByDescending(i => i.Due).ToList();
+        action = string.IsNullOrEmpty(project.ActionId) ? null : Actions.Load().Actions.FirstOrDefault(a => a.Id == project.ActionId);
+        if (readDetails)
+        {
+            detailChannel = project.Channel;
+            detailArea = project.Area;
+            detailStarts = project.Starts;
+            detailEnds = project.Due;
+            detailBudget = project.Budget;
+        }
+
+        result = null;
+        if (action is not null)
+        {
+            _ = MeasureAsync(action);
+        }
+    }
+
+    private async Task MeasureAsync(ShopAction forAction)
+    {
+        try
+        {
+            var measured = await Actions.MeasureAsync(forAction, CancellationToken.None);
+            if (action?.Id == forAction.Id)
+            {
+                result = measured;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Measuring the campaign's sales failed.");
+            result = new ActionResult { Verdict = ActionVerdict.NothingToCompare, Summary = "Could not read the figures: " + ex.Message };
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Reload();
+        StateHasChanged();
+    });
+
+    private static string Summary(WorkItem project)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(project.Channel))
+        {
+            parts.Add(project.Channel);
+        }
+
+        if (!string.IsNullOrWhiteSpace(project.Area))
+        {
+            parts.Add(project.Area);
+        }
+
+        if (project.Starts is { } starts)
+        {
+            parts.Add(project.Due is { } ends ? $"{Formats.Date(starts)} to {Formats.Date(ends)}" : $"from {Formats.Date(starts)}");
+        }
+        else if (project.Due is { } by)
+        {
+            parts.Add($"by {Formats.Date(by)}");
+        }
+
+        return parts.Count == 0 ? "A project in your plan. Add its details at the bottom of the page." : string.Join(" · ", parts);
+    }
+
+    private void Move(WorkItem item, WorkOp op) => Run(() => Work.Change(new WorkChange { Op = op, ItemId = item.Id }));
+
+    private void AddStep()
+    {
+        if (Run(() => Work.Change(new WorkChange { Op = WorkOp.Add, Item = new WorkItem { Kind = WorkKind.Task, Title = stepTitle, ProjectId = project!.Id, Due = stepDue } })))
+        {
+            stepTitle = "";
+            stepDue = null;
+        }
+    }
+
+    private void AddRecord()
+    {
+        var item = new WorkItem
+        {
+            Kind = WorkKind.Record,
+            Title = recordTitle,
+            ProjectId = project!.Id,
+            Label = recordLabel,
+            Amount = recordAmount,
+            Due = recordDay ?? Today,
+        };
+        if (Run(() => Work.Change(new WorkChange { Op = WorkOp.Add, Item = item })))
+        {
+            recordTitle = "";
+            recordAmount = null;
+        }
+    }
+
+    private void SaveDetails()
+    {
+        if (detailChannel.Trim() == project!.Channel && detailArea.Trim() == project.Area && detailStarts?.Date == project.Starts?.Date && detailEnds?.Date == project.Due?.Date && detailBudget == project.Budget)
+        {
+            error = null;
+            return;
+        }
+
+        var patch = new WorkItem
+        {
+            Channel = detailChannel,
+            Area = detailArea,
+            Starts = detailStarts,
+            Due = detailEnds,
+            Budget = detailBudget,
+        };
+        Run(() => Work.Change(new WorkChange { Op = WorkOp.Update, ItemId = project!.Id, Item = patch }));
+    }
+
+    private void TrackSales()
+    {
+        if (project?.Starts is not { } starts)
+        {
+            return;
+        }
+
+        var cost = report.ExpenseEntries > 0 ? report.Spent : project.Budget ?? 0m;
+        var expected = project.Detail.Length > ShopAction.MaxText ? project.Detail[..ShopAction.MaxText] : project.Detail;
+        var (problem, id) = Actions.Create(new ShopAction
+        {
+            Title = project.Title.Length > ShopAction.MaxTitle ? project.Title[..ShopAction.MaxTitle] : project.Title,
+            Kind = ActionKind.Advert,
+            Start = DateOnly.FromDateTime(starts),
+            End = project.Due is { } ends ? DateOnly.FromDateTime(ends) : null,
+            Cost = cost,
+            Expected = expected,
+            Source = "Plan",
+        });
+        if (problem is not null)
+        {
+            error = problem;
+            return;
+        }
+
+        Run(() => Work.Change(new WorkChange { Op = WorkOp.Update, ItemId = project.Id, Item = new WorkItem { ActionId = id } }));
+    }
+
+    private bool Run(Func<string?> change)
+    {
+        try
+        {
+            var problem = change();
+            error = problem;
+            Reload();
+            return problem is null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.LogWarning(ex, "Changing the campaign failed.");
+            error = "It was not saved: " + ex.Message;
+            return false;
+        }
+    }
+
+    public void Dispose() => Work.Changed -= OnChanged;
+}

@@ -32,7 +32,8 @@ namespace SmartRetail.AI.Desktop
             Database = new SqlServerQueryExecutor(
                 () => SqlServerQueryExecutor.BuildConnectionString(Settings.Database, Secrets.Get(SecretNames.DatabasePassword)),
                 () => Settings.Database.CommandTimeoutSeconds);
-            Assistant = new BusinessAssistant(Router, Database, () => Settings, null, MemorySnapshot);
+            Access = new PosAccessMonitor(Database);
+            Assistant = new BusinessAssistant(Router, Database, () => Settings, null, MemorySnapshot, null, Access);
             Updates = new UpdateService(Http, UpdateService.SettingsOfThisBuild(), UpdateFolder.Default);
         }
 
@@ -94,6 +95,9 @@ namespace SmartRetail.AI.Desktop
         public SqlServerQueryExecutor Database { get; }
 
         public BusinessAssistant Assistant { get; }
+
+        /// <summary>What the database login in use may do (read only, or could change data); asked of the database, kept for ten minutes.</summary>
+        public PosAccessMonitor Access { get; }
 
         /// <summary>Looks for a newer version now and then, and installs it when the owner says so.</summary>
         public UpdateService Updates { get; }

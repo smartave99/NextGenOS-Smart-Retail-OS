@@ -9,7 +9,11 @@
   Then, in the assistant: Settings > Database > untick "Windows authentication",
   SQL login = smartretail_ai, Password = the password you chose.
 
-  The login can only read. It cannot see the tables that hold passwords, API keys or licence data,
+  The login can only read: it is a member of db_datareader and is explicitly denied every kind of change
+  (db_denydatawriter, db_denyddladmin and DENY on INSERT, UPDATE, DELETE, EXECUTE, ALTER and CREATE).
+  In the assistant, Settings > Privacy > "Answer from the shop's data only with a read-only account" then makes the
+  assistant ask the database what the login may do, and refuse to read the shop's data if it could change anything.
+  It cannot see the tables that hold passwords, API keys or licence data,
   nor bank-account and PAN columns. It can read the POS log (Logs), where the times of bills are;
   the AI assistant never reads that table. Run this script again after updating to 1.7 or later.
 */
@@ -35,6 +39,13 @@ BEGIN
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N''smartretail_ai'')
     CREATE USER [smartretail_ai] FOR LOGIN [smartretail_ai];
 ALTER ROLE [db_datareader] ADD MEMBER [smartretail_ai];
+
+-- Reading is all this login may do. These denials are belt and braces: they hold even if the POS database
+-- was set up so that every user could write, and they override any such grant.
+ALTER ROLE [db_denydatawriter] ADD MEMBER [smartretail_ai];
+ALTER ROLE [db_denyddladmin] ADD MEMBER [smartretail_ai];
+DENY INSERT, UPDATE, DELETE, EXECUTE, ALTER ON SCHEMA::[dbo] TO [smartretail_ai];
+DENY CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE FUNCTION, CREATE SCHEMA TO [smartretail_ai];
 
 DECLARE @t sysname, @deny nvarchar(400);
 DECLARE denied CURSOR LOCAL FAST_FORWARD FOR SELECT name FROM (VALUES

@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "words": {
+    "figures": [
+      "udhar",
+      "khata",
+      "gst",
+      "बिक्री",
+      "बिल",
+      "स्टॉक",
+      "मुनाफा",
+      "नफा",
+      "उधार"
+    ],
+    "asksForFigures": [
+      "kitna",
+      "kitni",
+      "kitne",
+      "sabse",
+      "aaj",
+      "kal",
+      "pichle hafte",
+      "pichle mahine",
+      "is hafte",
+      "is mahine",
+      "iss hafte",
+      "iss mahine",
+      "कितना",
+      "कितनी",
+      "कितने",
+      "आज",
+      "कल"
+    ],
+    "advice": [
+      "kya karna chahiye",
+      "kya karein",
+      "kya karun",
+      "kya lagta",
+      "salah",
+      "sujhav",
+      "batao kya",
+      "rickshaw",
+      "rickshaws",
+      "e-rickshaw",
+      "e-rickshaws"
+    ],
+    "work": [
+      "yaad dilao",
+      "yaad dila dena"
+    ],
+    "continue": [
+      "dobara",
+      "phir se",
+      "fir se",
+      "dobara try karo",
+      "haan",
+      "han",
+      "ha",
+      "haa",
+      "ji",
+      "ji haan",
+      "theek hai",
+      "thik hai",
+      "bilkul",
+      "batao",
+      "bataiye",
+      "batao na",
+      "aur batao",
+      "aage batao",
+      "samjhao",
+      "aur",
+      "phir",
+      "fir",
+      "acha",
+      "accha",
+      "हाँ",
+      "हां",
+      "जी",
+      "ठीक है",
+      "बताओ",
+      "बताइए",
+      "और बताओ",
+      "आगे बताओ"
+    ],
+    "recall": [
+      "pichli baar",
+      "kal hum",
+      "humne baat",
+      "pehle baat",
+      "pichle hafte",
+      "pichle mahine"
+    ],
+    "money": [
+      "rs",
+      "inr",
+      "rupees",
+      "rupee",
+      "rupay",
+      "lakh",
+      "lakhs",
+      "lac",
+      "lacs",
+      "crore",
+      "crores",
+      "paise",
+      "paisa",
+      "kharcha"
+    ],
+    "limits": [
+      "sirf",
+      "nahi",
+      "nahin",
+      "chahiye",
+      "karenge",
+      "pasand"
+    ],
+    "topics": [
+      "rickshaw",
+      "rickshaws",
+      "e-rickshaw",
+      "e-rickshaws",
+      "diwali",
+      "holi"
+    ],
+    "wishes": [
+      "karna"
+    ]
+  }
+}

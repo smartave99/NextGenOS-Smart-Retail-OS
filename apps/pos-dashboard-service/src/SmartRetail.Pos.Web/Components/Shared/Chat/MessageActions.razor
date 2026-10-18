@@ -3,6 +3,21 @@
 @using SmartRetail.AI.Assistant
 @implements IDisposable
 @inject IJSRuntime Js
+@inject WorkService Plan
+
+@if (WaitingProposal is { } waiting)
+{
+    <div class="msg-actions work-waiting" role="group" aria-label="Suggested for your plan">
+        <span class="act-meta">@(waiting.Changes.Count == 1 ? "1 suggestion" : waiting.Changes.Count + " suggestions") for your plan, not saved yet</span>
+        <button type="button" class="act" @onclick="() => SavePlan(waiting)"><Icon Name="check" /><span>Save to my plan</span></button>
+        <button type="button" class="act" @onclick="() => RejectPlan(waiting)"><Icon Name="close" /><span>Don’t save</span></button>
+        <a class="act" href="work"><Icon Name="calendar" /><span>Open Plan &amp; tasks</span></a>
+        @if (planProblem is not null)
+        {
+            <span class="act-meta" role="alert">@planProblem</span>
+        }
+    </div>
+}
 
 <div class="msg-actions">
     @if (!Message.IsProblem && !Message.WasStopped && Message.Text.Length > 0)
@@ -50,6 +65,42 @@
 
     [Parameter] public bool Busy { get; set; }
 
+    /// <summary>What this answer suggested for the plan, if the owner has not yet said Save or Don't save.</summary>
+    private SmartRetail.AI.Work.WorkProposal? WaitingProposal =>
+        Message.WorkProposalId is { Length: > 0 } id ? Plan.Load().Pending.FirstOrDefault(p => p.Id == id) : null;
+
+    private string? planProblem;
+
+    private void SavePlan(SmartRetail.AI.Work.WorkProposal proposal)
+    {
+        try
+        {
+            var result = Plan.Approve(proposal.Id);
+            planProblem = result.Problems.Count > 0 ? "Not everything could be saved: " + string.Join("; ", result.Problems) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            planProblem = "It was not saved: " + ex.Message;
+        }
+    }
+
+    private void RejectPlan(SmartRetail.AI.Work.WorkProposal proposal)
+    {
+        try
+        {
+            Plan.Reject(proposal.Id);
+            planProblem = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            planProblem = "That could not be done: " + ex.Message;
+        }
+    }
+
+    private void OnPlanChanged() => _ = InvokeAsync(StateHasChanged);
+
+    protected override void OnInitialized() => Plan.Changed += OnPlanChanged;
+
     private async Task CopyAsync()
     {
         try
@@ -68,6 +119,7 @@
 
     public void Dispose()
     {
+        Plan.Changed -= OnPlanChanged;
         gone.Cancel();
         gone.Dispose();
     }

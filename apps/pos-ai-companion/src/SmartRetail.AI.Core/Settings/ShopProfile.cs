@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SmartRetail.AI.Assistant;
 
 namespace SmartRetail.AI.Settings
 {
@@ -53,6 +54,13 @@ namespace SmartRetail.AI.Settings
 
         /// <summary>The poster's second-language line when no AI writes one, by kind (e.g. "clearance"). Empty: such a poster has no second-language line until an AI or a person writes it.</summary>
         public Dictionary<string, string> PosterLines { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>
+        /// What the assistant recognises in the owner's words beyond plain English (their language, their money, their trade), from <c>profile/chat-words.json</c> beside the program.
+        /// Not part of <c>ai.json</c>: neutral (English only) when the customer has none.
+        /// </summary>
+        [JsonIgnore]
+        public ChatVocabulary ChatWords { get; set; } = ChatVocabulary.Neutral;
 
         public static ShopProfile Neutral => new ShopProfile();
 
@@ -211,7 +219,9 @@ namespace SmartRetail.AI.Settings
                     var file = new FileInfo(Path.Combine(folder, "profile", FileName));
                     if (file.Exists && file.Length <= MaxBytes && (file.Attributes & FileAttributes.ReparsePoint) == 0)
                     {
-                        return Parse(File.ReadAllText(file.FullName, System.Text.Encoding.UTF8), problems);
+                        var found = Parse(File.ReadAllText(file.FullName, System.Text.Encoding.UTF8), problems);
+                        found.ChatWords = ChatVocabulary.LoadNear(baseDirectory, problems);
+                        return found;
                     }
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
@@ -220,7 +230,7 @@ namespace SmartRetail.AI.Settings
                 }
             }
 
-            return new ShopProfile();
+            return new ShopProfile { ChatWords = ChatVocabulary.LoadNear(baseDirectory, problems) };
         }
     }
 }

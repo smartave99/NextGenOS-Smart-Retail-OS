@@ -70,6 +70,13 @@ namespace SmartRetail.AI.Tests
             return this;
         }
 
+        /// <summary>An answer worked out from the request, and free to change the provider (for example make it fail) as it is given.</summary>
+        public FakeProvider AnswersWith(Func<AiRequest, string> answer)
+        {
+            _answers.Enqueue(answer);
+            return this;
+        }
+
         public Task<ProviderStatus> CheckAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(Ready ? ProviderStatus.Ready("ready") : ProviderStatus.NotReady("not ready"));

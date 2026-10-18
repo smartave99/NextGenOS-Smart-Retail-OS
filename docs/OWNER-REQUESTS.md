@@ -1183,3 +1183,11 @@ The prompt that came with this message, **word for word** (the paths in it name 
 
 (What the assistant took it to mean, and did: finish what can be finished without the owner and say what cannot. The one thing it did **not** take it to mean: permission to commit, push or publish the AI assistant's code, because the owner's standing instruction for that work is *"Do not commit, push, publish, or deploy without my permission"* (the entry of 12 October 2026). That needs an explicit "go"; see `docs/OPEN-WORK.md` item 7b.)
 
+### 2026-10-18 (the owner's answer to the assistant's question, asked because a check said there were uncommitted changes)
+
+The question was: *"A check on this session says there are uncommitted changes. They are the AI assistant 2.0 code, which I kept uncommitted because your brief says 'Do not commit, push, publish, or deploy without my permission'. Do you give that permission now?"* The owner chose, word for word:
+
+> Yes: commit, open a PR, merge when green
+
+(Permission to commit the AI assistant's code, push it, open a pull request to `main` and merge it with a merge commit when the build passes. It is not permission to release or deploy to a shop; the standing words of 12 October still apply to that.)
+

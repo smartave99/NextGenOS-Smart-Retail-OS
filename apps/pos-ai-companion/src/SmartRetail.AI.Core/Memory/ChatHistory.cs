@@ -15,8 +15,15 @@ namespace SmartRetail.AI.Memory
     /// <summary>One message of a past chat, as kept: its words, and for a result table only its size and columns.</summary>
     public sealed class SavedMessage
     {
+        /// <summary>The message's own id: a chat that is kept and resumed keeps its turns' names and order. Empty in chats kept before ids.</summary>
+        public string Id { get; set; } = "";
+
         [JsonConverter(typeof(StringEnumConverter))]
         public ChatRole Role { get; set; }
+
+        /// <summary>For an answer: whether it came from the shop's figures, from a conversation or both, so that a resumed chat goes on the same way.</summary>
+        [JsonConverter(typeof(StringEnumConverter))]
+        public RequestKind? Route { get; set; }
 
         public string Text { get; set; } = "";
 
@@ -34,8 +41,11 @@ namespace SmartRetail.AI.Memory
     {
         public string Id { get; set; } = "";
 
-        /// <summary>The owner's first question, cut short.</summary>
+        /// <summary>The owner's first question, cut short; or the name the owner gave the chat (see <see cref="Renamed"/>).</summary>
         public string Title { get; set; } = "";
+
+        /// <summary>The owner gave this chat a name, which a later save of the same chat keeps.</summary>
+        public bool Renamed { get; set; }
 
         public DateTime Started { get; set; }
 
@@ -46,6 +56,32 @@ namespace SmartRetail.AI.Memory
         /// <summary>The owner's questions, in order.</summary>
         [JsonIgnore]
         public IEnumerable<string> Questions => Messages.Where(m => m.Role == ChatRole.Owner).Select(m => m.Text);
+
+        /// <summary>The six hex digits after the date in <see cref="Id"/>: the key the chat is kept under, and the key a resumed chat keeps.</summary>
+        [JsonIgnore]
+        public string Key => Id.Length > 7 && Id[Id.Length - 7] == '-' ? Id.Substring(Id.Length - 6) : "";
+
+        /// <summary>
+        /// The chat as messages again, to go on with it: the words (with phone numbers and e-mail addresses already hidden, as they were
+        /// kept), who said them, when, and where each answer came from. Result tables and photos are not kept, so an answer's table is
+        /// named in its words ("A table of 12 rows: ..."), and a message that carried a photo or a voice note says so in words.
+        /// </summary>
+        public IReadOnlyList<ChatMessage> ToMessages() => Messages.Select(m =>
+        {
+            var text = m.Text ?? "";
+            if (!string.IsNullOrEmpty(m.Table))
+            {
+                text = text.Length == 0 ? "[" + m.Table + "]" : text + " [" + m.Table + "]";
+            }
+
+            return new ChatMessage(m.Role, text, m.At)
+            {
+                Id = string.IsNullOrEmpty(m.Id) ? Guid.NewGuid().ToString("N") : m.Id,
+                Source = m.Source,
+                IsProblem = m.IsProblem,
+                Route = m.Route,
+            };
+        }).ToList();
     }
 
     /// <summary>A past chat that matches a search, with the words around the first match.</summary>
@@ -111,6 +147,8 @@ namespace SmartRetail.AI.Memory
                 .Where(x => x.Words.Length > 0)
                 .Select(x => new SavedMessage
                 {
+                    Id = x.Message.Id,
+                    Route = x.Message.Route,
                     Role = x.Message.Role,
                     Text = PiiMasker.MaskText(x.Words),
                     At = x.Message.At,
@@ -139,6 +177,14 @@ namespace SmartRetail.AI.Memory
             {
                 var path = MonthFile(started);
                 var month = Read(path);
+                var before = month.FirstOrDefault(c => c.Id == chat.Id);
+                if (before != null && before.Renamed)
+                {
+                    // A name the owner gave is kept when the chat is saved again after the next answer.
+                    chat.Title = before.Title;
+                    chat.Renamed = true;
+                }
+
                 month.RemoveAll(c => c.Id == chat.Id);
                 month.Add(chat);
                 Write(path, month);
@@ -215,6 +261,119 @@ namespace SmartRetail.AI.Memory
             return hits;
         }
 
+        private static readonly HashSet<string> RecallStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "what", "when", "where", "which", "did", "does", "have", "had", "was", "were", "will", "would", "could", "should", "discuss", "discussed", "talk", "talked", "spoke", "spoken",
+            "about", "last", "week", "month", "year", "yesterday", "earlier", "before", "remember", "remind", "again", "that", "this", "these", "those", "with", "from", "into", "over",
+            "your", "yours", "ours", "chat", "plan", "tell", "said", "says", "told", "know", "time", "back", "there", "then", "than", "they", "them", "just", "also", "kya", "humne", "baat",
+            "pichli", "pichle", "baar", "hafte", "mahine", "kal", "hum", "aap", "mujhe", "batao",
+        };
+
+        /// <summary>
+        /// A few words from the past chats that match what the owner asks to go back to ("what did we discuss about e-rickshaws last week?"),
+        /// for the next prompt: the date and title of each chat and the lines in it that name the same things. Chats are scored by how many of the
+        /// question's own words they hold, newest first among equals; the chat going on (<paramref name="exceptKey"/>) is left out, and so is
+        /// everything else: a chat that shares no word with the question is not brought in. Empty when nothing matches.
+        /// </summary>
+        public string Recall(string question, string exceptKey = "", int maxChars = 1200, int maxChats = 2)
+        {
+            // The question's own words, as stems: "e-rickshaws" is "rickshaw" (a hyphen splits a word, and a plural "s" is dropped), so that
+            // it finds "rickshaw" in the chat that was kept.
+            var words = (question ?? "").Split(new[] { ' ', '\t', '\r', '\n', '.', ',', '?', '!', ';', ':', '"', '(', ')', '-', '/' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(w => w.Trim('\'', '‘', '’', '“', '”'))
+                .Where(w => w.Length > 3 && !RecallStopWords.Contains(w))
+                .Select(w => w.Length > 4 && w.EndsWith("s", StringComparison.OrdinalIgnoreCase) ? w.Substring(0, w.Length - 1) : w)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(8)
+                .ToList();
+            var all = new List<SavedChat>();
+            lock (_gate)
+            {
+                foreach (var path in Months())
+                {
+                    all.AddRange(Read(path));
+                }
+            }
+
+            var candidates = all.Where(c => string.IsNullOrEmpty(exceptKey) || c.Key != exceptKey).ToList();
+            var scored = candidates
+                .Select(c => new { Chat = c, Score = words.Count(w => Contains(c.Title, w) || c.Messages.Any(m => Contains(m.Text, w))) })
+                .Where(x => words.Count == 0 ? false : x.Score > 0)
+                .OrderByDescending(x => x.Score).ThenByDescending(x => x.Chat.Started)
+                .Take(Math.Max(1, maxChats))
+                .ToList();
+            if (scored.Count == 0 && words.Count == 0)
+            {
+                // Nothing to look for ("what did we talk about?"): the latest other chat.
+                var latest = candidates.OrderByDescending(c => c.Started).FirstOrDefault();
+                scored = latest == null ? scored : new[] { new { Chat = latest, Score = 0 } }.ToList();
+            }
+
+            var text = new System.Text.StringBuilder();
+            foreach (var hit in scored)
+            {
+                var lines = hit.Chat.Messages
+                    .Where(m => !m.IsProblem && (words.Count == 0 || words.Any(w => Contains(m.Text, w))))
+                    .Take(4)
+                    .Select(m => (m.Role == ChatRole.Owner ? "Owner: " : "You: ") + Cut(MemoryRules.Normalize(m.Text), 200));
+                var block = "Chat of " + hit.Chat.Started.ToString("d MMMM yyyy", CultureInfo.InvariantCulture) + " (" + hit.Chat.Title + "):\n" + string.Join("\n", lines);
+                if (text.Length + block.Length > maxChars && text.Length > 0)
+                {
+                    break;
+                }
+
+                text.AppendLine(block);
+            }
+
+            return Cut(text.ToString().Trim(), maxChars);
+        }
+
+        /// <summary>
+        /// Gives a past chat a name of the owner's own (empty goes back to the first question). Personal details are hidden in it as in the chat's words.
+        /// False when there is no such chat or the name cannot be kept.
+        /// </summary>
+        public bool Rename(string id, string title)
+        {
+            var chat = Get(id);
+            if (chat == null)
+            {
+                return false;
+            }
+
+            var name = MemoryRules.Normalize(PiiMasker.MaskText(title ?? ""));
+            if (name.Any(char.IsControl))
+            {
+                return false;
+            }
+
+            lock (_gate)
+            {
+                var path = MonthFile(chat.Started);
+                var month = Read(path);
+                var found = month.FirstOrDefault(c => c.Id == id);
+                if (found == null)
+                {
+                    return false;
+                }
+
+                if (name.Length == 0)
+                {
+                    var first = found.Messages.FirstOrDefault(m => m.Role == ChatRole.Owner);
+                    found.Title = first == null ? found.Title : Cut(MemoryRules.Normalize(first.Text), TitleLength);
+                    found.Renamed = false;
+                }
+                else
+                {
+                    found.Title = Cut(name, TitleLength);
+                    found.Renamed = true;
+                }
+
+                Write(path, month);
+            }
+
+            return true;
+        }
+
         public bool Delete(string id)
         {
             var chat = Get(id);
@@ -266,7 +425,8 @@ namespace SmartRetail.AI.Memory
             }
         }
 
-        private static string Describe(ChatTable table)
+        /// <summary>"A table of 12 rows: Product, Qty" for a result table kept in words, or null.</summary>
+        public static string Describe(ChatTable table)
         {
             if (table == null)
             {

@@ -25,4 +25,9 @@ public static class SampleWords
 
     /// <summary>What the memory of the person might hold: the second language is offered only when the profile has one.</summary>
     public static string MemoryAboutYou(ShopProfile shop) => "e.g. Answer " + (shop.HasLocalLanguage ? "in " + shop.LocalLanguage + ", " : "") + "short, with the main figures first";
+
+    /// <summary>The line under "Ask anything about your shop": plain and neutral, offering the second language only when the profile has one.</summary>
+    public static string AskIntro(ShopProfile shop) =>
+        "Ask in your own words, for example “Which products sold most this month?” or “What could we do to bring more people to the shop?”"
+        + (shop.HasLocalLanguage ? " You can ask in " + shop.LocalLanguage + " too." : "");
 }

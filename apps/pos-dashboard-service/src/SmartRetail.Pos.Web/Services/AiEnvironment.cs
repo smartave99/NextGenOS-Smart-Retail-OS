@@ -22,6 +22,7 @@ public sealed class AiEnvironment : IDisposable
         _options = options.Value;
         _gate = gate;
         _shop = new Lazy<ShopProfile>(() => ShopProfile.LoadNear(ProfileFolder ?? AppContext.BaseDirectory));
+        _templates = new Lazy<IReadOnlyList<SmartRetail.AI.Work.CampaignTemplate>>(() => SmartRetail.AI.Work.CampaignTemplates.LoadNear(ProfileFolder ?? AppContext.BaseDirectory));
     }
 
     public string SettingsFile => _options.SettingsFilePath;
@@ -43,6 +44,11 @@ public sealed class AiEnvironment : IDisposable
     /// Read once: it is installed with the program, and the owner's settings cannot change it. Neutral when the customer has none.
     /// </summary>
     public ShopProfile Shop => _shop.Value;
+
+    private readonly Lazy<IReadOnlyList<SmartRetail.AI.Work.CampaignTemplate>> _templates;
+
+    /// <summary>The ways to plan a campaign: a neutral one that every customer has, then those in the customer's profile (<c>profile/campaigns.json</c>). Read once, like the shop profile.</summary>
+    public IReadOnlyList<SmartRetail.AI.Work.CampaignTemplate> CampaignTemplates => _templates.Value;
 
     /// <summary>The same, as the poster code needs it.</summary>
     public PosterLocale PosterLocale => PosterLocales.From(Shop);

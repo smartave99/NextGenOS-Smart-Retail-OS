@@ -46,8 +46,9 @@ public class ActionMeasureTests
         Assert.Equal(3141.18m, result.ExtraProfit);
         Assert.False(result.PaidBack);
         Assert.Equal("Sales a day: ₹12,600, 10% more than the 30 days before (₹11,480). Last year these dates were 3% up on the days before them. "
-            + "So it seems to have added about 7%. About ₹23,268 more in sales and ₹3,141 more profit, for ₹6,000 spent: it did not pay for itself.", result.Summary);
-        Assert.Equal("E-rickshaw ads around the market (advertising, 1–30 Oct 2025, ₹6,000): sales about 7% above the season, about ₹3,141 more profit; it did not pay for itself.", result.Lesson);
+            + "So sales were about 7% above what the season alone would bring. That is a comparison, not proof that it caused them. "
+            + "About ₹23,268 more in sales and ₹3,141 more profit than the days before would have given, for ₹6,000 spent: on these figures it did not pay for itself.", result.Summary);
+        Assert.Equal("E-rickshaw ads around the market (advertising, 1–30 Oct 2025, ₹6,000): sales about 7% above the season, about ₹3,141 more profit; on these figures it did not pay for itself.", result.Lesson);
     }
 
     [Fact]

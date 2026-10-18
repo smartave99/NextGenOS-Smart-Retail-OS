@@ -11,7 +11,7 @@ namespace SmartRetail.AI.Memory
     /// Ask AI with a memory: "Remember that…" is saved at once and "Forget…" removes the entry it points at, without
     /// asking an AI. Everything else goes to the chat it wraps, which is given what the assistant remembers.
     /// </summary>
-    public sealed class MemoryChatBackend : IChatBackend, IAttachmentChat
+    public sealed class MemoryChatBackend : IChatBackend, IAttachmentChat, IContextChat
     {
         private readonly IChatBackend _inner;
         private readonly IMemory _memory;
@@ -43,6 +43,24 @@ namespace SmartRetail.AI.Memory
             return _inner is IAttachmentChat withAttachments
                 ? withAttachments.AskAsync(question, attachments, progress, cancellationToken)
                 : Task.FromResult(new ChatMessage(ChatRole.Assistant, "This chat cannot read photos or voice notes. Type the question instead.", _now()) { IsProblem = true });
+        }
+
+        /// <summary>With the chat so far: "Remember…" and "Forget…" still change memory at once; anything else goes on to the chat this wraps, with the context when it takes it.</summary>
+        public Task<ChatMessage> AskAsync(AskRequest request, IProgress<string> progress, CancellationToken cancellationToken)
+        {
+            var typed = request.Attachments == null || request.Attachments.Count == 0;
+            var reply = typed ? Remember(request.Question) ?? Forget(request.Question) : null;
+            if (reply != null)
+            {
+                return Task.FromResult(reply);
+            }
+
+            if (_inner is IContextChat withContext)
+            {
+                return withContext.AskAsync(request, progress, cancellationToken);
+            }
+
+            return typed ? _inner.AskAsync(request.Question, progress, cancellationToken) : AskAsync(request.Question, request.Attachments, progress, cancellationToken);
         }
 
         public Task<ChatMessage> RunAsync(ChatStarter starter, IProgress<string> progress, CancellationToken cancellationToken) =>

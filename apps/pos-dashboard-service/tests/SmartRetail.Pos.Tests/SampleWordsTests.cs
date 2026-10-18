@@ -49,11 +49,19 @@ public sealed class SampleWordsTests
         {
             SampleWords.CreativeHeadline(ShopProfile.Neutral), SampleWords.CreativeSubtitle(ShopProfile.Neutral), SampleWords.CreativeBackground(ShopProfile.Neutral),
             SampleWords.PastChatSearch(ShopProfile.Neutral), SampleWords.MemoryAboutShop(ShopProfile.Neutral), SampleWords.MemoryAboutYou(ShopProfile.Neutral),
+            SampleWords.AskIntro(ShopProfile.Neutral),
         };
 
         foreach (var text in all)
         {
             Assert.DoesNotMatch("(?i)diwali|diya|hindi|hinglish|rupee|india|festival", text);
         }
+    }
+
+    [Fact]
+    public void The_line_on_the_empty_Ask_AI_screen_offers_a_second_language_only_when_the_profile_has_one()
+    {
+        Assert.Equal("Ask in your own words, for example “Which products sold most this month?” or “What could we do to bring more people to the shop?”", SampleWords.AskIntro(ShopProfile.Neutral));
+        Assert.EndsWith(" You can ask in Filipino too.", SampleWords.AskIntro(Profile("", "Filipino")));
     }
 }

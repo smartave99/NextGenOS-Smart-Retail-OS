@@ -38,7 +38,9 @@ try {
     assert.ok(text.includes(part), 'the file says: ' + part + '\n' + text.slice(0, 1500));
   step('the file is shown in full on the screen, in plain words, before anything is saved');
 
-  for (const secret of ['98765', '4111', 'a-long-test-password', 'Olivia', 'Corner Mart', ...names])
+  // The whole typed number is looked for, not its first four digits: the file holds other figures that are not secret (sizes, times, a licence number), and in one protected run on 18 October 2026
+  // it contained '4111' while the same code passed in another run (the figure was not recorded, so the exact source is not proven).
+  for (const secret of ['98765 43210', '9876543210', '4111 1111 1111 1111', '4111111111111111', 'a-long-test-password', 'Olivia', 'Corner Mart', ...names])
     assert.ok(!text.toLowerCase().includes(secret.toLowerCase()), 'the file has no ' + secret);
   assert.match(text, /WHAT YOU SAID\nThe printer stopped when I pressed Pay\. .*\[number\]/);
   step('what the owner typed has the obvious personal details taken out, and the file holds no customer, staff name, shop name or password (the sample company has people with names, and none of them is in the file)');

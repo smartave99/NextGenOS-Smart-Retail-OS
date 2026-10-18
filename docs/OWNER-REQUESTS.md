@@ -1191,3 +1191,1880 @@ The question was: *"A check on this session says there are uncommitted changes. 
 
 (Permission to commit the AI assistant's code, push it, open a pull request to `main` and merge it with a merge commit when the build passes. It is not permission to release or deploy to a shop; the standing words of 12 October still apply to that.)
 
+### 2026-10-18 (the owner's message after the AI assistant 2.0 code was committed and its pull request opened; the opening words are the owner's question, the rest is the owner's Version 2 brief again; recorded word for word)
+
+> continue and is all that we planned and all what i said has been completed You are acting as the principal software architect, senior AI/ML engineer, database architect, security engineer, and product engineer for an existing production POS/business-management application.
+>
+> Your task is NOT to rebuild the POS from scratch.
+>
+> Your task is to inspect the existing repository, understand how the current application actually works, and progressively evolve it into a world-class, local-first, AI-enabled Business Operating System inspired by the architectural principles of platforms such as Palantir — while preserving the current POS application's workflows, data integrity, user experience, and backwards compatibility.
+>
+> Do not make assumptions about the existing architecture before inspecting the repository.
+>
+> ==================================================
+> CORE PRODUCT VISION
+>
+> The application should evolve from:
+>
+> POS / inventory / business software
+>
+> into:
+>
+> REAL-TIME BUSINESS OPERATING SYSTEM
+>
+> The system should eventually understand:
+>
+> • people
+> • products
+> • inventory
+> • customers
+> • anonymous visitor sessions
+> • employees
+> • suppliers
+> • locations
+> • shelves
+> • counters
+> • warehouses
+> • machines
+> • devices
+> • transactions
+> • orders
+> • payments
+> • tasks
+> • documents
+> • cameras
+> • sensors
+> • events
+> • interactions
+> • business rules
+> • predictions
+> • recommendations
+> • actions
+>
+> The fundamental platform model should be:
+>
+> PHYSICAL WORLD + DIGITAL SYSTEMS
+> ↓
+> OBSERVATIONS
+> ↓
+> EVENTS
+> ↓
+> ONTOLOGY
+> ↓
+> CURRENT BUSINESS STATE / DIGITAL TWIN
+> ↓
+> ANALYTICS
+> ↓
+> AI REASONING
+> ↓
+> PREDICTIONS
+> ↓
+> RECOMMENDED OR AUTOMATED ACTIONS
+>
+> The POS must remain fully functional even when every AI service is disabled.
+>
+> AI enhances the system.
+>
+> AI must never become a hard dependency for basic POS operations.
+>
+> ==================================================
+> NON-NEGOTIABLE PRINCIPLE: LOCAL FIRST
+>
+> The default installation must run primarily on the customer's own computer/server.
+>
+> Default behavior:
+>
+> LOCAL DATA
+> LOCAL DATABASE
+> LOCAL EVENT PROCESSING
+> LOCAL EMBEDDINGS
+> LOCAL AI WHERE HARDWARE ALLOWS
+> LOCAL CAMERA PROCESSING
+> LOCAL ANALYTICS
+> LOCAL BUSINESS ONTOLOGY
+> LOCAL FILE STORAGE WHERE CONFIGURED
+>
+> The customer must NOT be forced to send business data, CCTV footage, customer activity, invoices, transaction history, inventory, audio, or documents to an external AI provider.
+>
+> Cloud AI must be OPTIONAL.
+>
+> ==================================================
+> AI PROVIDER ARCHITECTURE
+>
+> Create a provider-agnostic AI layer.
+>
+> Never hard-code the application around a single AI vendor.
+>
+> Define interfaces such as:
+>
+> LLMProvider
+> VisionProvider
+> EmbeddingProvider
+> SpeechProvider
+> OCRProvider
+> RerankerProvider
+> ObjectDetectionProvider
+> SegmentationProvider
+> TrackingProvider
+>
+> Possible providers may include:
+>
+> LOCAL
+> Ollama
+> llama.cpp
+> vLLM
+> ONNX Runtime
+> TensorRT
+> OpenVINO
+> DirectML
+> MLX where applicable
+>
+> REMOTE API
+> OpenAI-compatible APIs
+> Anthropic-compatible APIs
+> Google-compatible APIs
+> OpenRouter-compatible APIs
+> other configurable providers
+>
+> CLI / USER SUBSCRIPTION MODE
+>
+> Allow users to optionally connect supported CLI-based AI environments or authenticated subscriptions where technically and legally appropriate.
+>
+> Examples conceptually:
+>
+> Claude Code / Claude CLI
+> Gemini CLI
+> other supported authenticated CLI runtimes
+>
+> Never assume that a consumer subscription automatically grants API rights.
+>
+> Create adapters only where the corresponding CLI/runtime officially supports programmatic invocation.
+>
+> ==================================================
+> PROVIDER PRIORITY
+>
+> The default routing policy should be:
+>
+> 1. local model
+> 2. local optimized model
+> 3. local LAN inference server
+> 4. optional user-configured CLI provider
+> 5. optional user API provider
+>
+> unless the user explicitly changes the order.
+>
+> Example:
+>
+> task = "generate embedding"
+>
+> router checks:
+>
+> EmbeddingGemma local
+> ↓ unavailable
+>
+> local ONNX embedding model
+> ↓ unavailable
+>
+> LAN inference server
+> ↓ unavailable
+>
+> configured cloud provider
+> ↓ available
+>
+> execute remotely ONLY if user has permitted remote processing.
+>
+> ==================================================
+> PRIVACY ROUTING
+>
+> Every AI task must have a data classification.
+>
+> Example classifications:
+>
+> PUBLIC
+> INTERNAL
+> CONFIDENTIAL
+> PERSONAL
+> FINANCIAL
+> VIDEO
+> AUDIO
+> BIOMETRIC
+> PAYMENT_SENSITIVE
+>
+> The AI router should enforce policies such as:
+>
+> PAYMENT_SENSITIVE
+> → never leave local environment
+>
+> RAW CCTV
+> → local by default
+>
+> CUSTOMER PERSONAL DATA
+> → local unless specifically authorized
+>
+> aggregated anonymous statistics
+> → cloud allowed if configured
+>
+> Create the architecture so organizations can define their own routing policies.
+>
+> ==================================================
+> LOCAL MODEL MANAGER
+>
+> Build a Model Manager abstraction.
+>
+> It should know:
+>
+> model_id
+> model_family
+> task_type
+> model_version
+> quantization
+> precision
+> parameter_count
+> memory_requirement
+> disk_requirement
+> supported_hardware
+> runtime
+> context_length
+> embedding_dimension
+> license
+> commercial_usage_status
+> installed
+> loaded
+> available
+> health
+> performance metrics
+>
+> Model Manager responsibilities:
+>
+> download
+> install
+> verify checksum
+> load
+> unload
+> update
+> rollback
+> benchmark
+> health check
+> remove
+> select runtime
+> select quantization
+>
+> Do NOT download large models automatically without explicit user permission.
+>
+> ==================================================
+> HARDWARE DETECTION
+>
+> Create a hardware capability service.
+>
+> Detect where possible:
+>
+> CPU
+> architecture
+> x86_64 / ARM64
+> physical cores
+> logical cores
+> system RAM
+> available RAM
+> GPU vendor
+> GPU model
+> GPU VRAM
+> NPU availability
+> CUDA
+> ROCm
+> DirectML
+> Metal
+> OpenVINO
+> TensorRT
+> ONNX Runtime providers
+> disk free space
+> OS
+> network capabilities
+>
+> Produce a normalized internal capability profile.
+>
+> Example:
+>
+> {
+> "cpu_arch": "arm64",
+> "ram_gb": 16,
+> "gpu": null,
+> "npu": "qualcomm",
+> "recommended_profile": "LIGHT_LOCAL"
+> }
+>
+> Profiles might include:
+>
+> LIGHT_LOCAL
+> STANDARD_LOCAL
+> GPU_LOCAL
+> HEAVY_GPU
+> EDGE_SERVER
+> ENTERPRISE_SERVER
+>
+> AI features should adapt automatically to the hardware.
+>
+> ==================================================
+> RESOURCE-AWARE MODEL ROUTING
+>
+> Never load every AI model simultaneously.
+>
+> Implement resource-aware loading.
+>
+> Example:
+>
+> Embedding model:
+> resident if frequently used.
+>
+> Detector:
+> resident while camera analytics active.
+>
+> Large VLM:
+> load only when required.
+>
+> Reasoning LLM:
+> load on demand.
+>
+> Models should be unloadable when idle.
+>
+> Track:
+>
+> RAM
+> VRAM
+> CPU load
+> GPU load
+> latency
+> queue depth
+>
+> Avoid causing the POS UI or billing process to become slow because of AI workloads.
+>
+> POS-critical processes always have priority over AI inference.
+>
+> ==================================================
+> AI TASK QUEUE
+>
+> Create an AI job system.
+>
+> Jobs should support:
+>
+> QUEUED
+> RUNNING
+> SUCCEEDED
+> FAILED
+> CANCELLED
+> RETRYING
+>
+> Priority examples:
+>
+> CRITICAL
+> HIGH
+> NORMAL
+> BACKGROUND
+>
+> POS transaction:
+> CRITICAL
+>
+> fraud/event verification:
+> HIGH
+>
+> manager question:
+> NORMAL
+>
+> nightly analytics:
+> BACKGROUND
+>
+> AI processing must never freeze checkout operations.
+>
+> ==================================================
+> BUSINESS ONTOLOGY
+>
+> Build a universal ontology layer.
+>
+> Do NOT design it only around retail.
+>
+> Core object classes should conceptually support:
+>
+> Organization
+> Site
+> Location
+> Zone
+> Actor
+> PersonSession
+> Customer
+> Employee
+> Vendor
+> Supplier
+> Item
+> Product
+> SKU
+> Asset
+> Device
+> Camera
+> Sensor
+> Shelf
+> InventoryPosition
+> Order
+> Transaction
+> Payment
+> Document
+> Task
+> Process
+> Event
+> Observation
+> Alert
+> Prediction
+> Recommendation
+> Action
+> Policy
+>
+> Objects should support:
+>
+> properties
+> relationships
+> metadata
+> external IDs
+> source system
+> timestamps
+> versioning
+> permissions
+> confidence
+> provenance
+>
+> ==================================================
+> RELATIONSHIPS
+>
+> Relationships must be first-class data.
+>
+> Examples:
+>
+> Customer
+> PURCHASED
+> Product
+>
+> Employee
+> COMPLETED
+> Task
+>
+> Product
+> LOCATED_ON
+> Shelf
+>
+> Camera
+> OBSERVES
+> Zone
+>
+> Supplier
+> SUPPLIES
+> Product
+>
+> Transaction
+> CONTAINS
+> Product
+>
+> VisitorSession
+> INTERACTED_WITH
+> Product
+>
+> Asset
+> LOCATED_AT
+> Site
+>
+> Event
+> SUPPORTED_BY
+> Evidence
+>
+> ==================================================
+> EVENT MODEL
+>
+> Create a universal event model.
+>
+> Every event should answer:
+>
+> WHO / WHAT
+> DID WHAT
+> TO WHAT
+> WHERE
+> WHEN
+> WITH WHAT CONFIDENCE
+> BASED ON WHAT EVIDENCE
+> DETECTED BY WHICH MODEL/SYSTEM
+>
+> Possible structure:
+>
+> event_id
+> tenant_id
+> site_id
+> event_type
+> subject_type
+> subject_id
+> action
+> object_type
+> object_id
+> location_id
+> timestamp
+> received_at
+> confidence
+> source_type
+> source_id
+> model_id
+> model_version
+> evidence_reference
+> metadata
+> correlation_id
+> session_id
+> human_verified
+> created_at
+>
+> Events should be immutable where practical.
+>
+> Corrections should preferably create:
+>
+> superseding event
+> verification event
+> correction record
+>
+> rather than silently rewriting history.
+>
+> ==================================================
+> EVENT EXAMPLES
+>
+> customer_session.entered_store
+>
+> customer_session.entered_zone
+>
+> customer_session.viewed_product
+>
+> customer_session.picked_up_product
+>
+> customer_session.returned_product
+>
+> customer_session.added_to_cart
+>
+> customer_session.removed_from_cart
+>
+> customer_session.joined_queue
+>
+> customer_session.completed_purchase
+>
+> product.stock_changed
+>
+> product.moved
+>
+> product.possibly_misplaced
+>
+> shelf.low_stock_detected
+>
+> employee.started_task
+>
+> employee.completed_task
+>
+> transaction.created
+>
+> transaction.completed
+>
+> payment.completed
+>
+> inventory.received
+>
+> supplier.delivery_arrived
+>
+> machine.started
+>
+> machine.stopped
+>
+> machine.anomaly_detected
+>
+> document.received
+>
+> invoice.parsed
+>
+> ==================================================
+> OBSERVATION VS EVENT
+>
+> Do not treat raw model output as a confirmed business event.
+>
+> Create:
+>
+> OBSERVATION
+>
+> then derive:
+>
+> EVENT
+>
+> Example:
+>
+> Observation:
+> hand bounding box overlaps product bounding box.
+>
+> Observation:
+> product disappears from shelf.
+>
+> Observation:
+> tracked person's hand moves away.
+>
+> Event inference:
+> PRODUCT_PICKUP
+>
+> confidence:
+> 0.96
+>
+> This distinction is critical.
+>
+> ==================================================
+> EVENT INFERENCE ENGINE
+>
+> Build an event inference layer.
+>
+> It should combine:
+>
+> object detections
+> tracking
+> pose
+> segmentation
+> OCR
+> embeddings
+> business rules
+> POS events
+> sensor events
+> temporal sequences
+>
+> Example:
+>
+> person near shelf
+> +
+> hand reaches shelf
+> +
+> product removed
+> +
+> product follows same tracked person
+>
+> possible_product_pickup
+>
+> Use configurable thresholds.
+>
+> Example:
+>
+> confidence >= 0.95
+> → accept automatically
+>
+> confidence 0.80–0.95
+> → send to higher-level local VLM if available
+>
+> confidence below threshold
+> → store observation only / ignore depending policy
+>
+> These thresholds must be configurable.
+>
+> ==================================================
+> PROVENANCE
+>
+> Every AI-derived conclusion must retain provenance.
+>
+> Store:
+>
+> model name
+> model version
+> runtime
+> confidence
+> input references
+> camera
+> timestamp
+> inference pipeline
+> rule version
+> evidence clip/image
+> human verification status
+>
+> We must always be able to answer:
+>
+> "Why does the system believe this happened?"
+>
+> ==================================================
+> EVIDENCE SYSTEM
+>
+> Events may reference evidence.
+>
+> Evidence could include:
+>
+> image
+> short video segment
+> audio segment
+> document
+> POS transaction
+> sensor reading
+> barcode scan
+>
+> Do not keep unlimited raw video by default.
+>
+> Support configurable retention.
+>
+> Examples:
+>
+> raw continuous video: optional
+> event clips: 7 days
+> security clips: 30 days
+> metadata/events: longer
+>
+> Retention must be configurable per organization.
+>
+> ==================================================
+> CAMERA / PHYSICAL WORLD LAYER
+>
+> Design a modular camera analytics architecture.
+>
+> Possible sources:
+>
+> RTSP
+> ONVIF
+> USB
+> webcam
+> video file
+> mobile camera
+> existing CCTV/NVR streams
+>
+> Pipeline concept:
+>
+> camera
+> ↓
+> decode
+> ↓
+> frame sampling
+> ↓
+> detection
+> ↓
+> tracking
+> ↓
+> optional segmentation
+> ↓
+> optional embedding
+> ↓
+> observation creation
+> ↓
+> event inference
+>
+> Do NOT send every frame to a giant multimodal LLM.
+>
+> ==================================================
+> VISION MODEL STRATEGY
+>
+> Use specialized models.
+>
+> FAST LAYER:
+>
+> object detection
+> pose
+> tracking
+>
+> SEMANTIC LAYER:
+>
+> visual embeddings
+> product similarity
+> scene representations
+>
+> ADVANCED REASONING:
+>
+> VLM only when required
+>
+> Design the adapters so models can be replaced.
+>
+> Possible current model families include:
+>
+> YOLO-class detectors
+> RT-DETR-class detectors
+> SAM-family segmentation
+> DINO-family visual embeddings
+> EmbeddingGemma-class multimodal embeddings
+> Qwen-VL-class VLMs
+>
+> These are examples, not permanent dependencies.
+>
+> The architecture must survive model replacement.
+>
+> ==================================================
+> PRODUCT RECOGNITION
+>
+> Product recognition should combine multiple signals when available:
+>
+> barcode
+> OCR
+> visual embeddings
+> packaging similarity
+> shelf location
+> historical shelf assignment
+> POS catalog
+> price label
+> color/shape features
+>
+> Do not trust only one model.
+>
+> Return:
+>
+> candidate products
+> similarity score
+> confidence
+> reason/evidence
+>
+> ==================================================
+> VECTOR SEARCH
+>
+> Create a vector abstraction.
+>
+> Support:
+>
+> pgvector initially if the existing stack already uses PostgreSQL
+>
+> and optionally:
+>
+> Qdrant
+> other vector stores
+>
+> Embeddings may represent:
+>
+> products
+> images
+> documents
+> receipts
+> customers' anonymized behavior patterns
+> business knowledge
+> event summaries
+> audio
+> video frames
+>
+> Never tightly bind business logic to a specific vector DB.
+>
+> ==================================================
+> KNOWLEDGE / RAG
+>
+> Businesses should be able to add:
+>
+> policies
+> SOPs
+> product manuals
+> supplier contracts
+> training material
+> documents
+> invoices
+> catalogs
+>
+> Create a local-first RAG pipeline:
+>
+> document
+> ↓
+> parse
+> ↓
+> chunk
+> ↓
+> embed locally
+> ↓
+> store
+> ↓
+> retrieve
+> ↓
+> local or optional remote LLM
+>
+> Every generated answer should retain source references internally.
+>
+> ==================================================
+> REAL-TIME DIGITAL TWIN
+>
+> Events represent what happened.
+>
+> State represents what is true now.
+>
+> Create a state projection layer.
+>
+> Example:
+>
+> Shelf:
+> current products
+> estimated quantity
+> planogram status
+> last interaction
+> last restock
+>
+> Checkout:
+> queue length
+> wait estimate
+> employee present
+> status
+>
+> Product:
+> inventory
+> sales velocity
+> recent interactions
+> conversion
+>
+> Device:
+> online/offline
+> health
+> last seen
+>
+> The system should continuously update current state from events.
+>
+> ==================================================
+> TEMPORAL HISTORY
+>
+> Support questions such as:
+>
+> "What was the stock level at 4 PM yesterday?"
+>
+> "What happened immediately before the inventory mismatch?"
+>
+> "Which events caused this alert?"
+>
+> "What changed between Monday and Tuesday?"
+>
+> Do not only store present state.
+>
+> Preserve event history.
+>
+> ==================================================
+> DATABASE STRATEGY
+>
+> Before adding new databases, inspect what the application already uses.
+>
+> Prefer incremental integration.
+>
+> Potential future architecture:
+>
+> PostgreSQL
+> → transactional data
+> → ontology objects
+> → configuration
+> → current relationships
+>
+> ClickHouse
+> → high-volume event analytics
+>
+> Redis
+> → cache
+> → queues
+> → ephemeral state
+>
+> S3 / MinIO
+> → images
+> → clips
+> → documents
+> → model files if appropriate
+>
+> pgvector/Qdrant
+> → embeddings
+>
+> Redpanda/Kafka
+> → event streaming at larger scale
+>
+> DO NOT introduce Kafka, ClickHouse, Kubernetes, etc. during the first implementation unless the existing scale genuinely requires them.
+>
+> Design interfaces so they can be added later.
+>
+> ==================================================
+> MULTI-TENANT DESIGN
+>
+> Assume the product may eventually support:
+>
+> 1 company
+> many companies
+> many sites per company
+> many stores
+> many warehouses
+> many devices
+>
+> Every relevant object should be scoped appropriately.
+>
+> Typical hierarchy:
+>
+> Organization
+> → Site
+> → Zone
+> → Device
+>
+> Tenant data must never leak between organizations.
+>
+> ==================================================
+> EDGE + CLOUD ARCHITECTURE
+>
+> Eventually support:
+>
+> EDGE INSTANCE
+>
+> runs inside business
+>
+> handles:
+>
+> cameras
+> local AI
+> local events
+> local database/cache
+> local embeddings
+> local inference
+> offline operation
+>
+> CENTRAL PLATFORM
+>
+> optional
+>
+> handles:
+>
+> fleet management
+> cross-site analytics
+> model distribution
+> backup
+> organization-level dashboards
+> optional heavy AI
+> software updates
+>
+> Edge should continue operating if internet is unavailable.
+>
+> ==================================================
+> SYNC ENGINE
+>
+> Design eventual support for edge-to-cloud synchronization.
+>
+> Synchronize primarily:
+>
+> events
+> aggregates
+> configuration
+> model metadata
+> alerts
+>
+> Avoid uploading raw CCTV by default.
+>
+> Handle:
+>
+> offline periods
+> retries
+> duplicate events
+> idempotency
+> conflicts
+> clock drift
+>
+> ==================================================
+> AI ASSISTANT
+>
+> Create a Business AI Assistant abstraction.
+>
+> The assistant should eventually answer questions like:
+>
+> "Why were sales down today?"
+>
+> "Which products are frequently picked up but not purchased?"
+>
+> "What inventory looks incorrect?"
+>
+> "Which shelves need restocking?"
+>
+> "What happened at checkout 3?"
+>
+> "Which supplier causes the most stockouts?"
+>
+> "Show unusual activity today."
+>
+> "Which employee tasks remain incomplete?"
+>
+> The assistant must query structured business data whenever possible.
+>
+> It must NOT rely only on semantic search or hallucinated interpretation.
+>
+> Preferred flow:
+>
+> user question
+> ↓
+> intent classification
+> ↓
+> permission check
+> ↓
+> ontology/entity resolution
+> ↓
+> SQL/query/tool execution
+> ↓
+> retrieve verified data
+> ↓
+> reason
+> ↓
+> answer with evidence
+>
+> ==================================================
+> AGENT TOOLS
+>
+> The AI assistant should call controlled tools instead of directly changing arbitrary application data.
+>
+> Examples:
+>
+> query_sales
+> query_inventory
+> query_events
+> query_customer_history
+> query_supplier_performance
+> create_task
+> draft_purchase_order
+> create_alert
+> generate_report
+>
+> Actions should have permission policies.
+>
+> ==================================================
+> HUMAN APPROVAL
+>
+> Potentially consequential actions require approval.
+>
+> Examples:
+>
+> refund
+> delete transaction
+> change inventory
+> change price
+> place supplier order
+> send customer communication
+> modify employee permissions
+>
+> The assistant may recommend them.
+>
+> Execution should require explicit authorization unless an organization administrator has configured a safe automation rule.
+>
+> ==================================================
+> RULE ENGINE
+>
+> Create a rules engine.
+>
+> Example:
+>
+> IF
+> shelf_stock < 5
+> AND
+> backroom_stock > 20
+>
+> THEN
+> create_restockshelf_task
+>
+> Another:
+>
+> IF
+> queue_length > 8
+> FOR 3 minutes
+>
+> THEN
+> recommend_open_checkout
+>
+> Rules should support:
+>
+> conditions
+> time windows
+> actions
+> severity
+> sites
+> schedules
+> enabled/disabled state
+>
+> ==================================================
+> PREDICTION LAYER
+>
+> Do not implement speculative ML immediately.
+>
+> First create clean historical events.
+>
+> Later support:
+>
+> stockout prediction
+> demand forecasting
+> queue prediction
+> sales anomalies
+> maintenance prediction
+> fraud/anomaly detection
+> staffing recommendations
+>
+> Predictions must include:
+>
+> prediction
+> confidence
+> time horizon
+> model
+> features/evidence
+> created_at
+>
+> ==================================================
+> FEEDBACK LOOP
+>
+> Create infrastructure for corrections.
+>
+> Example:
+>
+> AI predicts:
+> product_pickup
+>
+> staff reviews:
+> actually shelf_restock
+>
+> Store correction.
+>
+> This should become labeled training data.
+>
+> Track:
+>
+> prediction
+> human correction
+> model version
+> final label
+>
+> This dataset will become a strategic asset.
+>
+> ==================================================
+> MODEL EVALUATION
+>
+> Never upgrade a model solely because it is newer.
+>
+> Maintain evaluation datasets.
+>
+> Evaluate:
+>
+> accuracy
+> precision
+> recall
+> false positives
+> false negatives
+> latency
+> RAM
+> VRAM
+> CPU
+> energy if available
+>
+> New models should be:
+>
+> installed
+> benchmarked
+> tested
+> optionally run in shadow mode
+> compared
+> then promoted
+>
+> ==================================================
+> MODEL REGISTRY
+>
+> Create a model registry.
+>
+> Possible status:
+>
+> CANDIDATE
+> TESTING
+> SHADOW
+> ACTIVE
+> DEPRECATED
+> ROLLED_BACK
+>
+> Track which model generated every AI event.
+>
+> ==================================================
+> OBSERVABILITY
+>
+> Build internal observability for:
+>
+> AI latency
+> queue length
+> CPU
+> RAM
+> GPU
+> VRAM
+> model failures
+> camera failures
+> event throughput
+> database latency
+> API failures
+> sync failures
+> dropped frames
+> provider cost
+> token usage
+>
+> Do not allow hidden runaway API spending.
+>
+> ==================================================
+> AI COST CONTROLS
+>
+> For external providers support:
+>
+> monthly budget
+> daily budget
+> per-user budget
+> per-feature budget
+> token limits
+> request limits
+> allowed models
+> allowed data classifications
+>
+> Show users estimated/actual usage where possible.
+>
+> ==================================================
+> SECRETS
+>
+> API keys must never be stored in plaintext.
+>
+> Use the safest available OS credential mechanism.
+>
+> Depending platform:
+>
+> Windows Credential Manager
+> macOS Keychain
+> Linux Secret Service
+> encrypted vault
+>
+> Never commit secrets.
+>
+> Never log API keys.
+>
+> Mask them in UI.
+>
+> ==================================================
+> REMOTE PROVIDER CONSENT
+>
+> When a user configures an external provider, clearly communicate:
+>
+> what categories of data may leave the device
+> which provider receives it
+> which features use it
+>
+> Allow provider-specific policies.
+>
+> Example:
+>
+> Anthropic:
+> business assistant only
+>
+> OpenAI:
+> document analysis
+>
+> Google:
+> multimodal analysis
+>
+> Local:
+> all camera processing
+>
+> ==================================================
+> PERMISSIONS
+>
+> Build/extend RBAC.
+>
+> Possible roles:
+>
+> Owner
+> Administrator
+> Manager
+> Cashier
+> Inventory Staff
+> Analyst
+> Auditor
+> AI Administrator
+>
+> AI must respect exactly the same authorization boundaries as the application.
+>
+> If a cashier cannot access profit data manually, the AI assistant must not reveal profit data to that cashier.
+>
+> ==================================================
+> AUDIT LOG
+>
+> Audit:
+>
+> login
+> configuration changes
+> AI provider changes
+> AI actions
+> manual corrections
+> data exports
+> permission changes
+> critical transactions
+> model changes
+> rule changes
+> automation actions
+>
+> Audit records should be tamper-resistant where practical.
+>
+> ==================================================
+> PRIVACY
+>
+> Do not build unnecessary permanent biometric identification.
+>
+> For physical customer tracking, prefer anonymous session IDs such as:
+>
+> visitor_82fa3c
+>
+> where identity does not need to be known.
+>
+> Design data retention and deletion controls.
+>
+> Avoid making facial recognition a default dependency.
+>
+> ==================================================
+> POS SAFETY
+>
+> This is extremely important.
+>
+> AI failures MUST NOT prevent:
+>
+> checkout
+> payment recording
+> receipt generation
+> inventory movement required for sales
+> user login
+> core POS functionality
+>
+> Run AI workloads outside latency-sensitive transaction paths whenever possible.
+>
+> ==================================================
+> FAILURE BEHAVIOR
+>
+> If:
+>
+> AI server stops
+> model crashes
+> GPU memory is exhausted
+> internet fails
+> API provider fails
+> API quota expires
+> camera disconnects
+>
+> the POS must continue working.
+>
+> Degrade gracefully.
+>
+> ==================================================
+> FEATURE FLAGS
+>
+> All major new capabilities should use feature flags.
+>
+> Examples:
+>
+> ai_assistant
+> camera_analytics
+> local_embeddings
+> remote_ai
+> business_ontology
+> event_engine
+> predictive_inventory
+> advanced_rules
+>
+> This allows gradual rollout and safe rollback.
+>
+> ==================================================
+> PLUGIN / MODULE ARCHITECTURE
+>
+> Where compatible with the existing architecture, make AI functionality modular.
+>
+> Possible modules:
+>
+> AI Core
+> Ontology
+> Events
+> Camera Intelligence
+> Document Intelligence
+> Business Assistant
+> Rules
+> Predictions
+> Model Manager
+> Provider Manager
+> Hardware Manager
+>
+> Avoid creating a giant tightly-coupled "AI service."
+>
+> ==================================================
+> DEVELOPER EXPERIENCE
+>
+> Create clear internal interfaces.
+>
+> Examples conceptually:
+>
+> AIProvider.generate()
+> EmbeddingProvider.embed()
+> VisionProvider.analyze()
+> EventStore.append()
+> OntologyService.resolve()
+> ModelManager.load()
+> HardwareService.capabilities()
+> RuleEngine.evaluate()
+>
+> Use typed contracts where possible.
+>
+> ==================================================
+> MIGRATIONS
+>
+> Never manually mutate production database schemas.
+>
+> Use the project's existing migration system.
+>
+> Every schema change must be reversible where practical.
+>
+> Never delete existing production columns/tables simply because a cleaner design exists.
+>
+> ==================================================
+> BACKWARDS COMPATIBILITY
+>
+> Existing:
+>
+> sales
+> transactions
+> inventory
+> customers
+> users
+> reports
+> settings
+>
+> must continue working.
+>
+> Build adapters around existing entities rather than blindly duplicating them.
+>
+> Example:
+>
+> existing Product table
+>
+> should likely become or map to ontology entity Product
+>
+> rather than creating unrelated AI_Product.
+>
+> ==================================================
+> REPOSITORY RECONNAISSANCE
+>
+> BEFORE WRITING MAJOR CODE:
+>
+> Inspect:
+>
+> README
+> package manifests
+> workspace configuration
+> backend structure
+> frontend structure
+> database schema
+> migrations
+> API routes
+> auth
+> permissions
+> POS transaction path
+> inventory logic
+> customer logic
+> reporting
+> settings
+> logging
+> background jobs
+> tests
+> deployment
+> Docker
+> environment variables
+> desktop packaging if present
+> update mechanism
+>
+> Then produce an internal architecture map.
+>
+> Determine:
+>
+> languages
+> frameworks
+> database
+> ORM
+> state management
+> API architecture
+> desktop/web architecture
+> authentication model
+> multi-tenancy model
+> background job system
+> existing AI functionality
+> existing camera functionality
+>
+> Do not ask me to explain things you can discover from the repository.
+>
+> ==================================================
+> IMPLEMENTATION STRATEGY
+>
+> Do NOT attempt the entire vision in one giant patch.
+>
+> Implement incrementally.
+>
+> Recommended order:
+>
+> PHASE 0
+> Repository understanding
+>
+> PHASE 1
+> AI foundation
+>
+> • hardware detection
+> • provider interfaces
+> • provider registry
+> • local model configuration
+> • secure API key storage
+> • feature flags
+>
+> PHASE 2
+> Event foundation
+>
+> • universal event schema
+> • event store
+> • provenance
+> • event APIs
+> • event viewer
+>
+> PHASE 3
+> Ontology foundation
+>
+> • ontology entities
+> • relationships
+> • mapping existing POS objects
+> • ontology APIs
+>
+> PHASE 4
+> Business intelligence
+>
+> • event projections
+> • current state
+> • rules engine
+> • analytics
+>
+> PHASE 5
+> Embeddings / local knowledge
+>
+> • local embedding provider
+> • vector storage abstraction
+> • document ingestion
+> • RAG
+>
+> PHASE 6
+> AI assistant
+>
+> • local LLM support
+> • provider routing
+> • controlled business query tools
+> • permission enforcement
+>
+> PHASE 7
+> Camera intelligence
+>
+> • camera registry
+> • streams
+> • detection/tracking
+> • observation model
+> • event inference
+>
+> PHASE 8
+> Advanced intelligence
+>
+> • VLM escalation
+> • predictions
+> • anomaly detection
+> • workflow agents
+>
+> ==================================================
+> WHAT TO DO RIGHT NOW
+>
+> Start with repository reconnaissance.
+>
+> Do not immediately install heavy dependencies.
+>
+> Do not immediately download AI models.
+>
+> Do not rewrite working modules.
+>
+> First determine what already exists and how this architecture should fit naturally into the current codebase.
+>
+> Then:
+>
+> 1. Produce a concise architecture assessment.
+>
+> 2. Identify exact integration points.
+>
+> 3. Identify technical debt or blockers relevant to this project.
+>
+> 4. Propose the smallest safe Phase 1.
+>
+> 5. Implement Phase 1 using the repository's existing conventions.
+>
+> 6. Add tests.
+>
+> 7. Run existing tests.
+>
+> 8. Fix regressions.
+>
+> 9. Document what changed.
+>
+> 10. Continue incrementally.
+>
+> ==================================================
+> CODING BEHAVIOR
+>
+> You are authorized to inspect and modify the repository.
+>
+> Prefer actually implementing over merely suggesting code.
+>
+> However:
+>
+> Never destroy working functionality.
+>
+> Never silently change financial calculations.
+>
+> Never modify tax/payment/business logic without understanding it.
+>
+> Never weaken authentication.
+>
+> Never bypass RLS/security policies.
+>
+> Never expose secrets.
+>
+> Never introduce unnecessary dependencies.
+>
+> Never fake integrations.
+>
+> Never create placeholder systems and claim they are production-ready.
+>
+> If something cannot yet be implemented properly, create the interface and document the missing implementation honestly.
+>
+> ==================================================
+> CODE QUALITY
+>
+> Use:
+>
+> clear modules
+> typed interfaces
+> small services
+> dependency injection where appropriate
+> database transactions
+> idempotency
+> structured logging
+> explicit error handling
+> tests
+> schema validation
+>
+> Avoid:
+>
+> god classes
+> giant files
+> unstructured JSON everywhere
+> tight model coupling
+> hardcoded vendor names throughout business logic
+> global mutable state
+> hidden background behavior
+>
+> ==================================================
+> PERFORMANCE
+>
+> Remember this application may run on:
+>
+> 16 GB RAM office laptop
+> Snapdragon ARM laptop
+> ordinary x86 PC
+> gaming PC
+> NVIDIA workstation
+> Jetson edge box
+> enterprise GPU server
+>
+> Features must gracefully adapt.
+>
+> Example:
+>
+> LOW POWER DEVICE
+>
+> text embeddings
+> small local LLM
+> basic analytics
+> no heavy continuous vision
+>
+> GPU WORKSTATION
+>
+> real-time camera analytics
+> VLM
+> larger LLM
+>
+> ENTERPRISE
+>
+> multiple camera pipelines
+> larger models
+> distributed processing
+>
+> ==================================================
+> CONFIGURATION UI
+>
+> Eventually expose a simple settings experience:
+>
+> AI
+>
+> Mode:
+> [ Local First ]
+>
+> Local Models:
+> Embedding: Installed
+> LLM: Installed
+> Vision: Not Installed
+>
+> External Providers:
+> Anthropic: Not Connected
+> OpenAI: Not Connected
+> Google: Not Connected
+> Custom: Not Connected
+>
+> Privacy:
+> [x] Keep CCTV local
+> [x] Keep financial data local
+> [x] Keep customer data local
+> [ ] Allow anonymous analytics to remote AI
+>
+> Fallback:
+> Local → External
+>
+> The user should not need to understand model architecture to use the product.
+>
+> ==================================================
+> FINAL ARCHITECTURAL PRINCIPLE
+>
+> MODELS ARE REPLACEABLE.
+>
+> The long-term product value lies in:
+>
+> business ontology
+> event history
+> integrations
+> workflow engine
+> business state
+> feedback data
+> permissions
+> auditability
+> analytics
+> customer-specific knowledge
+> proprietary datasets
+>
+> Never architect the application such that replacing an AI model requires rebuilding the business platform.
+>
+> ==================================================
+> ULTIMATE PRODUCT DIRECTION
+>
+> The system should eventually be capable of knowing:
+>
+> WHAT EXISTS
+>
+> WHERE IT IS
+>
+> WHAT IS HAPPENING
+>
+> WHAT HAPPENED
+>
+> WHY IT HAPPENED
+>
+> WHAT IS LIKELY TO HAPPEN NEXT
+>
+> WHAT ACTION SHOULD BE TAKEN
+>
+> WHETHER THAT ACTION ACTUALLY WORKED
+>
+> while remaining:
+>
+> LOCAL-FIRST
+>
+> OFFLINE-CAPABLE
+>
+> PRIVACY-PRESERVING
+>
+> AUDITABLE
+>
+> MODEL-AGNOSTIC
+>
+> HARDWARE-ADAPTIVE
+>
+> MULTI-BUSINESS
+>
+> ENTERPRISE-READY
+>
+> and with the existing POS remaining reliable at its core.
+>
+> Begin now by studying the repository thoroughly and designing Phase 1 around the actual existing system rather than around assumptions.
+
+(What the assistant took it to mean, and did: the owner asks whether everything that was planned and said is completed, and restates the Version 2 brief (`docs/VERSION-2.md`). The honest answer is in `docs/OPEN-WORK.md`: the AI assistant 2.0 brief is built, with the gaps listed there, and still has to pass the full gate and the build on GitHub before it is merged; Version 2 Phases 1 to 3 were built earlier, Phase 4 has started with this session ("what is true now", `docs/V2-ARCHITECTURE-ASSESSMENT.md` section 9), and Phases 5 to 8 are not started. Nothing was released or deployed to a shop.)

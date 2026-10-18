@@ -1172,3 +1172,14 @@ The prompt that came with this message, **word for word** (the paths in it name 
 > **START NOW: inspect the repository, investigate the existing conversation architecture, identify the root causes, and begin implementing the highest-priority fixes.**
 
 (Recorded on 12 October 2026. What the assistant did with it, what is built and what is still open are in `docs/AI-ASSISTANT-2.md`. **Two instructions in it are standing rules for this work:** the live shop database and the shop program's files are never written to by the AI (also `CLAUDE.md` sections 3 and 15), and *"Do not commit, push, publish, or deploy without my permission"*: the code of the AI assistant is kept uncommitted until the owner says so.)
+
+### 2026-10-12 (later the same day; the owner's message after a usage limit; recorded word for word)
+
+> I hit my usage limit while you were working, but it has reset now. Please continue from where you left off.
+
+### 2026-10-18 (the owner's message after the assistant had been waiting for the last check to finish; recorded word for word)
+
+> complete all whats left
+
+(What the assistant took it to mean, and did: finish what can be finished without the owner and say what cannot. The one thing it did **not** take it to mean: permission to commit, push or publish the AI assistant's code, because the owner's standing instruction for that work is *"Do not commit, push, publish, or deploy without my permission"* (the entry of 12 October 2026). That needs an explicit "go"; see `docs/OPEN-WORK.md` item 7b.)
+

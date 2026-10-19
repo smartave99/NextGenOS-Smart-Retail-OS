@@ -1,0 +1,143 @@
+@page "/ask"
+@inherits HubPage
+@using NextGenOS.Hub.Assistant
+
+<PageTitle>Ask the shop</PageTitle>
+<h1>Ask the shop</h1>
+<p class="sub">Write a question in your own words. The assistant looks in the shop's records and in your notes, only at what you are allowed to see, and answers only from what it finds. It cannot change anything: it only looks things up.</p>
+<Notice Error="@Error" Info="@Info" />
+
+@if (!App.Ai.Flags.Licensed)
+{
+    <div class="notice warn" id="as-unlicensed">The business assistant is not part of this shop's licence.</div>
+}
+else if (!App.Assistant.On)
+{
+    <div class="notice warn" id="as-off">The business assistant is switched off. @if (Me.Can(Perm.Ai)) { <span>You can switch it on under <a href="settings/ai">AI helpers</a>.</span> } else { <span>The owner can switch it on.</span> }</div>
+}
+else
+{
+    <section class="card" id="as-ask">
+        <form @onsubmit="AskNow" @onsubmit:preventDefault>
+            <label for="as-q">Your question</label>
+            <input id="as-q" @bind="question" maxlength="500" autocomplete="off" placeholder="for example how much did we sell today" />
+            <div class="row">
+                <button type="submit" class="btn primary" id="as-go" disabled="@busy">@(busy ? "Looking…" : "Ask")</button>
+                @if (busy) { <span class="muted small" id="as-busy">Looking through the records. This can take a little while.</span> }
+            </div>
+        </form>
+        <p class="muted small" id="as-can">I can look in: @string.Join(", ", can.Select(c => c.Title.ToLowerInvariant())).</p>
+    </section>
+
+    @if (reply is not null)
+    {
+        <section class="card" id="as-answer">
+            <h2>@reply.Question</h2>
+            @if (reply.Mode == AssistantMode.Answered)
+            {
+                <p id="as-text">@reply.Text</p>
+                <p class="muted small">The numbers in square brackets point at the facts below. Check them against the facts: the assistant can make mistakes.</p>
+            }
+            else if (reply.Mode == AssistantMode.FactsOnly)
+            {
+                <div class="notice warn" id="as-facts-only">No answer could be written, so here is what was found.</div>
+            }
+            else
+            {
+                <div class="empty" id="as-nothing">Nothing was found in the records or the notes that you can see, so there is nothing to answer from.</div>
+            }
+            @foreach (var note in reply.Notes) { <p class="muted small as-note">@note</p> }
+            @if (reply.Facts.Count > 0)
+            {
+                <h3>What the answer is based on</h3>
+                <div class="tbl-wrap">
+                <table class="tbl" id="as-facts">
+                    <thead><tr><th class="num">No.</th><th>Where it comes from</th><th>What it says</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var fact in reply.Facts)
+                    {
+                        <tr id="@("as-fact-" + fact.Number)">
+                            <td class="num">@fact.Number</td>
+                            <td>@fact.Title</td>
+                            <td>@fact.Text</td>
+                            <td class="muted small">@(reply.Cited.Contains(fact.Number) ? "used in the answer" : "")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                </div>
+            }
+            @if (reply.Tools.Any(t => t.Problem is not null))
+            {
+                <h3>What could not be looked up</h3>
+                <ul id="as-problems">
+                    @foreach (var t in reply.Tools.Where(t => t.Problem is not null)) { <li>@t.Title: @t.Problem</li> }
+                </ul>
+            }
+        </section>
+    }
+
+    <section class="card" id="as-recent-card">
+        <h2>@(Me.Can(Perm.Ai) ? "Questions asked lately" : "Your questions lately")</h2>
+        <p class="muted small">The question, what was looked at and how it ended are kept for 90 days. The answers are not kept, and a question that holds a telephone number or an e-mail address is not kept at all.</p>
+        @if (recent.Count == 0) { <div class="empty" id="as-recent-none">Nothing has been asked yet.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="as-recent">
+                <thead><tr><th>When</th>@if (Me.Can(Perm.Ai)) { <th>Who</th> }<th>Question</th><th>Looked at</th><th>How it ended</th></tr></thead>
+                <tbody>
+                @foreach (var q in recent)
+                {
+                    <tr>
+                        <td>@When(q.At)</td>
+                        @if (Me.Can(Perm.Ai)) { <td>@q.UserName</td> }
+                        <td>@q.Question</td>
+                        <td class="small">@string.Join(", ", q.Tools)</td>
+                        <td>@Ended(q.Outcome)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private string question = "";
+    private bool busy;
+    private AssistantReply? reply;
+    private IReadOnlyList<ToolInfo> can = Array.Empty<ToolInfo>();
+    private IReadOnlyList<AskedQuestion> recent = Array.Empty<AskedQuestion>();
+
+    protected override Task LoadAsync()
+    {
+        if (App.Assistant.On)
+        {
+            can = App.Assistant.WhatICanLookAt();
+            recent = App.Assistant.Recent(10);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task AskNow()
+    {
+        if (busy) return;
+        busy = true;
+        reply = null;
+        await Run(async () => reply = await App.Assistant.AskAsync(question));
+        busy = false;
+        if (reply is not null) question = "";
+        await Reload();
+    }
+
+    private static string Ended(string outcome) => outcome switch
+    {
+        AssistantMode.Answered => "answered",
+        AssistantMode.FactsOnly => "facts shown, no answer written",
+        AssistantMode.NothingFound => "nothing found",
+        _ => outcome,
+    };
+}

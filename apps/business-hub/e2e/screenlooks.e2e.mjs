@@ -12,7 +12,7 @@ const step = (s) => console.log('✓ ' + s);
 const hub = await startHub(['--E2E:White=none']);
 
 const SCREENS = ['/', '/sell', '/items', '/items/batches', '/items/changes', '/items/sheet', '/items/groups', '/posters', '/people', '/people/sheet', '/purchases', '/documents', '/staff', '/employees', '/reports',
-  '/reports/more', '/books', '/registers', '/offers', '/settings', '/settings/keys', '/settings/network', '/settings/ai', '/settings/events', '/settings/map', '/settings/knowledge', '/help'];
+  '/reports/more', '/books', '/registers', '/offers', '/settings', '/settings/keys', '/settings/network', '/settings/ai', '/settings/events', '/settings/map', '/settings/knowledge', '/ask', '/help'];
 
 /** What the page looks like to a person: how far it spills sideways, which pressable things are too small, and where the menu is. */
 const measure = () => {

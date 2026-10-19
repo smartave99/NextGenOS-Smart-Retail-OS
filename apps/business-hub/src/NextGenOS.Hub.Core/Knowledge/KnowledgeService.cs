@@ -283,7 +283,7 @@ public sealed class KnowledgeService(HubDb db, IClock clock, AuditService audit,
             var score = usedMeaning && comparable.Contains(key) ? MeaningShare * cosine + (1 - MeaningShare) * kw : kw;
             if (score <= 0) continue;
             var source = sources[piece.Source];
-            hits.Add((new KnowledgeHit(source.Ref, source.Title, piece.Seq, Shorten(piece.Text, ExcerptChars), Math.Round(Math.Min(score, 1), 4), hasMeaning), piece.Source));
+            hits.Add((new KnowledgeHit(source.Ref, source.Title, piece.Seq, Shorten(piece.Text, ExcerptChars), Math.Round(Math.Min(score, 1), 4), hasMeaning, source.Class), piece.Source));
         }
 
         var best = hits.OrderByDescending(h => h.Hit.Score).ThenBy(h => h.Source).ThenBy(h => h.Hit.Piece).Take(limit).Select(h => h.Hit).ToList();

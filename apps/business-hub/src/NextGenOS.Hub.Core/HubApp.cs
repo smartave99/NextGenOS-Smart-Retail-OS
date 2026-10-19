@@ -11,6 +11,7 @@ using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Intelligence;
+using NextGenOS.Hub.Assistant;
 using NextGenOS.Hub.Knowledge;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Loyalty;
@@ -86,6 +87,8 @@ public sealed class HubApp
         Rules = new RuleService(db, clock, Audit, Ai.Flags, Events, Access);
         // The owner's notes as local knowledge: found by their words always, and by their meaning when the owner has switched on "Search by meaning" and an AI service that may receive them makes vectors.
         Knowledge = new KnowledgeService(db, clock, Audit, Ai.Flags, Ai.Gateway, new SqliteVectorIndex(db), Access);
+        // "Ask the shop": a question answered from the shop's own records and notes, as the person asking. It only looks things up. Off until the owner switches on "Business assistant".
+        Assistant = new AssistantService(db, clock, Audit, Ai.Flags, Ai.Gateway, Knowledge, Reports, Shop, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
@@ -143,6 +146,7 @@ public sealed class HubApp
     public StateService State { get; }
     public RuleService Rules { get; }
     public KnowledgeService Knowledge { get; }
+    public AssistantService Assistant { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public UpdateService Updates { get; }
@@ -167,6 +171,7 @@ public sealed class HubApp
         try { Rules.Run(); } catch (HubException) { /* a rule that cannot be looked at now is looked at the next time; it never stops the rest of the upkeep */ }
         if (Shop.Current.Features.Lending) Library.ProcessHolds();
         Retention.Prune(null);
+        Assistant.Sweep();   // questions asked of the assistant are forgotten after 90 days
         Backups.RunIfDue();   // the night's copy, when it is due (a failed try is written down and shown to the owner; it never stops the till)
     }
 

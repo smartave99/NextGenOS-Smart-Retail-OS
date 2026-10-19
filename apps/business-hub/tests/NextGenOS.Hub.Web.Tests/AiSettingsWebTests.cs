@@ -195,4 +195,30 @@ public class AiSettingsWebTests
         public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
             Problems.Add(formatter(state, exception) + (exception is null ? "" : ": " + exception.GetType().Name + " " + exception.Message));
     }
+
+    [Fact]
+    public async Task The_ask_screen_is_for_people_who_are_signed_in_and_opening_it_asks_nothing()
+    {
+        // The screen and the menu entry are drawn live in the browser (the browser test checks the words and that the entry follows the switch); here: what the server decides and keeps.
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        var http = Client(f);
+
+        var anonymous = await Get(http, "/ask");
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.Contains("/login", anonymous.Headers.Location!.OriginalString);
+
+        var manager = await SignIn(http, "boss", "manager good password");
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/ask", manager)).StatusCode);
+        Assert.False(f.Hub.Assistant.On);
+
+        f.Hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.AiAssistant, true, null);
+        Assert.True(f.Hub.Assistant.On);
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/ask", manager)).StatusCode);
+
+        // Looking at the screen (even with the switch on) asked nothing: no question was kept, no AI service was used, nothing was sent.
+        Assert.Equal(0L, Convert.ToInt64(f.Hub.Db.Scalar("SELECT COUNT(*) FROM assistant_questions")));
+        Assert.Empty(f.Hub.Ai.Usage.Recent());
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("assistant.", StringComparison.Ordinal));
+    }
 }

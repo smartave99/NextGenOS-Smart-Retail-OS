@@ -53,9 +53,18 @@ Install a program that runs AI models on your PC and speaks the common web proto
 4. Rename the product in *Items*: the map shows the new name at once (it holds no copy).
 5. Remove the area: its connections end and the check says all is in order.
 
+## 6. Ask the shop (Settings, AI helpers; then the menu entry *Ask the shop*)
+
+1. Switch on **Business assistant** under the AI helpers (and **Search by meaning**, so that notes can be written). A menu entry **Ask the shop** appears. Write a note about something you do (for example *Rice supplier's terms: cheap price when we order ten bags*).
+2. With **no AI service connected**, ask *what price does the rice supplier give*. It says no answer could be written and shows the note it found, numbered, with where it came from. Ask something that is in no note and no report: it says nothing was found.
+3. Connect an AI service that runs **on this computer** (AI helpers, *Connect a service*; the address of your local AI program and a model that can follow instructions), press **Test**, switch it on, and ask *how much did we sell in the last 30 days?*. The assistant should choose the sales lookup, write a short answer and point at a numbered fact below it ("used in the answer"). Check the answer against the fact: the assistant can make mistakes. **Tell us which program and model you used, how long it took, whether it chose the right lookup, and any answer that was wrong.**
+4. Sign in as a **cashier** and ask about the best sellers or what is out of stock: the cashier is not offered those lookups. The cashier does not find notes marked confidential or financial.
+5. Under **Settings, Activity**, every question is listed as `assistant.ask` with what was looked at, never with the words of the question. The AI helpers screen shows the use of the AI service and what was sent.
+6. Nothing is changed by a question, whatever it asks for ("refund everything" only gets facts or a plain answer). Nothing leaves this computer unless you allowed that service that kind of information.
+
 ## What to tell us
 
-Anything that is wrong, unclear or in words you would not use, with a screenshot. The list of what is **not** done is in `docs/OPEN-WORK.md`; the exact limits of each part are in `docs/V2-ARCHITECTURE-ASSESSMENT.md`, sections 6 to 8.
+Anything that is wrong, unclear or in words you would not use, with a screenshot. The list of what is **not** done is in `docs/OPEN-WORK.md`; the exact limits of each part are in `docs/V2-ARCHITECTURE-ASSESSMENT.md`, sections 6 to 11.
 
 ## Try running low (stock forecasts)
 1. Switch on **Stock forecasts** under Settings, AI helpers (the licence must include the AI part).

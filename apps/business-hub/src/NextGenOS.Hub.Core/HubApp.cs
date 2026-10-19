@@ -11,6 +11,7 @@ using NextGenOS.Hub.Events;
 using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Intelligence;
+using NextGenOS.Hub.Knowledge;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Loyalty;
 using NextGenOS.Hub.Offers;
@@ -83,6 +84,8 @@ public sealed class HubApp
         State = new StateService(db, clock, Access);
         // Automatic rules over the event history: a rule can only propose an event for a person to check. Off until the owner switches on "Advanced automatic rules" and the rule itself.
         Rules = new RuleService(db, clock, Audit, Ai.Flags, Events, Access);
+        // The owner's notes as local knowledge: found by their words always, and by their meaning when the owner has switched on "Search by meaning" and an AI service that may receive them makes vectors.
+        Knowledge = new KnowledgeService(db, clock, Audit, Ai.Flags, Ai.Gateway, new SqliteVectorIndex(db), Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
@@ -139,6 +142,7 @@ public sealed class HubApp
     public OntologyService Ontology { get; }
     public StateService State { get; }
     public RuleService Rules { get; }
+    public KnowledgeService Knowledge { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public UpdateService Updates { get; }

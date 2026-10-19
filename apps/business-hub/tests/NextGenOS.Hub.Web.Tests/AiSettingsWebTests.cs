@@ -140,6 +140,27 @@ public class AiSettingsWebTests
     }
 
     [Fact]
+    public async Task The_notes_screen_is_for_the_owner_and_looking_at_it_keeps_nothing_and_asks_no_AI_service()
+    {
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        var http = Client(f);
+
+        var anonymous = await Get(http, "/settings/knowledge");
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.Contains("/login", anonymous.Headers.Location!.OriginalString);
+
+        var owner = await SignIn(http, "owner", "correct horse battery");
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/settings/knowledge", owner)).StatusCode);
+        var manager = await SignIn(http, "boss", "manager good password");
+        await Get(http, "/settings/knowledge", manager);
+
+        Assert.False(f.Hub.Knowledge.Recording);
+        Assert.Empty(f.Hub.Knowledge.List(includeRetired: true));
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("knowledge.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task The_background_upkeep_forgets_records_past_their_day_without_any_switch()
     {
         using var f = new HubWebFactory { Modules = ["hub", "ai"] };

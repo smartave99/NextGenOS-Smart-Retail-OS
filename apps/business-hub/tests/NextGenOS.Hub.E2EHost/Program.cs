@@ -47,6 +47,14 @@ if (builder.Configuration.GetValue("E2E:Seed", false))
         return Results.Ok(new { events = hub.Events.Counts().Confirmed });
     }).AllowAnonymous().DisableAntiforgery();
 
+    // Notes to search: the switch for "Search by meaning" (there is no AI service in the test program, so notes are found by their words).
+    app.MapPost("/__e2e/seed-knowledge", (NextGenOS.Hub.HubApp hub) =>
+    {
+        using var asTheProgram = hub.Access.AsSystem();
+        hub.Ai.Flags.Set(NextGenOS.Hub.Ai.FlagKey.LocalEmbeddings, true, null);
+        return Results.Ok(new { recording = hub.Knowledge.Recording });
+    }).AllowAnonymous().DisableAntiforgery();
+
     // Automatic rules: the switch for them, and three door events recorded now (a rule switched on earlier sees them, one switched on later does not).
     app.MapPost("/__e2e/seed-rules", (NextGenOS.Hub.HubApp hub) =>
     {

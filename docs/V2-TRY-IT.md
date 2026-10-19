@@ -38,6 +38,13 @@ Install a program that runs AI models on your PC and speaks the common web proto
 4. Make one sale at the till, press **Write the waiting ones down now**, then in the box **What is true now** write `payment:1` (or `document:1`) and press **Show what is true**. It says when the newest confirmed event about it happened and how many there are. Write a name or an e-mail address instead: it is refused, because things are named by a short reference such as `item:12` or `zone:entrance`. Press **Show what was active in the last day** to list the things that had a confirmed event. This box only reads the history; it changes nothing.
 5. Under **AI helpers** switch on **Advanced automatic rules**. In the box **Automatic rules** make a rule (for example: name *Back door forced*, events starting with `door.opened`, 3 events within 10 minutes, about the same thing, propose `alert.door_forced`) and press **Save the rule**. It is made switched off: press **Switch on**. A rule looks only at events recorded from that moment, so nothing is proposed from old history. There are no door cameras yet (Phase 7), so to see a rule work, ask us to add three test events with the test program; then press **Look at the events now** and look in the list above under *Waiting to be checked*. **Why?** says which rule made the proposal. A rule can only propose; nothing else happens until you say *Yes, it happened* or *No, it was wrong*.
 
+## 6. Notes to search (Settings, AI helpers, Notes to search)
+
+1. Switch on **Search by meaning** under the AI helpers. Open **Notes to search** and write a note (for example *Rice supplier's terms: the supplier gives a cheap price for rice when we order ten bags*); choose the kind of information it holds. Write a second note about something else.
+2. Under **Look for something** type *what price for rice*: the first note is found by its words, with where it came from (`note:1`). Type a word that is in no note: "Nothing found."
+3. Press **Prepare the notes now**. With no AI service set up it says so in plain words and keeps the notes. If you have set up a service on this computer that makes embeddings (AI helpers, a service for "finding things by meaning"), the notes become "ready" and a question such as *an inexpensive supplier* finds the first note by its meaning; the table says "its meaning". Tell us which service and model you used and what it found.
+4. **Change** a note and **Retire** a note: a retired note is gone from every search. Nothing is ever sent outside this computer unless you have allowed that service that kind of information.
+
 ## 5. Business map (Settings, AI helpers, Business map)
 
 1. Switch on **Business map**. Add your shop, an area inside it ("Aisle 1"), a shelf inside the area, and a camera.

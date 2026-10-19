@@ -4,6 +4,7 @@
 @using System.Globalization
 @using NextGenOS.Hub.Ai
 @using NextGenOS.Hub.Events
+@using NextGenOS.Hub.Intelligence
 @using NextGenOS.Hub
 
 <PageTitle>Business events</PageTitle>
@@ -166,6 +167,121 @@ else if (!App.Events.Recording)
     </section>
 }
 
+<section class="card" id="ev-state">
+    <h2>What is true now</h2>
+    <p class="muted small">Pick one thing or one place and see what the history says about it: the newest event that was confirmed, how many there are of each kind, and how long it has been quiet. A thing is written as <code>item:12</code> or <code>track:cam1:17</code>, a place as <code>zone:entrance</code>. Leave the day empty for now, or choose a day to see how it stood at the end of that day. Events that are still waiting to be checked are counted apart and do not decide anything.</p>
+    <div class="field-row">
+        <div><label for="st-ref">Thing or place</label><input id="st-ref" @bind="stateRef" maxlength="140" placeholder="for example item:12 or zone:entrance" /></div>
+        <div><label for="st-when">As it stood on</label><input id="st-when" type="date" value="@stateWhen" @onchange="e => stateWhen = e.Value?.ToString() ?? string.Empty" /></div>
+    </div>
+    <div class="row">
+        <button type="button" class="btn primary" id="st-go" @onclick="AskState">Show what is true</button>
+        <button type="button" class="btn ghost" id="st-active" @onclick="ShowActive">Show what was active in the last day</button>
+    </div>
+    @if (asked is not null)
+    {
+        <p id="st-sentence"><strong>@Named(asked.Ref)</strong>: @asked.Sentence</p>
+        @if (asked.ByType.Count > 0)
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="st-table">
+                <thead><tr><th>What happened</th><th class="num">How many</th><th>The newest</th></tr></thead>
+                <tbody>
+                @foreach (var t in asked.ByType)
+                {
+                    <tr><td>@EventTypes.Label(t.Type)</td><td class="num">@t.Count</td><td class="nowrap">@When(t.LastAt)</td></tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+        @if (asked.Latest is { } latestOne)
+        {
+            <div class="row"><button type="button" class="btn ghost small" id="st-why" @onclick="() => Explain(latestOne.Id)">Why does the system believe the newest one?</button></div>
+        }
+    }
+    @if (active is not null)
+    {
+        @if (active.Count == 0) { <div class="empty" id="st-none">Nothing had a confirmed event in the last day.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="st-active-table">
+                <thead><tr><th>Thing</th><th>Newest event</th><th>When</th><th class="num">Events</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var a in active)
+                {
+                    var reference = a.Ref;
+                    <tr>
+                        <td>@Named(reference)</td><td>@EventTypes.Label(a.LastType)</td><td class="nowrap">@When(a.LastAt)</td><td class="num">@a.Events</td>
+                        <td class="row"><button type="button" class="btn ghost small" @onclick="() => LookAt(reference)">Look</button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+    }
+</section>
+
+<section class="card" id="ev-rules">
+    <h2>Automatic rules</h2>
+    <p class="muted small">A rule watches the history for you: <em>when this many confirmed events of one kind happen within this time, propose a new event</em>. A rule can <strong>only propose</strong>: what it proposes appears in the list above as "Waiting to be checked", and nothing happens until you say yes. A rule is made switched off; once you switch it on it looks only at events recorded from that moment. If you change a rule it is switched off again.</p>
+    @if (!App.Ai.Flags.IsEnabled(FlagKey.AdvancedRules))
+    {
+        <div class="notice warn" id="rl-off">Automatic rules are switched off, so the rules below do nothing. You can switch them on under <a href="settings/ai">AI helpers</a> (Advanced automatic rules).</div>
+    }
+    @if (ruleList.Count == 0) { <div class="empty" id="rl-none">There are no rules yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl" id="rl-table">
+            <thead><tr><th>Rule</th><th>What it does</th><th>Now</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in ruleList)
+            {
+                var rule = r;
+                <tr id="@("rl-" + rule.Id)">
+                    <td>@rule.Name</td>
+                    <td class="small">@rule.Sentence@(string.IsNullOrWhiteSpace(rule.Explanation) ? "" : " " + rule.Explanation)</td>
+                    <td class="nowrap">@(rule.Enabled ? "On" : "Off")@(rule.CheckedUntil is { } lookedTo && rule.Enabled ? ", looked until " + When(lookedTo) : "")</td>
+                    <td class="row">
+                        <button type="button" class="btn ghost small" @onclick="() => SwitchRule(rule)">@(rule.Enabled ? "Switch off" : "Switch on")</button>
+                        <button type="button" class="btn ghost small" @onclick="() => EditRule(rule)">Change</button>
+                        <button type="button" class="btn ghost small" @onclick="() => RetireRule(rule)">Retire</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+    <h3>@(form.Id is null ? "Make a rule" : "Change the rule")</h3>
+    <div class="field-row">
+        <div><label for="rl-name">Name</label><input id="rl-name" @bind="form.Name" maxlength="80" placeholder="for example Back door forced" /></div>
+        <div><label for="rl-prefix">Count events starting with</label><input id="rl-prefix" @bind="form.Prefix" maxlength="80" placeholder="for example door.opened" /></div>
+        <div><label for="rl-min">Each at least this sure (%)</label><input id="rl-min" class="qty" inputmode="numeric" @bind="form.Min" maxlength="3" /></div>
+    </div>
+    <div class="field-row">
+        <div><label for="rl-count">When there are this many</label><input id="rl-count" class="qty" inputmode="numeric" @bind="form.Count" maxlength="4" /></div>
+        <div><label for="rl-window">within this many minutes</label><input id="rl-window" class="qty" inputmode="numeric" @bind="form.Window" maxlength="5" /></div>
+        <div>
+            <label for="rl-group">that happened</label>
+            <select id="rl-group" @bind="form.Group">@foreach (var g in RuleGroup.Known) { <option value="@g">@RuleGroup.Label(g)</option> }</select>
+        </div>
+    </div>
+    <div class="field-row">
+        <div><label for="rl-then">Then propose an event of type</label><input id="rl-then" @bind="form.Then" maxlength="80" placeholder="for example alert.door_forced" /></div>
+        <div><label for="rl-sure">and say it is this sure (%)</label><input id="rl-sure" class="qty" inputmode="numeric" @bind="form.Sure" maxlength="3" /></div>
+        <div><label for="rl-why">Note for whoever checks it (optional)</label><input id="rl-why" @bind="form.Explanation" maxlength="300" /></div>
+    </div>
+    <div class="row">
+        <button type="button" class="btn primary" id="rl-save" @onclick="SaveRule">@(form.Id is null ? "Save the rule" : "Save the change")</button>
+        @if (form.Id is not null) { <button type="button" class="btn ghost" id="rl-cancel" @onclick="() => form = new RuleForm()">Cancel</button> }
+        <button type="button" class="btn ghost" id="rl-run" @onclick="RunRules">Look at the events now</button>
+    </div>
+</section>
+
 <section class="card" id="ev-retention">
     <h2>How long things are kept</h2>
     <p class="muted small">Records are forgotten when their time is up, even when the history is switched off. What is private is kept for a short time unless you choose otherwise. Biometric data (faces, fingerprints) is <strong>not kept at all</strong> unless you write a number of days here. Card and payment details are never kept.</p>
@@ -211,6 +327,87 @@ else if (!App.Events.Recording)
     private OutboxStats queue = new(0, 0, 0, null, null, false);
     private IReadOnlyList<OutboxMessage> failedMessages = Array.Empty<OutboxMessage>();
 
+    private IReadOnlyList<EventRule> ruleList = Array.Empty<EventRule>();
+    private RuleForm form = new();
+
+    private sealed class RuleForm
+    {
+        public long? Id;
+        public string Name = "", Prefix = "", Group = RuleGroup.Subject, Then = "", Explanation = "", Min = "60", Count = "3", Window = "10", Sure = "70";
+    }
+
+    private static int Whole(string text, string what)
+    {
+        if (!int.TryParse((text ?? "").Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var n)) throw new HubException("bad-number", "'" + text + "' is not a whole number (" + what + ").");
+        return n;
+    }
+
+    private async Task SaveRule()
+    {
+        var wasNew = form.Id is null;
+        await Run(() =>
+        {
+            var input = new RuleInput(form.Name, form.Prefix, Whole(form.Min, "how sure the events must be") / 100.0, Whole(form.Count, "how many events"), Whole(form.Window, "minutes"), form.Group, form.Then,
+                Whole(form.Sure, "how sure the proposal is") / 100.0, form.Explanation);
+            if (form.Id is { } id) App.Rules.Update(id, input, Me.Id); else App.Rules.Create(input, Me.Id);
+            form = new RuleForm();
+        }, wasNew ? "Saved. The rule is switched off: switch it on when you are ready." : "Saved. The rule is switched off again: switch it on when you are ready.");
+        await Reload();
+    }
+
+    private void EditRule(EventRule rule) => form = new RuleForm
+    {
+        Id = rule.Id, Name = rule.Name, Prefix = rule.TypePrefix, Group = rule.GroupBy, Then = rule.ThenType, Explanation = rule.Explanation ?? "",
+        Min = Math.Round(rule.MinConfidence * 100).ToString(CultureInfo.InvariantCulture), Count = rule.Count.ToString(CultureInfo.InvariantCulture),
+        Window = rule.WindowMinutes.ToString(CultureInfo.InvariantCulture), Sure = Math.Round(rule.ThenConfidence * 100).ToString(CultureInfo.InvariantCulture),
+    };
+
+    private async Task SwitchRule(EventRule rule)
+    {
+        await Run(() => App.Rules.SetEnabled(rule.Id, !rule.Enabled, Me.Id), rule.Enabled ? "Switched off." : "Switched on. It looks at events recorded from now on.");
+        await Reload();
+    }
+
+    private async Task RetireRule(EventRule rule)
+    {
+        await Run(() => App.Rules.Retire(rule.Id, Me.Id), "Retired. What it proposed stays in the history.");
+        await Reload();
+    }
+
+    private async Task RunRules()
+    {
+        await Run(() =>
+        {
+            if (!App.Rules.Running) { Info = "Rules are not running: the AI features need the licence, and \"Business event history\" and \"Advanced automatic rules\" must be switched on under AI helpers."; return; }
+            var done = App.Rules.Run();
+            Info = done.Rules == 0 ? "No rule is switched on." : "Looked at " + done.Looked + " event(s) for " + done.Rules + " rule(s): " + done.Proposed + " proposed" + (done.Skipped > 0 ? ", " + done.Skipped + " could not be kept" : "") + ".";
+        });
+        await Reload();
+    }
+
+    private string stateRef = "", stateWhen = "";
+    private EntityState? asked;
+    private IReadOnlyList<ActiveThing>? active;
+
+    private async Task AskState()
+    {
+        await Run(() =>
+        {
+            var text = stateRef.Trim();
+            var at = Date(stateWhen, end: true);
+            asked = text.StartsWith("zone:", StringComparison.Ordinal) ? App.State.OfZone(text, at) : App.State.Of(text, at);
+        });
+    }
+
+    private async Task ShowActive() => await Run(() => active = App.State.Active(null, TimeSpan.FromDays(1), 20));
+
+    private async Task LookAt(string reference)
+    {
+        stateRef = reference;
+        stateWhen = "";
+        await AskState();
+    }
+
     private static string Wait(TimeSpan age) => age.TotalMinutes < 1 ? "less than a minute" : age.TotalHours < 1 ? (int)age.TotalMinutes + " minute(s)" : age.TotalDays < 1 ? (int)age.TotalHours + " hour(s)" : (int)age.TotalDays + " day(s)";
 
     private async Task RetryFailed()
@@ -235,6 +432,7 @@ else if (!App.Events.Recording)
         queue = App.Outbox.Stats();
         failedMessages = queue.Failed > 0 ? App.Outbox.List("failed", 5) : Array.Empty<OutboxMessage>();
         counts = App.Events.Counts();
+        ruleList = App.Rules.List();
         rules = App.Retention.Rules();
         foreach (var rule in rules) days[(rule.Subject, rule.DataClass)] = rule.IsDefault ? "" : rule.Days.ToString(CultureInfo.InvariantCulture);
         Query(reset: false);

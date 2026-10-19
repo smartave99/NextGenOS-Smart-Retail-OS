@@ -95,6 +95,68 @@ try {
   await rows(page, '#ev-table', 3);
   step('a person confirms an event that was only proposed, and it is counted as confirmed');
 
+  // What is true now (Phase 4, step 1): worked out from the confirmed events at the moment of asking.
+  await page.locator('#st-ref').fill('track:cam1:17');
+  await page.locator('#st-go').click();
+  await page.locator('#st-sentence', { hasText: 'picked up product' }).waitFor();
+  assert.match(await page.locator('#st-sentence').innerText(), /Newest confirmed event: 'Customer session: picked up product', 3 minutes ago \(90% sure, made by an automatic rule\)\. 1 event is confirmed in all\./);
+  await page.locator('#st-ref').fill('zone:aisle-3');
+  await page.locator('#st-go').click();
+  await page.locator('#st-sentence', { hasText: '3 events are confirmed in all' }).waitFor();
+  assert.match(await page.locator('#st-sentence').innerText(), /Newest confirmed event: 'Shelf: checked', 1 minute ago/);
+  assert.strictEqual(await page.locator('#st-table tbody tr').count(), 3, 'one row for each kind of event in the place');
+  assert.doesNotMatch(await page.locator('#st-table').innerText(), /restocked/, 'the replaced event is left out');
+  await shot(page, '3-state');
+  await page.locator('#st-why').click();
+  await page.locator('#ev-why').waitFor();
+  assert.match(await page.locator('#ev-sentence').innerText(), /Made by a person 'staff'/);
+  await page.locator('#st-ref').fill('Maria Santos');
+  await page.locator('#st-go').click();
+  await page.locator('.notice.error', { hasText: 'reference' }).waitFor();
+  await page.locator('#st-active').click();
+  await page.locator('#st-active-table').waitFor();
+  assert.strictEqual(await page.locator('#st-active-table tbody tr').count(), 1);
+  assert.match(await page.locator('#st-active-table').innerText(), /track:cam1:17/);
+  step('"what is true now" shows the newest confirmed event of a thing or a place, leaves out what was replaced, explains it, refuses a name, and lists what was active');
+
+  // Automatic rules (Phase 4, step 2): made switched off, switched on by a person, they only propose, and the proposal explains itself.
+  await page.locator('#rl-none').waitFor();
+  assert.match(await page.locator('#rl-off').innerText(), /Automatic rules are switched off/);
+  await page.locator('#rl-name').fill('Back door forced');
+  await page.locator('#rl-prefix').fill('Door Opened');
+  await page.locator('#rl-then').fill('alert.door_forced');
+  await page.locator('#rl-save').click();
+  await page.locator('.notice.error', { hasText: 'lower-case words' }).waitFor();
+  await page.locator('#rl-prefix').fill('door.opened');
+  await page.locator('#rl-save').click();
+  await page.locator('.notice.ok', { hasText: 'The rule is switched off' }).waitFor();
+  await page.locator('#rl-table').waitFor();
+  const ruleRow = page.locator('#rl-1');
+  assert.match(await ruleRow.innerText(), /When 3 or more confirmed events starting with 'door\.opened' \(each at least 60% sure\) happen about the same thing within 10 minutes, propose 'Alert: door forced' for a person to check\./);
+  assert.match(await ruleRow.innerText(), /Off/);
+  const on = await page.request.post(hub.url + '/__e2e/seed-rules');
+  assert.deepStrictEqual(await on.json(), { running: true });
+  await page.reload();
+  await page.locator('#rl-table').waitFor();
+  assert.strictEqual(await page.locator('#rl-off').count(), 0, 'the notice is gone once the rules are switched on');
+  await page.locator('#rl-1').getByRole('button', { name: 'Switch on' }).click();
+  await page.locator('.notice.ok', { hasText: 'Switched on' }).waitFor();
+  assert.strictEqual((await page.request.post(hub.url + '/__e2e/door-events')).status(), 200);
+  await page.locator('#rl-run').click();
+  await page.locator('.notice.ok', { hasText: 'Looked at 3 event(s) for 1 rule(s): 1 proposed.' }).waitFor();
+  await shot(page, '4-rules');
+  await page.locator('#f-status').selectOption('proposed');
+  await page.locator('#f-go').click();
+  await rows(page, '#ev-table', 1);
+  assert.match(await page.locator('#ev-table').innerText(), /Alert: door forced/);
+  await page.locator('#ev-table tbody tr').first().getByRole('button', { name: 'Why?' }).click();
+  assert.match(await page.locator('#ev-sentence').innerText(), /Made by an automatic rule 'rule-1' \(version v1\), 70% sure\./);
+  assert.match(await page.locator('#ev-sentence').innerText(), /It is waiting for a person to check it\./);
+  await page.locator('#rl-run').click();
+  await page.locator('.notice.ok', { hasText: '0 proposed' }).waitFor();
+  await page.locator('#f-status').selectOption('');
+  step('a rule is made switched off, a person switches it on, it proposes one event for three door events (and not again), and the proposal says which rule made it and waits to be checked');
+
   await page.locator('#f-what').selectOption('observations');
   await page.locator('#f-status').selectOption('');
   await page.locator('#f-go').click();

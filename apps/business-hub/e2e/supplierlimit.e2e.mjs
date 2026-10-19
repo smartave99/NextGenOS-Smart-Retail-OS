@@ -10,11 +10,14 @@ const shot = shots('supplierlimit');
 const step = (s) => console.log('✓ ' + s);
 let hub;
 
-async function order(page, cost) {
+// An item that has been bought before gets its last cost put in the cost box a moment after it is chosen (the screen asks the server). A cost typed before that moment is written over, and the
+// order goes in at the old cost (it did once in CI: 600 instead of 500, "owing 1,200" where 1,100 was expected). So when the item has a cost, wait for the box to be filled before typing.
+async function order(page, cost, itemHasCost = false) {
   await go(page, 'Buying');
   await page.locator('#new-order').click();
   await page.getByLabel('Supplier').selectOption({ label: 'Grain Co' });
   await page.locator('#po-item').selectOption({ label: 'Rice' });
+  if (itemHasCost) await page.waitForFunction(() => document.querySelector('input[aria-label="Cost of each"]').value !== '', null, { timeout: 15000 });
   await page.getByLabel('How many').fill('1');
   await page.getByLabel('Cost of each').fill(String(cost));
   await page.locator('#add-order-line').click();
@@ -52,7 +55,7 @@ try {
   await page.getByText('Stock is updated.').first().waitFor();
   step('goods of 600.00 arrive: 600.00 is owed');
 
-  await order(page, 500);
+  await order(page, 500, true);   // Rice was bought at 600.00, so its cost box is filled for us
   await page.getByRole('button', { name: 'Goods arrived' }).first().click();
   await page.getByText(/owing Grain Co ₹1,100\.00, more than the limit of ₹1,000\.00/).first().waitFor();
   await shot(page, '1-refused');

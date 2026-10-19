@@ -3068,3 +3068,11 @@ The question was: *"A check on this session says there are uncommitted changes. 
 > Begin now by studying the repository thoroughly and designing Phase 1 around the actual existing system rather than around assumptions.
 
 (What the assistant took it to mean, and did: the owner asks whether everything that was planned and said is completed, and restates the Version 2 brief (`docs/VERSION-2.md`). The honest answer is in `docs/OPEN-WORK.md`: the AI assistant 2.0 brief is built, with the gaps listed there, and still has to pass the full gate and the build on GitHub before it is merged; Version 2 Phases 1 to 3 were built earlier, Phase 4 has started with this session ("what is true now", `docs/V2-ARCHITECTURE-ASSESSMENT.md` section 9), and Phases 5 to 8 are not started. Nothing was released or deployed to a shop.)
+
+### 2026-10-18 and 2026-10-19 (two short messages sent after the assistant said the next step was Phase 6; recorded word for word)
+
+> continue
+
+> Continue from where you left off.
+
+(What the assistant took it to mean, and did: carry on with the Version 2 plan in `docs/VERSION-2.md`. Phase 6 step 1, "Ask the shop", was built, as `docs/V2-ARCHITECTURE-ASSESSMENT.md` section 11 says. Nothing was released or deployed to a shop.)

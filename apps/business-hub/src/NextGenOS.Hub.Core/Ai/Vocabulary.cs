@@ -139,7 +139,7 @@ public static class FlagKey
 
     public static string Describe(string key) => key switch
     {
-        AiAssistant => "Lets staff ask questions about the business in plain words. Needs a connected AI service.",
+        AiAssistant => "Lets staff ask questions about the shop in plain words (Ask the shop), and lets the program write short descriptions for the website. It only looks things up and writes; it changes nothing. It needs a connected AI service to write an answer; without one it still shows the facts it found.",
         CameraAnalytics => "Understands what cameras see (needs a capable computer). Raw video stays on this computer.",
         LocalEmbeddings => "Finds products, documents and notes by meaning, using a model on this computer.",
         RemoteAi => "Allows an online AI service to be used at all. Even then, only the kinds of data you allowed for that service leave this computer.",

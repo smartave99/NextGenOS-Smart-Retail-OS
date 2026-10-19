@@ -19,6 +19,16 @@ For every request made through a reason, also the refused ones: when; the reason
 
 No screen calls either yet. They are the first two entries of the list and what the tests (`EgressTests`) use; a feature that wants to send something new adds a reason here, with its own tests, and fills the fields from the shop's records, never from what a person typed as a note.
 
+## Ask the shop (free text, judged by the kind of information, not by a fixed reason)
+
+*Ask the shop* (`docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 11) is the one feature that sends **free text** to an AI service through the plain door (`AiGateway.GenerateAsync` with a context), not through a fixed reason from the list above, because the question is whatever the person types. So the guard above does not apply to it; these rules do, and they are the same as for every other AI work:
+
+- It is off until the owner switches on **Business assistant**, and the licence must have the AI part.
+- Two requests are made for a question. The first, *which lookups?*, carries the lookups the person's role allows and **the question** (counted as confidential business information; a telephone number or an e-mail address in it makes it personal data). The second, *the answer*, carries the program's rules, **the facts the lookups found** (numbered, one line each: for example the day's takings, the best sellers, the items out of stock, the pieces of notes the person may read) and the question, and is counted as the strictest kind of information among the facts (money is financial; a note is whatever the owner marked it).
+- A service **on this computer** may receive all of it. A service on the shop's network or online receives it **only if the owner allowed that service that kind of information** (and, online, switched on *Use online AI services*); the program can limit a permission to named features (this one is called `assistant`), but the AI helpers screen today allows a kind for every feature of that service. When no service may, nothing is sent and the screen shows the facts as they are.
+- Card and payment details and biometric data never leave this computer; a question with a card number in it is refused before anything is done.
+- It is written down in *What was used* (the use record: when, feature `assistant`, service and model, kind of information, tokens, cost, how it ended), **never the text**. It is **not** in the *What was sent* list, which belongs to the fixed reasons. The question record of the feature keeps the question (not the answer, not the figures) for 90 days, and does not keep a question that holds a telephone number or an e-mail address.
+
 ## What the guard cannot know (said plainly)
 
 A short name field cannot tell a product from a remark typed as one. That is why no reason has a field for a remark, a note or a message, and why a screen must fill a name field from the catalogue. The guard does catch names and addresses the shop keeps (customers, suppliers, staff), first names and surnames on their own, a street line on its own, contact details, card numbers (also written in groups with other digits beside them), links, and text that reads like an instruction. It is a safety net, not a replacement for choosing the fields well.

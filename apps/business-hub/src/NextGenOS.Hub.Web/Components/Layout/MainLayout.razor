@@ -62,6 +62,7 @@
         var f = Shop.Features;
         bool Can(string p) => me?.Can(p) == true;
         yield return new Link("", "Today", "home");
+        if (App.Assistant.On) yield return new Link("ask", "Ask the shop", "chat");
         if (f.CounterSale && Can(Perm.Sell)) yield return new Link("sell", Shop.Singular("sale") == "Order" ? "Take an order" : "New " + Shop.Singular("sale").ToLowerInvariant(), "cart");
         if (f.Tables && Can(Perm.Orders)) yield return new Link("tables", "Tables", "table");
         if (f.Kitchen && Can(Perm.Kitchen)) yield return new Link("kitchen", "Kitchen", "flame");

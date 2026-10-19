@@ -32,8 +32,8 @@ public sealed record KnowledgeSource(
     public bool Retired => RetiredAt is not null;
 }
 
-/// <summary>One thing found: which note (by its reference, so that an answer can point at it), the piece that matched and how well. <see cref="ByMeaning"/> says a vector helped to find it.</summary>
-public sealed record KnowledgeHit(string Ref, string Title, int Piece, string Excerpt, double Score, bool ByMeaning);
+/// <summary>One thing found: which note (by its reference, so that an answer can point at it), the piece that matched and how well. <see cref="ByMeaning"/> says a vector helped to find it. <see cref="DataClass"/> is the kind of information the note holds, so that whoever uses the piece next (the assistant) sends it only where that kind may go.</summary>
+public sealed record KnowledgeHit(string Ref, string Title, int Piece, string Excerpt, double Score, bool ByMeaning, string DataClass);
 
 /// <summary>What a search found, and whether the meaning of the words was used (and, when not, why not, in plain words).</summary>
 public sealed record KnowledgeAnswer(IReadOnlyList<KnowledgeHit> Hits, bool UsedMeaning, string? Note);

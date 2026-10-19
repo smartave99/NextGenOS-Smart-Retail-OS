@@ -1,0 +1,158 @@
+@page "/settings/knowledge"
+@attribute [Authorize(Policy = Perm.Ai)]
+@inherits HubPage
+@using System.Globalization
+@using NextGenOS.Hub.Ai
+@using NextGenOS.Hub.Knowledge
+
+<PageTitle>Notes to search</PageTitle>
+<h1>Notes to search</h1>
+<p class="sub">Your own notes (a supplier's terms, a way of doing things, a decision), kept on this computer and found again by their words. When "Search by meaning" is on and an AI service that may receive them is set up, they are also found by what they mean. <a href="settings/ai">Back to the AI helpers</a></p>
+<Notice Error="@Error" Info="@Info" />
+
+@if (!App.Ai.Flags.Licensed)
+{
+    <div class="notice warn" id="kn-unlicensed">Notes for search by meaning are not part of this shop's licence. What was kept stays readable, and nothing new can be written.</div>
+}
+else if (!App.Knowledge.Recording)
+{
+    <div class="notice warn" id="kn-off">"Search by meaning" is switched off, so new notes cannot be written. You can switch it on under <a href="settings/ai">AI helpers</a>. What is already here can still be found by its words.</div>
+}
+
+<section class="card" id="kn-notes">
+    <h2>Your notes</h2>
+    <p class="muted small">A note is kept in short pieces on this computer, in the shop's own file. Card and payment details and fingerprints or faces are never kept in a note. What a person can find is only what the shop would show them anyway: a cashier does not find a note marked confidential or financial. When you retire a note its words and its numbers are deleted.</p>
+    @if (notes.Count == 0) { <div class="empty" id="kn-none">There are no notes yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl" id="kn-table">
+            <thead><tr><th>Note</th><th>What it holds</th><th class="num">Pieces</th><th>Search by meaning</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var n in notes)
+            {
+                var note = n;
+                <tr id="@("kn-" + note.Id)">
+                    <td>@note.Title <span class="muted small">(@note.Ref)</span></td>
+                    <td>@DataClass.Label(note.DataClass)</td>
+                    <td class="num">@note.Pieces</td>
+                    <td>@(note.PiecesWithVectors == note.Pieces ? "ready" : note.PiecesWithVectors + " of " + note.Pieces + " ready")</td>
+                    <td class="row">
+                        <button type="button" class="btn ghost small" @onclick="() => Edit(note)">Change</button>
+                        <button type="button" class="btn ghost small" @onclick="() => Retire(note)">Retire</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+    <h3>@(form.Id is null ? "Write a note" : "Change the note")</h3>
+    <div class="field-row">
+        <div><label for="kn-title">Title</label><input id="kn-title" @bind="form.Title" maxlength="120" placeholder="for example Rice supplier's terms" /></div>
+        <div>
+            <label for="kn-class">What kind of information it holds</label>
+            <select id="kn-class" @bind="form.Class">
+                @foreach (var c in Kinds) { <option value="@c">@DataClass.Label(c)</option> }
+            </select>
+        </div>
+    </div>
+    <div class="field-row">
+        <div class="wide"><label for="kn-text">The note</label><textarea id="kn-text" rows="6" @bind="form.Text" maxlength="20000" placeholder="Write it in your own words."></textarea></div>
+    </div>
+    <div class="row">
+        <button type="button" class="btn primary" id="kn-save" @onclick="Save">@(form.Id is null ? "Keep the note" : "Save the change")</button>
+        @if (form.Id is not null) { <button type="button" class="btn ghost" id="kn-cancel" @onclick="() => form = new NoteForm()">Cancel</button> }
+    </div>
+    <h3>Search by meaning</h3>
+    <p class="muted small">Before a note can be found by its meaning, an AI service makes numbers for its pieces. It only does so for a service that may receive that kind of information (a service on this computer may receive all kinds; an online service only what you allowed it, and only when "Use online AI services" is on). With no such service, notes are found by their words.</p>
+    <div class="row">
+        <button type="button" class="btn secondary" id="kn-prepare" @onclick="PrepareNow">Prepare the notes now</button>
+        <span class="muted small" id="kn-waiting">@waiting piece(s) waiting</span>
+    </div>
+</section>
+
+<section class="card" id="kn-search">
+    <h2>Look for something</h2>
+    <div class="field-row">
+        <div class="wide"><label for="kn-q">What to look for</label><input id="kn-q" @bind="query" maxlength="300" placeholder="for example what price does the rice supplier give" /></div>
+    </div>
+    <div class="row"><button type="button" class="btn primary" id="kn-go" @onclick="Look">Look</button></div>
+    @if (answer is not null)
+    {
+        @if (answer.Note is not null) { <p class="muted small" id="kn-note">@answer.Note</p> }
+        @if (answer.Hits.Count == 0) { <div class="empty" id="kn-found-none">Nothing found.</div> }
+        else
+        {
+            <div class="tbl-wrap">
+            <table class="tbl" id="kn-hits">
+                <thead><tr><th>Note</th><th>The part that matched</th><th>Found by</th><th class="num">How well</th></tr></thead>
+                <tbody>
+                @foreach (var h in answer.Hits)
+                {
+                    <tr><td>@h.Title <span class="muted small">(@h.Ref)</span></td><td class="small">@h.Excerpt</td><td>@(h.ByMeaning ? "its meaning" : "its words")</td><td class="num">@Math.Round(h.Score * 100).ToString(CultureInfo.InvariantCulture)%</td></tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private static readonly string[] Kinds = [DataClass.Internal, DataClass.Confidential, DataClass.Personal, DataClass.Financial, DataClass.Public];
+
+    private sealed class NoteForm { public long? Id; public string Title = "", Text = "", Class = DataClass.Confidential; }
+
+    private IReadOnlyList<KnowledgeSource> notes = Array.Empty<KnowledgeSource>();
+    private NoteForm form = new();
+    private int waiting;
+    private string query = "";
+    private KnowledgeAnswer? answer;
+
+    protected override Task LoadAsync()
+    {
+        notes = App.Knowledge.List();
+        waiting = App.Knowledge.Waiting();
+        return Task.CompletedTask;
+    }
+
+    private async Task Save()
+    {
+        var wasNew = form.Id is null;
+        await Run(() =>
+        {
+            if (form.Id is { } id) App.Knowledge.UpdateNote(id, form.Title, form.Text, form.Class, Me.Id); else App.Knowledge.AddNote(form.Title, form.Text, form.Class, Me.Id);
+            form = new NoteForm();
+        }, wasNew ? "Kept." : "Saved. Its numbers for search by meaning were deleted: press Prepare to make them again.");
+        await Reload();
+    }
+
+    private async Task Edit(KnowledgeSource note)
+    {
+        await Run(() => form = new NoteForm { Id = note.Id, Title = note.Title, Text = App.Knowledge.TextOf(note.Id) ?? "", Class = note.DataClass });
+    }
+
+    private async Task Retire(KnowledgeSource note)
+    {
+        await Run(() => App.Knowledge.RetireNote(note.Id, Me.Id), "Retired. Its words and numbers were deleted.");
+        if (form.Id == note.Id) form = new NoteForm();
+        await Reload();
+    }
+
+    private async Task PrepareNow()
+    {
+        await Run(async () =>
+        {
+            var done = await App.Knowledge.PrepareAsync(Me.Id);
+            Info = done.Prepared == 0 && done.Waiting == 0 && done.Note is null ? "Nothing was waiting."
+                : done.Prepared + " piece(s) prepared for search by meaning" + (done.Note is null ? "." : ". " + done.Note);
+        });
+        await Reload();
+    }
+
+    private async Task Look()
+    {
+        await Run(async () => answer = await App.Knowledge.SearchAsync(query, 10));
+    }
+}

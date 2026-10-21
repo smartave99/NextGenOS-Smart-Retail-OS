@@ -38,11 +38,19 @@ public static class AssistantMode
     public static readonly IReadOnlyList<string> All = [Answered, FactsOnly, NothingFound];
 }
 
+/// <summary>
+/// A request the screen can offer for a thing the answer points at (a running-low warning): what it would do in plain words, and whether this person can ask for it now. The program builds it
+/// from the warning's own figures and checks it with the same rules as the Buying page; a model never writes one. <see cref="Problem"/> says why it cannot be asked for (for example an order to
+/// the same supplier for the same goods is still open).
+/// </summary>
+public sealed record AssistantOffer(long FindingId, string Action, string Title, string Summary, string? Problem, bool CanAsk);
+
 /// <summary>The reply to one question.</summary>
 /// <param name="Cited">The numbers of the facts the answer points at (only numbers that exist).</param>
 /// <param name="Notes">Plain-word remarks about how the reply was made (a lookup skipped, search by words only, an AI service that did not answer).</param>
+/// <param name="Offers">Requests a person could ask for from what the answer points at. Nothing is asked for until the person presses the button, and nothing is done until someone who may approve it does.</param>
 public sealed record AssistantReply(
-    long Id, string Question, string Mode, string? Text, IReadOnlyList<AssistantFact> Facts, IReadOnlyList<int> Cited, IReadOnlyList<ToolRun> Tools, IReadOnlyList<string> Notes, string? ProviderId, string? Model);
+    long Id, string Question, string Mode, string? Text, IReadOnlyList<AssistantFact> Facts, IReadOnlyList<int> Cited, IReadOnlyList<ToolRun> Tools, IReadOnlyList<string> Notes, string? ProviderId, string? Model, IReadOnlyList<AssistantOffer> Offers);
 
 /// <summary>A question that was asked, as the record keeps it (never the answer).</summary>
 public sealed record AskedQuestion(

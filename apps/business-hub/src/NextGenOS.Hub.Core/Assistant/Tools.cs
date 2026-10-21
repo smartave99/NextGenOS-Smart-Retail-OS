@@ -1,5 +1,6 @@
 using System.Globalization;
 using NextGenOS.Hub.Ai;
+using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Knowledge;
 using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Security;
@@ -49,13 +50,17 @@ internal static class AssistantTools
     public const string SalesId = "sales.summary";
     public const string BestId = "sales.best-sellers";
     public const string StockId = "stock.out";
+    public const string RunningLowId = "stock.running-low";
+    /// <summary>A reference that starts like this is a running-low warning (<c>finding:12</c>); the screen may offer a request for it.</summary>
+    public const string FindingRef = "finding:";
 
     private const int OutOfStockLines = 15;
+    private const int Warnings = 5;
     private const int BestSellers = 5;
 
     private static readonly ToolArg PeriodArg = new("period", "the days to look at", AssistantPeriods.All);
 
-    public static IReadOnlyList<ToolSpec> Build(ReportService reports, KnowledgeService knowledge, ShopContextProvider shop, IClock clock)
+    public static IReadOnlyList<ToolSpec> Build(ReportService reports, KnowledgeService knowledge, InsightService insights, ShopContextProvider shop, IClock clock)
     {
         DateOnly Today() => shop.Current.Time.LocalDate(clock.UtcNow);
 
@@ -118,6 +123,29 @@ internal static class AssistantTools
                     lines.AddRange(gone.Take(OutOfStockLines).Select(o => new ToolLine("Out of stock: " + o.Name + " (" + ShopContext.Qty(o.OnHandMilli).TrimEnd('0').TrimEnd('.') + " " + o.Unit + " on hand).")));
                     if (gone.Count > OutOfStockLines) lines.Add(new ToolLine("There are " + (gone.Count - OutOfStockLines) + " more out of stock that are not listed here."));
                     return Task.FromResult(new ToolResult(lines, DataClass.Internal));
+                }),
+
+            new ToolSpec(RunningLowId, "Running low", "The things that will run out before a new delivery could arrive, from the stock forecast, with the order the program suggests for each.",
+                [], [Perm.Stock, Perm.Purchases],
+                (_, _, _) =>
+                {
+                    if (!insights.On) throw new HubException("insights-off", "Stock forecasts are switched off, so there are no running-low warnings. The owner can switch them on under Settings, AI helpers.");
+                    var open = insights.Open();
+                    string Qty(long milli) => ShopContext.Qty(milli).TrimEnd('0').TrimEnd('.');
+                    var lines = open.Take(Warnings).Select(w =>
+                    {
+                        var d = w.Detail;
+                        var pace = d.Name + ": " + Qty(d.OnHandMilli) + " " + d.Unit + " on hand, " + Qty(d.SoldMilli) + " " + d.Unit + " sold in the last " + d.Days.ToString(CultureInfo.InvariantCulture) + " days, and delivery takes " +
+                            d.LeadDays.ToString(CultureInfo.InvariantCulture) + " days. ";
+                        var next = w.Status == LowStockStatus.Order
+                            ? "The forecast suggests ordering " + Qty(d.ProposedMilli) + " " + d.Unit + (d.SupplierName is null ? "." : " from " + d.SupplierName + ".")
+                            : "Orders already on the way cover it.";
+                        return new ToolLine("Running low (warning " + w.Id.ToString(CultureInfo.InvariantCulture) + "): " + pace + next, FindingRef + w.Id.ToString(CultureInfo.InvariantCulture));
+                    }).ToList();
+                    if (open.Count == 0) lines.Add(new ToolLine("There are no running-low warnings open."));
+                    else if (open.Count > Warnings) lines.Add(new ToolLine("There are " + (open.Count - Warnings) + " more warnings that are not listed here."));
+                    // Supplier names are shown, so this is counted as confidential business information.
+                    return Task.FromResult(new ToolResult(lines, DataClass.Confidential));
                 }),
         ];
     }

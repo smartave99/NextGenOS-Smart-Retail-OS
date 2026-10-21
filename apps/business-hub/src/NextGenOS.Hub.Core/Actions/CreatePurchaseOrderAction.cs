@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Purchasing;
 using NextGenOS.Hub.Security;
 using NextGenOS.Hub.Shop;
@@ -23,6 +24,13 @@ public sealed record CreatePurchaseOrderInput(long SupplierId, IReadOnlyList<Ord
 /// </summary>
 public sealed class CreatePurchaseOrderAction(HubDb db, PartyService parties, CatalogService catalog, PurchaseService purchasing, ShopContextProvider shop) : IActionHandler
 {
+    /// <summary>
+    /// The request that a running-low warning proposes: the supplier and the quantity the warning names, at what the item costs now. The one place that makes it, for the Buying page's
+    /// "Ask for approval" and for the assistant's offer, so that the two can never ask for different things from the same warning.
+    /// </summary>
+    public static string InputFor(StoredFinding finding, long costMinor) =>
+        JsonSerializer.Serialize(new CreatePurchaseOrderInput(finding.Detail.SupplierId, [new OrderLineInput(finding.ItemId, finding.Detail.ProposedMilli, costMinor)]));
+
     public const int MaxLines = 50;
     public const long MaxQtyMilli = 1_000_000_000;      // a million units
     public const long MaxCostMinor = 1_000_000_000_000;

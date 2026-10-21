@@ -61,6 +61,7 @@ Install a program that runs AI models on your PC and speaks the common web proto
 4. Sign in as a **cashier** and ask about the best sellers or what is out of stock: the cashier is not offered those lookups. The cashier does not find notes marked confidential or financial.
 5. Under **Settings, Activity**, every question is listed as `assistant.ask` with what was looked at, never with the words of the question. The AI helpers screen shows the use of the AI service and what was sent.
 6. Nothing is changed by a question, whatever it asks for ("refund everything" only gets facts or a plain answer). Nothing leaves this computer unless you allowed that service that kind of information.
+7. **A recommended order:** switch on **Stock forecasts** and **Suggested actions**, type a delivery time for something you stock (Buying, Delivery times), press **Check now**, then ask *what is running low?*. If the answer rests on a warning, a card **A next step you could take** shows the order the warning proposes. Press **Ask for approval**: a request appears under **Waiting for approval** on the Buying page, asked for by you. Nothing is ordered until someone who may buy presses **Approve and draft the order**; then one draft order exists and the warning is not offered again. A cashier is not offered the lookup. **Tell us whether the assistant chose the running-low lookup for your question, and whether the suggested order was one you would place.**
 
 ## What to tell us
 

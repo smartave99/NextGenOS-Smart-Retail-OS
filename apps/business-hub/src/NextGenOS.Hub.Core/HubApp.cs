@@ -88,7 +88,7 @@ public sealed class HubApp
         // The owner's notes as local knowledge: found by their words always, and by their meaning when the owner has switched on "Search by meaning" and an AI service that may receive them makes vectors.
         Knowledge = new KnowledgeService(db, clock, Audit, Ai.Flags, Ai.Gateway, new SqliteVectorIndex(db), Access);
         // "Ask the shop": a question answered from the shop's own records and notes, as the person asking. It only looks things up. Off until the owner switches on "Business assistant".
-        Assistant = new AssistantService(db, clock, Audit, Ai.Flags, Ai.Gateway, Knowledge, Reports, Shop, Access);
+        Assistant = new AssistantService(db, clock, Audit, Ai.Flags, Ai.Gateway, Knowledge, Reports, Insights, Actions, Catalog, Shop, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);

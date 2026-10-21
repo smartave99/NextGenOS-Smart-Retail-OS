@@ -67,6 +67,24 @@ else
                 </table>
                 </div>
             }
+            @if (reply.Offers.Count > 0)
+            {
+                <h3>A next step you could take</h3>
+                <p class="muted small" id="as-offer-note">The assistant only points at it. Asking puts a request on the <a href="purchases">Buying</a> page; nothing is ordered until someone who may buy approves it.</p>
+                @foreach (var offer in reply.Offers)
+                {
+                    var o = offer;
+                    <div class="card inner" id="@("as-offer-" + o.FindingId)">
+                        <strong>@o.Title</strong>
+                        <p>@o.Summary</p>
+                        @if (o.Problem is not null) { <p class="muted small as-offer-problem">It cannot be asked for now: @o.Problem</p> }
+                        @if (o.CanAsk)
+                        {
+                            <button type="button" class="btn secondary small" id="@("as-offer-ask-" + o.FindingId)" disabled="@asked.Contains(o.FindingId)" @onclick="() => AskForApproval(o)">@(asked.Contains(o.FindingId) ? "Asked for" : "Ask for approval")</button>
+                        }
+                    </div>
+                }
+            }
             @if (reply.Tools.Any(t => t.Problem is not null))
             {
                 <h3>What could not be looked up</h3>
@@ -132,6 +150,14 @@ else
         if (reply is not null) question = "";
         await Reload();
     }
+
+    private readonly HashSet<long> asked = new();
+
+    private Task AskForApproval(AssistantOffer offer) => Run(() =>
+    {
+        App.Assistant.AskForApproval(offer.FindingId);
+        asked.Add(offer.FindingId);
+    }, "Asked for. It waits for approval on the Buying page.");
 
     private static string Ended(string outcome) => outcome switch
     {

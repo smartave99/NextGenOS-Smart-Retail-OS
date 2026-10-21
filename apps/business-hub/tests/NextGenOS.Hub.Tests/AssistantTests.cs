@@ -248,12 +248,13 @@ public sealed class AssistantTests : IDisposable
 
         var plans = model.Plans.Select(p => p.Messages[0].Content).ToList();
         Assert.Equal(3, plans.Count);
-        foreach (var lookup in new[] { "notes.search", "sales.summary", "sales.best-sellers", "stock.out" }) { Assert.Contains(lookup + ":", plans[0]); Assert.Contains(lookup + ":", plans[1]); }
+        foreach (var lookup in new[] { "notes.search", "sales.summary", "sales.best-sellers", "stock.out", "stock.running-low" }) { Assert.Contains(lookup + ":", plans[0]); Assert.Contains(lookup + ":", plans[1]); }
         // The cashier sells and so sees the day's totals on the first screen, but not the best sellers or the stock reports.
         Assert.Contains("sales.summary:", plans[2]);
         Assert.Contains("notes.search:", plans[2]);
         Assert.DoesNotContain("sales.best-sellers", plans[2]);
         Assert.DoesNotContain("stock.out", plans[2]);
+        Assert.DoesNotContain("stock.running-low", plans[2]);
     }
 
     [Fact]
@@ -328,10 +329,10 @@ public sealed class AssistantTests : IDisposable
     [Fact]
     public void Each_person_is_told_what_the_assistant_can_look_at_for_them()
     {
-        using (S.Access.As(owner)) Assert.Equal(["notes.search", "sales.best-sellers", "sales.summary", "stock.out"], S.Assistant.WhatICanLookAt().Select(t => t.Id).Order().ToArray());
+        using (S.Access.As(owner)) Assert.Equal(["notes.search", "sales.best-sellers", "sales.summary", "stock.out", "stock.running-low"], S.Assistant.WhatICanLookAt().Select(t => t.Id).Order().ToArray());
         using (S.Access.As(cashier)) Assert.Equal(["notes.search", "sales.summary"], S.Assistant.WhatICanLookAt().Select(t => t.Id).Order().ToArray());
         using (S.Access.As(kitchen)) Assert.Equal(["notes.search"], S.Assistant.WhatICanLookAt().Select(t => t.Id).ToArray());
-        Assert.Equal(4, S.Assistant.AllLookups.Count);
+        Assert.Equal(5, S.Assistant.AllLookups.Count);
     }
 
     // ---- what the model is not trusted with --------------------------------------------------------------------------------------------

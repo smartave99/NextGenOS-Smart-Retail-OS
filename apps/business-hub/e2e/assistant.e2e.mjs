@@ -1,6 +1,7 @@
 // "Ask the shop" (Version 2, phase 6, step 1): off until the owner switches it on; with no AI service it still shows what it found in the owner's notes; with a (stand-in) AI service on this
 // computer it chooses a lookup, the answer is written from the numbered facts and points at them, and a pointer to a fact that does not exist is taken out. The AI service here is a small
-// program of this test that speaks the same web language as the usual local AI programs, so the real connection is used.
+// program of this test that speaks the same web language as the usual local AI programs, so the real connection is used. Then (step 2) a running-low warning: the answer offers the order the warning
+// proposes, a person presses "Ask for approval", nothing is ordered until someone who may buy approves it on the Buying page.
 import assert from 'node:assert';
 import http from 'node:http';
 import { build, startHub, launch, newPage, setUp, signIn, shots, go } from './lib.mjs';
@@ -26,9 +27,12 @@ const fake = http.createServer((req, res) => {
       const choosing = payload.messages[0].content.startsWith('You help a person who works in a shop');
       // The answer points at the sales fact, wherever it is in the list (a common word such as "we" can bring a note in before it).
       const sales = choosing ? null : /^\[(\d+)\] Sales for /m.exec(payload.messages[1].content)?.[1];
+      const low = choosing ? null : /^\[(\d+)\] Running low/m.exec(payload.messages[1].content)?.[1];
+      const lookup = /running low/i.test(payload.messages[1].content) ? { tool: 'stock.running-low' } : { tool: 'sales.summary', args: { period: 'last-30-days' } };
       const text = choosing
-        ? JSON.stringify({ tools: [{ tool: 'sales.summary', args: { period: 'last-30-days' } }] })
-        : answerMode === 'good' ? `The shop sold what the sales fact says [${sales}].` : `The shop sold a lot [${sales}] and also a loan [9].`;
+        ? JSON.stringify({ tools: [lookup] })
+        : low ? `The program suggests an order [${low}].`
+          : answerMode === 'good' ? `The shop sold what the sales fact says [${sales}].` : `The shop sold a lot [${sales}] and also a loan [9].`;
       res.end(JSON.stringify({ model: 'fake-model', choices: [{ message: { role: 'assistant', content: text } }], usage: { prompt_tokens: 30, completion_tokens: 10 } }));
       return;
     }
@@ -146,11 +150,57 @@ try {
   assert.ok(!recent.includes('sales fact says'), 'the answers are not kept');
   step('the questions asked are listed with what was looked at and how each ended, without the answers');
 
+  // ---- step 2: a running-low warning, the offer, the request and the approval ---------------------------------------------------------
+  const stock = await page.request.post(hub.url + '/__e2e/seed-stock');
+  assert.ok(stock.ok(), 'the shop that has sold rice and dal for four weeks was made');
+  await go(page, 'Buying');
+  await page.locator('#low-check').click();
+  await page.locator('[id^="low-order-"]').first().waitFor({ timeout: 30000 });
+  assert.strictEqual(await page.getByRole('button', { name: 'Goods arrived' }).count(), 0, 'no order exists yet');
+
+  await go(page, 'Ask the shop');
+  await ask(page, 'What is running low?');
+  await page.locator('#as-text').waitFor();
+  assert.match(await page.locator('#as-facts').innerText(), /Running low \(warning \d+\): Basmati rice: .* The forecast suggests ordering .* from National Foods\./);
+  const offer = page.locator('#as-answer .card.inner', { hasText: 'Basmati rice' });
+  assert.match(await offer.innerText(), /Order more Basmati rice/);
+  assert.match(await offer.innerText(), /Draft an order to National Foods/);
+  assert.match(await offer.innerText(), /of Basmati rice/);
+  assert.match(await page.locator('#as-offer-note').innerText(), /nothing is ordered until someone who may buy approves it/);
+  await shot(page, '4-offer');
+  step('an answer that points at a running-low warning offers the order the warning proposes, in plain words, and says nothing is ordered until it is approved');
+
+  await go(page, 'Buying');
+  assert.strictEqual(await page.locator('#approvals').count(), 0, 'looking at the offer asked for nothing');
+  await go(page, 'Ask the shop');
+  await ask(page, 'What is running low?');
+  await page.locator('#as-answer .card.inner', { hasText: 'Basmati rice' }).getByRole('button', { name: 'Ask for approval' }).click();
+  await page.locator('.notice.ok', { hasText: 'Asked for. It waits for approval on the Buying page.' }).waitFor();
+  await page.locator('#as-answer .card.inner', { hasText: 'Basmati rice' }).getByRole('button', { name: 'Asked for' }).waitFor();
+  await go(page, 'Buying');
+  const waitingCard = page.locator('#approvals .approval-row', { hasText: 'Basmati rice' });
+  await waitingCard.waitFor();
+  assert.match(await waitingCard.innerText(), /Asked for by Olivia Owner/);
+  assert.strictEqual(await page.getByRole('button', { name: 'Goods arrived' }).count(), 0, 'asking for approval ordered nothing');
+  await shot(page, '5-waiting');
+  step('pressing the button puts one request on the Buying page, asked for by the person who pressed it, and nothing is ordered');
+
+  await waitingCard.getByRole('button', { name: 'Approve and draft the order' }).click();
+  await page.getByRole('button', { name: 'Goods arrived' }).waitFor();
+  assert.strictEqual(await page.getByRole('button', { name: 'Goods arrived' }).count(), 1, 'the approval made one draft order');
+  step('only the approval makes the draft order, once');
+
+  await go(page, 'Ask the shop');
+  await ask(page, 'What is running low?');
+  assert.strictEqual(await page.locator('#as-answer .card.inner', { hasText: 'Basmati rice' }).count(), 0, 'the warning that was acted on is not offered again');
+  step('the warning that was acted on is not offered again');
+
   await go(page, 'Settings');
   await page.getByRole('tab', { name: 'Activity' }).click();
   await page.getByRole('heading', { name: 'What people did' }).waitFor();
   const activity = await page.locator('main').innerText();
   assert.ok(activity.includes('assistant.ask'));
+  assert.ok(activity.includes('assistant.request'), 'the request made from the offer is in the activity list');
   assert.ok(!activity.includes('rice supplier give'), 'the words of a question are not in the activity list');
   step('every question is in the activity list, without its words');
 } finally {

@@ -1,7 +1,10 @@
 using System.Globalization;
 using System.Text.Json;
+using NextGenOS.Hub.Actions;
 using NextGenOS.Hub.Ai;
+using NextGenOS.Hub.Catalog;
 using NextGenOS.Hub.Data;
+using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Knowledge;
 using NextGenOS.Hub.Reports;
 using NextGenOS.Hub.Security;
@@ -11,8 +14,9 @@ namespace NextGenOS.Hub.Assistant;
 
 /// <summary>
 /// "Ask the shop" (Version 2, Phase 6, step 1): a person writes a question in their own words and gets an answer written from the shop's own records and notes, with the facts it rests on
-/// numbered beside it. It can only LOOK THINGS UP; there is nothing in it that changes the shop, so there is nothing for a person to approve yet (the next step lets it prepare a request through
-/// the typed actions that already wait for approval).
+/// numbered beside it. It can only LOOK THINGS UP; there is nothing in it that changes the shop. Where an answer points at a running-low warning, the screen can <b>offer</b> the order that
+/// warning proposes: the program builds it from the warning's own figures (never a model), a person presses "Ask for approval", and it then waits, as any such request does, for someone who
+/// may buy to approve it (the typed actions, <see cref="ActionService"/>). The assistant cannot ask for it, approve it or do it.
 /// <list type="bullet">
 /// <item><b>The shop never depends on it.</b> It is off until the owner switches on "Business assistant". It runs apart from the till: at most two questions at once, a time limit, and a person
 /// who asks too often is asked to wait. With no AI service, or none that may receive the information, it still shows the facts it found; it never fails the screen.</item>
@@ -25,7 +29,7 @@ namespace NextGenOS.Hub.Assistant;
 /// <item><b>Written down:</b> who asked, the question, which lookups were made (never what they found) and how it ended; kept 90 days. The answer itself is not kept.</item>
 /// </list>
 /// </summary>
-public sealed class AssistantService(HubDb db, IClock clock, AuditService audit, FeatureFlagService flags, AiGateway gateway, KnowledgeService knowledge, ReportService reports, ShopContextProvider shop, Access access)
+public sealed class AssistantService(HubDb db, IClock clock, AuditService audit, FeatureFlagService flags, AiGateway gateway, KnowledgeService knowledge, ReportService reports, InsightService insights, ActionService actions, CatalogService catalog, ShopContextProvider shop, Access access)
 {
     private const string Tenant = FeatureFlagService.Tenant;
     private const string Site = FeatureFlagService.Site;
@@ -43,7 +47,7 @@ public sealed class AssistantService(HubDb db, IClock clock, AuditService audit,
     /// <summary>The longest one question may take, all its lookups and both requests to a model included. A slow AI service is given up on, quietly; the facts are shown instead.</summary>
     internal TimeSpan TimeLimit { get; set; } = TimeSpan.FromSeconds(120);
 
-    private readonly IReadOnlyList<ToolSpec> _tools = AssistantTools.Build(reports, knowledge, shop, clock);
+    private readonly IReadOnlyList<ToolSpec> _tools = AssistantTools.Build(reports, knowledge, insights, shop, clock);
     private readonly SemaphoreSlim _busy = new(AtOnce, AtOnce);
 
     /// <summary>True while a question can be asked: the licence has the AI part and "Business assistant" is on.</summary>
@@ -184,8 +188,9 @@ public sealed class AssistantService(HubDb db, IClock clock, AuditService audit,
             }
         }
 
+        var offers = OffersFor(facts, notes);
         var id = Record(who, question, runs, facts, mode, providerId, model, notes);
-        return new AssistantReply(id, question, mode, answer, facts, cited, runs, notes, providerId, model);
+        return new AssistantReply(id, question, mode, answer, facts, cited, runs, notes, providerId, model, offers);
     }
 
     private sealed record Generated(LlmResponse? Reply, string? ProviderId, string Why);
@@ -213,6 +218,60 @@ public sealed class AssistantService(HubDb db, IClock clock, AuditService audit,
         if (text.Any(char.IsControl)) throw new HubException("bad-question", "The question has characters that cannot be used here.");
         if (TextGuard.ContainsCardNumber(text)) throw new HubException("bad-question", "Please do not type card numbers here.");
         return text;
+    }
+
+    // ---- offers: a request a person may ask for -------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The requests the screen may offer for what the answer rests on: for each running-low warning among the facts that still needs an order, the order that warning proposes, checked with the
+    /// rules of the Buying page and described in plain words. Nothing is kept. Only for a person who may ask for such an order, and only while "Suggested actions" is on.
+    /// </summary>
+    private IReadOnlyList<AssistantOffer> OffersFor(IReadOnlyList<AssistantFact> facts, List<string> notes)
+    {
+        var ids = facts.Select(f => f.Ref).Where(r => r is not null && r.StartsWith(AssistantTools.FindingRef, StringComparison.Ordinal))
+            .Select(r => long.TryParse(r![AssistantTools.FindingRef.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : 0).Where(n => n > 0).Distinct().ToList();
+        if (ids.Count == 0) return [];
+        if (!actions.On)
+        {
+            notes.Add("To ask for an order from a warning here, the owner switches on Suggested actions under AI helpers.");
+            return [];
+        }
+
+        var offers = new List<AssistantOffer>();
+        foreach (var id in ids)
+        {
+            try
+            {
+                var finding = insights.Finding(id);
+                if (finding is not { State: "open", Status: LowStockStatus.Order }) continue;
+                var prepared = actions.Preview(CreatePurchaseOrderActionId, 1, CreatePurchaseOrderAction.InputFor(finding, catalog.Get(finding.ItemId)?.CostMinor ?? 0));
+                offers.Add(new AssistantOffer(id, CreatePurchaseOrderActionId, "Order more " + finding.Detail.Name, prepared.Summary, prepared.Ok ? null : prepared.Problems[0], prepared.Ok));
+            }
+            catch (HubException)
+            {
+                // A person who may not ask for this, or a warning that is gone, simply gets no offer.
+            }
+        }
+
+        return offers;
+    }
+
+    private const string CreatePurchaseOrderActionId = "CreatePurchaseOrder";
+
+    /// <summary>
+    /// A person presses "Ask for approval" on an offer. It asks for exactly what the Buying page would ask for from the same warning (the same request, by the same key, so asking twice is one
+    /// request), as this person, and it waits for someone who may buy to approve it. Nothing is ordered, received or paid by this. Refused when the assistant is off, the person is not signed in,
+    /// the warning is not open or needs no order, or the person may not ask for such an order.
+    /// </summary>
+    public ActionView AskForApproval(long findingId)
+    {
+        var who = Asker();
+        RequireOn();
+        var finding = insights.Finding(findingId) ?? throw new HubException("no-finding", "That warning was not found.");
+        if (finding.Status != LowStockStatus.Order) throw new HubException("no-order-needed", "That warning does not need an order.");
+        var made = actions.Propose(CreatePurchaseOrderActionId, 1, CreatePurchaseOrderAction.InputFor(finding, catalog.Get(finding.ItemId)?.CostMinor ?? 0), "finding", finding.Id, "finding:" + finding.Id, who.UserId);
+        audit.Log(who.UserId, "assistant.request", "action", made.Id, "asked for from the warning " + finding.Id + " that the assistant pointed at");
+        return made;
     }
 
     // ---- the record ----------------------------------------------------------------------------------------------------------------------

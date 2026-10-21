@@ -254,7 +254,7 @@
     private Task AskFor(StoredFinding f) => Run(() =>
     {
         var cost = App.Catalog.Get(f.ItemId)?.CostMinor ?? 0;
-        var input = System.Text.Json.JsonSerializer.Serialize(new NextGenOS.Hub.Actions.CreatePurchaseOrderInput(f.Detail.SupplierId, [new NextGenOS.Hub.Actions.OrderLineInput(f.ItemId, f.Detail.ProposedMilli, cost)]));
+        var input = NextGenOS.Hub.Actions.CreatePurchaseOrderAction.InputFor(f, cost);
         App.Actions.Propose("CreatePurchaseOrder", 1, input, "finding", f.Id, "finding:" + f.Id, Me.Id);
         ReadInsights();
     }, "Asked for. It waits for approval above.");

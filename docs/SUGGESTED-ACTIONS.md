@@ -30,3 +30,8 @@ A new request is a new handler in code (`IActionHandler`) with its own typed inp
 ## Not built yet
 
 An assistant that asks for things (it will use the same `Propose` and can never approve); the other four actions; a second approver above a limit; sending anything outside the shop (the order is a draft, nothing is sent to the supplier); measuring whether an approved order prevented a stock-out.
+
+## Asked for from *Ask the shop* (added 21 October 2026)
+
+An answer on the *Ask the shop* screen that points at a running-low warning can offer the same order that the Buying page's *Ask for approval* would ask for (one shared function builds it from the warning, `CreatePurchaseOrderAction.InputFor`). The person presses the button, the request is made as that person with the same key (so asking from either place is one request), and it waits for someone who may buy exactly as above. The assistant itself cannot ask, approve, decline or do anything, and a model never writes a request. The press is in the audit trail as `assistant.request`. See `docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 11, step 2.
+

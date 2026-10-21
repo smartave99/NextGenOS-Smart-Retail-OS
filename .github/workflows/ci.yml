@@ -11,7 +11,9 @@ permissions:
 jobs:
   gate:
     name: Release gate (all checks)
-    runs-on: ubuntu-latest
+    # Pinned, not "ubuntu-latest": on 21 October 2026 "latest" became Ubuntu 26.04, where the Playwright of the Hub's browser tests (1.56.1) cannot install its browser, so the gate stopped
+    # before any test ran. Move to a newer image together with a Playwright that supports it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       # The whole history, so the gate can look for a secret that was committed and later deleted.

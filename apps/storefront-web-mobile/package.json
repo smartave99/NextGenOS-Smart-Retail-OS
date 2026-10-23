@@ -74,7 +74,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "write-excel-file": "^4.1.1",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.4",

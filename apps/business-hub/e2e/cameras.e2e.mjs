@@ -137,6 +137,7 @@ try {
   await page.locator('#cam-table tbody tr', { hasText: 'Door camera' }).waitFor({ timeout: 15000 });
   assert.match(await row.innerText(), /Switched on/);
   await row.getByRole('button', { name: 'Change' }).click();
+  await page.getByRole('heading', { name: 'Change the camera', level: 3 }).waitFor();   // the form is filled with the camera's own words only after this
   await fill(page, { address: `rtsp://127.0.0.1:${doorPort}/other` });
   await page.locator('#cam-save').click();
   await page.locator('#cam-table tbody tr', { hasText: '/other' }).waitFor({ timeout: 15000 });

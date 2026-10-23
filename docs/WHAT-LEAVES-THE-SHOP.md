@@ -29,6 +29,10 @@ No screen calls either yet. They are the first two entries of the list and what 
 - Card and payment details and biometric data never leave this computer; a question with a card number in it is refused before anything is done.
 - It is written down in *What was used* (the use record: when, feature `assistant`, service and model, kind of information, tokens, cost, how it ended), **never the text**. It is **not** in the *What was sent* list, which belongs to the fixed reasons. The question record of the feature keeps the question (not the answer, not the figures) for 90 days, and does not keep a question that holds a telephone number or an e-mail address.
 
+## Cameras (the register only)
+
+The camera register (`docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 12) sends **nothing** to any AI service or anywhere else. A camera must be on this computer or on the shop's own network (an internet address is refused, and so is a name that turns out to lead outside); the program only connects to a camera and lets go, and reads no picture or video; a camera's password is kept in the computer's safe place and is never written to the database, the activity list or a screen. Later steps that read pictures will keep video on this computer (`VIDEO` information never leaves the shop; `docs/VERSION-2.md`) and will be listed here before they exist.
+
 ## What the guard cannot know (said plainly)
 
 A short name field cannot tell a product from a remark typed as one. That is why no reason has a field for a remark, a note or a message, and why a screen must fill a name field from the catalogue. The guard does catch names and addresses the shop keeps (customers, suppliers, staff), first names and surnames on their own, a street line on its own, contact details, card numbers (also written in groups with other digits beside them), links, and text that reads like an instruction. It is a safety net, not a replacement for choosing the fields well.

@@ -232,8 +232,7 @@ public sealed class CameraService(HubDb db, IClock clock, AuditService audit, Fe
             using var client = new TcpClient();
             await client.ConnectAsync(host, port, limit.Token);
             // A name can point anywhere: what it really connected to must also be on the shop's own network.
-            var reached = (client.Client.RemoteEndPoint as IPEndPoint)?.Address;
-            if (reached is null || EndpointClassifier.Classify(reached) is not (EndpointClassifier.Loopback or EndpointClassifier.PrivateNetwork))
+            if (!ReachedIsOnShopNetwork((client.Client.RemoteEndPoint as IPEndPoint)?.Address))
                 return new CameraCheck(CameraCheckStatus.Failed, "The address leads outside the shop's own network, so it is not used. Cameras must be on the shop's network.");
             return new CameraCheck(CameraCheckStatus.Ok, "The camera answered at " + host + ":" + port.ToString(CultureInfo.InvariantCulture) + ". No picture was read.");
         }
@@ -246,6 +245,10 @@ public sealed class CameraService(HubDb db, IClock clock, AuditService audit, Fe
             return new CameraCheck(CameraCheckStatus.Failed, "The camera could not be reached at " + host + ":" + port.ToString(CultureInfo.InvariantCulture) + ". Check that it is switched on, on the shop's network, and that the address is right.");
         }
     }
+
+    /// <summary>Whether the address a connection really reached is this computer or on the shop's own network (a name that looked fine when it was added can lead anywhere later).</summary>
+    internal static bool ReachedIsOnShopNetwork(IPAddress? reached) =>
+        reached is not null && EndpointClassifier.Classify(reached) is EndpointClassifier.Loopback or EndpointClassifier.PrivateNetwork;
 
     private static CameraCheck LookForFile(string path)
     {

@@ -177,6 +177,17 @@ public sealed class CameraTests : IDisposable
     }
 
     [Fact]
+    public void A_name_that_leads_outside_the_shops_network_when_the_test_connects_is_not_used_however_it_looked_when_added()
+    {
+        // The test looks again at the address it really reached (a name can be changed to point anywhere after it was added); this is that look.
+        foreach (var inside in new[] { "127.0.0.1", "::1", "10.2.3.4", "172.16.0.9", "172.31.255.1", "192.168.1.9", "169.254.3.3" })
+            Assert.True(CameraService.ReachedIsOnShopNetwork(IPAddress.Parse(inside)), inside);
+        foreach (var outside in new[] { "8.8.8.8", "93.184.216.34", "172.32.0.1", "192.169.0.1", "2001:db8::1", "::ffff:8.8.8.8" })
+            Assert.False(CameraService.ReachedIsOnShopNetwork(IPAddress.Parse(outside)), outside);
+        Assert.False(CameraService.ReachedIsOnShopNetwork(null));
+    }
+
+    [Fact]
     public void A_user_name_or_password_in_the_address_is_refused()
     {
         Assert.Equal("password-in-address", Code(() => C.Register(Input("x", CameraKind.Rtsp, "rtsp://admin:hunter2@192.168.1.50/s"), owner)));

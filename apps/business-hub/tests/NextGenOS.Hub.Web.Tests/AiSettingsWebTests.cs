@@ -161,6 +161,28 @@ public class AiSettingsWebTests
     }
 
     [Fact]
+    public async Task The_cameras_screen_is_for_the_owner_and_looking_at_it_adds_tests_and_connects_to_nothing()
+    {
+        using var f = new HubWebFactory { Modules = ["hub", "ai"] };
+        SetUp(f);
+        var http = Client(f);
+
+        var anonymous = await Get(http, "/settings/cameras");
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.Contains("/login", anonymous.Headers.Location!.OriginalString);
+
+        var owner = await SignIn(http, "owner", "correct horse battery");
+        Assert.Equal(HttpStatusCode.OK, (await Get(http, "/settings/cameras", owner)).StatusCode);
+        var manager = await SignIn(http, "boss", "manager good password");
+        await Get(http, "/settings/cameras", manager);
+
+        Assert.False(f.Hub.Cameras.On);
+        Assert.Empty(f.Hub.Cameras.List(includeRetired: true));
+        Assert.DoesNotContain(f.Hub.Audit.Recent(), a => a.Action.StartsWith("camera.", StringComparison.Ordinal));
+        Assert.Empty(f.Hub.Ai.Usage.Recent());
+    }
+
+    [Fact]
     public async Task The_background_upkeep_forgets_records_past_their_day_without_any_switch()
     {
         using var f = new HubWebFactory { Modules = ["hub", "ai"] };

@@ -1,0 +1,182 @@
+@page "/settings/cameras"
+@attribute [Authorize(Policy = Perm.Ai)]
+@inherits HubPage
+@using System.Globalization
+@using NextGenOS.Hub.Cameras
+
+<PageTitle>Cameras</PageTitle>
+<h1>Cameras</h1>
+<p class="sub">The shop's cameras, kept as a list. A camera must be on this computer or on the shop's own network. For now the program only keeps the list and checks that a camera answers: it does not read any picture or video, it never recognises anyone, and nothing here is sent to an AI service. <a href="settings/ai">Back to the AI helpers</a></p>
+<Notice Error="@Error" Info="@Info" />
+
+@if (!App.Ai.Flags.Licensed)
+{
+    <div class="notice warn" id="cam-unlicensed">Cameras are not part of this shop's licence. What was kept stays readable, and nothing new can be added.</div>
+}
+else if (!App.Cameras.On)
+{
+    <div class="notice warn" id="cam-off">"Camera analytics" is switched off, so cameras cannot be added or tested. You can switch it on under <a href="settings/ai">AI helpers</a>.</div>
+}
+
+<section class="card" id="cam-list">
+    <h2>Your cameras</h2>
+    <p class="muted small">Every camera is off until you switch it on, and it can be switched on only after the program has reached it. A camera's password is kept in a safe place on this computer and is never shown again. Changing a camera's kind or address switches it off again.</p>
+    @if (cameras.Count == 0) { <div class="empty" id="cam-none">There are no cameras yet.</div> }
+    else
+    {
+        <div class="tbl-wrap">
+        <table class="tbl" id="cam-table">
+            <thead><tr><th>Camera</th><th>How it is reached</th><th>Looks for</th><th>Reached?</th><th>State</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var c in cameras)
+            {
+                var camera = c;
+                <tr id="@("cam-" + camera.Id)">
+                    <td>@camera.Name <span class="muted small">(@camera.Ref)</span>@if (camera.ZoneRef is not null) { <div class="muted small">Looks at @camera.ZoneRef</div> }</td>
+                    <td>@CameraKind.Label(camera.Kind)<div class="muted small">@camera.Address@(camera.HasPassword ? " · password kept" : "")</div></td>
+                    <td class="small">@string.Join(", ", camera.Classes.Select(x => CameraClass.Label(x)))<div class="muted">at least @camera.MinConfidencePercent.ToString(CultureInfo.InvariantCulture)% sure</div></td>
+                    <td class="small">@CameraCheckStatus.Label(camera.CheckStatus)@if (camera.CheckedAt is { } at) { <div class="muted">@When(at)</div> }@if (camera.CheckNote is not null) { <div class="muted">@camera.CheckNote</div> }</td>
+                    <td>@(camera.Enabled ? "Switched on" : "Switched off")</td>
+                    <td class="row">
+                        <button type="button" class="btn ghost small" id="@("cam-test-" + camera.Id)" @onclick="() => TestIt(camera)">Test</button>
+                        <button type="button" class="btn ghost small" id="@("cam-switch-" + camera.Id)" @onclick="() => Switch(camera)">@(camera.Enabled ? "Switch off" : "Switch on")</button>
+                        <button type="button" class="btn ghost small" @onclick="() => Edit(camera)">Change</button>
+                        <button type="button" class="btn ghost small" @onclick="() => Retire(camera)">Retire</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</section>
+
+<section class="card" id="cam-form">
+    <h3>@(form.Id is null ? "Add a camera" : "Change the camera")</h3>
+    <div class="field-row">
+        <div><label for="cam-name">Name</label><input id="cam-name" @bind="form.Name" maxlength="@CameraService.MaxNameChars" placeholder="for example Front door" /></div>
+        <div>
+            <label for="cam-kind">How it is reached</label>
+            <select id="cam-kind" @bind="form.Kind">
+                @foreach (var k in CameraKind.All) { <option value="@k">@CameraKind.Label(k)</option> }
+            </select>
+        </div>
+    </div>
+    <div class="field-row">
+        <div class="wide"><label for="cam-addr">Address</label><input id="cam-addr" @bind="form.Address" maxlength="@CameraService.MaxAddressChars" placeholder="@CameraKind.AddressHint(form.Kind)" autocomplete="off" /></div>
+    </div>
+    <div class="field-row">
+        <div><label for="cam-zone">The place it looks at (optional)</label><input id="cam-zone" @bind="form.Zone" maxlength="64" placeholder="for example zone:aisle-3" /></div>
+        <div><label for="cam-conf">How sure the program must be (percent)</label><input id="cam-conf" inputmode="numeric" @bind="form.Confidence" maxlength="2" /></div>
+    </div>
+    <div class="stack">
+        <strong>What it may look for</strong>
+        @foreach (var c in CameraClass.All)
+        {
+            var cls = c;
+            <label class="check"><input type="checkbox" id="@("cam-class-" + cls)" checked="@form.Classes.Contains(cls)" @onchange="e => ToggleClass(cls, (bool)(e.Value ?? false))" /> @CameraClass.Label(cls)</label>
+        }
+    </div>
+    <p class="muted small">A person is only "someone is there": the program does not look at faces and does not know who anyone is.</p>
+    <div class="row">
+        <button type="button" class="btn primary" id="cam-save" disabled="@(!App.Ai.Flags.Licensed)" @onclick="Save">@(form.Id is null ? "Add the camera" : "Save the change")</button>
+        @if (form.Id is not null) { <button type="button" class="btn ghost" id="cam-cancel" @onclick="Cancel">Cancel</button> }
+    </div>
+    @if (form.Id is { } editing)
+    {
+        <h3>Password</h3>
+        <p class="muted small">Only if the camera asks for one. It is kept in a safe place on this computer and is never shown again.</p>
+        <div class="field-row">
+            <div><label for="cam-secret">Password</label><input id="cam-secret" type="password" autocomplete="off" @bind="password" maxlength="@CameraService.MaxPasswordChars" placeholder="Type a new password to keep it" /></div>
+            <div class="row">
+                <button type="button" class="btn ghost small" id="cam-key" @onclick="() => KeepPassword(editing)">Keep password</button>
+                @if (cameras.FirstOrDefault(x => x.Id == editing)?.HasPassword == true) { <button type="button" class="btn ghost small" id="cam-key-remove" @onclick="() => RemovePassword(editing)">Remove password</button> }
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private sealed class CamForm
+    {
+        public long? Id;
+        public string Name = "", Kind = CameraKind.Rtsp, Address = "", Zone = "", Confidence = CameraService.DefaultMinConfidence.ToString(CultureInfo.InvariantCulture);
+        public HashSet<string> Classes = [CameraClass.Person];
+    }
+
+    private IReadOnlyList<Camera> cameras = Array.Empty<Camera>();
+    private CamForm form = new();
+    private string password = "";
+
+    protected override Task LoadAsync()
+    {
+        cameras = App.Cameras.List();
+        return Task.CompletedTask;
+    }
+
+    private void ToggleClass(string cls, bool on)
+    {
+        if (on) form.Classes.Add(cls); else form.Classes.Remove(cls);
+    }
+
+    private CameraInput Input()
+    {
+        if (!int.TryParse(form.Confidence?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var percent)) throw new HubException("bad-confidence", "How sure the program must be is a whole number from " + CameraService.LowestMinConfidence + " to " + CameraService.HighestMinConfidence + ".");
+        return new CameraInput(form.Name, form.Kind, form.Address, form.Zone, CameraClass.All.Where(form.Classes.Contains).ToList(), percent);
+    }
+
+    private async Task Save()
+    {
+        var adding = form.Id is null;
+        await Run(() =>
+        {
+            if (form.Id is { } id) App.Cameras.Update(id, Input(), Me.Id); else App.Cameras.Register(Input(), Me.Id);
+            form = new CamForm();
+            password = "";
+        }, adding ? "Added. It is switched off: press Test, then switch it on." : "Saved. If you changed how it is reached, it is switched off again: test it, then switch it on.");
+        await Reload();
+    }
+
+    private Task Edit(Camera camera) => Run(() =>
+    {
+        form = new CamForm { Id = camera.Id, Name = camera.Name, Kind = camera.Kind, Address = camera.Address, Zone = camera.ZoneRef ?? "", Confidence = camera.MinConfidencePercent.ToString(CultureInfo.InvariantCulture), Classes = camera.Classes.ToHashSet() };
+        password = "";
+    });
+
+    private Task Cancel() => Run(() => { form = new CamForm(); password = ""; });
+
+    private async Task TestIt(Camera camera)
+    {
+        await Run(async () =>
+        {
+            var answer = await App.Cameras.TestAsync(camera.Id, Me.Id);
+            Info = camera.Name + ": " + answer.Note;
+        });
+        await Reload();
+    }
+
+    private async Task Switch(Camera camera)
+    {
+        await Run(() => App.Cameras.SetEnabled(camera.Id, !camera.Enabled, Me.Id), camera.Enabled ? "Switched off." : "Switched on. It is not read yet: the steps that read a camera come later.");
+        await Reload();
+    }
+
+    private async Task Retire(Camera camera)
+    {
+        await Run(() => App.Cameras.Retire(camera.Id, Me.Id), "Retired. Its password was deleted.");
+        if (form.Id == camera.Id) { form = new CamForm(); password = ""; }
+        await Reload();
+    }
+
+    private async Task KeepPassword(long id)
+    {
+        await Run(() => { App.Cameras.SetPassword(id, password, Me.Id); password = ""; }, "Kept in a safe place. It is not shown again.");
+        await Reload();
+    }
+
+    private async Task RemovePassword(long id)
+    {
+        await Run(() => App.Cameras.ClearPassword(id, Me.Id), "The password was deleted.");
+        await Reload();
+    }
+}

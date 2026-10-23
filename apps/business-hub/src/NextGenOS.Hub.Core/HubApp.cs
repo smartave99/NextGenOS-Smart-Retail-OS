@@ -12,6 +12,7 @@ using NextGenOS.Hub.Import;
 using NextGenOS.Hub.Insights;
 using NextGenOS.Hub.Intelligence;
 using NextGenOS.Hub.Assistant;
+using NextGenOS.Hub.Cameras;
 using NextGenOS.Hub.Knowledge;
 using NextGenOS.Hub.Lending;
 using NextGenOS.Hub.Loyalty;
@@ -89,6 +90,8 @@ public sealed class HubApp
         Knowledge = new KnowledgeService(db, clock, Audit, Ai.Flags, Ai.Gateway, new SqliteVectorIndex(db), Access);
         // "Ask the shop": a question answered from the shop's own records and notes, as the person asking. It only looks things up. Off until the owner switches on "Business assistant".
         Assistant = new AssistantService(db, clock, Audit, Ai.Flags, Ai.Gateway, Knowledge, Reports, Insights, Actions, Catalog, Shop, Access);
+        // The register of the shop's cameras: where each is on the shop's own network, what it may look for, whether the owner switched it on. It reads no picture and no video. Off until the owner switches on "Camera analytics".
+        Cameras = new CameraService(db, clock, Audit, Ai.Flags, Ai.Secrets, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
@@ -147,6 +150,7 @@ public sealed class HubApp
     public RuleService Rules { get; }
     public KnowledgeService Knowledge { get; }
     public AssistantService Assistant { get; }
+    public CameraService Cameras { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public UpdateService Updates { get; }

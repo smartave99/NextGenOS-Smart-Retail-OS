@@ -65,7 +65,7 @@
     "firebase-admin": "^14.5.0",
     "framer-motion": "^12.33.0",
     "lucide-react": "^0.563.0",
-    "next": "^15.5.27",
+    "next": "^15.5.28",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "read-excel-file": "^9.3.10",
@@ -74,7 +74,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "write-excel-file": "^4.1.1",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.4",
@@ -92,7 +92,7 @@
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "eslint": "^9",
-    "eslint-config-next": "^15.5.27",
+    "eslint-config-next": "^15.5.28",
     "jsdom": "^28.1.0",
     "postcss": "^8.5.23",
     "prisma": "6.19.3",

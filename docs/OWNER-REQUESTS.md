@@ -3083,3 +3083,10 @@ The question was: *"A check on this session says there are uncommitted changes. 
 
 (What the assistant took it to mean, and did: carry on with Version 2 in `docs/VERSION-2.md`. The next piece of Phase 6 was the part that makes a person approve what the assistant recommends: step 2 of "Ask the shop", an order recommended from a running-low warning that a person asks for and someone who may buy approves, using the typed actions that already exist. Nothing was released or deployed to a shop.)
 
+### 2026-10-23 (two short messages: one after the assistant said the recommended-order step was merged, one while the camera register was being checked; recorded word for word)
+
+> continue
+
+> continue
+
+(What the assistant took it to mean, and did: carry on with Version 2 in `docs/VERSION-2.md`. Phase 7 (cameras) was next, and its smallest safe step is the register of the shop's cameras: the list, where each is reached, what it may look for, an off switch for each and a check that it answers, without reading any picture or video. `docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 12. Nothing was released or deployed to a shop.)

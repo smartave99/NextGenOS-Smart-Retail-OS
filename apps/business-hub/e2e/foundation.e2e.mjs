@@ -130,15 +130,18 @@ try {
   await page.getByRole('button', { name: 'Switch on' }).click();
   const attacker = await fresh([]);
   await attacker.goto(hub.url + '/login');
-  for (let i = 0; i < 5; i += 1) {
+  // Each attempt waits for the page that answers it: the error of the attempt before is still on the screen until the new page arrives, so waiting for "an error" alone would let the next attempt
+  // start on a page that is about to be replaced.
+  const attempt = async (password) => {
     await attacker.getByLabel('User name').fill('till');
-    await attacker.getByLabel('Password', { exact: true }).fill('guess-' + i + '-guess');
-    await attacker.getByRole('button', { name: 'Sign in' }).click();
+    await attacker.getByLabel('Password', { exact: true }).fill(password);
+    await Promise.all([attacker.waitForEvent('load'), attacker.getByRole('button', { name: 'Sign in' }).click()]);
+  };
+  for (let i = 0; i < 5; i += 1) {
+    await attempt('guess-' + i + '-guess');
     await attacker.locator('.notice.error').waitFor();
   }
-  await attacker.getByLabel('User name').fill('till');
-  await attacker.getByLabel('Password', { exact: true }).fill('another-good-password');
-  await attacker.getByRole('button', { name: 'Sign in' }).click();
+  await attempt('another-good-password');
   await attacker.locator('.notice.error', { hasText: /Too many wrong passwords/ }).waitFor();
   step('after five wrong passwords the account is locked, even for the right password');
 

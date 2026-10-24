@@ -53,10 +53,12 @@ try {
   await page.getByRole('dialog', { name: 'New booking' }).getByRole('button', { name: 'Cancel' }).click();
   step('a time already taken is not offered again');
 
-  // Charge a visit that is today: a walk-in
-  await page.locator('#day').fill(new Date().toISOString().slice(0, 10));
-  await page.locator('#day').press('Enter');
-  await page.getByRole('button', { name: 'Today' }).click();
+  // Charge a visit that is today: a walk-in. "Today" is the shop's own day, which the screen showed when it opened (`start`): a shop that is ahead of UTC is already on the next date late in the
+  // UTC evening, so the UTC date is not today. On a Sunday the shop is closed, so the walk-in is on the open day the screen is on.
+  if (new Date(start + 'T12:00:00').getDay() !== 0) {
+    await page.getByRole('button', { name: 'Today' }).click();
+    await page.waitForFunction((d) => document.querySelector('#day').value === d, start);
+  }
   await page.locator('#new-booking').click();
   await page.getByLabel('Client').selectOption({ label: 'Priya Nair' });
   await page.locator('#bk-service').selectOption({ index: 1 });

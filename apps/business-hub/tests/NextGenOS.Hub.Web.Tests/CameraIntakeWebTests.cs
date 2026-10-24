@@ -118,6 +118,32 @@ public class CameraIntakeWebTests
     }
 
     [Fact]
+    public async Task A_message_that_does_not_say_how_long_it_is_and_is_too_big_is_refused_without_reading_all_of_it()
+    {
+        using var s = Prepare();
+        var request = Post(s.Key, null);
+        request.Content = new Unsized("{\"observations\":[" + new string(' ', IntakeBatch.MaxChars * 4) + "]}");
+        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+
+        var answer = await s.Http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, answer.StatusCode);
+        Assert.Equal(0L, Stored(s));
+    }
+
+    /// <summary>A body that cannot say its length in advance (it is sent in pieces), as a program that streams its message would send it.</summary>
+    private sealed class Unsized(string text) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(Encoding.UTF8.GetBytes(text)).AsTask();
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = -1;
+            return false;
+        }
+    }
+
+    [Fact]
     public async Task What_the_owner_has_not_switched_on_is_answered_in_words_and_after_the_key_was_checked()
     {
         using var s = Prepare();

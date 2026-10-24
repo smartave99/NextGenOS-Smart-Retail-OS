@@ -55,11 +55,11 @@ try {
   await page.locator('#flag-camera_analytics').waitFor();
   await page.locator('#flag-camera_analytics').check();
   await info(page, 'Switched on.');
-  assert.match(await page.locator('main').innerText(), /does not watch or read any camera/);
+  assert.match(await page.locator('main').innerText(), /The Hub itself does not read any camera/);
   await page.locator('#ai-cameras-link').click();
   await page.getByRole('heading', { name: 'Cameras', level: 1 }).waitFor();
   assert.strictEqual(await page.locator('#cam-off').count(), 0);
-  step('once "Camera analytics" is on, the Cameras page is open for adding, and the switch says the program does not read any camera yet');
+  step('once "Camera analytics" is on, the Cameras page is open for adding, and the switch says the Hub itself does not read any camera');
 
   // Refusals, in plain words: a camera on the internet, a password in the address, nothing to look for.
   await fill(page, { name: 'Front door', kind: 'rtsp', address: 'rtsp://8.8.8.8/stream1' });
@@ -131,6 +131,54 @@ try {
   await page.locator('#cam-key-remove').waitFor();
   step('the password goes to the safe place; the page says only that one is kept, and never shows it');
 
+  // The key for a camera program: made on this screen and shown once; a stand-in camera program on this computer sends what it saw; the event history counts it; removing the key stops it.
+  await go(page, 'Settings');
+  await page.getByRole('tab', { name: 'AI helpers' }).click();
+  await page.locator('#flag-event_engine').check();
+  await info(page, 'Switched on.');
+  await page.goto(hub.url + '/settings/cameras');
+  await page.getByRole('heading', { name: 'Cameras', level: 1 }).waitFor();
+  await page.locator('#cam-table tbody tr').first().getByRole('button', { name: 'Change' }).click();
+  await page.getByRole('heading', { name: 'Change the camera', level: 3 }).waitFor();
+  assert.match(await page.locator('#cam-ikey-note').innerText(), /no such program is included yet/);
+  assert.strictEqual(await page.locator('#cam-ikey-new').count(), 0);
+  assert.strictEqual(await page.locator('#cam-ikey-remove').count(), 0);
+  await page.locator('#cam-ikey-make').click();
+  await page.locator('#cam-ikey-new').waitFor();
+  const cameraKey = (await page.locator('#cam-ikey-new').innerText()).trim();
+  assert.match(cameraKey, /^ngc-\d+-[A-Za-z0-9_-]{43}$/);
+  await shot(page, '5-key');
+  const send = (k, body) => fetch(hub.url + '/api/cameras/observations', { method: 'POST', headers: { 'content-type': 'application/json', ...(k ? { authorization: 'Bearer ' + k } : {}) }, body: JSON.stringify(body) });
+  assert.strictEqual((await send(null, { observations: [{ class: 'person', confidence: 0.9 }] })).status, 401);
+  assert.strictEqual((await send(cameraKey + 'x', { observations: [{ class: 'person', confidence: 0.9 }] })).status, 401);
+  const sent = await send(cameraKey, { model: 'stand-in', version: '1.0', observations: [{ class: 'person', count: 2, confidence: 0.9 }, { class: 'basket', confidence: 0.9 }, { class: 'person', confidence: 0.9, image: 'AAAA' }] });
+  assert.strictEqual(sent.status, 200);
+  const answer = await sent.json();
+  assert.strictEqual(answer.accepted, 1);
+  assert.deepStrictEqual(answer.rejected.map((r) => r.index), [1, 2]);
+  assert.match(answer.rejected[0].reason, /not something this camera is set to look for/);
+  assert.match(answer.rejected[1].reason, /Only class, count, confidence and at are accepted/);
+  step('the key is shown once; the stand-in camera program is refused without it and with a wrong one, and what passes is kept while a basket, a picture and anything else is refused with the reason');
+
+  await page.goto(hub.url + '/settings/events');
+  await page.getByRole('heading', { name: 'Business events', level: 1 }).waitFor();
+  assert.strictEqual(await page.locator('#ev-obs').innerText(), '1');
+  await shot(page, '6-seen');
+  await page.goto(hub.url + '/settings/cameras');
+  await page.getByRole('heading', { name: 'Cameras', level: 1 }).waitFor();
+  assert.match(await page.locator('#cam-table tbody tr').first().innerText(), /Key kept · last heard .*1 kept/);
+  await page.locator('#cam-table tbody tr').first().getByRole('button', { name: 'Change' }).click();
+  await page.getByRole('heading', { name: 'Change the camera', level: 3 }).waitFor();
+  assert.strictEqual(await page.locator('#cam-ikey-new').count(), 0, 'the key is not shown again');
+  assert.ok(!(await page.content()).includes(cameraKey), 'the key is not anywhere on the page any more');
+  step('the event history counted the one observation, the list says when the camera program was last heard from, and the key is not shown again');
+
+  await page.locator('#cam-ikey-remove').click();
+  await info(page, 'The key was removed');
+  assert.strictEqual((await send(cameraKey, { observations: [{ class: 'person', confidence: 0.9 }] })).status, 401);
+  assert.strictEqual(await page.locator('#cam-ikey-make').innerText(), 'Make a key');
+  step('removing the key refuses the camera program at once');
+
   // Changing only the name keeps it on; moving it switches it off and forgets the check.
   await fill(page, { name: 'Door camera' });
   await page.locator('#cam-save').click();
@@ -174,8 +222,8 @@ try {
   await page.getByRole('tab', { name: 'Activity' }).click();
   await page.getByRole('heading', { name: 'What people did' }).waitFor();
   const activity = await page.locator('main').innerText();
-  for (const action of ['camera.add', 'camera.test', 'camera.enable', 'camera.password', 'camera.update', 'camera.retire']) assert.ok(activity.includes(action), action + ' is in the activity list');
-  assert.ok(!activity.includes('127.0.0.1') && !activity.includes('stream1') && !activity.includes(secret), 'the activity list has the camera names, not the addresses or the password');
+  for (const action of ['camera.add', 'camera.test', 'camera.enable', 'camera.password', 'camera.key', 'camera.key-removed', 'camera.update', 'camera.retire']) assert.ok(activity.includes(action), action + ' is in the activity list');
+  assert.ok(!activity.includes('127.0.0.1') && !activity.includes('stream1') && !activity.includes(secret) && !activity.includes(cameraKey), 'the activity list has the camera names, not the addresses, the password or the key');
   step('retiring removes a camera from the list and deletes its password; the activity list has names only');
 } finally {
   await browser.close();

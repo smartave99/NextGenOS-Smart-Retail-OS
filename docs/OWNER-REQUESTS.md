@@ -3090,3 +3090,9 @@ The question was: *"A check on this session says there are uncommitted changes. 
 > continue
 
 (What the assistant took it to mean, and did: carry on with Version 2 in `docs/VERSION-2.md`. Phase 7 (cameras) was next, and its smallest safe step is the register of the shop's cameras: the list, where each is reached, what it may look for, an off switch for each and a check that it answers, without reading any picture or video. `docs/V2-ARCHITECTURE-ASSESSMENT.md`, section 12. Nothing was released or deployed to a shop.)
+
+### 2026-10-24 (a short message after the camera register was merged; recorded word for word)
+
+> continue
+
+(What the assistant took it to mean, and did: carry on with Version 2 in `docs/VERSION-2.md`. The next piece of Phase 7 that reads a picture needs two decisions that are the owner's (how video is decoded, and which detection model; see `docs/OPEN-WORK.md`), and "continue" is not that decision, so nothing was built on either. The step that needs neither is the way a camera program on the same PC sends what it saw into the event history: a per-camera key and a door that accepts only this PC. Nothing was released or deployed to a shop.)

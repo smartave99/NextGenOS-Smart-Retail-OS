@@ -36,7 +36,7 @@ else if (!App.Cameras.On)
                     <td>@CameraKind.Label(camera.Kind)<div class="muted small">@camera.Address@(camera.HasPassword ? " · password kept" : "")</div></td>
                     <td class="small">@string.Join(", ", camera.Classes.Select(x => CameraClass.Label(x)))<div class="muted">at least @camera.MinConfidencePercent.ToString(CultureInfo.InvariantCulture)% sure</div></td>
                     <td class="small">@CameraCheckStatus.Label(camera.CheckStatus)@if (camera.CheckedAt is { } at) { <div class="muted">@When(at)</div> }@if (camera.CheckNote is not null) { <div class="muted">@camera.CheckNote</div> }</td>
-                    <td>@(camera.Enabled ? "Switched on" : "Switched off")</td>
+                    <td>@(camera.Enabled ? "Switched on" : "Switched off")@if (keys.TryGetValue(camera.Id, out var heard)) { <div class="muted small">Key kept · @(heard.LastUsedAt is { } used ? "last heard " + When(used) + ", " + heard.Accepted.ToString(CultureInfo.InvariantCulture) + " kept" : "not heard from yet")</div> }</td>
                     <td class="row">
                         <button type="button" class="btn ghost small" id="@("cam-test-" + camera.Id)" @onclick="() => TestIt(camera)">Test</button>
                         <button type="button" class="btn ghost small" id="@("cam-switch-" + camera.Id)" @onclick="() => Switch(camera)">@(camera.Enabled ? "Switch off" : "Switch on")</button>
@@ -93,6 +93,16 @@ else if (!App.Cameras.On)
                 @if (cameras.FirstOrDefault(x => x.Id == editing)?.HasPassword == true) { <button type="button" class="btn ghost small" id="cam-key-remove" @onclick="() => RemovePassword(editing)">Remove password</button> }
             </div>
         </div>
+        <h3>Key for a camera program</h3>
+        <p class="muted small" id="cam-ikey-note">A separate program on this computer that reads this camera can tell the Hub what it saw: how many people, trolleys, baskets or products, and how sure it was. Never a picture and never a face. It sends that to <code>/api/cameras/observations</code> with this key; the Hub accepts it only from this computer. The Hub does not read the camera itself, and no such program is included yet. What it sends is kept in the business event history only while "Business events" is on and this camera is switched on, and only the kinds of thing chosen above, at least as sure as set above. The key is shown once; a new key replaces the old one.</p>
+        <div class="row">
+            <button type="button" class="btn ghost small" id="cam-ikey-make" disabled="@(!App.Cameras.On)" @onclick="() => MakeKey(editing)">@(keys.ContainsKey(editing) ? "Make a new key" : "Make a key")</button>
+            @if (keys.ContainsKey(editing)) { <button type="button" class="btn ghost small" id="cam-ikey-remove" @onclick="() => RemoveKey(editing)">Remove the key</button> }
+        </div>
+        @if (newKey is not null && newKeyFor == editing)
+        {
+            <div class="notice ok" id="cam-ikey-new-box">Copy this key now. It is not shown again.<div><code id="cam-ikey-new">@newKey</code></div></div>
+        }
     }
 </section>
 
@@ -105,12 +115,16 @@ else if (!App.Cameras.On)
     }
 
     private IReadOnlyList<Camera> cameras = Array.Empty<Camera>();
+    private IReadOnlyDictionary<long, IntakeKeyInfo> keys = new Dictionary<long, IntakeKeyInfo>();
+    private string? newKey;
+    private long newKeyFor;
     private CamForm form = new();
     private string password = "";
 
     protected override Task LoadAsync()
     {
         cameras = App.Cameras.List();
+        keys = App.CameraIntake.Keys().ToDictionary(k => k.CameraId);
         return Task.CompletedTask;
     }
 
@@ -139,11 +153,12 @@ else if (!App.Cameras.On)
 
     private Task Edit(Camera camera) => Run(() =>
     {
+        newKey = null;
         form = new CamForm { Id = camera.Id, Name = camera.Name, Kind = camera.Kind, Address = camera.Address, Zone = camera.ZoneRef ?? "", Confidence = camera.MinConfidencePercent.ToString(CultureInfo.InvariantCulture), Classes = camera.Classes.ToHashSet() };
         password = "";
     });
 
-    private Task Cancel() => Run(() => { form = new CamForm(); password = ""; });
+    private Task Cancel() => Run(() => { form = new CamForm(); password = ""; newKey = null; });
 
     private async Task TestIt(Camera camera)
     {
@@ -171,6 +186,20 @@ else if (!App.Cameras.On)
     private async Task KeepPassword(long id)
     {
         await Run(() => { App.Cameras.SetPassword(id, password, Me.Id); password = ""; }, "Kept in a safe place. It is not shown again.");
+        await Reload();
+    }
+
+    private async Task MakeKey(long id)
+    {
+        newKey = null;
+        await Run(() => { newKey = App.CameraIntake.MakeKey(id, Me.Id); newKeyFor = id; }, "A key was made. Copy it now: it is not shown again.");
+        await Reload();
+    }
+
+    private async Task RemoveKey(long id)
+    {
+        newKey = null;
+        await Run(() => App.CameraIntake.RemoveKey(id, Me.Id), "The key was removed. A camera program that had it is refused from now on.");
         await Reload();
     }
 

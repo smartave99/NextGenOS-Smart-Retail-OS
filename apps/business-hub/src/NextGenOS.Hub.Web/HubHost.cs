@@ -181,6 +181,7 @@ public static class HubHost
         app.MapGet("/people-sheets/{which}.csv", PartySheetEndpoint.Handle).RequireAuthorization(Perm.Parties);
         app.MapGet("/item-images/{id:long}", ItemImageEndpoint.Handle).RequireAuthorization();
         DeviceEndpoints.Map(app);
+        CameraIntakeEndpoint.Map(app);
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode(o => o.ContentSecurityFrameAncestorsPolicy = "'none'");
         // Nothing is done in the shop's database until there is a licence: the background upkeep (HubWorker) starts with the licence, and the first request that needs the shop opens it.
     }

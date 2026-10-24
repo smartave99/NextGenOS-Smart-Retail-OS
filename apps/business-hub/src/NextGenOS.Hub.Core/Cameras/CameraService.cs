@@ -43,7 +43,7 @@ public sealed class CameraService(HubDb db, IClock clock, AuditService audit, Fe
     /// <summary>True while a camera can be added or tested: the licence has the AI part and "Camera analytics" is on.</summary>
     public bool On => flags.IsEnabled(FlagKey.CameraAnalytics);
 
-    private void RequireOn()
+    internal void RequireOn()
     {
         if (!flags.Licensed) throw new HubException("not-licensed", "Cameras are not part of this shop's licence.");
         if (!flags.IsEnabled(FlagKey.CameraAnalytics)) throw new HubException("cameras-off", "Camera analytics is switched off. The owner can switch it on under Settings, AI helpers.");
@@ -133,6 +133,7 @@ public sealed class CameraService(HubDb db, IClock clock, AuditService audit, Fe
         {
             HubDb.Exec(c, "UPDATE cameras SET enabled = 0, retired_at = $at, updated_at = $at, updated_by = $u WHERE tenant_id = $t AND site_id = $s AND id = $id", t,
                 ("$at", Iso.Text(clock.UtcNow)), ("$u", userId), ("$t", Tenant), ("$s", Site), ("$id", id));
+            HubDb.Exec(c, "DELETE FROM camera_intake_keys WHERE tenant_id = $t AND site_id = $s AND camera_id = $id", t, ("$t", Tenant), ("$s", Site), ("$id", id));   // its key dies with it
             audit.Log(c, t, userId, "camera.retire", "camera", id, camera.Name);
         });
         TryDeleteSecret(id);
@@ -143,6 +144,9 @@ public sealed class CameraService(HubDb db, IClock clock, AuditService audit, Fe
         access.Require(Perm.Ai);
         return db.Query(Select + (includeRetired ? "" : " AND retired_at IS NULL") + " ORDER BY id", Map, ("$t", Tenant), ("$s", Site));
     }
+
+    /// <summary>The camera as the program itself reads it when a camera program sends what it saw. The sender is not a signed-in person, so no permission is asked here: its key was checked by <see cref="CameraIntakeService"/>.</summary>
+    internal Camera? ForIntake(long id) => db.QueryOne(Select + " AND id = $id", Map, ("$t", Tenant), ("$s", Site), ("$id", id));
 
     public Camera Get(long id)
     {

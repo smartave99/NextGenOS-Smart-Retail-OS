@@ -43,10 +43,20 @@ const fake = http.createServer((req, res) => {
 await new Promise((r) => fake.listen(0, '127.0.0.1', r));
 const fakeUrl = 'http://127.0.0.1:' + fake.address().port;
 
+// The screen shows its question box a moment before it has finished loading and is then drawn again; a question typed or sent in that moment is lost, and the Hub answers "Write your question
+// first." (found by running six copies of this test at once on four cores). So: wait until the screen has finished loading, and if the question was lost anyway (the Hub says so, or says nothing
+// and is not looking), send it again. A question the Hub is working on ("Looking through the records") is waited for, never sent twice.
 const ask = async (page, question) => {
-  await page.locator('#as-q').fill(question);
-  await page.locator('#as-go').click();
-  await page.locator('#as-answer h2', { hasText: question }).waitFor({ timeout: 60000 });
+  await page.locator('#as-can', { hasText: 'your notes' }).waitFor();
+  const answered = page.locator('#as-answer h2', { hasText: question });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.locator('#as-q').fill(question);
+    await page.locator('#as-go').click();
+    await answered.or(page.getByText('Write your question first.')).first().waitFor({ timeout: 20000 }).catch(() => {});
+    if (await answered.count() === 0 && await page.locator('#as-busy').count() > 0) await answered.waitFor({ timeout: 100000 });
+    if (await answered.count() > 0) return;
+  }
+  throw new Error('The question "' + question + '" was lost three times.');
 };
 
 try {

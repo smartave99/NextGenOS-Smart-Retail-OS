@@ -25,6 +25,50 @@ public sealed class EventStore(HubDb db, IClock clock, AuditService audit, Featu
     public ObservationRecord Observe(ObservationInput input)
     {
         RequireOn();
+        var made = PrepareObservation(input);
+        long id = 0;
+        db.InTransaction((c, t) => id = InsertObservation(c, t, made));
+        return GetObservation(id)!;
+    }
+
+    /// <summary>
+    /// Records several observations in one step (a camera program sends a message of them at once). Each one is judged on its own by the same rules as <see cref="Observe"/>: one that breaks a rule is
+    /// not written and comes back with the reason in plain words, and the others are written together. Switched off or not licensed is a refusal of the whole list, as for one.
+    /// </summary>
+    public IReadOnlyList<(ObservationRecord? Record, string? Problem)> ObserveMany(IReadOnlyList<ObservationInput> inputs)
+    {
+        RequireOn();
+        var results = new (ObservationRecord? Record, string? Problem)[inputs.Count];
+        var ready = new List<(int Index, PreparedObservation Made)>();
+        for (var i = 0; i < inputs.Count; i++)
+        {
+            try
+            {
+                ready.Add((i, PrepareObservation(inputs[i])));
+            }
+            catch (HubException e)
+            {
+                results[i] = (null, e.Message);
+            }
+        }
+
+        if (ready.Count == 0) return results;
+        var ids = new List<long>(ready.Count);
+        db.InTransaction((c, t) =>
+        {
+            ids.Clear();
+            foreach (var (_, made) in ready) ids.Add(InsertObservation(c, t, made));
+        });
+        for (var n = 0; n < ready.Count; n++) results[ready[n].Index] = (GetObservation(ids[n]), null);
+        return results;
+    }
+
+    private sealed record PreparedObservation(string Kind, string SourceType, string SourceId, string? ModelId, string? ModelVersion, string? Zone, string? Subject, string? Label, double Confidence, string? Data,
+        string DataClass, DateTimeOffset Occurred, DateTimeOffset Recorded, DateTimeOffset KeepUntil);
+
+    /// <summary>The rules every observation passes before it is written. Throws a plain <see cref="HubException"/> and writes nothing.</summary>
+    private PreparedObservation PrepareObservation(ObservationInput input)
+    {
         var kind = EventRules.Kind(input.Kind);
         if (!SourceType.IsKnown(input.SourceType)) throw new HubException("bad-source", "Say what saw it: a model, a sensor, a device, the program or a person.");
         var sourceId = EventRules.Id(input.SourceId, "source");
@@ -39,18 +83,19 @@ public sealed class EventStore(HubDb db, IClock clock, AuditService audit, Featu
         var occurred = CheckTime(input.OccurredAt);
         var recorded = clock.UtcNow;
         var keepUntil = retention.RetainUntil(RetentionSubject.Observation, dataClass, recorded) ?? throw NotKept(dataClass);
+        return new PreparedObservation(kind, input.SourceType, sourceId, modelId, modelVersion, zone, subject, label, confidence, data, dataClass, occurred, recorded, keepUntil);
+    }
 
-        long id = 0;
-        db.InTransaction((c, t) =>
-        {
-            id = NextId(c, t, "observations");
-            HubDb.Exec(c,
-                "INSERT INTO observations(tenant_id, site_id, id, kind, source_type, source_id, model_id, model_version, zone_ref, subject_ref, label, confidence, data, data_class, occurred_at, recorded_at, retain_until) " +
-                "VALUES ($t, $s, $id, $k, $st, $si, $m, $mv, $z, $sub, $l, $conf, $d, $dc, $occ, $rec, $keep)", t,
-                ("$t", Tenant), ("$s", Site), ("$id", id), ("$k", kind), ("$st", input.SourceType), ("$si", sourceId), ("$m", modelId), ("$mv", modelVersion), ("$z", zone), ("$sub", subject), ("$l", label),
-                ("$conf", confidence), ("$d", data), ("$dc", dataClass), ("$occ", Iso.Text(occurred)), ("$rec", Iso.Text(recorded)), ("$keep", Iso.Text(keepUntil)));
-        });
-        return GetObservation(id)!;
+    private static long InsertObservation(SqliteConnection c, SqliteTransaction t, PreparedObservation made)
+    {
+        var id = NextId(c, t, "observations");
+        HubDb.Exec(c,
+            "INSERT INTO observations(tenant_id, site_id, id, kind, source_type, source_id, model_id, model_version, zone_ref, subject_ref, label, confidence, data, data_class, occurred_at, recorded_at, retain_until) " +
+            "VALUES ($t, $s, $id, $k, $st, $si, $m, $mv, $z, $sub, $l, $conf, $d, $dc, $occ, $rec, $keep)", t,
+            ("$t", Tenant), ("$s", Site), ("$id", id), ("$k", made.Kind), ("$st", made.SourceType), ("$si", made.SourceId), ("$m", made.ModelId), ("$mv", made.ModelVersion), ("$z", made.Zone),
+            ("$sub", made.Subject), ("$l", made.Label), ("$conf", made.Confidence), ("$d", made.Data), ("$dc", made.DataClass), ("$occ", Iso.Text(made.Occurred)), ("$rec", Iso.Text(made.Recorded)),
+            ("$keep", Iso.Text(made.KeepUntil)));
+        return id;
     }
 
     /// <summary>

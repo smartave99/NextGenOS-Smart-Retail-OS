@@ -140,7 +140,7 @@ public static class FlagKey
     public static string Describe(string key) => key switch
     {
         AiAssistant => "Lets staff ask questions about the shop in plain words (Ask the shop), and lets the program write short descriptions for the website. It only looks things up and writes; it changes nothing. It needs a connected AI service to write an answer; without one it still shows the facts it found.",
-        CameraAnalytics => "Keeps the list of the shop's cameras and checks that each one can be reached; every camera is off until you switch it on. For now it does not watch or read any camera. Cameras must be on this computer or the shop's own network, and pictures and video never leave this computer.",
+        CameraAnalytics => "Keeps the list of the shop's cameras and checks that each one can be reached; every camera is off until you switch it on. The Hub itself does not read any camera. A separate camera program on this computer can send it counts of what it saw (never pictures) with a key you make for that camera. Cameras must be on this computer or the shop's own network, and pictures and video never leave this computer.",
         LocalEmbeddings => "Finds products, documents and notes by meaning, using a model on this computer.",
         RemoteAi => "Allows an online AI service to be used at all. Even then, only the kinds of data you allowed for that service leave this computer.",
         BusinessOntology => "Keeps a map of the business: products, shelves, devices, people and how they connect.",

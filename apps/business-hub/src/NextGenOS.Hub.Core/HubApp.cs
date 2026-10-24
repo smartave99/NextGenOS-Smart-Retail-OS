@@ -92,6 +92,7 @@ public sealed class HubApp
         Assistant = new AssistantService(db, clock, Audit, Ai.Flags, Ai.Gateway, Knowledge, Reports, Insights, Actions, Catalog, Shop, Access);
         // The register of the shop's cameras: where each is on the shop's own network, what it may look for, whether the owner switched it on. It reads no picture and no video. Off until the owner switches on "Camera analytics".
         Cameras = new CameraService(db, clock, Audit, Ai.Flags, Ai.Secrets, Access);
+        CameraIntake = new CameraIntakeService(db, clock, Audit, Ai.Flags, Cameras, Events, Access);
         // Moving a shop across from an older system (a check first, then one all-or-nothing move). Nothing runs until the owner starts it from Settings.
         Importer = new ImportService(db, Shop, clock, Audit, Catalog, Parties, Offers, Books, Access);
         ItemSheets = new ItemSheetService(db, Shop, clock, Audit, Catalog, Books, Access);
@@ -151,6 +152,7 @@ public sealed class HubApp
     public KnowledgeService Knowledge { get; }
     public AssistantService Assistant { get; }
     public CameraService Cameras { get; }
+    public CameraIntakeService CameraIntake { get; }
     public ImportService Importer { get; }
     public BackupService Backups { get; }
     public UpdateService Updates { get; }
